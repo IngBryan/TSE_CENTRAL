@@ -1,0 +1,64 @@
+name: tse-central
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    hostname: rabbitmq
+    container_name: rabbitmq-server
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Panel web: http://localhost:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    post_start:
+      - user: rabbitmq
+        command:
+          - sh
+          - -c
+          - |
+            for i in $$(seq 1 60); do rabbitmqctl -q await_startup >/dev/null 2>&1 && break; sleep 2; done
+            rabbitmqctl import_definitions /etc/rabbitmq/definitions.json
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmqctl -q list_queues name | grep -qx tracking.events"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+  frontofficeciudadanos-front:
+    hostname: frontofficeciudadanos
+    container_name: frontciudadanos-server
+    build:
+      context: ./componente_central/frontend/frontofficeciudadanos
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+  frontofficefuncionarios-front:
+    hostname: frontofficefuncionarios
+    container_name: frontfuncionarios-server
+    build:
+      context: ./componente_central/frontend/Frontofficefuncionarios
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+  backofficeautoridadesadministradores-front:
+    hostname: backofficeautoridadesadministradores
+    container_name: backoffice-server
+    build:
+      context: ./componente_central/frontend/backofficeautoridadesadministradores
+    ports:
+      - "3004:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:

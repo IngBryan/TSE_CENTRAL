@@ -1,0 +1,32 @@
+# Este .gitignore es solo para la raiz del monorepo (tse_lab).
+# Cada componente (balanzas/, tracking/, componente_central/backend/*,
+# componente_central/frontend/*) ya trae su propio .gitignore especifico
+# (Maven/Eclipse o Next.js) - este cubre lo que puede aparecer a nivel
+# workspace cuando se abre todo tse_lab junto.
+
+# Eclipse (si se usa tse_lab como workspace)
+.metadata/
+.recommenders/
+
+# VS Code (si se abre tse_lab como carpeta raiz)
+.vscode/
+
+# IntelliJ / otros IDEs JetBrains
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs sueltos en la raiz
+*.log
+
+# Por si alguien corre npm/mvn desde la raiz por error
+/node_modules/
+/target/
+
+# Variables de entorno / secretos (en cualquier carpeta del repo)
+.env*
+!.env.example

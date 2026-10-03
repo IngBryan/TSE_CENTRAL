@@ -1,0 +1,33 @@
+{
+  "vhosts": [{ "name": "/" }],
+  "exchanges": [
+    {
+      "name": "tracking",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "tracking.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "tracking",
+      "vhost": "/",
+      "destination": "tracking.events",
+      "destination_type": "queue",
+      "routing_key": "tracking.event",
+      "arguments": {}
+    }
+  ]
+}
