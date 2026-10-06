@@ -1,0 +1,32 @@
+# Envia los logs de WildFly a Logstash (TCP + JSON). El Dockerfile lo aplica al construir la
+# imagen; para un WildFly fuera de Docker se aplica una vez sobre standalone.xml:
+#
+#   $JBOSS_HOME/bin/jboss-cli.sh --file=logging-logstash.cli
+#
+# Host y puerto de Logstash por variable de entorno (LOGSTASH_HOST / LOGSTASH_PORT):
+#   - WildFly en la misma maquina que el compose de TSE_CENTRAL: localhost:5044 (por defecto)
+#   - WildFly en un contenedor de ese compose: LOGSTASH_HOST=logstash
+#
+# Los logs siguen saliendo tambien por consola (server.log). Si Logstash no esta disponible
+# WildFly sigue andando; los registros de ese rato no se envian.
+
+embed-server --server-config=standalone.xml --std-out=echo
+
+/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=logstash:add( \
+    host=expression "${env.LOGSTASH_HOST:localhost}", \
+    port=expression "${env.LOGSTASH_PORT:5044}")
+
+# Una linea JSON por registro; el stack trace va como texto en "stackTrace".
+/subsystem=logging/json-formatter=logstash-json:add(exception-output-type=formatted)
+
+/subsystem=logging/socket-handler=logstash:add( \
+    named-formatter=logstash-json, \
+    outbound-socket-binding-ref=logstash, \
+    protocol=TCP, \
+    level=INFO, \
+    autoflush=true, \
+    block-on-reconnect=false)
+
+/subsystem=logging/root-logger=ROOT:add-handler(name=logstash)
+
+stop-embedded-server
