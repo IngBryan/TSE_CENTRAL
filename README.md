@@ -20,7 +20,6 @@ TSE_CENTRAL/
 │       └── backofficeautoridadesadministradores/
 │
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
-├── postgres/                    # Script de inicializacion: una base por proyecto
 ├── logstash/                    # Pipeline de logs (WildFly -> Elasticsearch)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
 ├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, WildFly, Elasticsearch/Kibana/Logstash y los 3 frontends
@@ -84,7 +83,8 @@ RABBITMQ_PASSWORD=<un-secreto>
 
 #PostgreSQL (backend)
 POSTGRES_USER=tse
-POSTGRES_PASSWORD=<un-secreto>         # usuario duenio de las 3 bases; WildFly lo usa para conectarse
+POSTGRES_PASSWORD=<un-secreto>         # usuario duenio de la base main_db; WildFly lo usa para conectarse
+#POSTGRES_PORT=5433                    # opcional: puerto en la maquina (por defecto 5432); usar otro si ya hay un PostgreSQL local
 
 #Elasticsearch / Kibana (observabilidad)
 ELASTIC_PASSWORD=<un-secreto>          # usuario "elastic" (superusuario)
@@ -110,7 +110,7 @@ docker compose up --build
 | `kibana`                                      | http://localhost:5601    |
 | `logstash` (entrada de logs, TCP)             | `localhost:5044`         |
 | `wildfly` (las 3 aplicaciones del backend)    | http://localhost:8080    |
-| `postgres`                                    | `localhost:5432`         |
+| `postgres`                                    | `localhost:5432` (o `POSTGRES_PORT`) |
 | `rabbitmq` (panel web)                        | http://localhost:15672   |
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
@@ -124,7 +124,7 @@ compose pueden correr a la vez.
 
 Un unico servidor WildFly 41 con las 3 aplicaciones Jakarta EE desplegadas como EAR
 (`Frontofficeciudadanos`, `Frontofficefuncionarios`, `Backofficeautoridadesadministradores`),
-mas un PostgreSQL con una base por proyecto.
+mas un PostgreSQL con una unica base (`main_db`) compartida por los 3.
 
 ```bash
 docker compose up -d --build wildfly   # levanta tambien postgres y logstash
@@ -138,16 +138,14 @@ docker compose up -d --build wildfly   # levanta tambien postgres y logstash
 - **Context roots:** cada app queda en `/<proyecto>-web`, por ejemplo
   http://localhost:8080/frontofficeciudadanos-web/. Hoy responden `403` porque todavia no hay
   paginas; un `404` indicaria que la app no esta desplegada.
-- **Datasources:** `wildfly/datasources.cli` registra el driver de PostgreSQL y los 3 datasources
-  que esperan los `persistence.xml` (`java:/FrontofficeciudadanosDS`,
-  `java:/FrontofficefuncionariosDS`, `java:/BackofficeautoridadesadministradoresDS`). El host,
-  usuario y password se resuelven al arrancar (`DB_HOST`, `DB_USER`, `DB_PASSWORD`): no hay
-  secretos en la imagen.
-- **Bases de datos:** `postgres/init/01-databases.sh` crea `frontofficeciudadanos`,
-  `frontofficefuncionarios` y `backofficeautoridadesadministradores`. Solo corre la primera
-  vez (volumen `tse-central_postgres-data` vacio); para agregar o recrear bases hay que borrar
-  el volumen (`docker compose rm -sfv postgres` y `docker volume rm tse-central_postgres-data`)
-  o crearlas a mano. Los `persistence.xml` usan `drop-and-create`: **cada deploy borra y recrea
+- **Datasource:** `wildfly/datasources.cli` registra el driver de PostgreSQL y un unico
+  datasource, `java:/MainDS`, que usan los `persistence.xml` de los 3 proyectos (comparten base
+  y tablas). El host, base, usuario y password se resuelven al arrancar (`DB_HOST`, `DB_NAME`,
+  `DB_USER`, `DB_PASSWORD`): no hay secretos en la imagen.
+- **Base de datos:** la imagen de postgres crea `main_db` a partir de `POSTGRES_DB`
+  (`docker-compose.yml`). Solo ocurre la primera vez (volumen `tse-central_postgres-data`
+  vacio); para recrearla hay que borrar el volumen (`docker compose rm -sfv postgres` y
+  `docker volume rm tse-central_postgres-data`) o crearla a mano. Los `persistence.xml` usan `drop-and-create`: **cada deploy borra y recrea
   el esquema**.
 - **Fiscalizacionautomatica** no se despliega en WildFly: es un jar standalone (cliente
   remoto). La imagen lo compila y lo deja en `/opt/fiscalizacionautomatica/`, pero no se

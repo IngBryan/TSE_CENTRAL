@@ -1,9 +1,9 @@
-# Driver de PostgreSQL y los 3 datasources que esperan los persistence.xml de los proyectos
-# (java:/<Proyecto>DS). Se aplica al construir la imagen (ver Dockerfile).
+# Driver de PostgreSQL y el datasource unico (java:/MainDS) que usan los persistence.xml de los
+# 3 proyectos: todos comparten la misma base y las mismas tablas. Se aplica al construir la
+# imagen (ver Dockerfile).
 #
 # Variables de entorno, resueltas al arrancar WildFly:
-#   DB_HOST (por defecto postgres), DB_PORT (5432), DB_USER, DB_PASSWORD
-# Una base por proyecto en el mismo servidor PostgreSQL.
+#   DB_HOST (por defecto postgres), DB_PORT (5432), DB_NAME (main_db), DB_USER, DB_PASSWORD
 
 module add --name=org.postgresql --resources=/tmp/postgresql.jar --dependencies=javax.api,jakarta.transaction.api
 
@@ -14,28 +14,10 @@ embed-server --server-config=standalone.xml --std-out=echo
     driver-module-name=org.postgresql, \
     driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
 
-/subsystem=datasources/data-source=FrontofficeciudadanosDS:add( \
-    jndi-name=java:/FrontofficeciudadanosDS, \
+/subsystem=datasources/data-source=MainDS:add( \
+    jndi-name=java:/MainDS, \
     driver-name=postgresql, \
-    connection-url=expression "jdbc:postgresql://${env.DB_HOST:postgres}:${env.DB_PORT:5432}/frontofficeciudadanos", \
-    user-name=expression "${env.DB_USER}", \
-    password=expression "${env.DB_PASSWORD}", \
-    valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, \
-    background-validation=true)
-
-/subsystem=datasources/data-source=FrontofficefuncionariosDS:add( \
-    jndi-name=java:/FrontofficefuncionariosDS, \
-    driver-name=postgresql, \
-    connection-url=expression "jdbc:postgresql://${env.DB_HOST:postgres}:${env.DB_PORT:5432}/frontofficefuncionarios", \
-    user-name=expression "${env.DB_USER}", \
-    password=expression "${env.DB_PASSWORD}", \
-    valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, \
-    background-validation=true)
-
-/subsystem=datasources/data-source=BackofficeautoridadesadministradoresDS:add( \
-    jndi-name=java:/BackofficeautoridadesadministradoresDS, \
-    driver-name=postgresql, \
-    connection-url=expression "jdbc:postgresql://${env.DB_HOST:postgres}:${env.DB_PORT:5432}/backofficeautoridadesadministradores", \
+    connection-url=expression "jdbc:postgresql://${env.DB_HOST:postgres}:${env.DB_PORT:5432}/${env.DB_NAME:main_db}", \
     user-name=expression "${env.DB_USER}", \
     password=expression "${env.DB_PASSWORD}", \
     valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, \
