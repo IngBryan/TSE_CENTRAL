@@ -1,0 +1,6 @@
+# Archivos que se ejecutan dentro de contenedores Linux: siempre con LF, aunque Git en Windows
+# convierta los finales de linea (core.autocrlf=true). Con CRLF el shebang queda "#!/bin/bash\r"
+# y el contenedor no arranca ("cannot execute: required file not found").
+*.sh        text eol=lf
+*.cli       text eol=lf
+Dockerfile  text eol=lf

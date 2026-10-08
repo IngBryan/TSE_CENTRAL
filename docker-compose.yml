@@ -176,7 +176,8 @@ services:
 
   # --- Backend (componente central) ---
 
-  # Una base por proyecto (postgres/init/01-databases.sh, solo en el primer arranque).
+  # Una unica base (main_db) compartida por los 3 proyectos. La imagen la crea a partir de
+  # POSTGRES_DB, solo en el primer arranque (volumen vacio).
   postgres:
     image: postgres:17-alpine
     hostname: postgres
@@ -185,13 +186,15 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=main_db
     ports:
-      - "5432:5432"
+      # Puerto en la maquina configurable: si ya hay un PostgreSQL local en el 5432, usar otro
+      # (POSTGRES_PORT en .env). WildFly no lo usa: se conecta por la red interna (postgres:5432).
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d frontofficeciudadanos"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -214,6 +217,7 @@ services:
         condition: service_healthy
     environment:
       - DB_HOST=postgres
+      - DB_NAME=main_db
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - LOGSTASH_HOST=logstash
