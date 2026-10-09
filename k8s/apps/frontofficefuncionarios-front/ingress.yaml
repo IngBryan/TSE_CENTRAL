@@ -1,0 +1,22 @@
+# Expone la app hacia afuera por el ingress-nginx del cluster: en Elastic Cloud (Antel) el
+# dominio del entorno llega a ese controlador.
+# Sin "host": atiende cualquier dominio en "/". Alcanza para la prueba con un solo frontend;
+# cuando haya mas apps, cada una va a necesitar su propio dominio o ruta.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontofficefuncionarios-front
+  labels:
+    app: frontofficefuncionarios-front
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontofficefuncionarios-front
+                port:
+                  name: http

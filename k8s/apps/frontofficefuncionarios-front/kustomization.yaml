@@ -8,3 +8,4 @@ namespace: tse
 resources:
   - deployment.yaml
   - service.yaml
+  - ingress.yaml
