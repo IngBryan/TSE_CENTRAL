@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend - ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Frontoffice ciudadanos
+            path: componente_central/backend/Frontofficeciudadanos
+
+          - name: Frontoffice funcionarios
+            path: componente_central/backend/Frontofficefuncionarios
+
+          - name: Backoffice autoridades administradores
+            path: componente_central/backend/Backofficeautoridadesadministradores
+
+          - name: Fiscalizacion automatica
+            path: componente_central/backend/Fiscalizacionautomatica
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 24
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "24"
+          cache: maven
+
+      - name: Compilar y ejecutar tests
+        run: mvn -B -f "${{ matrix.path }}/pom.xml" clean verify
+
+  frontend:
+    name: Frontend - ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Frontoffice ciudadanos
+            path: componente_central/frontend/frontofficeciudadanos
+
+          - name: Frontoffice funcionarios
+            path: componente_central/frontend/Frontofficefuncionarios
+
+          - name: Backoffice autoridades administradores
+            path: componente_central/frontend/backofficeautoridadesadministradores
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
