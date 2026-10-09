@@ -1,0 +1,26 @@
+name: Docker - WildFly
+
+# La imagen de WildFly empaqueta las 3 aplicaciones Jakarta EE y compila todos los backends
+# adentro del Dockerfile. Para no recompilar todo por un cambio en un solo backend, se valida
+# solo cuando cambia su configuracion (cada backend ya se compila en su propio workflow).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - wildfly/**
+      - docker-compose.yml
+      - .github/workflows/docker-wildfly.yml
+  workflow_dispatch:
+
+jobs:
+  docker:
+    name: Validar imagen Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir imagen Docker
+        run: docker compose build wildfly

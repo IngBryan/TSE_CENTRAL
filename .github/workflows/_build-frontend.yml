@@ -1,0 +1,75 @@
+name: Build frontend
+
+# Plantilla reutilizable: no corre sola, la llaman los workflows frontend-*.yml (uno por
+# proyecto), que son los que deciden cuando correr segun la carpeta que cambio.
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Carpeta del proyecto Next.js
+        type: string
+        required: true
+      artifact-name:
+        description: Nombre del artifact que se guarda
+        type: string
+        required: true
+      docker-service:
+        description: Servicio de docker-compose.yml que construye la imagen de este frontend
+        type: string
+        required: true
+
+jobs:
+  build:
+    name: Compilar y guardar build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.path }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ${{ inputs.path }}/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+      # Igual que el Dockerfile: el build standalone necesita public/ y .next/static
+      # al lado de server.js. Asi el artifact queda listo para correr con "node server.js".
+      - name: Preparar build standalone
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/
+
+      - name: Guardar build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.path }}/.next/standalone
+          # .next es una carpeta oculta: sin esto upload-artifact la deja afuera
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
+  docker:
+    name: Validar imagen Docker
+    runs-on: ubuntu-latest
+
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir imagen Docker
+        run: docker compose build ${{ inputs.docker-service }}

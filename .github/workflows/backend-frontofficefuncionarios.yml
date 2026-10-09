@@ -1,0 +1,20 @@
+name: Backend - Frontoffice funcionarios
+
+# Solo corre cuando se pushea a main un cambio en este proyecto (o a mano desde Actions).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - componente_central/backend/Frontofficefuncionarios/**
+      - .github/workflows/backend-frontofficefuncionarios.yml
+      - .github/workflows/_build-backend.yml
+  workflow_dispatch:
+
+jobs:
+  backend:
+    uses: ./.github/workflows/_build-backend.yml
+    with:
+      path: componente_central/backend/Frontofficefuncionarios
+      artifact-name: backend-frontofficefuncionarios
+      artifact: ear/target/*.ear

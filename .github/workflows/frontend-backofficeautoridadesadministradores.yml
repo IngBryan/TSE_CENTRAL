@@ -1,0 +1,20 @@
+name: Frontend - Backoffice autoridades administradores
+
+# Solo corre cuando se pushea a main un cambio en este proyecto (o a mano desde Actions).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - componente_central/frontend/backofficeautoridadesadministradores/**
+      - .github/workflows/frontend-backofficeautoridadesadministradores.yml
+      - .github/workflows/_build-frontend.yml
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    uses: ./.github/workflows/_build-frontend.yml
+    with:
+      path: componente_central/frontend/backofficeautoridadesadministradores
+      artifact-name: frontend-backofficeautoridadesadministradores
+      docker-service: backofficeautoridadesadministradores-front
