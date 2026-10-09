@@ -13,10 +13,6 @@ on:
         description: Nombre del artifact que se guarda
         type: string
         required: true
-      docker-service:
-        description: Servicio de docker-compose.yml que construye la imagen de este frontend
-        type: string
-        required: true
 
 jobs:
   build:
@@ -60,16 +56,3 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
-
-  docker:
-    name: Validar imagen Docker
-    runs-on: ubuntu-latest
-
-    needs: build
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Construir imagen Docker
-        run: docker compose build ${{ inputs.docker-service }}

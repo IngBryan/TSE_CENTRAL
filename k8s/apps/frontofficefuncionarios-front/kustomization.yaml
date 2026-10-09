@@ -1,0 +1,10 @@
+# Kustomize (y no manifiestos sueltos) porque Argo CD Image Updater solo puede cambiar el tag
+# de la imagen en aplicaciones Kustomize o Helm.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tse
+
+resources:
+  - deployment.yaml
+  - service.yaml

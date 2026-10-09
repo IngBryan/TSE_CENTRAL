@@ -9,6 +9,7 @@ on:
       - componente_central/frontend/frontofficeciudadanos/**
       - .github/workflows/frontend-frontofficeciudadanos.yml
       - .github/workflows/_build-frontend.yml
+      - .github/workflows/_docker-image.yml
   workflow_dispatch:
 
 jobs:
@@ -17,4 +18,12 @@ jobs:
     with:
       path: componente_central/frontend/frontofficeciudadanos
       artifact-name: frontend-frontofficeciudadanos
-      docker-service: frontofficeciudadanos-front
+
+  docker:
+    needs: frontend
+    uses: ./.github/workflows/_docker-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service: frontofficeciudadanos-front

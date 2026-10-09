@@ -9,6 +9,7 @@ on:
       - componente_central/frontend/backofficeautoridadesadministradores/**
       - .github/workflows/frontend-backofficeautoridadesadministradores.yml
       - .github/workflows/_build-frontend.yml
+      - .github/workflows/_docker-image.yml
   workflow_dispatch:
 
 jobs:
@@ -17,4 +18,12 @@ jobs:
     with:
       path: componente_central/frontend/backofficeautoridadesadministradores
       artifact-name: frontend-backofficeautoridadesadministradores
-      docker-service: backofficeautoridadesadministradores-front
+
+  docker:
+    needs: frontend
+    uses: ./.github/workflows/_docker-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service: backofficeautoridadesadministradores-front

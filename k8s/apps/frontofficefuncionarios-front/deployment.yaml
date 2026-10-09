@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontofficefuncionarios-front
+  labels:
+    app: frontofficefuncionarios-front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontofficefuncionarios-front
+  template:
+    metadata:
+      labels:
+        app: frontofficefuncionarios-front
+    spec:
+      # Las imagenes de ghcr.io son privadas: este secret se crea a mano (ver k8s/README.md)
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: front
+          # Argo CD Image Updater reemplaza este tag por el sha-<commit> mas nuevo que publique el CI
+          image: ghcr.io/ingbryan/tse_central/frontofficefuncionarios-front:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          # El Dockerfile corre como el usuario nextjs (uid 1001); Kubernetes necesita el numero
+          # para poder verificar que no es root.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
