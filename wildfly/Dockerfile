@@ -18,13 +18,12 @@ COPY --from=backend . .
 # Cada proyecto es un build Maven independiente. El cache de ~/.m2 evita bajar todo de nuevo.
 RUN --mount=type=cache,target=/root/.m2 \
     set -e; \
-    for project in Frontofficeciudadanos Frontofficefuncionarios Backofficeautoridadesadministradores Fiscalizacionautomatica; do \
+    for project in Frontofficeciudadanos Frontofficefuncionarios Backofficeautoridadesadministradores; do \
       mvn -B -ntp -q -f "$project/pom.xml" clean package -Dmaven.test.skip=true; \
     done; \
     mkdir /out; \
     cp Frontofficeciudadanos/ear/target/*.ear Frontofficefuncionarios/ear/target/*.ear \
        Backofficeautoridadesadministradores/ear/target/*.ear /out/; \
-    cp Fiscalizacionautomatica/target/fiscalizacionautomatica.jar /out/; \
     curl -fsSL -o /out/postgresql.jar \
       "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/${PG_JDBC_VERSION}/postgresql-${PG_JDBC_VERSION}.jar"
 
@@ -42,8 +41,8 @@ RUN /opt/jboss/wildfly/bin/jboss-cli.sh --file=/tmp/cli/datasources.cli \
 
 COPY --from=builder --chown=jboss:jboss /out/*.ear /opt/jboss/wildfly/standalone/deployments/
 
-# Fiscalizacionautomatica es un jar standalone (cliente remoto), no se despliega en WildFly.
-COPY --from=builder --chown=jboss:jboss /out/fiscalizacionautomatica.jar /opt/fiscalizacionautomatica/fiscalizacionautomatica.jar
+# Fiscalizacionautomatica no va aca: es un jar standalone con su propia imagen
+# (componente_central/backend/Fiscalizacionautomatica/Dockerfile).
 
 EXPOSE 8080
 # Se reemplaza solo el CMD: el ENTRYPOINT de la imagen base (certificados) se conserva.
