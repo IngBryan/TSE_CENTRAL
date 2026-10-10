@@ -60,120 +60,6 @@ services:
       - NODE_ENV=production
     restart: unless-stopped
 
-  # --- Observabilidad (Elasticsearch + Kibana) ---
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.3.0}
-    hostname: elasticsearch
-    container_name: elasticsearch
-    restart: unless-stopped
-    environment:
-      - node.name=elasticsearch
-      - cluster.name=tse-observabilidad
-      - discovery.type=single-node
-      - xpack.security.enabled=true
-      - xpack.security.http.ssl.enabled=false   # solo HTTP: entorno de laboratorio
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - ES_JAVA_OPTS=-Xms${ELASTIC_HEAP:-512m} -Xmx${ELASTIC_HEAP:-512m}
-      - bootstrap.memory_lock=true
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "9200:9200"
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 30s
-
-  # Tarea unica e idempotente, cuando el cluster esta sano:
-  #  - fija la password de kibana_system (Elasticsearch no la acepta por variable de entorno)
-  #  - crea el usuario tse_logs, de solo escritura sobre los data streams logs-*-*, con el que
-  #    Logstash envia los logs (asi no se usa el superusuario elastic)
-  elasticsearch-setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.3.0}
-    restart: "no"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    environment:
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - KIBANA_PASSWORD=${KIBANA_PASSWORD}
-      - LOGS_PASSWORD=${LOGS_PASSWORD}
-    command:
-      - bash
-      - -c
-      - |
-        set -e
-        es() { curl -sf -u "elastic:$${ELASTIC_PASSWORD}" -H 'Content-Type: application/json' "$$@"; }
-        es -X POST http://elasticsearch:9200/_security/user/kibana_system/_password \
-          -d "{\"password\":\"$${KIBANA_PASSWORD}\"}" >/dev/null && echo "kibana_system password OK"
-        es -X PUT http://elasticsearch:9200/_security/role/tse_logs_writer \
-          -d '{"cluster":["monitor"],"indices":[{"names":["logs-*-*"],"privileges":["create_doc","auto_configure"]}]}' >/dev/null
-        es -X PUT http://elasticsearch:9200/_security/user/tse_logs \
-          -d "{\"password\":\"$${LOGS_PASSWORD}\",\"roles\":[\"tse_logs_writer\"]}" >/dev/null && echo "user tse_logs OK"
-
-  # Recibe los logs de los backends del componente central (WildFly) por TCP/JSON y los envia
-  # a Elasticsearch. Pipeline en logstash/pipeline/logstash.conf.
-  logstash:
-    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-9.3.0}
-    hostname: logstash
-    container_name: logstash
-    restart: unless-stopped
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-      elasticsearch-setup:
-        condition: service_completed_successfully
-    environment:
-      - ES_USER=tse_logs
-      - ES_PASSWORD=${LOGS_PASSWORD}
-      - LS_JAVA_OPTS=-Xms${LOGSTASH_HEAP:-256m} -Xmx${LOGSTASH_HEAP:-256m}
-      - XPACK_MONITORING_ENABLED=false
-    ports:
-      - "5044:5044"   # entrada TCP/JSON: aca se conecta WildFly
-    volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-    healthcheck:
-      # healthy recien cuando el input TCP (5044) escucha: la API (9600) responde antes
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5044'"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-9.3.0}
-    hostname: kibana
-    container_name: kibana
-    restart: unless-stopped
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-      elasticsearch-setup:
-        condition: service_completed_successfully
-    environment:
-      - SERVER_NAME=kibana
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
-      - XPACK_REPORTING_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
-      - XPACK_SECURITY_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
-    ports:
-      - "5601:5601"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 40s
-
   # --- Backend (componente central) ---
 
   # Una unica base (main_db) compartida por los 3 proyectos. La imagen la crea a partir de
@@ -201,7 +87,7 @@ services:
       start_period: 10s
 
   # Un unico WildFly con los 3 EAR desplegados (ciudadanos, funcionarios, backoffice).
-  # Imagen: wildfly/Dockerfile. Los logs salen por consola y por TCP a Logstash.
+  # Imagen: wildfly/Dockerfile. Los logs salen por consola (docker logs wildfly-server).
   wildfly:
     build:
       context: ./wildfly
@@ -213,14 +99,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      logstash:
-        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_NAME=main_db
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - LOGSTASH_HOST=logstash
     ports:
       - "8080:8080"
     healthcheck:
@@ -233,5 +116,4 @@ services:
 
 volumes:
   rabbitmq-data:
-  elasticsearch-data:
   postgres-data:

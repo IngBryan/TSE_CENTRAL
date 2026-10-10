@@ -32,13 +32,12 @@ RUN --mount=type=cache,target=/root/.m2 \
 FROM ${WILDFLY_IMAGE}
 USER jboss
 COPY --from=builder --chown=jboss:jboss /out/postgresql.jar /tmp/postgresql.jar
-COPY --chown=jboss:jboss datasources.cli logging-logstash.cli /tmp/cli/
+COPY --chown=jboss:jboss datasources.cli /tmp/cli/
 
-# Configura WildFly una vez, al construir la imagen. Host, usuario y password de la base y
-# destino de los logs quedan como expresiones: se resuelven al arrancar el contenedor con
-# DB_HOST/DB_PORT/DB_USER/DB_PASSWORD y LOGSTASH_HOST/LOGSTASH_PORT, sin secretos en la imagen.
+# Configura WildFly una vez, al construir la imagen. Host, usuario y password de la base quedan
+# como expresiones: se resuelven al arrancar el contenedor con DB_HOST/DB_PORT/DB_USER/DB_PASSWORD,
+# sin secretos en la imagen.
 RUN /opt/jboss/wildfly/bin/jboss-cli.sh --file=/tmp/cli/datasources.cli \
- && /opt/jboss/wildfly/bin/jboss-cli.sh --file=/tmp/cli/logging-logstash.cli \
  && rm -rf /opt/jboss/wildfly/standalone/configuration/standalone_xml_history /tmp/cli /tmp/postgresql.jar
 
 COPY --from=builder --chown=jboss:jboss /out/*.ear /opt/jboss/wildfly/standalone/deployments/
@@ -46,9 +45,8 @@ COPY --from=builder --chown=jboss:jboss /out/*.ear /opt/jboss/wildfly/standalone
 # Fiscalizacionautomatica es un jar standalone (cliente remoto), no se despliega en WildFly.
 COPY --from=builder --chown=jboss:jboss /out/fiscalizacionautomatica.jar /opt/fiscalizacionautomatica/fiscalizacionautomatica.jar
 
-COPY --chown=jboss:jboss --chmod=755 entrypoint.sh /opt/jboss/entrypoint.sh
-
 EXPOSE 8080
 # Se reemplaza solo el CMD: el ENTRYPOINT de la imagen base (certificados) se conserva.
-CMD ["/opt/jboss/entrypoint.sh"]
+# -b 0.0.0.0: escuchar en todas las interfaces, no solo dentro del contenedor.
+CMD ["/opt/jboss/wildfly/bin/standalone.sh", "-b", "0.0.0.0"]
 
