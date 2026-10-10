@@ -84,11 +84,18 @@ RABBITMQ_PASSWORD=<un-secreto>
 POSTGRES_USER=tse
 POSTGRES_PASSWORD=<un-secreto>         # usuario duenio de la base main_db; WildFly lo usa para conectarse
 #POSTGRES_PORT=5433                    # opcional: puerto en la maquina (por defecto 5432); usar otro si ya hay un PostgreSQL local
+
+#PDI (Servicio de Informacion DNIC, corre en TSE_NODOS)
+PDI_ORGANISMO_CODIGO=MTOP-CARGA        # mismo valor que en TSE_NODOS/.env
+PDI_ORGANISMO_CLAVE=<mismo-que-en-TSE_NODOS>
+#PDI_URL=http://host.docker.internal:3005/ws/servicioInformacion   # opcional: donde corre la PDI
 ```
 
-Las credenciales de los nodos (`balanzas`, `tracking`) van en `TSE_NODOS/.env`.
+Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
 `RABBITMQ_USER` / `RABBITMQ_PASSWORD` deben ser las mismas en ambos `.env`: el central crea el
-usuario y tracking lo usa para publicar.
+usuario y tracking lo usa para publicar. Lo mismo `PDI_ORGANISMO_CODIGO` / `PDI_ORGANISMO_CLAVE`:
+la PDI crea el organismo al arrancar y el central lo usa en `Organismo` / `ClaveAcceso1`.
+El compose le pasa a WildFly `RABBITMQ_*` (host `rabbitmq`) y `PDI_*`.
 
 ```bash
 docker compose up --build
@@ -104,8 +111,8 @@ docker compose up --build
 | `frontofficefuncionarios-front`               | http://localhost:3003    |
 | `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
 
-Los puertos `3000` y `3001` los usan `tracking` y `balanzas` (`TSE_NODOS`), asi que ambos
-compose pueden correr a la vez.
+Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
+que ambos compose pueden correr a la vez.
 
 ### Backend (WildFly + PostgreSQL)
 

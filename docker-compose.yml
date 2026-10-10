@@ -104,6 +104,17 @@ services:
       - DB_NAME=main_db
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
+      # Consumo de la cola tracking.events (RabbitMQ de este mismo compose)
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      # PDI (TSE_NODOS): se alcanza por el puerto publicado en el host
+      - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
+      - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
+      - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:
       - "8080:8080"
     healthcheck:
