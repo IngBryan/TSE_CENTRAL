@@ -95,6 +95,11 @@ PDI_ORGANISMO_CLAVE=<mismo-que-en-TSE_NODOS>
 MONGO_USER=tse
 MONGO_PASSWORD=<un-secreto>           # usuario root; se crea solo en el primer arranque
 #MONGO_PORT=27017                      # opcional: puerto en la maquina (por defecto 27017)
+
+#Login con ID Uruguay (gub.uy, testing) - frontofficeciudadanos
+OIDC_CLIENT_ID=<client id que dieron los docentes>
+OIDC_CLIENT_SECRET=<client secret>
+SESSION_SECRET=<string largo y aleatorio>   # cifra la cookie de sesion
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -120,6 +125,22 @@ docker compose up --build
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
 que ambos compose pueden correr a la vez.
+
+### Login con ID Uruguay (frontofficeciudadanos)
+
+El frontoffice de ciudadanos usa OpenID Connect (Authorization Code Flow) contra el ambiente de
+testing de ID Uruguay (`https://auth-testing.iduruguay.gub.uy/oidc/v1`). Todo el flujo corre en el
+servidor de Next (`src/app/auth/*`, `src/lib/auth/*`): el canje del `code` con Basic Auth, la
+validacion del `id_token` contra el JWKS (iss, aud, exp, nonce) y el userinfo. El navegador solo
+ve una cookie de sesion cifrada.
+
+- **Puerto 80:** las redirect URIs registradas son `http://localhost` y `http://localhost:8080`
+  (logout: `/logout`). El 8080 lo usa WildFly, asi que la app tiene que atender en el 80. El compose
+  publica `80:3000`; en desarrollo usar `npm run dev:gubuy` (`next dev -p 80`).
+- **Credenciales:** en desarrollo van en `componente_central/frontend/frontofficeciudadanos/.env.local`
+  (ver `.env.example`); en Docker, en el `.env` de la raiz. Ninguno se commitea.
+- **Perfil:** al ingresar se busca o crea el perfil por cedula (`numero_documento`). Por ahora se
+  guarda en memoria del servidor de Next hasta que el backend exponga el endpoint.
 
 ### Backend (WildFly + PostgreSQL)
 

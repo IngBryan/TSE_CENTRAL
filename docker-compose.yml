@@ -36,8 +36,14 @@ services:
       context: ./componente_central/frontend/frontofficeciudadanos
     ports:
       - "3002:3000"
+      # Login con gub.uy: la redirect URI registrada en ID Uruguay es http://localhost (puerto 80)
+      - "80:3000"
     environment:
       - NODE_ENV=production
+      - APP_BASE_URL=http://localhost
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
     restart: unless-stopped
   frontofficefuncionarios-front:
     hostname: frontofficefuncionarios

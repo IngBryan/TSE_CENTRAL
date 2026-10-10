@@ -1,69 +1,85 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+import { Encabezado, botonGubUy } from "@/components/encabezado";
+import { getSesion } from "@/lib/auth/session";
 
-export default function Home() {
+const MENSAJES: Record<string, string> = {
+  cancelado: "Cancelaste el ingreso con gub.uy. Podés volver a intentarlo cuando quieras.",
+  estado_invalido: "La solicitud de ingreso venció o no es válida. Volvé a intentarlo.",
+  token_invalido: "No pudimos validar tu identidad con gub.uy. Volvé a intentarlo.",
+  idp_no_disponible: "gub.uy no está disponible en este momento. Probá de nuevo en unos minutos.",
+  error_idp: "gub.uy devolvió un error al ingresar. Volvé a intentarlo.",
+};
+
+const SERVICIOS = [
+  {
+    titulo: "Empresas",
+    texto: "Registrá y administrá las empresas de transporte de carga que representás.",
+  },
+  {
+    titulo: "Vehículos",
+    texto: "Mantené al día el padrón de camiones y remolques habilitados de tu flota.",
+  },
+  {
+    titulo: "Guías de viaje",
+    texto: "Emití y consultá las guías de viaje de tus cargas en todo el país.",
+  },
+];
+
+// Portal publico. Tambien recibe la vuelta de ID Uruguay: la redirect URI registrada es la raiz.
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const params = await searchParams;
+
+  if (typeof params.state === "string" && (params.code || params.error)) {
+    redirect(`/auth/callback?${new URLSearchParams(params as Record<string, string>)}`);
+  }
+
+  const sesion = await getSesion();
+  const error = typeof params.error === "string" ? MENSAJES[params.error] ?? MENSAJES.error_idp : null;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+      <Encabezado sesion={sesion} />
+
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-12">
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+            {error}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        )}
+        {params.sesion === "cerrada" && !sesion && (
+          <p className="rounded-lg bg-zinc-100 p-4 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+            Cerraste sesión correctamente.
+          </p>
+        )}
+
+        <section className="flex max-w-2xl flex-col gap-5">
+          <h1 className="text-4xl font-semibold tracking-tight text-black sm:text-5xl dark:text-zinc-50">
+            Gestioná el transporte de carga en un solo lugar
+          </h1>
+          <p className="text-lg text-zinc-700 dark:text-zinc-300">
+            carga.uy reúne los trámites de empresas, vehículos y guías de viaje del transporte de carga
+            por carretera. Ingresá con tu cuenta de ID Uruguay para empezar.
+          </p>
+          {!sesion && (
+            <a href="/auth/login" className={`${botonGubUy} h-12 self-start px-6 text-base`}>
+              Ingresar con gub.uy
+            </a>
+          )}
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-3">
+          {SERVICIOS.map((s) => (
+            <article key={s.titulo} className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+              <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">{s.titulo}</h2>
+              <p className="text-zinc-600 dark:text-zinc-400">{s.texto}</p>
+            </article>
+          ))}
+        </section>
       </main>
+
+      <footer className="border-t border-black/5 py-6 text-center text-sm text-zinc-500 dark:border-white/10">
+        carga.uy
+      </footer>
     </div>
   );
 }
