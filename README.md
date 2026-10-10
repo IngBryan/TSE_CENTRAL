@@ -21,7 +21,8 @@ TSE_CENTRAL/
 │
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
-├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, WildFly y los 3 frontends
+├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea la coleccion tracking)
+├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly y los 3 frontends
 └── .gitignore                   # Reglas a nivel workspace (cada modulo tiene el suyo)
 ```
 
@@ -89,6 +90,11 @@ POSTGRES_PASSWORD=<un-secreto>         # usuario duenio de la base main_db; Wild
 PDI_ORGANISMO_CODIGO=MTOP-CARGA        # mismo valor que en TSE_NODOS/.env
 PDI_ORGANISMO_CLAVE=<mismo-que-en-TSE_NODOS>
 #PDI_URL=http://host.docker.internal:3005/ws/servicioInformacion   # opcional: donde corre la PDI
+
+#MongoDB (base main_db, coleccion tracking)
+MONGO_USER=tse
+MONGO_PASSWORD=<un-secreto>           # usuario root; se crea solo en el primer arranque
+#MONGO_PORT=27017                      # opcional: puerto en la maquina (por defecto 27017)
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -105,6 +111,7 @@ docker compose up --build
 |-----------------------------------------------|--------------------------|
 | `wildfly` (las 3 aplicaciones del backend)    | http://localhost:8080    |
 | `postgres`                                    | `localhost:5432` (o `POSTGRES_PORT`) |
+| `mongodb`                                     | `mongodb://localhost:27017` (o `MONGO_PORT`) |
 | `rabbitmq` (panel web)                        | http://localhost:15672   |
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
@@ -149,6 +156,34 @@ docker compose up -d --build wildfly   # levanta tambien postgres
 - **Memoria:** usa el heap por defecto de WildFly (512 MB maximo).
 - **Consola de administracion:** no se publica (queda solo dentro del contenedor). Para correr
   comandos: `docker exec wildfly-server /opt/jboss/wildfly/bin/jboss-cli.sh -c "<comando>"`.
+
+### MongoDB
+
+MongoDB 8.0.0 (`mongo:8.0.0`) con la base `main_db` y la coleccion `tracking`.
+
+```bash
+docker compose up -d mongodb
+```
+
+- **Usuario:** `MONGO_USER` / `MONGO_PASSWORD` es un usuario root, creado en la base `admin`.
+  Por eso al conectarse hay que indicar `authSource=admin`.
+- **Coleccion:** `mongodb/init/01-tracking.js` la crea en `main_db`. El servicio queda
+  `healthy` recien cuando la coleccion existe.
+- **Primer arranque:** el usuario y la coleccion se crean solo con el volumen
+  `tse-central_mongodb-data` vacio. Si se cambian las credenciales en el `.env` o se agrega un
+  script en `mongodb/init`, hay que borrar el volumen (se pierden los datos):
+  `docker compose rm -sfv mongodb` y `docker volume rm tse-central_mongodb-data`.
+- **Desde un contenedor de este compose** el host es `mongodb:27017`.
+
+**Conectarse con MongoDB Compass:** *Add new connection* y pegar en *URI* (con los valores
+del `.env`):
+
+```
+mongodb://<MONGO_USER>:<MONGO_PASSWORD>@localhost:27017/main_db?authSource=admin
+```
+
+O en *Advanced Connection Options*: *General* → Host `localhost:27017`; *Authentication* →
+*Username/Password* con `MONGO_USER` / `MONGO_PASSWORD` y *Authentication Database* `admin`.
 
 ### Observabilidad
 
