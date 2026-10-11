@@ -18,6 +18,10 @@ jobs:
     with:
       path: componente_central/frontend/Frontofficefuncionarios
       artifact-name: frontend-frontofficefuncionarios
+      sonar-project-key: tse-central-frontend-frontofficefuncionarios
+    
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  
 
   docker:
     needs: frontend
@@ -27,3 +31,5 @@ jobs:
       packages: write
     with:
       service: frontofficefuncionarios-front
+      
+    

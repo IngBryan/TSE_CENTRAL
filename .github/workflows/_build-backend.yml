@@ -17,15 +17,25 @@ on:
         description: Archivo a guardar, relativo a la carpeta del proyecto
         type: string
         required: true
+      sonar-project-key:
+        description: Project Key de SonarQube Cloud
+        type: string
+        required: true
+    
+    secrets:
+      SONAR_TOKEN:
+        required: true
 
 jobs:
   build:
-    name: Compilar, testear y guardar build
+    name: Compilar, testear, analizar y guardar build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Java 24
         uses: actions/setup-java@v4
@@ -36,6 +46,16 @@ jobs:
 
       - name: Compilar y ejecutar tests
         run: mvn -B -f "${{ inputs.path }}/pom.xml" clean verify
+      
+      - name: Analisis estatico SonarQube
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B
+          -f "${{ inputs.path }}/pom.xml"
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.projectKey="${{ inputs.sonar-project-key }}"
+          -Dsonar.organization="${{ vars.SONAR_ORGANIZATION }}"
 
       # El .ear (o el .jar de Fiscalizacion) queda descargable en la pagina de la corrida.
       - name: Guardar build
