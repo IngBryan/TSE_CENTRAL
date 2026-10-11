@@ -44,6 +44,11 @@ services:
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
       - SESSION_SECRET=${SESSION_SECRET}
+      # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
+      - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
+    depends_on:
+      - wildfly
     restart: unless-stopped
   frontofficefuncionarios-front:
     hostname: frontofficefuncionarios
@@ -143,6 +148,8 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
+      # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:

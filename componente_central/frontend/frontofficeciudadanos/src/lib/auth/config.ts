@@ -40,6 +40,11 @@ export function getAuthConfig() {
     timeoutMs: Number(opcional("OIDC_TIMEOUT_MS", "8000")),
     appBaseUrl,
     sessionSecret: requerida("SESSION_SECRET"),
+    // Backend Frontofficeciudadanos (WildFly). En Docker: http://wildfly:8080/frontofficeciudadanos-web/api
+    backendUrl: opcional("BACKEND_URL", "http://localhost:8080/frontofficeciudadanos-web/api").replace(/\/$/, ""),
+    backendApiKey: requerida("BACKEND_API_KEY"),
+    // Alcanza para los reintentos de la PDI del lado del backend (3 intentos de 5 s + esperas)
+    backendTimeoutMs: Number(opcional("BACKEND_TIMEOUT_MS", "20000")),
     cookiesSeguras: appBaseUrl.startsWith("https://"),
   };
 }

@@ -100,6 +100,9 @@ MONGO_PASSWORD=<un-secreto>           # usuario root; se crea solo en el primer 
 OIDC_CLIENT_ID=<client id que dieron los docentes>
 OIDC_CLIENT_SECRET=<client secret>
 SESSION_SECRET=<string largo y aleatorio>   # cifra la cookie de sesion
+
+#API del backend Frontofficeciudadanos (la consume el front de Next)
+BACKEND_API_KEY=<string largo y aleatorio>  # clave compartida front <-> WildFly (header X-Api-Key)
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -139,8 +142,33 @@ ve una cookie de sesion cifrada.
   publica `80:3000`; en desarrollo usar `npm run dev:gubuy` (`next dev -p 80`).
 - **Credenciales:** en desarrollo van en `componente_central/frontend/frontofficeciudadanos/.env.local`
   (ver `.env.example`); en Docker, en el `.env` de la raiz. Ninguno se commitea.
-- **Perfil:** al ingresar se busca o crea el perfil por cedula (`numero_documento`). Por ahora se
-  guarda en memoria del servidor de Next hasta que el backend exponga el endpoint.
+- **Perfil y PDI (CU-01 pasos 6 a 8, CU-03):** despues del login el front llama a
+  `POST /frontofficeciudadanos-web/api/ciudadanos/ingreso-gubuy` (header `X-Api-Key` =
+  `BACKEND_API_KEY`, sin ella responde 401) con la cedula, el email y el `sub` de gub.uy. El backend
+  busca o crea el perfil (tabla `ciudadanos`, entidad `PerfilCiudadano`); si esta pendiente lo
+  valida contra la PDI por SOAP (`ClientePdi`: timeout, reintentos y circuit breaker, configurables
+  con `PDI_TIMEOUT_MS`, `PDI_REINTENTOS`, `PDI_CB_UMBRAL`, `PDI_CB_ESPERA_S`). Resultados:
+  `VALIDADO` y `NO_DISPONIBLE` (sesion con la validacion pendiente) inician sesion; `NO_EXISTE` y
+  `MENOR_DE_EDAD` no. Cada ingreso lleva un `X-Correlation-Id` que aparece en los logs del front
+  (`[login gub.uy] correlationId=...`), de WildFly (`evento=ingreso.gubuy`, `evento=pdi.consulta`)
+  y de la PDI. Para probarlo hay que levantar tambien la PDI (`TSE_NODOS`, servicio `pdi`).
+- **Roles (CU-01 paso 9):** el ingreso devuelve `roles` (`RESPONSABLE` y/o `CHOFER`, con su empresa;
+  el de chofer con estado `HABILITADO` o `PENDIENTE_VALIDACION`). El front los guarda en la sesion y
+  `/mi-cuenta` muestra la pantalla segun el rol.
+- **Alta de chofer (CU-02):** seccion `/empresa/choferes` del responsable. API:
+  `GET /api/empresa/choferes` (listado), `POST /api/empresa/choferes/consulta` (pasos 2 a 7: valida
+  contra la PDI si hace falta y devuelve solo primer nombre y primer apellido) y
+  `POST /api/empresa/choferes` (confirmar, pasos 8 a 10). Quien llama va en el header
+  `X-Usuario-Ci`; el backend (`AltaChoferService`) exige que sea responsable validado de una empresa
+  habilitada y si no responde 403. **Limitacion:** el backend confia en `X-Usuario-Ci` porque solo
+  el servidor de Next tiene la `BACKEND_API_KEY` y saca la cedula de su cookie de sesion cifrada; si
+  la API se abre a otros clientes hay que pasar un token firmado. Cada consulta de cedula queda en
+  la tabla `consultas_persona` (Ley 18.331: usuario, cedula consultada, fecha y hora).
+- **Modelo:** `Chofer` es la asociacion persona-empresa (id propio, `(ci, nro_empresa)` unico), asi
+  una persona puede ser chofer de varias empresas; las guias referencian esa asociacion.
+- **Datos de prueba (solo desarrollo):** `ejb/src/main/resources/META-INF/datos-prueba.sql` carga en
+  cada deploy (despues del drop-and-create) la empresa 1 habilitada y su responsable. Las otras
+  aplicaciones no tienen tablas propias en `main_db`, asi que el script no choca con nada.
 
 ### Backend (WildFly + PostgreSQL)
 

@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthConfig } from "@/lib/auth/config";
 import { canjearCodigo, ErrorLogin, obtenerUserinfo, validarIdToken, type MotivoError } from "@/lib/auth/oidc";
-import { buscarOCrearPerfil } from "@/lib/auth/perfil";
+import { ingresarEnBackend } from "@/lib/auth/perfil";
 import {
   abrir,
   COOKIE_SESION,
@@ -19,9 +20,11 @@ export async function GET(req: NextRequest) {
   const cfg = getAuthConfig();
   const params = req.nextUrl.searchParams;
   const tx = abrir<TransaccionLogin>(req.cookies.get(COOKIE_TRANSACCION)?.value);
+  // Un correlation id por ingreso: va en los logs del front, del backend y de la PDI
+  const correlationId = randomUUID();
 
   const fallar = (motivo: MotivoError, detalle: string) => {
-    console.warn(`[login gub.uy] ${motivo}: ${detalle}`);
+    console.warn(`[login gub.uy] correlationId=${correlationId} ${motivo}: ${detalle}`);
     const res = NextResponse.redirect(`${cfg.appBaseUrl}/?error=${motivo}`, 302);
     res.cookies.delete(COOKIE_TRANSACCION);
     return res;
@@ -47,14 +50,22 @@ export async function GET(req: NextRequest) {
     const tokens = await canjearCodigo(code);
     const idToken = await validarIdToken(tokens.id_token, tx.nonce);
     const claims = await obtenerUserinfo(tokens.access_token, idToken.sub!);
-    const { perfil, nuevo } = await buscarOCrearPerfil(claims);
+    const { perfil, resultado, sesionPermitida, nuevo } = await ingresarEnBackend(claims, correlationId);
+    console.info(
+      `[login gub.uy] correlationId=${correlationId} ci=${perfil.cedula} nuevo=${nuevo} resultado=${resultado} estado=${perfil.estado}`,
+    );
 
+    // CU-01 FA6 / FA7: la PDI dice que no existe o que es menor de edad, no se inicia sesion
+    if (!sesionPermitida) {
+      return fallar(resultado === "MENOR_DE_EDAD" ? "menor_de_edad" : "no_existe", `resultado ${resultado}`);
+    }
+
+    // FA8 (NO_DISPONIBLE): sesion con el perfil pendiente de validacion
     const sesion: Sesion = {
       perfil,
       idToken: tokens.id_token,
       exp: Math.floor(Date.now() / 1000) + DURACION_SESION_S,
     };
-    console.info(`[login gub.uy] ingreso ci=${perfil.cedula} nuevo=${nuevo}`);
 
     const res = NextResponse.redirect(`${cfg.appBaseUrl}/mi-cuenta${nuevo ? "?bienvenida=1" : ""}`, 302);
     res.cookies.delete(COOKIE_TRANSACCION);

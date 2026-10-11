@@ -3,7 +3,10 @@ import { Encabezado, botonGubUy } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 
 const MENSAJES: Record<string, string> = {
-  cancelado: "Cancelaste el ingreso con gub.uy. Podés volver a intentarlo cuando quieras.",
+  cancelado: "No se completó el ingreso. Podés volver a intentarlo cuando quieras.",
+  no_existe: "No se pudo verificar tu identidad. Comunicate con el MTOP.",
+  menor_de_edad: "No cumplís con la edad mínima para usar carga.uy.",
+  ingreso_no_disponible: "El ingreso no está disponible temporalmente. Probá de nuevo en unos minutos.",
   estado_invalido: "La solicitud de ingreso venció o no es válida. Volvé a intentarlo.",
   token_invalido: "No pudimos validar tu identidad con gub.uy. Volvé a intentarlo.",
   idp_no_disponible: "gub.uy no está disponible en este momento. Probá de nuevo en unos minutos.",

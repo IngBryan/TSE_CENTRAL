@@ -10,7 +10,10 @@ export type MotivoError =
   | "estado_invalido" // state ausente, vencido o distinto (posible CSRF)
   | "token_invalido" // code rechazado, firma/iss/aud/nonce del id_token invalidos, sub distinto
   | "idp_no_disponible" // gub.uy no responde, timeout o error 5xx
-  | "error_idp"; // otro error informado por gub.uy
+  | "error_idp" // otro error informado por gub.uy
+  | "ingreso_no_disponible" // el backend (WildFly) no responde
+  | "no_existe" // CU-03: la cedula no existe en DNIC (CU-01 FA6)
+  | "menor_de_edad"; // CU-03: menor de 18 (CU-01 FA7)
 
 export class ErrorLogin extends Error {
   constructor(

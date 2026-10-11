@@ -1,23 +1,31 @@
-import type { ClaimsGubUy } from "./oidc";
+import { BackendNoDisponible, llamarBackend } from "../backend";
+import { ErrorLogin, type ClaimsGubUy } from "./oidc";
 
-// Perfil del ciudadano en carga.uy, identificado por su cedula.
-// Hoy el backend Frontofficeciudadanos (WildFly) no expone un endpoint para esto, asi que los
-// perfiles se guardan en memoria del servidor de Next (se pierden al reiniciar). Cuando exista el
-// endpoint REST, alcanza con reemplazar buscarOCrearPerfil por la llamada al backend.
+// Perfil del ciudadano en carga.uy, identificado por su cedula. Lo busca o crea el backend
+// Frontofficeciudadanos (WildFly), que ademas lo valida contra la PDI si hace falta (CU-01 pasos
+// 6 a 8 y CU-03) y devuelve sus roles (paso 9).
+
+export type EstadoPerfil = "PENDIENTE_VALIDACION" | "VALIDADO" | "RECHAZADO" | "NO_HABILITADO";
+export type ResultadoValidacion = "VALIDADO" | "NO_EXISTE" | "MENOR_DE_EDAD" | "NO_DISPONIBLE";
+
+// estado solo aplica a CHOFER: HABILITADO o PENDIENTE_VALIDACION
+export type Rol = { rol: "RESPONSABLE" | "CHOFER"; nroEmpresa: number; empresa: string; estado?: string | null };
 
 export type PerfilCiudadano = {
   cedula: string;
   nombre: string;
   email?: string;
-  emailVerificado?: boolean;
-  subGubUy: string;
-  nivelIdentidad?: number;
-  creado: string;
-  ultimoLogin: string;
+  estado: EstadoPerfil;
+  roles: Rol[];
 };
 
-const store: Map<string, PerfilCiudadano> = ((globalThis as { __perfilesCiudadanos?: Map<string, PerfilCiudadano> })
-  .__perfilesCiudadanos ??= new Map());
+type RespuestaIngreso = {
+  resultado: ResultadoValidacion;
+  sesionPermitida: boolean;
+  nuevo: boolean;
+  perfil: { cedula: string; email?: string; nombres?: string; apellidos?: string; estado: EstadoPerfil };
+  roles?: Rol[];
+};
 
 // La cedula sale de numero_documento (scope document) o, si no vino, del uid (scope personal_info),
 // que tiene la forma "uy-ci-12345678".
@@ -37,26 +45,42 @@ export function nombreDe(claims: ClaimsGubUy): string {
   );
 }
 
-export async function buscarOCrearPerfil(
+export async function ingresarEnBackend(
   claims: ClaimsGubUy,
-): Promise<{ perfil: PerfilCiudadano; nuevo: boolean }> {
+  correlationId: string,
+): Promise<{ perfil: PerfilCiudadano; resultado: ResultadoValidacion; sesionPermitida: boolean; nuevo: boolean }> {
   const cedula = cedulaDe(claims);
   if (!cedula) {
-    throw new Error("gub.uy no devolvio la cedula (falta el scope document o personal_info)");
+    throw new ErrorLogin("token_invalido", "gub.uy no devolvio la cedula (falta el scope document o personal_info)");
   }
 
-  const ahora = new Date().toISOString();
-  const existente = store.get(cedula);
-  const perfil: PerfilCiudadano = {
-    cedula,
-    nombre: nombreDe(claims),
-    email: claims.email ?? existente?.email,
-    emailVerificado: claims.email_verified ?? existente?.emailVerificado,
-    subGubUy: claims.sub,
-    nivelIdentidad: claims.rid !== undefined ? Number(claims.rid) : existente?.nivelIdentidad,
-    creado: existente?.creado ?? ahora,
-    ultimoLogin: ahora,
+  let res;
+  try {
+    res = await llamarBackend<RespuestaIngreso>("/ciudadanos/ingreso-gubuy", {
+      method: "POST",
+      body: { cedula, email: claims.email, sub: claims.sub },
+      correlationId,
+    });
+  } catch (e) {
+    if (e instanceof BackendNoDisponible) throw new ErrorLogin("ingreso_no_disponible", e.message);
+    throw e;
+  }
+  if (res.status !== 200 || !res.data) {
+    throw new ErrorLogin("ingreso_no_disponible", `El backend respondio ${res.status}`);
+  }
+
+  const r = res.data;
+  const nombrePdi = [r.perfil.nombres, r.perfil.apellidos].filter(Boolean).join(" ");
+  return {
+    perfil: {
+      cedula: r.perfil.cedula,
+      nombre: nombrePdi || nombreDe(claims),
+      email: r.perfil.email,
+      estado: r.perfil.estado,
+      roles: r.roles ?? [],
+    },
+    resultado: r.resultado,
+    sesionPermitida: r.sesionPermitida,
+    nuevo: r.nuevo,
   };
-  store.set(cedula, perfil);
-  return { perfil, nuevo: !existente };
 }
