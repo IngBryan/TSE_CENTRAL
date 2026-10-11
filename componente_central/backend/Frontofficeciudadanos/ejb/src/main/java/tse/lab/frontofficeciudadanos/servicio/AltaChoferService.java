@@ -8,14 +8,12 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
-import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.model.Chofer;
 import tse.lab.frontofficeciudadanos.model.Empresa;
 import tse.lab.frontofficeciudadanos.model.EstadoChofer;
 import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
 import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
 import tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona;
-import tse.lab.frontofficeciudadanos.model.Responsable;
 import tse.lab.frontofficeciudadanos.pdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.pdi.ValidacionPdiService;
 import tse.lab.frontofficeciudadanos.servicio.ResultadoAltaChofer.Resultado;
@@ -34,7 +32,7 @@ public class AltaChoferService {
     static final String OP_CONFIRMACION = "ALTA_CHOFER_CONFIRMACION";
 
     @EJB
-    private ResponsableDAO responsables;
+    private AutorizacionResponsable autorizacion;
     @EJB
     private PerfilCiudadanoDAO perfiles;
     @EJB
@@ -117,25 +115,7 @@ public class AltaChoferService {
 
     // Precondiciones de CU-02: responsable autenticado y validado, empresa habilitada.
     private Empresa empresaDelResponsable(String ciResponsable, String correlationId) throws NoAutorizadoException {
-        Responsable responsable = ciResponsable == null ? null : responsables.buscarPorCi(ciResponsable);
-        String motivo = null;
-        if (responsable == null || responsable.getEmpresa() == null) {
-            motivo = "no es responsable de ninguna empresa";
-        } else if (!responsable.getEmpresa().isHabilitada()) {
-            motivo = "la empresa no esta habilitada";
-        } else {
-            PerfilCiudadano perfil = perfiles.buscarPorCi(ciResponsable);
-            if (perfil == null || perfil.getEstado() != EstadoValidacion.VALIDADO) {
-                motivo = "el perfil del responsable no esta validado";
-            }
-        }
-        if (motivo != null) {
-            final String m = motivo;
-            LOG.warning(() -> "evento=chofer.no_autorizado correlationId=" + correlationId + " usuario=" + ciResponsable
-                    + " detalle=\"" + m + "\"");
-            throw new NoAutorizadoException(motivo);
-        }
-        return responsable.getEmpresa();
+        return autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
     }
 
     // Ley 18.331: cada consulta queda registrada con usuario, cedula consultada y fecha y hora.

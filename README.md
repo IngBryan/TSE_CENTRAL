@@ -164,6 +164,17 @@ ve una cookie de sesion cifrada.
   el servidor de Next tiene la `BACKEND_API_KEY` y saca la cedula de su cookie de sesion cifrada; si
   la API se abre a otros clientes hay que pasar un token firmado. Cada consulta de cedula queda en
   la tabla `consultas_persona` (Ley 18.331: usuario, cedula consultada, fecha y hora).
+- **Perfil de la Empresa:** `/empresa` (front) y `GET`/`PUT /api/empresa` (`PerfilEmpresaService`). El
+  responsable validado consulta y edita nombre publico, razon social y direccion principal (obligatorios,
+  100/100/200 caracteres; 400 con el error por campo). El nro. de empresa se muestra pero no se edita:
+  es la clave que referencian choferes, vehiculos, guias y el responsable. El control de acceso es
+  `AutorizacionResponsable`, compartido con el alta de choferes.
+- **Gestion de Viajes de Carga y CU-07:** `/empresa/guias` (front) y `/api/empresa/guias` (`GuiasService`).
+  El responsable de una empresa habilitada ingresa guias (rubro del cliente, carga en kg, fecha >= hoy,
+  origen y destino distintos) y las asigna: `GET /{id}/asignacion` devuelve la guia, los vehiculos y
+  solo los choferes `HABILITADO` de la empresa; `POST /{id}/asignacion` con `matricula` e `idChofer`
+  la deja `ASIGNADA` (409 si ya lo estaba, 400 si el vehiculo o el chofer no son de la empresa o el
+  chofer esta pendiente). `Guia` tiene `@Version` para que dos asignaciones simultaneas no ganen las dos.
 - **Modelo:** `Chofer` es la asociacion persona-empresa (id propio, `(ci, nro_empresa)` unico), asi
   una persona puede ser chofer de varias empresas; las guias referencian esa asociacion.
 - **Datos de prueba (solo desarrollo):** `ejb/src/main/resources/META-INF/datos-prueba.sql` carga en

@@ -58,9 +58,17 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
               <p className="text-zinc-700 dark:text-zinc-300">
                 Sos responsable de <strong>{r.empresa}</strong> (empresa n.º {r.nroEmpresa}).
               </p>
-              <Link href="/empresa/choferes" className={`${botonGubUy} self-start`}>
-                Choferes
-              </Link>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/empresa" className={botonSecundario}>
+                  Datos de la empresa
+                </Link>
+                <Link href="/empresa/choferes" className={botonGubUy}>
+                  Choferes
+                </Link>
+                <Link href="/empresa/guias" className={botonGubUy}>
+                  Guías de viaje
+                </Link>
+              </div>
             </div>
           ))}
           {chofer.map((r) => (

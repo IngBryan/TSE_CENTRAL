@@ -82,7 +82,10 @@ class AltaChoferServiceTest {
         set(validacion, "perfiles", perfiles);
         set(validacion, "choferes", choferes);
         servicio = new AltaChoferService();
-        set(servicio, "responsables", responsables);
+        AutorizacionResponsable autorizacion = new AutorizacionResponsable();
+        set(autorizacion, "responsables", responsables);
+        set(autorizacion, "perfiles", perfiles);
+        set(servicio, "autorizacion", autorizacion);
         set(servicio, "perfiles", perfiles);
         set(servicio, "choferes", choferes);
         set(servicio, "auditoria", auditoria);
