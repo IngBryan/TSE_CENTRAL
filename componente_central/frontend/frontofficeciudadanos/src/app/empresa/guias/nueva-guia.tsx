@@ -6,6 +6,7 @@ import { crearGuia, type EstadoNuevaGuia } from "./actions";
 
 const CAMPOS = [
   { nombre: "rubroCliente", etiqueta: "Rubro del cliente", tipo: "text", ayuda: "Por ejemplo: agropecuario, forestal, construcción." },
+  { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "text", ayuda: "Por ejemplo: granos a granel, rollizos, contenedor." },
   { nombre: "pesoCargaKg", etiqueta: "Carga (kg)", tipo: "number" },
   { nombre: "fecha", etiqueta: "Fecha del viaje", tipo: "date" },
   { nombre: "origen", etiqueta: "Origen", tipo: "text" },

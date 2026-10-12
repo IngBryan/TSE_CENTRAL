@@ -13,22 +13,24 @@ export type ChoferResumen = { id: number; cedula: string; primerNombre?: string;
 export type Guia = {
   id: string;
   rubroCliente: string;
+  tipoCarga?: string | null;
   pesoCargaKg: number;
   fecha: string;
   origen: string;
   destino: string;
-  estado: "SIN_ASIGNAR" | "ASIGNADA";
+  estado: "SIN_ASIGNAR" | "ASIGNADA" | "EN_CURSO" | "FINALIZADA" | "CANCELADA";
   vehiculo?: VehiculoResumen | null;
   chofer?: ChoferResumen | null;
+  version?: number | null;
 };
 
-export type ValoresGuia = { rubroCliente: string; pesoCargaKg: string; fecha: string; origen: string; destino: string };
+export type ValoresGuia = { rubroCliente: string; tipoCarga: string; pesoCargaKg: string; fecha: string; origen: string; destino: string };
 export type EstadoNuevaGuia = { ok?: string; error?: string; campos?: Record<string, string>; valores?: ValoresGuia };
 export type ResultadoAsignacion = { ok: true } | { ok: false; error: string; campos?: Record<string, string> };
 
 type ErrorBackend = { detalle?: string; campos?: Record<string, string> };
 
-async function llamar<T>(ruta: string, method: "GET" | "POST", body?: unknown) {
+async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: unknown) {
   const sesion = await getSesion();
   if (!sesion) return null;
   const correlationId = randomUUID();
@@ -40,6 +42,7 @@ async function llamar<T>(ruta: string, method: "GET" | "POST", body?: unknown) {
 export async function crearGuia(_previo: EstadoNuevaGuia, formulario: FormData): Promise<EstadoNuevaGuia> {
   const valores: ValoresGuia = {
     rubroCliente: String(formulario.get("rubroCliente") ?? ""),
+    tipoCarga: String(formulario.get("tipoCarga") ?? ""),
     pesoCargaKg: String(formulario.get("pesoCargaKg") ?? ""),
     fecha: String(formulario.get("fecha") ?? ""),
     origen: String(formulario.get("origen") ?? ""),
@@ -81,4 +84,43 @@ export async function asignarGuia(idGuia: string, matricula: string, idChofer: n
     if (!(e instanceof BackendNoDisponible)) throw e;
     return { ok: false, error: "El servicio no está disponible en este momento. Probá de nuevo en unos minutos." };
   }
+}
+
+// ===== Modificacion de una guia ASIGNADA (editar, reasignar, cancelar) =====
+// version: la de la guia que se estaba mirando; si cambio entretanto, el backend responde 409
+// GUIA_DESACTUALIZADA y hay que recargar.
+
+export type DatosEdicion = Omit<ValoresGuia, "pesoCargaKg"> & { pesoCargaKg: number | null };
+export type ResultadoModificacion = { ok: true } | { ok: false; error: string; campos?: Record<string, string> };
+
+async function modificar(idGuia: string, ruta: string, method: "POST" | "PUT", body: unknown): Promise<ResultadoModificacion> {
+  try {
+    const res = await llamar<Guia>(`/empresa/guias/${encodeURIComponent(idGuia)}${ruta}`, method, body);
+    if (!res) return { ok: false, error: "Tu sesión venció. Volvé a ingresar con gub.uy." };
+    if (res.status === 200) {
+      revalidatePath("/empresa/guias");
+      revalidatePath(`/empresa/guias/${idGuia}`);
+      return { ok: true };
+    }
+    if (res.status === 400) return { ok: false, error: res.data?.campos?.general ?? "Revisá los datos marcados.", campos: res.data?.campos };
+    if (res.status === 409) return { ok: false, error: res.data?.detalle ?? "La guía ya no se puede modificar." };
+    if (res.status === 404) return { ok: false, error: "La guía no existe." };
+    if (res.status === 403) return { ok: false, error: `No podés modificar guías: ${res.data?.detalle ?? "no sos responsable"}.` };
+    return { ok: false, error: "No se pudo guardar el cambio." };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return { ok: false, error: "El servicio no está disponible en este momento. Probá de nuevo en unos minutos." };
+  }
+}
+
+export async function editarGuia(idGuia: string, version: number, datos: DatosEdicion): Promise<ResultadoModificacion> {
+  return modificar(idGuia, "", "PUT", { ...datos, version });
+}
+
+export async function reasignarGuia(idGuia: string, version: number, matricula: string, idChofer: number): Promise<ResultadoModificacion> {
+  return modificar(idGuia, "/reasignacion", "POST", { matricula, idChofer, version });
+}
+
+export async function cancelarGuia(idGuia: string, version: number, motivo: string): Promise<ResultadoModificacion> {
+  return modificar(idGuia, "/cancelacion", "POST", { motivo, version });
 }

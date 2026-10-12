@@ -12,7 +12,15 @@ function formatoFecha(iso: string) {
   return `${d}/${m}/${a}`;
 }
 
-const nombre = (c?: { primerNombre?: string; primerApellido?: string } | null) =>
+// Estados despues de la asignacion; EN_CURSO y FINALIZADA los registra el chofer desde la app movil
+const ESTADOS: Record<Exclude<Guia["estado"], "SIN_ASIGNAR">, { texto: string; clase: string }> = {
+  ASIGNADA: { texto: "Asignada", clase: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" },
+  EN_CURSO: { texto: "En curso", clase: "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" },
+  FINALIZADA: { texto: "Finalizada", clase: "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200" },
+  CANCELADA: { texto: "Cancelada", clase: "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200" },
+};
+
+const nombre = (c?:{ primerNombre?: string; primerApellido?: string } | null) =>
   [c?.primerNombre, c?.primerApellido].filter(Boolean).join(" ");
 
 // Gestion de Viajes de Carga: guias de la empresa del responsable (el backend decide si puede verlas).
@@ -73,7 +81,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
                     <tr>
                       <th className="px-4 py-3 font-medium">Guía</th>
                       <th className="px-4 py-3 font-medium">Fecha</th>
-                      <th className="px-4 py-3 font-medium">Rubro</th>
+                      <th className="px-4 py-3 font-medium">Rubro / tipo de carga</th>
                       <th className="px-4 py-3 font-medium">Recorrido</th>
                       <th className="px-4 py-3 text-right font-medium">Carga</th>
                       <th className="px-4 py-3 font-medium">Asignación</th>
@@ -82,17 +90,33 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
                   <tbody>
                     {guias.map((g) => (
                       <tr key={g.id} className="border-b border-black/5 align-top last:border-0 dark:border-white/10">
-                        <td className="px-4 py-3 font-mono text-xs">{g.id}</td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {g.estado === "SIN_ASIGNAR" ? (
+                            g.id
+                          ) : (
+                            <Link href={`/empresa/guias/${encodeURIComponent(g.id)}`} className="underline" title="Ver eventos del viaje">
+                              {g.id}
+                            </Link>
+                          )}
+                        </td>
                         <td className="px-4 py-3 tabular-nums">{formatoFecha(g.fecha)}</td>
-                        <td className="px-4 py-3">{g.rubroCliente}</td>
+                        <td className="px-4 py-3">
+                          {g.rubroCliente}
+                          {g.tipoCarga && <span className="block text-xs text-zinc-500">{g.tipoCarga}</span>}
+                        </td>
                         <td className="px-4 py-3">
                           {g.origen} → {g.destino}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{g.pesoCargaKg.toLocaleString("es-UY")} kg</td>
                         <td className="px-4 py-3">
-                          {g.estado === "ASIGNADA" ? (
-                            <span>
-                              {g.vehiculo?.matricula} · {nombre(g.chofer) || g.chofer?.cedula}
+                          {g.estado !== "SIN_ASIGNAR" ? (
+                            <span className="flex flex-col gap-1">
+                              <span>
+                                {g.vehiculo?.matricula} · {nombre(g.chofer) || g.chofer?.cedula}
+                              </span>
+                              <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${ESTADOS[g.estado].clase}`}>
+                                {ESTADOS[g.estado].texto}
+                              </span>
                             </span>
                           ) : (
                             <Link href={`/empresa/guias/${encodeURIComponent(g.id)}/asignar`} className={`${botonSecundario} h-8 px-3`}>

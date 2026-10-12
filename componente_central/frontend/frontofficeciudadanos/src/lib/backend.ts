@@ -38,3 +38,24 @@ export async function llamarBackend<T>(
   }
   return { status: res.status, data: (await res.json().catch(() => null)) as T };
 }
+
+// Para respuestas binarias (fotos de los eventos): devuelve la Response del backend tal cual.
+export async function descargarBackend(
+  ruta: string,
+  opciones: { correlationId: string; usuarioCi: string },
+): Promise<Response> {
+  const cfg = getAuthConfig();
+  try {
+    return await fetch(`${cfg.backendUrl}${ruta}`, {
+      headers: {
+        "X-Api-Key": cfg.backendApiKey,
+        "X-Correlation-Id": opciones.correlationId,
+        "X-Usuario-Ci": opciones.usuarioCi,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(cfg.backendTimeoutMs),
+    });
+  } catch (e) {
+    throw new BackendNoDisponible(`No se pudo contactar el backend: ${(e as Error).message}`);
+  }
+}

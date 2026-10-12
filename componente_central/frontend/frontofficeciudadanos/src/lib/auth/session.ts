@@ -21,6 +21,8 @@ export type TransaccionLogin = {
   state: string;
   nonce: string;
   creada: number;
+  // Solo en el login de la app movil (/auth/movil/login): a donde volver y el challenge PKCE de la app
+  movil?: { redirect: string; codeChallenge: string };
 };
 
 function clave(): Buffer {

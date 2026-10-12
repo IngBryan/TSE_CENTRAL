@@ -2,10 +2,13 @@ package tse.lab.frontofficeciudadanos.data;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
+import tse.lab.frontofficeciudadanos.model.Chofer;
 import tse.lab.frontofficeciudadanos.model.Guia;
 import tse.lab.frontofficeciudadanos.model.Empresa;
+import tse.lab.frontofficeciudadanos.model.EstadoGuia;
 
 @Stateless
 public class GuiaDAO {
@@ -17,8 +20,18 @@ public class GuiaDAO {
         return em.find(Guia.class, id);
     }
 
+    // Bloquea la fila hasta el fin de la transaccion: dos eventos del movil sobre la misma guia
+    // (por ejemplo dos INICIO casi simultaneos) se procesan de a uno y el segundo ve el estado nuevo.
+    public Guia buscarPorIdParaActualizar(String id) {
+        return em.find(Guia.class, id, LockModeType.PESSIMISTIC_WRITE);
+    }
+
     public void guardar(Guia guia) {
         em.persist(guia);
+    }
+
+    public void sincronizar() {
+        em.flush();
     }
 
     public Guia actualizar(Guia guia) {
@@ -51,6 +64,19 @@ public class GuiaDAO {
         return em.createQuery(
                 "SELECT g FROM Guia g WHERE g.empresa = :empresa ORDER BY g.fecha DESC, g.id", Guia.class)
                 .setParameter("empresa", empresa)
+                .getResultList();
+    }
+
+    // App movil: las guias asignadas a esas asociaciones de chofer en alguno de los estados dados
+    public List<Guia> buscarPorChoferesYEstados(List<Chofer> choferes, List<EstadoGuia> estados) {
+        if (choferes.isEmpty()) {
+            return List.of();
+        }
+        return em.createQuery(
+                "SELECT g FROM Guia g WHERE g.chofer IN :choferes AND g.estado IN :estados ORDER BY g.fecha, g.id",
+                Guia.class)
+                .setParameter("choferes", choferes)
+                .setParameter("estados", estados)
                 .getResultList();
     }
 

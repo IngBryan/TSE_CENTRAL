@@ -50,7 +50,7 @@ export default async function Asignar({ params }: PageProps<"/empresa/guias/[id]
           {opciones && (
             <p className="text-zinc-600 dark:text-zinc-400">
               Guía <span className="font-mono text-sm">{opciones.guia.id}</span>: {opciones.guia.origen} → {opciones.guia.destino},{" "}
-              {opciones.guia.pesoCargaKg.toLocaleString("es-UY")} kg ({opciones.guia.rubroCliente})
+              {opciones.guia.pesoCargaKg.toLocaleString("es-UY")} kg ({[opciones.guia.rubroCliente, opciones.guia.tipoCarga].filter(Boolean).join(", ")})
             </p>
           )}
         </div>

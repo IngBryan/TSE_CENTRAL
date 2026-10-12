@@ -19,7 +19,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
+import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
+import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
@@ -63,6 +65,8 @@ class GuiasServiceTest {
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "choferes", conEm(new ChoferDAO()));
         set(servicio, "perfiles", perfiles);
+        set(servicio, "eventos", conEm(new EventoViajeDAO()));
+        set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         empresa.setHabilitada(true);
@@ -98,9 +102,10 @@ class GuiasServiceTest {
     @Test
     void crearGuiaQuedaSinAsignarYAparaceEnElListado() throws Exception {
         GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
-                new NuevaGuia(" Agropecuario ", 18000L, MANANA, "Montevideo", "Paysandú"), "t"));
+                new NuevaGuia(" Agropecuario ", " Granos  a granel ", 18000L, MANANA, "Montevideo", "Paysandú"), "t"));
         assertTrue(g.id().startsWith("GV-"));
         assertEquals("Agropecuario", g.rubroCliente());
+        assertEquals("Granos a granel", g.tipoCarga());
         assertEquals("SIN_ASIGNAR", g.estado());
         assertNull(g.vehiculo());
         assertEquals(List.of(g), servicio.listar(RESPONSABLE, "t"));
@@ -109,14 +114,15 @@ class GuiasServiceTest {
     @Test
     void validacionesAlCrear() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
-                new NuevaGuia("", 0L, "2020-01-01", "Salto", " salto "), "t"));
-        assertEquals(4, e.getErrores().size(), e.getErrores().toString());
+                new NuevaGuia("", null, 0L, "2020-01-01", "Salto", " salto "), "t"));
+        assertEquals(5, e.getErrores().size(), e.getErrores().toString());
+        assertTrue(e.getErrores().get("tipoCarga").contains("obligatorio"));
         assertTrue(e.getErrores().containsKey("rubroCliente"));
         assertTrue(e.getErrores().get("pesoCargaKg").contains("mayor que 0"));
         assertTrue(e.getErrores().get("fecha").contains("anterior a hoy"));
         assertTrue(e.getErrores().get("destino").contains("distinto"));
         assertTrue(assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
-                new NuevaGuia("x", 1L, "10/10/2026", "a", "b"), "t")).getErrores().containsKey("fecha"));
+                new NuevaGuia("x", "y", 1L, "10/10/2026", "a", "b"), "t")).getErrores().containsKey("fecha"));
     }
 
     @Test
@@ -162,7 +168,7 @@ class GuiasServiceTest {
         assertThrows(RecursoNoEncontradoException.class, () -> servicio.opcionesAsignacion(RESPONSABLE, "GV-NOEXISTE", "t"));
         assertThrows(NoAutorizadoException.class, () -> servicio.listar("56087406", "t"));
         assertThrows(NoAutorizadoException.class,
-                () -> servicio.crear(null, new NuevaGuia("x", 1L, MANANA, "a", "b"), "t"));
+                () -> servicio.crear(null, new NuevaGuia("x", "y", 1L, MANANA, "a", "b"), "t"));
         // la empresa tiene que estar habilitada
         enTx(() -> {
             em.find(Empresa.class, 1L).setHabilitada(false);
@@ -171,10 +177,215 @@ class GuiasServiceTest {
         assertThrows(NoAutorizadoException.class, () -> servicio.listar(RESPONSABLE, "t"));
     }
 
+    // Historial de eventos de la app movil en la web del responsable (los CONFLICTO se marcan)
+    @Test
+    void historialDeEventosDeLaGuiaConConflictosYFoto() throws Exception {
+        GuiaVista g = nuevaGuia();
+        enTx(() -> servicio.asignar(RESPONSABLE, g.id(), "SBA 1234", choferHabilitado, "t"));
+        ViajesChoferService movil = new ViajesChoferService();
+        set(movil, "choferes", conEm(new ChoferDAO()));
+        set(movil, "guias", conEm(new GuiaDAO()));
+        set(movil, "eventos", conEm(new EventoViajeDAO()));
+        byte[] jpeg = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0x10 };
+        String fin = "00000000-0000-0000-0000-000000000001";
+        String inicio = "00000000-0000-0000-0000-000000000002";
+        String incidente = "00000000-0000-0000-0000-000000000003";
+        // llegan desordenados: el FIN (sin iniciar) primero
+        enTx(() -> movil.registrarEvento("56087406", new ViajesChoferService.NuevoEvento(fin, g.id(), "FIN",
+                "2026-10-11T10:00:00-03:00", null, null, null, null, null), "t"));
+        enTx(() -> movil.registrarEvento("56087406", new ViajesChoferService.NuevoEvento(inicio, g.id(), "INICIO",
+                "2026-10-11T08:00:00-03:00", null, null, null, null, null), "t"));
+        enTx(() -> movil.registrarEvento("56087406", new ViajesChoferService.NuevoEvento(incidente, g.id(),
+                "INCIDENTE", "2026-10-11T09:00:00-03:00", "Pinchadura", -34.9, -56.1,
+                java.util.Base64.getEncoder().encodeToString(jpeg), null), "t"));
+
+        GuiasService.GuiaConEventos detalle = servicio.eventos(RESPONSABLE, g.id(), "t");
+        assertEquals("EN_CURSO", detalle.guia().estado());
+        // ordenados por la hora del dispositivo
+        assertEquals(List.of(inicio, incidente, fin),
+                detalle.eventos().stream().map(GuiasService.EventoVista::idEvento).toList());
+        GuiasService.EventoVista conflicto = detalle.eventos().get(2);
+        assertEquals("CONFLICTO", conflicto.resultado());
+        assertEquals("VIAJE_NO_INICIADO", conflicto.codigo());
+        assertEquals("Bryan", detalle.eventos().get(0).chofer().primerNombre());
+        assertTrue(detalle.eventos().get(1).conFoto());
+        assertEquals(6, servicio.fotoEvento(RESPONSABLE, g.id(), incidente, "t").length);
+        assertNull(servicio.fotoEvento(RESPONSABLE, g.id(), inicio, "t"));
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.eventos(RESPONSABLE, "GV-NOEXISTE", "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.eventos("56087406", g.id(), "t"));
+    }
+
+    // ===== Modificacion de guias (solo ASIGNADA) =====
+
+    @Test
+    void editarGuiaAsignadaRegistraLosCambiosYSubeLaVersion() throws Exception {
+        GuiaVista g = asignada();
+        GuiaVista editada = enTx(() -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Forestal", "Rollizos", 21000L, MANANA, "Rivera", "Salto", g.version()), "t"));
+        assertEquals("Salto", editada.destino());
+        assertEquals(21000, editada.pesoCargaKg());
+        assertEquals("ASIGNADA", editada.estado());
+        assertEquals(g.version() + 1, editada.version());
+
+        GuiasService.ModificacionVista m = servicio.eventos(RESPONSABLE, g.id(), "t").modificaciones().get(0);
+        assertEquals("EDICION", m.tipo());
+        assertEquals(RESPONSABLE, m.ciResponsable());
+        assertTrue(m.cambios().contains("destino: Montevideo -> Salto"), m.cambios());
+        assertTrue(m.cambios().contains("carga (kg): 20000 -> 21000"), m.cambios());
+        assertEquals(g.version(), m.versionAnterior());
+        assertEquals(editada.version(), m.versionNueva());
+    }
+
+    @Test
+    void editarValidaLosDatosYQueHayaCambios() throws Exception {
+        GuiaVista g = asignada();
+        DatosInvalidosException e = falla(DatosInvalidosException.class, () -> servicio.editar(RESPONSABLE,
+                g.id(), new GuiasService.EdicionGuia("", "x", 0L, "2020-01-01", "A", "a", g.version()), "t"));
+        assertTrue(e.getErrores().keySet().containsAll(List.of("rubroCliente", "pesoCargaKg", "fecha", "destino")));
+        e = falla(DatosInvalidosException.class, () -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Forestal", "Rollizos", 20000L, MANANA, "Rivera", "Montevideo", g.version()), "t"));
+        assertTrue(e.getErrores().containsKey("general"));
+    }
+
+    @Test
+    void soloSeModificaUnaGuiaAsignadaYConLaVersionActual() throws Exception {
+        GuiaVista sinAsignar = nuevaGuia();
+        assertEquals("GUIA_NO_MODIFICABLE", falla(ConflictoException.class, () -> servicio.cancelar(RESPONSABLE,
+                sinAsignar.id(), new GuiasService.Cancelacion("x", sinAsignar.version()), "t")).getCodigo());
+        GuiaVista g = asignada();
+        // otra sesion la modifico mientras se editaba: version vieja
+        enTx(() -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Forestal", "Rollizos", 1000L, MANANA, "Rivera", "Montevideo", g.version()), "t"));
+        assertEquals("GUIA_DESACTUALIZADA", falla(ConflictoException.class, () -> servicio.editar(RESPONSABLE,
+                g.id(), new GuiasService.EdicionGuia("Forestal", "Rollizos", 2000L, MANANA, "Rivera", "Montevideo",
+                        g.version()), "t")).getCodigo());
+        // el chofer la inicio: ya no se modifica
+        enTx(() -> {
+            em.find(Guia.class, g.id()).cambiarEstado(EstadoGuia.EN_CURSO);
+            return null;
+        });
+        Long actual = em.find(Guia.class, g.id()).getVersion();
+        assertEquals("GUIA_NO_MODIFICABLE", falla(ConflictoException.class, () -> servicio.reasignar(RESPONSABLE,
+                g.id(), new GuiasService.Reasignacion("SBA 1234", choferHabilitado, actual), "t")).getCodigo());
+        falla(RecursoNoEncontradoException.class, () -> servicio.cancelar(RESPONSABLE, "GV-NOEXISTE",
+                new GuiasService.Cancelacion("x", 0L), "t"));
+        falla(NoAutorizadoException.class, () -> servicio.cancelar("56087406", g.id(),
+                new GuiasService.Cancelacion("x", actual), "t"));
+    }
+
+    @Test
+    void reasignarCambiaVehiculoYChoferYLoRegistra() throws Exception {
+        Long otroChofer = otroChoferHabilitado();
+        GuiaVista g = asignada();
+        assertTrue(falla(DatosInvalidosException.class, () -> servicio.reasignar(RESPONSABLE, g.id(),
+                new GuiasService.Reasignacion("SBA 1234", choferPendiente, g.version()), "t")).getErrores().get("chofer")
+                .contains("pendiente"));
+        assertTrue(falla(DatosInvalidosException.class, () -> servicio.reasignar(RESPONSABLE, g.id(),
+                new GuiasService.Reasignacion("OTR 0001", otroChofer, g.version()), "t")).getErrores().containsKey("vehiculo"));
+        assertTrue(falla(DatosInvalidosException.class, () -> servicio.reasignar(RESPONSABLE, g.id(),
+                new GuiasService.Reasignacion("SBA 1234", choferHabilitado, g.version()), "t")).getErrores()
+                .containsKey("general"));
+
+        GuiaVista r = enTx(() -> servicio.reasignar(RESPONSABLE, g.id(),
+                new GuiasService.Reasignacion("SBA 1234", otroChofer, g.version()), "t"));
+        assertEquals("33333333", r.chofer().cedula());
+        assertEquals("ASIGNADA", r.estado());
+        GuiasService.ModificacionVista m = servicio.eventos(RESPONSABLE, g.id(), "t").modificaciones().get(0);
+        assertEquals("REASIGNACION", m.tipo());
+        assertEquals("chofer: 56087406 -> 33333333", m.cambios());
+    }
+
+    @Test
+    void cancelarRequiereMotivoYLaGuiaQuedaCancelada() throws Exception {
+        GuiaVista g = asignada();
+        assertTrue(falla(DatosInvalidosException.class, () -> servicio.cancelar(RESPONSABLE, g.id(),
+                new GuiasService.Cancelacion("  ", g.version()), "t")).getErrores().containsKey("motivo"));
+        GuiaVista c = enTx(() -> servicio.cancelar(RESPONSABLE, g.id(),
+                new GuiasService.Cancelacion("El cliente suspendió el envío", g.version()), "t"));
+        assertEquals("CANCELADA", c.estado());
+        GuiasService.GuiaConEventos detalle = servicio.eventos(RESPONSABLE, g.id(), "t");
+        assertEquals("CANCELACION", detalle.modificaciones().get(0).tipo());
+        assertEquals("El cliente suspendió el envío", detalle.modificaciones().get(0).motivo());
+        assertTrue(detalle.vehiculos().isEmpty()); // ya no se ofrecen opciones para reasignar
+    }
+
+    // Integrado con la app movil: el chofer estaba sin conexion con la version anterior de la guia
+    @Test
+    void modificacionesDelResponsableYEventosDelChoferSinConexion() throws Exception {
+        ViajesChoferService movil = movil();
+        Long otroChofer = otroChoferHabilitado();
+
+        // 1. Editar -> el evento con la version vieja se aplica y avisa guiaModificada con los datos nuevos
+        GuiaVista g1 = asignada();
+        enTx(() -> servicio.editar(RESPONSABLE, g1.id(),
+                new GuiasService.EdicionGuia("Forestal", "Rollizos", 20000L, MANANA, "Rivera", "Salto", g1.version()), "t"));
+        ViajesChoferService.ResultadoEvento r1 = enTx(() -> movil.registrarEvento("56087406",
+                eventoMovil(g1.id(), "INICIO", g1.version()), "t"));
+        assertEquals("APLICADO", r1.resultado());
+        assertTrue(r1.guiaModificada());
+        assertEquals("Salto", r1.guia().destino());
+
+        // 2. Reasignar a otro chofer -> el evento del chofer anterior queda CONFLICTO / GUIA_REASIGNADA
+        GuiaVista g2 = asignada();
+        enTx(() -> servicio.reasignar(RESPONSABLE, g2.id(),
+                new GuiasService.Reasignacion("SBA 1234", otroChofer, g2.version()), "t"));
+        ViajesChoferService.ResultadoEvento r2 = enTx(() -> movil.registrarEvento("56087406",
+                eventoMovil(g2.id(), "INICIO", g2.version()), "t"));
+        assertEquals("CONFLICTO", r2.resultado());
+        assertEquals("GUIA_REASIGNADA", r2.codigo());
+        assertNull(r2.guia());
+        assertEquals("ASIGNADA", servicio.eventos(RESPONSABLE, g2.id(), "t").guia().estado());
+
+        // 3. Cancelar -> el evento queda CONFLICTO / GUIA_CANCELADA y la guia sale de la app
+        GuiaVista g3 = asignada();
+        enTx(() -> servicio.cancelar(RESPONSABLE, g3.id(), new GuiasService.Cancelacion("Sin carga", g3.version()), "t"));
+        ViajesChoferService.ResultadoEvento r3 = enTx(() -> movil.registrarEvento("56087406",
+                eventoMovil(g3.id(), "INICIO", g3.version()), "t"));
+        assertEquals("CONFLICTO", r3.resultado());
+        assertEquals("GUIA_CANCELADA", r3.codigo());
+        assertTrue(movil.viajes("56087406", "t").stream().noneMatch(v -> v.id().equals(g3.id())));
+
+        // la linea de tiempo de la guia tiene la cancelacion y el evento en conflicto
+        GuiasService.GuiaConEventos detalle = servicio.eventos(RESPONSABLE, g3.id(), "t");
+        assertEquals(1, detalle.modificaciones().size());
+        assertEquals("CONFLICTO", detalle.eventos().get(0).resultado());
+    }
+
+    // Las modificaciones bloquean la guia (PESSIMISTIC_WRITE): en el contenedor siempre hay transaccion
+    private <E extends Exception> E falla(Class<E> tipo, Accion<?> accion) {
+        return assertThrows(tipo, () -> enTx(accion));
+    }
+
+    private GuiaVista asignada() throws Exception {
+        GuiaVista g = nuevaGuia();
+        return enTx(() -> servicio.asignar(RESPONSABLE, g.id(), "SBA 1234", choferHabilitado, "t"));
+    }
+
+    private Long otroChoferHabilitado() throws Exception {
+        return enTx(() -> {
+            Chofer c = new Chofer("33333333", null, em.find(Empresa.class, 1L), EstadoChofer.HABILITADO);
+            em.persist(c);
+            return c;
+        }).getId();
+    }
+
+    private ViajesChoferService movil() throws Exception {
+        ViajesChoferService movil = new ViajesChoferService();
+        set(movil, "choferes", conEm(new ChoferDAO()));
+        set(movil, "guias", conEm(new GuiaDAO()));
+        set(movil, "eventos", conEm(new EventoViajeDAO()));
+        return movil;
+    }
+
+    private static ViajesChoferService.NuevoEvento eventoMovil(String guia, String tipo, Long version) {
+        return new ViajesChoferService.NuevoEvento(java.util.UUID.randomUUID().toString(), guia, tipo,
+                "2026-10-12T08:00:00-03:00", null, null, null, null, version);
+    }
+
     // ===== helpers =====
 
     private GuiaVista nuevaGuia() throws Exception {
-        return enTx(() -> servicio.crear(RESPONSABLE, new NuevaGuia("Forestal", 20000L, MANANA, "Rivera", "Montevideo"), "t"));
+        return enTx(() -> servicio.crear(RESPONSABLE, new NuevaGuia("Forestal", "Rollizos", 20000L, MANANA, "Rivera", "Montevideo"), "t"));
     }
 
     private static PerfilCiudadano validado(String ci, String nombre, String apellido) {

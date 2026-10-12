@@ -2,6 +2,7 @@ package tse.lab.frontofficeciudadanos.model;
 
 import java.io.Serializable;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -21,6 +22,9 @@ public class Guia implements Serializable {
     @Id
     private String id;
     private String rubroCliente;
+    // Que se transporta (granos a granel, rollizos, contenedor...); lo ve el chofer en la app movil
+    @Column(length = 100)
+    private String tipoCarga;
     private long pesoCargaKg; /* lo dejo como peso en vez de volumen */
     private LocalDate fecha;
     private String origen;
@@ -64,6 +68,14 @@ public class Guia implements Serializable {
 
     public String getRubroCliente() {
         return rubroCliente;
+    }
+
+    public String getTipoCarga() {
+        return tipoCarga;
+    }
+
+    public void setTipoCarga(String tipoCarga) {
+        this.tipoCarga = tipoCarga;
     }
 
     public long getPesoCargaKg() {
@@ -145,5 +157,15 @@ public class Guia implements Serializable {
         this.chofer = chofer;
         this.estado = EstadoGuia.ASIGNADA;
         this.fechaAsignacion = Instant.now();
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    // App movil: el chofer inicia (ASIGNADA -> EN_CURSO) y finaliza (EN_CURSO -> FINALIZADA) el viaje.
+    // Las reglas de transicion se controlan en ViajesChoferService.
+    public void cambiarEstado(EstadoGuia nuevo) {
+        this.estado = nuevo;
     }
 }
