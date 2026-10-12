@@ -1,131 +1,69 @@
+
 # Deploy en Kubernetes con Argo CD
 
-El componente central de TSE se despliega en Kubernetes utilizando Argo CD.
+El componente central de TSE utiliza Kubernetes para el despliegue de sus servicios y Argo CD para la sincronización automática con los manifiestos del repositorio.
 
-## Componentes desplegados
+## Componentes
 
-### Frontend
+### Frontends
 
 - `frontofficeciudadanos-front`
 - `frontofficefuncionarios-front`
 - `backofficeautoridadesadministradores-front`
 
-Cada frontend se despliega de forma independiente y publica su propia imagen en GitHub Container Registry (GHCR).
+Cada frontend dispone de su propio Deployment, Service e Ingress.
 
-### Backend
+### Backends
 
-Las tres aplicaciones Jakarta EE se ejecutan en una única instancia de WildFly:
+**WildFly:** servidor de aplicaciones que contiene los tres EAR Jakarta EE:
 
-- Frontoffice ciudadanos
-- Frontoffice funcionarios
-- Backoffice autoridades/administradores
+- `frontofficeciudadanos.ear`
+- `frontofficefuncionarios.ear`
+- `backofficeautoridadesadministradores.ear`
 
-La imagen utilizada es:
-
-```text
-ghcr.io/ingbryan/tse_central/wildfly
-```
+**Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ y los persiste en MongoDB. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP.
 
 ### Infraestructura
-
-La infraestructura desplegada en Kubernetes está formada por:
 
 - PostgreSQL
 - MongoDB
 - RabbitMQ
 
-Los datos persistentes utilizan `PersistentVolumeClaim`.
+Los tres servicios disponen de almacenamiento persistente mediante PVC.
 
-`Fiscalizacionautomatica` todavía no forma parte del despliegue runtime y se configurará posteriormente como componente independiente.
+## Organización
 
-## Estructura
+- `k8s/apps/`: manifiestos de cada aplicación y sus archivos Kustomize.
+- `k8s/infrastructure/`: PostgreSQL, MongoDB y RabbitMQ.
+- `k8s/argocd/`: Applications de Argo CD y configuraciones de Image Updater.
 
-```text
-k8s/
-├── apps/
-│   ├── frontofficeciudadanos-front/
-│   ├── frontofficefuncionarios-front/
-│   ├── backofficeautoridadesadministradores-front/
-│   └── wildfly/
-│
-├── infrastructure/
-│   ├── postgres/
-│   ├── mongodb/
-│   ├── rabbitmq/
-│   └── kustomization.yaml
-│
-└── argocd/
-    ├── frontofficeciudadanos-front.yaml
-    ├── frontofficefuncionarios-front.yaml
-    ├── backofficeautoridadesadministradores-front.yaml
-    ├── infrastructure.yaml
-    └── wildfly.yaml
-```
+## Publicación y actualización
 
-Cada aplicación en `k8s/apps/` contiene sus manifiestos Kubernetes y su
-`kustomization.yaml`.
+Los workflows de GitHub Actions construyen y publican las imágenes Docker en GitHub Container Registry (GHCR).
 
-La infraestructura se administra conjuntamente mediante:
-
-```text
-k8s/infrastructure/kustomization.yaml
-```
-
-## Flujo de CD
-
-```text
-Push / merge a main
-        |
-        v
-GitHub Actions
-        |
-        +-- Build / test / análisis
-        |
-        +-- Build imagen Docker
-        |
-        v
-GitHub Container Registry
-        |
-        v
-Argo CD Image Updater
-        |
-        v
-Argo CD
-        |
-        v
-Kubernetes
-```
-
-GitHub Actions no necesita ingresar al cluster.
-
-Las imágenes de las aplicaciones se publican con los tags:
+Las imágenes se publican con los tags:
 
 ```text
 latest
 sha-<commit>
 ```
 
-Argo CD Image Updater observa los tags `sha-*` y actualiza las aplicaciones correspondientes.
+Argo CD Image Updater detecta las nuevas imágenes y actualiza la aplicación correspondiente. Argo CD sincroniza los cambios con Kubernetes.
 
-PostgreSQL, MongoDB y RabbitMQ utilizan imágenes definidas explícitamente en sus manifiestos y no son actualizadas automáticamente mediante Image Updater.
+Las imágenes de PostgreSQL, MongoDB y RabbitMQ se definen directamente en los manifiestos y no utilizan Image Updater.
 
-## Secretos de runtime
+## Configuración inicial
 
-Las credenciales de runtime no se almacenan en Git.
+### 1. Crear namespaces
 
-Los manifiestos esperan un Secret llamado:
-
-```text
-tse-runtime-secrets
+```bash
+kubectl create namespace tse
+kubectl create namespace argocd
 ```
 
-en el namespace:
+### 2. Crear secretos de runtime
 
-```text
-tse
-```
-
-El Secret debe contener las siguientes claves:
+Los manifiestos utilizan el Secret `tse-runtime-secrets` en el namespace `tse`, con las siguientes claves:
 
 ```text
 postgres-user
@@ -136,7 +74,7 @@ rabbitmq-user
 rabbitmq-password
 ```
 
-Antes del primer despliegue se crea directamente en el cluster:
+Crearlo con los valores correspondientes al entorno:
 
 ```bash
 kubectl -n tse create secret generic tse-runtime-secrets \
@@ -148,15 +86,9 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>'
 ```
 
-Los valores reales nunca deben agregarse al repositorio.
-
-## Configuración inicial de Argo CD
-
-### 1. Instalar Argo CD y Argo CD Image Updater
+### 3. Instalar Argo CD e Image Updater
 
 ```bash
-kubectl create namespace argocd
-
 kubectl apply -n argocd --server-side --force-conflicts \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
@@ -164,72 +96,99 @@ kubectl apply -n argocd \
   -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
 ```
 
-### 2. Dar acceso de Argo CD al repositorio
+### 4. Configurar acceso al repositorio
 
-El repositorio es privado, por lo que Argo CD necesita credenciales de lectura.
+Para acceder al repositorio privado, Argo CD requiere un token de GitHub con permiso de lectura.
 
 ```bash
 kubectl -n argocd create secret generic repo-tse-central \
   --from-literal=type=git \
   --from-literal=url=https://github.com/IngBryan/TSE_CENTRAL.git \
   --from-literal=username=IngBryan \
-  --from-literal=password=<TOKEN_REPO>
+  --from-literal=password='<TOKEN_REPO>'
 
 kubectl -n argocd label secret repo-tse-central \
   argocd.argoproj.io/secret-type=repository
 ```
 
-### 3. Dar acceso a GHCR
+### 5. Configurar acceso a GHCR
 
-El namespace `tse` necesita credenciales para descargar las imágenes privadas:
+Se necesita un token de GitHub con permiso `read:packages` para descargar las imágenes privadas.
+
+Crear el Secret en `tse`, utilizado por los pods:
 
 ```bash
-kubectl create namespace tse
-
 kubectl -n tse create secret docker-registry ghcr-credentials \
   --docker-server=ghcr.io \
   --docker-username=IngBryan \
-  --docker-password=<TOKEN_PACKAGES>
+  --docker-password='<TOKEN_PACKAGES>'
 ```
 
-Argo CD Image Updater también necesita acceso a GHCR:
+Crear el mismo Secret en `argocd`, utilizado por Image Updater:
 
 ```bash
 kubectl -n argocd create secret docker-registry ghcr-credentials \
   --docker-server=ghcr.io \
   --docker-username=IngBryan \
-  --docker-password=<TOKEN_PACKAGES>
+  --docker-password='<TOKEN_PACKAGES>'
 ```
 
-## Registrar las aplicaciones en Argo CD
+## Registrar aplicaciones en Argo CD
 
-Una vez que los manifiestos se encuentren en `main`:
+Con los manifiestos e imágenes publicados en `main`:
 
 ```bash
 kubectl apply -f k8s/argocd/infrastructure.yaml
+
 kubectl apply -f k8s/argocd/frontofficeciudadanos-front.yaml
 kubectl apply -f k8s/argocd/frontofficefuncionarios-front.yaml
 kubectl apply -f k8s/argocd/backofficeautoridadesadministradores-front.yaml
+
 kubectl apply -f k8s/argocd/wildfly.yaml
+kubectl apply -f k8s/argocd/fiscalizacionautomatica.yaml
 ```
 
-A partir de ese momento Argo CD mantiene sincronizado el estado del cluster con los manifiestos almacenados en Git.
+## Validación
 
-## Validación offline
-
-Los manifiestos pueden validarse sin conexión al cluster utilizando Kustomize:
+### Validar manifiestos sin acceder al cluster
 
 ```bash
+kubectl kustomize k8s/infrastructure
+
 kubectl kustomize k8s/apps/frontofficeciudadanos-front
 kubectl kustomize k8s/apps/frontofficefuncionarios-front
 kubectl kustomize k8s/apps/backofficeautoridadesadministradores-front
 kubectl kustomize k8s/apps/wildfly
-kubectl kustomize k8s/infrastructure
+kubectl kustomize k8s/apps/fiscalizacionautomatica
+```
+
+### Comprobar recursos desplegados
+
+```bash
+kubectl -n tse get deployments
+kubectl -n tse get pods
+kubectl -n tse get services
+kubectl -n tse get ingress
+kubectl -n tse get pvc
+```
+
+### Consultar logs
+
+```bash
+kubectl -n tse logs deployment/wildfly
+
+kubectl -n tse logs deployment/fiscalizacionautomatica
+```
+
+Para observar el estado de los pods:
+
+```bash
+kubectl -n tse get pods -w
 ```
 
 ## Acceso HTTP
 
-Los componentes se publican mediante NGINX Ingress sobre:
+Host configurado en NGINX Ingress:
 
 ```text
 env-6537388.web.elasticloud.uy
@@ -243,7 +202,7 @@ Rutas de los frontends:
 /backoffice
 ```
 
-Rutas de las aplicaciones Jakarta EE desplegadas en WildFly:
+Rutas de las aplicaciones Jakarta EE:
 
 ```text
 /frontofficeciudadanos-web
@@ -251,21 +210,21 @@ Rutas de las aplicaciones Jakarta EE desplegadas en WildFly:
 /backofficeautoridadesadministradores-web
 ```
 
-## Interfaz web de Argo CD
+## Interfaz de Argo CD
 
-Para acceder localmente a la interfaz de Argo CD:
+Acceder mediante port-forward:
 
 ```bash
 kubectl -n argocd port-forward svc/argocd-server 8081:443
 ```
 
-Luego abrir:
+Abrir:
 
 ```text
 https://localhost:8081
 ```
 
-La contraseña inicial del usuario `admin` puede obtenerse con:
+Obtener la contraseña inicial del usuario `admin`:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -274,10 +233,10 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 
 ## Diagnóstico
 
-Si un pod queda en `ImagePullBackOff`, revisar que exista `ghcr-credentials` en el namespace `tse`.
-
-Si Argo CD no puede leer el repositorio, revisar el Secret `repo-tse-central`.
-
-Si Image Updater no detecta nuevas imágenes, revisar sus logs y verificar que `ghcr-credentials` exista en el namespace `argocd`.
-
-Si una aplicación no arranca por falta de credenciales de runtime, verificar que exista `tse-runtime-secrets` en el namespace `tse`.
+- **ImagePullBackOff:** comprobar `ghcr-credentials` en el namespace `tse` y los permisos de GHCR.
+- **Argo CD no accede al repositorio:** verificar `repo-tse-central`.
+- **Image Updater no detecta imágenes:** revisar sus logs y `ghcr-credentials` en `argocd`.
+- **Contenedores sin credenciales:** verificar las claves de `tse-runtime-secrets`.
+- **PVC en Pending:** comprobar la StorageClass y el almacenamiento disponible.
+- **WildFly no inicia:** revisar logs y conectividad con PostgreSQL.
+- **Fiscalización no consume eventos:** revisar la conexión a RabbitMQ, la cola `tracking.events` y MongoDB.
