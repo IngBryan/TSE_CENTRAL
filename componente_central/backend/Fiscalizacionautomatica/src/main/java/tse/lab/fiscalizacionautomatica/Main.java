@@ -12,12 +12,17 @@ import com.rabbitmq.client.AuthenticationFailureException;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.bson.Document;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
+import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
+import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingConsumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver;
 
@@ -25,7 +30,26 @@ public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
 
+    /** Hardcoded test values: what to query (scales, vehicles, range) is still to be defined. */
+    private static final List<Long> SCALE_IDS = List.of(4L);
+    private static final String LICENSE_PLATE = "SBC1234";
+    private static final Duration WEIGHINGS_WINDOW = Duration.ofDays(30);
+
+    /**
+     * The same jar runs as the tracking consumer (default: keeps running, scalable) or as the
+     * weighings poller (polls once and exits, launched by a cron).
+     */
     public static void main(String[] args) throws Exception {
+        String mode = args.length == 0 ? "tracking-consumer" : args[0];
+        switch (mode) {
+            case "tracking-consumer" -> startTrackingConsumer();
+            case "weighings-poller" -> System.exit(pollWeighings());
+            default -> throw new IllegalArgumentException(
+                    "Unknown mode: " + mode + " (expected tracking-consumer or weighings-poller)");
+        }
+    }
+
+    private static void startTrackingConsumer() throws IOException, InterruptedException {
         requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD");
 
         MongoClient mongo = createMongoClient();
@@ -44,6 +68,24 @@ public class Main {
         new TrackingConsumer(connection.createChannel(), receiver).start();
         System.out.printf("Consuming %s from %s:%d, saving to %s.%s%n", TrackingConsumer.QUEUE,
                 factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION);
+    }
+
+    /** @return exit code: 0 if every scale was polled, 1 otherwise (so the cron sees the failure) */
+    private static int pollWeighings() {
+        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET");
+        String url = env("BALANZAS_URL", "http://localhost:3001");
+
+        ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
+                System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
+        PollResult result = new WeighingsPoller(SCALE_IDS, LICENSE_PLATE, WEIGHINGS_WINDOW, api, Clock.systemUTC())
+                .poll();
+
+        System.out.printf("Fetched %d weighings from %s%n", result.weighings().size(), url);
+        if (!result.failedScaleIds().isEmpty()) {
+            System.err.println("Could not poll scales " + result.failedScaleIds());
+            return 1;
+        }
+        return 0;
     }
 
     private static String env(String name, String defaultValue) {

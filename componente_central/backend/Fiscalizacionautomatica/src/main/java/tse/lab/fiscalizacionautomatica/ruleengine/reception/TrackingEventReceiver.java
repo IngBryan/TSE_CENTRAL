@@ -58,6 +58,7 @@ public class TrackingEventReceiver {
         }
         TrackingMessage m = JSON.readValue(body, TrackingMessage.class);
         if (m == null || m.id() == null || m.gpsId() == null || m.datetime() == null
+                || m.latitude() == null || m.longitude() == null
                 || m.licensePlate() == null || m.licensePlate().isBlank()) {
             throw new IllegalArgumentException("Missing required fields");
         }

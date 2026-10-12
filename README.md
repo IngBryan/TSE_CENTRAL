@@ -1,8 +1,8 @@
 # TSE Central
 
 Componente central del laboratorio: backend Jakarta EE (desplegado en un unico WildFly), sus
-frontends Next.js y el RabbitMQ al que publican los nodos perifericos. Los nodos (`tracking`,
-`balanzas`) viven en el repo hermano `TSE_NODOS`.
+frontends Next.js, la fiscalizacion automatica y el RabbitMQ al que publican los nodos
+perifericos. Los nodos (`tracking`, `balanzas`, `pdi`) viven en el repo hermano `TSE_NODOS`.
 
 ## Estructura del repositorio
 
@@ -13,7 +13,7 @@ TSE_CENTRAL/
 │   │   ├── Frontofficeciudadanos/
 │   │   ├── Frontofficefuncionarios/
 │   │   ├── Backofficeautoridadesadministradores/
-│   │   └── Fiscalizacionautomatica/   # script standalone (jar), sin ejb/web/ear
+│   │   └── Fiscalizacionautomatica/   # script standalone (jar, imagen propia), sin ejb/web/ear
 │   └── frontend/                # Clientes Next.js que consumen el backend de arriba
 │       ├── frontofficeciudadanos/
 │       ├── Frontofficefuncionarios/
@@ -22,7 +22,7 @@ TSE_CENTRAL/
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
 ├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea la coleccion tracking)
-├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly y los 3 frontends
+├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y los 3 frontends
 └── .gitignore                   # Reglas a nivel workspace (cada modulo tiene el suyo)
 ```
 
@@ -95,6 +95,11 @@ PDI_ORGANISMO_CLAVE=<mismo-que-en-TSE_NODOS>
 MONGO_USER=tse
 MONGO_PASSWORD=<un-secreto>           # usuario root; se crea solo en el primer arranque
 #MONGO_PORT=27017                      # opcional: puerto en la maquina (por defecto 27017)
+
+#Balanzas (TSE_NODOS): cliente OAuth con el que el poller de fiscalizacion consulta la API
+BALANZAS_CLIENT_ID=componente-central  # mismo valor que BALANZAS_OAUTH_CLIENT_ID en TSE_NODOS/.env
+BALANZAS_CLIENT_SECRET=<mismo-que-BALANZAS_OAUTH_CLIENT_SECRET-en-TSE_NODOS>
+#BALANZAS_URL=http://host.docker.internal:3001   # opcional: donde corre balanzas
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -117,6 +122,7 @@ docker compose up --build
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
 | `frontofficefuncionarios-front`               | http://localhost:3003    |
 | `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
+| `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
 que ambos compose pueden correr a la vez.
@@ -148,9 +154,8 @@ docker compose up -d --build wildfly   # levanta tambien postgres
   vacio); para recrearla hay que borrar el volumen (`docker compose rm -sfv postgres` y
   `docker volume rm tse-central_postgres-data`) o crearla a mano. Los `persistence.xml` usan `drop-and-create`: **cada deploy borra y recrea
   el esquema**.
-- **Fiscalizacionautomatica** no se despliega en WildFly: es un jar standalone (cliente
-  remoto). La imagen lo compila y lo deja en `/opt/fiscalizacionautomatica/`, pero no se
-  ejecuta (todavia no tiene codigo ni clase `Main`).
+- **Fiscalizacionautomatica** no se despliega en WildFly: es un jar standalone con su propia
+  imagen. Ver [Fiscalizacion automatica](#fiscalizacion-automatica).
 - **Logs:** los de WildFly salen por consola (`docker logs wildfly-server`). Ver
   [Observabilidad](#observabilidad).
 - **Memoria:** usa el heap por defecto de WildFly (512 MB maximo).
@@ -184,6 +189,131 @@ mongodb://<MONGO_USER>:<MONGO_PASSWORD>@localhost:27017/main_db?authSource=admin
 
 O en *Advanced Connection Options*: *General* → Host `localhost:27017`; *Authentication* →
 *Username/Password* con `MONGO_USER` / `MONGO_PASSWORD` y *Authentication Database* `admin`.
+
+### Fiscalizacion automatica
+
+`componente_central/backend/Fiscalizacionautomatica` es un jar standalone (`java -jar`), no se
+despliega en WildFly. Tiene su propia imagen (`Dockerfile` de la carpeta) y el mismo jar corre
+en dos modos, segun el argumento:
+
+| Modo | Servicio del compose | Que hace | Como corre |
+|------|----------------------|----------|------------|
+| `tracking-consumer` (por defecto) | `fiscalizacionautomatica` (`fiscalizacion-server`) | Consume la cola `tracking.events` y guarda cada evento en MongoDB (`main_db.tracking`) | Siempre arriba; puede escalar (varias replicas consumen la misma cola) |
+| `weighings-poller` | `fiscalizacionautomatica-poller` (perfil `cron`) | Consulta la API de balanzas (`TSE_NODOS`) | Corre **una vez y termina**: lo lanza un cron. No guarda estado entre ejecuciones |
+
+**Consumidor de tracking:**
+
+- Confirmacion manual: el mensaje se confirma recien despues de guardarlo. Duplicado → se
+  confirma sin guardar; invalido → se descarta; si falla el guardado (por ejemplo, Mongo
+  caido) vuelve a la cola y se reintenta.
+- El `_id` del documento es el `message_id` de RabbitMQ, asi una reentrega no se guarda dos
+  veces. Documento: `{ _id, eventId, gpsId, licensePlate, location (GeoJSON), timestamp }`.
+- Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
+  `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
+  (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`). Si RabbitMQ o Mongo
+  no estan arriba al arrancar, reintenta cada 5 s.
+
+**Poller de balanzas:**
+
+- Cada ejecucion pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza
+  (fechas en hora de Uruguay, `-03:00`), imprime
+  `Fetched N weighings from <url>` y termina. **No guarda estado**: cada ejecucion es
+  independiente, asi que la frecuencia la define el cron que lo lanza.
+- Codigo de salida: `0` si consulto todas las balanzas, `1` si fallo alguna (el cron o el
+  CronJob lo registra como ejecucion fallida).
+- Cliente con MicroProfile Rest Client (RESTEasy) y OAuth 2.0 client credentials: pide un token
+  por ejecucion y, ante un `401`, pide otro y reintenta una vez.
+- Variables: `BALANZAS_URL` (`http://localhost:3001`; en el compose
+  `http://host.docker.internal:3001`), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET`.
+- **Por ahora:** que consultar esta hardcodeado en `Main` (`SCALE_IDS`, matricula
+  `LICENSE_PLATE = "SBC1234"` y los ultimos 30 dias; se va a definir que balanzas y vehiculos
+  consultar) y los pesajes no se guardan.
+
+El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
+`META-INF/services` con los que RESTEasy registra sus providers.
+
+#### Probar en dev
+
+**Consumidor de tracking** (con RabbitMQ y MongoDB arriba):
+
+```bash
+docker compose up -d --build fiscalizacionautomatica
+docker logs fiscalizacion-server            # "Consuming tracking.events from rabbitmq:5672, ..."
+```
+
+Para mandarle un evento: prender el nodo `tracking` (`TSE_NODOS`) o publicar a mano desde el panel
+de RabbitMQ (Exchanges → `tracking` → *Publish message*, routing key `tracking.event`, property
+`message_id` con cualquier valor y el JSON del evento como payload). El documento aparece en
+`main_db.tracking` (Compass).
+
+**Poller de balanzas** (con `balanzas` arriba: `docker compose up -d balanzas` en `TSE_NODOS`, y
+`BALANZAS_CLIENT_ID` / `BALANZAS_CLIENT_SECRET` en el `.env`):
+
+```bash
+docker compose run --rm --build fiscalizacionautomatica-poller   # una ejecucion; "Fetched N weighings from ..."
+echo $?                                                         # 0 = ok, 1 = fallo alguna balanza
+```
+
+Para que se ejecute solo cada 5 minutos en la maquina de desarrollo (opcional):
+
+```bash
+# Linux / macOS: agregar con "crontab -e"
+*/5 * * * * docker compose -f /ruta/a/TSE_CENTRAL/docker-compose.yml run --rm fiscalizacionautomatica-poller >> /tmp/weighings-poller.log 2>&1
+```
+
+```powershell
+# Windows (Programador de tareas). Para quitarlo: schtasks /Delete /TN tse-weighings-poller /F
+schtasks /Create /SC MINUTE /MO 5 /TN tse-weighings-poller /TR "docker compose -f C:\ruta\a\TSE_CENTRAL\docker-compose.yml run --rm fiscalizacionautomatica-poller"
+```
+
+**Fuera de Docker** (con las variables de cada modo definidas):
+
+```bash
+cd componente_central/backend/Fiscalizacionautomatica
+mvn clean package
+java -jar target/fiscalizacionautomatica.jar                     # consumidor de tracking
+java -jar target/fiscalizacionautomatica.jar weighings-poller    # poller de balanzas (una ejecucion)
+```
+
+Si el contenedor `fiscalizacion-server` esta arriba, el consumidor local y el del contenedor se
+reparten los mensajes de la cola: para debuggear, pararlo antes
+(`docker compose stop fiscalizacionautomatica`).
+
+#### Produccion
+
+Los dos modos usan la misma imagen (hay que publicarla en ghcr.io como las demas; todavia no hay
+workflow para esta). Las credenciales van en un `Secret` de Kubernetes, no en el manifiesto.
+
+| | Consumidor de tracking | Poller de balanzas |
+|---|---|---|
+| Recurso | `Deployment` (escala con el largo de la cola, p. ej. con KEDA) | `CronJob` (corre una vez por ejecucion) |
+| Argumentos | ninguno | `["weighings-poller"]` |
+| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `BALANZAS_URL` (URL de balanzas en produccion), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) |
+
+Puntos del `CronJob` del poller:
+
+```yaml
+spec:
+  schedule: "*/5 * * * *"          # frecuencia de consulta
+  concurrencyPolicy: Forbid        # nunca dos ejecuciones a la vez
+  jobTemplate:
+    spec:
+      backoffLimit: 0              # si falla, se reintenta en la proxima ejecucion programada
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-credentials
+          containers:
+            - name: poller
+              image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:<tag>
+              args: ["weighings-poller"]
+              envFrom:
+                - secretRef:
+                    name: fiscalizacion-balanzas   # BALANZAS_URL, BALANZAS_CLIENT_ID, BALANZAS_CLIENT_SECRET
+```
+
+Un codigo de salida `1` deja el `Job` como fallido (`kubectl -n tse get jobs`).
 
 ### Observabilidad
 
@@ -222,9 +352,10 @@ consume; no hay respuesta ni cola de retorno. Cada mensaje lo procesa un unico c
   (volumen `rabbitmq-data` vacio). Si despues se cambian en el `.env`, hay que borrar el
   volumen para que se vuelva a crear (se pierden los mensajes encolados):
   `docker compose rm -sf rabbitmq` y `docker volume rm tse-central_rabbitmq-data`.
-- **Conexion desde el componente central** (WildFly, hoy fuera del compose):
-  `amqp://<RABBITMQ_USER>:<RABBITMQ_PASSWORD>@localhost:5672`, consumiendo de la cola
-  `tracking.events`. Desde un contenedor de este compose el host es `rabbitmq`.
+- **Quien consume:** el servicio `fiscalizacionautomatica` (ver
+  [Fiscalizacion automatica](#fiscalizacion-automatica)). Desde la maquina:
+  `amqp://<RABBITMQ_USER>:<RABBITMQ_PASSWORD>@localhost:5672`; desde un contenedor de este
+  compose el host es `rabbitmq`.
 - **Mensajes:** JSON persistente (`content_type: application/json`, `type: tracking.event`):
   `{ id, gpsId, licensePlate, latitude, longitude, datetime }`. La entrega es *at-least-once*:
   ante un reintento puede llegar un duplicado con el mismo `message_id`, que el consumidor
@@ -234,4 +365,4 @@ consume; no hay respuesta ni cola de retorno. Cada mensaje lo procesa un unico c
 
 - JDK 24 y Apache Maven 3.9+ (solo para compilar el backend fuera de Docker)
 - Node.js 24 / npm
-- Docker + Docker Compose 2.30+ (RabbitMQ, PostgreSQL, WildFly y las 3 apps Next.js; el compose usa `post_start`)
+- Docker + Docker Compose 2.30+ (RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y las 3 apps Next.js; el compose usa `post_start`)

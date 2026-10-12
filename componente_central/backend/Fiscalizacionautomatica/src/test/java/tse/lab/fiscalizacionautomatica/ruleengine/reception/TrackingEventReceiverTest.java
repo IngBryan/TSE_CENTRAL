@@ -37,6 +37,16 @@ class TrackingEventReceiverTest {
     }
 
     @Test
+    void readsDatesInUruguayTime() {
+        List<TrackingEvent> saved = new ArrayList<>();
+        TrackingEventReceiver receiver = new TrackingEventReceiver(saved::add);
+
+        receiver.receive("msg-1", bytes(MESSAGE.replace("2026-10-10T15:30:00.000Z", "2026-10-12T17:41:00.000-03:00")));
+
+        assertEquals(Instant.parse("2026-10-12T20:41:00Z"), saved.getFirst().timestamp());
+    }
+
+    @Test
     void discardsRedeliveryOfSameMessage() {
         TrackingEventReceiver receiver = new TrackingEventReceiver(new InMemoryTrackingEventDAO());
 
@@ -74,7 +84,9 @@ class TrackingEventReceiverTest {
             """
             {"id": 7, "gpsId": 1, "licensePlate": " ", "latitude": 0, "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
             """
-            {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "latitude": 91, "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
+            {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
+            """
+            {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "latitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
             """
             {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "latitude": 0, "longitude": 0, "datetime": "yesterday"}""",
     })
