@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
@@ -102,7 +103,7 @@ class DAOIntegrationTest {
         commitTransaction();
 
         beginTransaction();
-        Chofer encontrado = dao.buscarPorCi("CI-4");
+        Chofer encontrado = dao.buscarPorCi("CI-4").get(0);
         List<Chofer> resultados = dao.buscarPorEmpresa(empresa);
         dao.eliminar(encontrado);
         commitTransaction();
@@ -110,7 +111,7 @@ class DAOIntegrationTest {
         assertNotNull(encontrado);
         assertEquals(1, resultados.size());
         assertEquals("CI-4", resultados.get(0).getCi());
-        assertNull(dao.buscarPorCi("CI-4"));
+        assertTrue(dao.buscarPorCi("CI-4").isEmpty());
     }
 
     @Test
