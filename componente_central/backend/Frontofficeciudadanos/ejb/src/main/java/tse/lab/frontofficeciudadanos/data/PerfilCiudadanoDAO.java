@@ -4,8 +4,8 @@ import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
-import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
+import tse.lab.model.EstadoValidacion;
+import tse.lab.model.PerfilCiudadano;
 
 @Stateless
 public class PerfilCiudadanoDAO {

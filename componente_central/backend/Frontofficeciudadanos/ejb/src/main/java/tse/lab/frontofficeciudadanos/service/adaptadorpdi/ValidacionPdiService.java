@@ -11,9 +11,9 @@ import jakarta.ejb.Stateless;
 import jakarta.inject.Inject;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
+import tse.lab.model.Chofer;
+import tse.lab.model.EstadoValidacion;
+import tse.lab.model.PerfilCiudadano;
 
 // CU-03 Validar ciudadano contra PDI. Lo incluyen CU-01 (ingreso con gub.uy), CU-02 (alta de
 // chofer) y CU-04 (reintento de validaciones pendientes).

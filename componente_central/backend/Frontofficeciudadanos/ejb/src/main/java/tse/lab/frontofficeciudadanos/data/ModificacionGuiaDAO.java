@@ -5,8 +5,8 @@ import java.util.List;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.ModificacionGuia;
+import tse.lab.model.Guia;
+import tse.lab.model.ModificacionGuia;
 
 @Stateless
 public class ModificacionGuiaDAO {

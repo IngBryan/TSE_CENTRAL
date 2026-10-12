@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
-import tse.lab.frontofficeciudadanos.model.Empresa;
+import tse.lab.model.Empresa;
 
 // Perfil de la Empresa: el responsable consulta y actualiza los datos de su empresa (nombre publico,
 // razon social y direccion principal). El numero de empresa se muestra pero no se modifica: es la

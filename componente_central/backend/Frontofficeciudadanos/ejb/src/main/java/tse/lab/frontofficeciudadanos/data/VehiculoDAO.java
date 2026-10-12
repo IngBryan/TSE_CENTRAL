@@ -4,8 +4,8 @@ import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
+import tse.lab.model.Empresa;
+import tse.lab.model.Vehiculo;
 
 @Stateless
 public class VehiculoDAO {

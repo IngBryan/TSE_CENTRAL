@@ -21,14 +21,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
-import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
+import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ClientePdi;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.DatosPersonaPdi;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.PdiNoDisponibleException;
@@ -36,7 +31,12 @@ import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.gestionchoferes.ResultadoAltaChofer.Resultado;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
-import tse.lab.frontofficeciudadanos.service.ResponsablesFalsos;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoValidacion;
+import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Responsable;
 
 // CU-02 contra H2 con los DAOs reales y una PDI simulada.
 class AltaChoferServiceTest {
@@ -75,6 +75,7 @@ class AltaChoferServiceTest {
         pdi.personas.put("56087406", persona("Juan", "Pérez", LocalDate.of(1990, 5, 10)));
         pdi.personas.put("33333333", persona("Lucía", "Fernández", LocalDate.now().minusYears(16)));
 
+        ResponsableDAO responsables = inyectarEm(new ResponsableDAO());
         PerfilCiudadanoDAO perfiles = inyectarEm(new PerfilCiudadanoDAO());
         ChoferDAO choferes = inyectarEm(new ChoferDAO());
         RegistroConsultaPersonaDAO auditoria = inyectarEm(new RegistroConsultaPersonaDAO());
@@ -84,8 +85,7 @@ class AltaChoferServiceTest {
         set(validacion, "choferes", choferes);
         servicio = new AltaChoferService();
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
-        set(autorizacion, "responsables", new ResponsablesFalsos().con(RESPONSABLE, 1L));
-        set(autorizacion, "empresas", inyectarEm(new EmpresaDAO()));
+        set(autorizacion, "responsables", responsables);
         set(autorizacion, "perfiles", perfiles);
         set(servicio, "autorizacion", autorizacion);
         set(servicio, "perfiles", perfiles);
@@ -93,12 +93,13 @@ class AltaChoferServiceTest {
         set(servicio, "auditoria", auditoria);
         set(servicio, "validacionPdi", validacion);
 
-        empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Pando");
+        empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Pando", null);
         empresa.setHabilitada(true);
         PerfilCiudadano perfilResponsable = new PerfilCiudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
         perfilResponsable.setEstado(EstadoValidacion.VALIDADO);
         enTransaccion(() -> {
             em.persist(empresa);
+            em.persist(new Responsable(RESPONSABLE, "r@prueba.uy", empresa));
             em.persist(perfilResponsable);
         });
     }
@@ -186,7 +187,7 @@ class AltaChoferServiceTest {
 
     @Test
     void unChoferPuedeEstarEnVariasEmpresas() throws Exception {
-        Empresa otra = new Empresa(2L, "Otra", "Otra S.A.", "Montevideo");
+        Empresa otra = new Empresa(2L, "Otra", "Otra S.A.", "Montevideo", null);
         otra.setHabilitada(true);
         enTransaccion(() -> {
             em.persist(otra);

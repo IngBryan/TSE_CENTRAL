@@ -18,7 +18,7 @@ on:
         type: string
         required: true
       install-first:
-        description: Proyecto Maven del que depende y que se instala antes (por ejemplo un api de EJB remoto)
+        description: Proyecto Maven del que depende y que se instala antes (por ejemplo Modelo)
         type: string
         required: false
         default: ""

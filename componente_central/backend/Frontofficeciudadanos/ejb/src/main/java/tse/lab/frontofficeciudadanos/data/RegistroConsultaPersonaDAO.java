@@ -4,7 +4,7 @@ import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
-import tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona;
+import tse.lab.model.RegistroConsultaPersona;
 
 // Auditoria de solo agregado (Ley 18.331): no expone modificar ni borrar.
 @Stateless

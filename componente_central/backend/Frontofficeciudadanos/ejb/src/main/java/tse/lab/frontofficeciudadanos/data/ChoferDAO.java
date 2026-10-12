@@ -4,9 +4,9 @@ import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
 
 @Stateless
 public class ChoferDAO {

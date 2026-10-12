@@ -5,8 +5,8 @@ import java.util.List;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import tse.lab.frontofficeciudadanos.model.EventoViaje;
-import tse.lab.frontofficeciudadanos.model.Guia;
+import tse.lab.model.EventoViaje;
+import tse.lab.model.Guia;
 
 @Stateless
 public class EventoViajeDAO {

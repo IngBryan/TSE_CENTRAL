@@ -8,12 +8,13 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Ciudadano;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
+import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
-import tse.lab.frontofficefuncionarios.api.gestiondeempresas.ResponsablesRemote;
+import tse.lab.model.Chofer;
+import tse.lab.model.Ciudadano;
+import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Responsable;
 
 // CU-01 Ingresar al sistema con Usuario gub.uy, pasos 6 a 9. Los pasos 1 a 5 (OIDC) y la sesion
 // los hace el frontoffice de Next; este servicio recibe la cedula y el email que gub.uy ya valido
@@ -27,8 +28,8 @@ public class IngresoService {
     private PerfilCiudadanoDAO perfiles;
     @EJB
     private ChoferDAO choferes;
-    @EJB(lookup = ResponsablesRemote.JNDI)
-    private ResponsablesRemote responsables;
+    @EJB
+    private ResponsableDAO responsables;
     @EJB
     private ValidacionPdiService validacionPdi;
     @EJB
@@ -77,12 +78,12 @@ public class IngresoService {
     // Devuelve true si habia registro previo.
     private boolean vincularRegistroPrevio(String cedula, String email, String correlationId) {
         List<Chofer> comoChofer = choferes.buscarPorCi(cedula);
-        boolean esResponsable = responsables.buscarPorCi(cedula) != null;
+        Responsable responsable = responsables.buscarPorCi(cedula);
         completarEmailRegistrosPrevios(cedula, email);
-        boolean previo = !comoChofer.isEmpty() || esResponsable;
+        boolean previo = !comoChofer.isEmpty() || responsable != null;
         if (previo) {
             LOG.info(() -> "evento=ingreso.vinculacion correlationId=" + correlationId + " ci=" + cedula
-                    + " choferEn=" + comoChofer.size() + " responsable=" + esResponsable);
+                    + " choferEn=" + comoChofer.size() + " responsable=" + (responsable != null));
         }
         return previo;
     }
@@ -90,7 +91,7 @@ public class IngresoService {
     // Guarda el email de gub.uy en los registros de chofer/responsable que no lo tenian.
     private void completarEmailRegistrosPrevios(String cedula, String email) {
         choferes.buscarPorCi(cedula).forEach(c -> completarEmail(c, email));
-        responsables.completarEmail(cedula, email);
+        completarEmail(responsables.buscarPorCi(cedula), email);
     }
 
     private static void completarEmail(Ciudadano registro, String email) {

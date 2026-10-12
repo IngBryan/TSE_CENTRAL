@@ -13,10 +13,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
 import tse.lab.frontofficeciudadanos.service.autenticacion.IngresoService;
 import tse.lab.frontofficeciudadanos.service.autenticacion.ResultadoIngreso;
 import tse.lab.frontofficeciudadanos.service.autenticacion.RolPersona;
+import tse.lab.model.PerfilCiudadano;
 
 // CU-01: el frontoffice de Next llama aca despues de validar el login con gub.uy.
 @Path("/ciudadanos")

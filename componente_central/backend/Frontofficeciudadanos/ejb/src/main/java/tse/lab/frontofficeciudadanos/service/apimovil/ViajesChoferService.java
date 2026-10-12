@@ -17,18 +17,18 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoGuia;
-import tse.lab.frontofficeciudadanos.model.EventoViaje;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.ResultadoEventoViaje;
-import tse.lab.frontofficeciudadanos.model.TipoEventoViaje;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.model.Chofer;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoGuia;
+import tse.lab.model.EventoViaje;
+import tse.lab.model.Guia;
+import tse.lab.model.ResultadoEventoViaje;
+import tse.lab.model.TipoEventoViaje;
+import tse.lab.model.Vehiculo;
 
 // App movil del chofer: sus viajes pendientes y los eventos que registra durante el viaje (inicio,
 // fin, cargas y descargas parciales, incidentes). El movil trabaja sin conexion y reenvia los

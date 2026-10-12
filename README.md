@@ -10,6 +10,7 @@ frontends Next.js y el RabbitMQ al que publican los nodos perifericos. Los nodos
 TSE_CENTRAL/
 ├── componente_central/          # Sistema principal, separado en back y front
 │   ├── backend/                 # Apps Jakarta EE (Maven multi-modulo: ejb + web + ear)
+│   │   ├── Modelo/                    # entidades JPA compartidas (jar, paquete tse.lab.model)
 │   │   ├── Frontofficeciudadanos/
 │   │   ├── Frontofficefuncionarios/
 │   │   ├── Backofficeautoridadesadministradores/
@@ -31,7 +32,7 @@ TSE_CENTRAL/
 Tres proyectos Maven, cada uno con la misma forma:
 
 - `pom.xml` padre (`packaging=pom`), Jakarta EE sobre el BOM de WildFly.
-- `ejb/` — packaging `ejb`, capa de modelo/servicio/persistencia (`model`, `service`, `data`).
+- `ejb/` — packaging `ejb`, capa de servicio/persistencia (`service`, `data`).
 - `web/` — packaging `war`, JSF + PrimeFaces + REST (`web/controller`, `web/jsf`, `web/ws`).
 - `ear/` — packaging `ear`, empaqueta `ejb` + `web` para desplegar en WildFly.
 
@@ -39,17 +40,23 @@ Tres proyectos Maven, cada uno con la misma forma:
 Todos comparten `groupId` base `tse.lab.<proyecto>`, Java 24 (`maven.compiler.release=24`)
 y corren sobre el mismo WildFly.
 
+**Modelo compartido:** las entidades JPA (`Empresa`, `Responsable`, `Chofer`, `Guia`, ...) estan en
+`backend/Modelo` (paquete `tse.lab.model`), porque los tres backends usan la misma base `main_db`.
+Cada `ejb/pom.xml` depende de `tse.lab.modelo:modelo`, el EAR lo empaqueta en `lib/modelo.jar` y el
+`persistence.xml` lo incluye con `<jar-file>lib/modelo.jar</jar-file>`. Cada backend tiene sus propios
+DAOs y servicios (sus ABM); lo unico compartido son las entidades.
+
+- El esquema lo genera **solo** Frontofficeciudadanos (`drop-and-create` + `datos-prueba.sql`). Los otros
+  dos usan `schema-generation.database.action=none`: si no, se borrarian las tablas entre si en cada deploy.
+- Hay que instalar Modelo antes de compilar cualquier backend (y despues de cambiar una entidad).
+
 **Levantar un modulo:**
 ```bash
+mvn -f componente_central/backend/Modelo/pom.xml install
 cd componente_central/backend/Frontofficeciudadanos
 mvn clean install
 mvn wildfly:deploy -pl ear
 ```
-
-Frontofficeciudadanos consulta los responsables de empresa a Frontofficefuncionarios por EJB remoto
-(modulo `Frontofficefuncionarios/api`). Para compilarlo, instalar antes Frontofficefuncionarios
-(`mvn -f componente_central/backend/Frontofficefuncionarios/pom.xml install`) y, para que funcione,
-desplegar los dos EAR en el mismo WildFly.
 
 ### componente_central/frontend
 

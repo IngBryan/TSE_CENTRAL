@@ -24,21 +24,21 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoGuia;
-import tse.lab.frontofficeciudadanos.model.EventoViaje;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.ResultadoEventoViaje;
-import tse.lab.frontofficeciudadanos.model.TipoEventoViaje;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.NuevoEvento;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.ResultadoEvento;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.ViajeVista;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoGuia;
+import tse.lab.model.EventoViaje;
+import tse.lab.model.Guia;
+import tse.lab.model.ResultadoEventoViaje;
+import tse.lab.model.TipoEventoViaje;
+import tse.lab.model.Vehiculo;
 
 // API de la app movil (viajes del chofer y eventos del viaje) contra H2 con los DAOs reales.
 class ViajesChoferServiceTest {
@@ -321,7 +321,7 @@ class ViajesChoferServiceTest {
     }
 
     private static Empresa empresa(Long nro, String nombre) {
-        Empresa e = new Empresa(nro, nombre, nombre + " S.A.", "Montevideo");
+        Empresa e = new Empresa(nro, nombre, nombre + " S.A.", "Montevideo", null);
         e.setHabilitada(true);
         return e;
     }

@@ -8,17 +8,17 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
-import tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.gestionchoferes.ResultadoAltaChofer.Resultado;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoValidacion;
+import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.RegistroConsultaPersona;
 
 // CU-02 Dar de alta chofer en la empresa, en dos pasos:
 // - consultar (pasos 2 a 7): busca o crea a la persona, la valida contra la PDI si hace falta y

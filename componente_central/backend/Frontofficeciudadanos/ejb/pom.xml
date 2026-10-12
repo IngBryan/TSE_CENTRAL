@@ -14,11 +14,11 @@
 
     <dependencies>
 
-        <!-- Vista remota (EJB) de los responsables de empresa, que viven en Frontofficefuncionarios.
-            Hay que instalarla antes: mvn -f ../Frontofficefuncionarios/pom.xml install -->
+        <!-- Entidades JPA compartidas (componente_central/backend/Modelo). Va en el lib/ del EAR.
+            Hay que instalarlo antes: mvn -f ../Modelo/pom.xml install -->
         <dependency>
-            <groupId>tse.lab.frontofficefuncionarios</groupId>
-            <artifactId>frontofficefuncionarios-api</artifactId>
+            <groupId>tse.lab.modelo</groupId>
+            <artifactId>modelo</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 

@@ -3,14 +3,15 @@
              version="3.2">
     <persistence-unit name="frontofficeciudadanosTestPersistenceUnit" transaction-type="RESOURCE_LOCAL">
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <class>tse.lab.frontofficeciudadanos.model.Empresa</class>
-        <class>tse.lab.frontofficeciudadanos.model.Guia</class>
-        <class>tse.lab.frontofficeciudadanos.model.Vehiculo</class>
-        <class>tse.lab.frontofficeciudadanos.model.Chofer</class>
-        <class>tse.lab.frontofficeciudadanos.model.PerfilCiudadano</class>
-        <class>tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona</class>
-        <class>tse.lab.frontofficeciudadanos.model.EventoViaje</class>
-        <class>tse.lab.frontofficeciudadanos.model.ModificacionGuia</class>
+        <class>tse.lab.model.Empresa</class>
+        <class>tse.lab.model.Guia</class>
+        <class>tse.lab.model.Vehiculo</class>
+        <class>tse.lab.model.Chofer</class>
+        <class>tse.lab.model.Responsable</class>
+        <class>tse.lab.model.PerfilCiudadano</class>
+        <class>tse.lab.model.RegistroConsultaPersona</class>
+        <class>tse.lab.model.EventoViaje</class>
+        <class>tse.lab.model.ModificacionGuia</class>
         <properties>
             <property name="jakarta.persistence.validation.mode" value="NONE"/>
             <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>

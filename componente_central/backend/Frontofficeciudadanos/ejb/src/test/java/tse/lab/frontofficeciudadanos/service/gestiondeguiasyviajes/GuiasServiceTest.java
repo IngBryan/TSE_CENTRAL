@@ -19,20 +19,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
-import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoGuia;
-import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
@@ -42,7 +34,15 @@ import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.OpcionesAsignacion;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
-import tse.lab.frontofficeciudadanos.service.ResponsablesFalsos;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoGuia;
+import tse.lab.model.EstadoValidacion;
+import tse.lab.model.Guia;
+import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Responsable;
+import tse.lab.model.Vehiculo;
 
 // Gestion de Viajes de Carga y CU-07 contra H2 con los DAOs reales.
 class GuiasServiceTest {
@@ -63,8 +63,7 @@ class GuiasServiceTest {
         em = emf.createEntityManager();
         PerfilCiudadanoDAO perfiles = conEm(new PerfilCiudadanoDAO());
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
-        set(autorizacion, "responsables", new ResponsablesFalsos().con(RESPONSABLE, 1L));
-        set(autorizacion, "empresas", conEm(new EmpresaDAO()));
+        set(autorizacion, "responsables", conEm(new ResponsableDAO()));
         set(autorizacion, "perfiles", perfiles);
         servicio = new GuiasService();
         set(servicio, "autorizacion", autorizacion);
@@ -75,9 +74,9 @@ class GuiasServiceTest {
         set(servicio, "eventos", conEm(new EventoViajeDAO()));
         set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
 
-        Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando");
+        Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         empresa.setHabilitada(true);
-        Empresa otra = new Empresa(2L, "Otra", "Otra S.A.", "Montevideo");
+        Empresa otra = new Empresa(2L, "Otra", "Otra S.A.", "Montevideo", null);
         otra.setHabilitada(true);
         PerfilCiudadano responsable = validado(RESPONSABLE, "Emiliano", "Tomas");
         Chofer habilitado = new Chofer("56087406", null, empresa, EstadoChofer.HABILITADO);
@@ -86,6 +85,7 @@ class GuiasServiceTest {
         em.getTransaction().begin();
         em.persist(empresa);
         em.persist(otra);
+        em.persist(new Responsable(RESPONSABLE, null, empresa));
         em.persist(responsable);
         em.persist(validado("56087406", "Bryan", "Salamone"));
         em.persist(new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, empresa));

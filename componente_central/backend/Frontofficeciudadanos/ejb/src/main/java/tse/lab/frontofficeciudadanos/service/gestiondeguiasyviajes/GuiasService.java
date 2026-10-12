@@ -20,21 +20,21 @@ import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.EstadoChofer;
-import tse.lab.frontofficeciudadanos.model.EstadoGuia;
-import tse.lab.frontofficeciudadanos.model.EventoViaje;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.ModificacionGuia;
-import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
-import tse.lab.frontofficeciudadanos.model.TipoModificacionGuia;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.model.Chofer;
+import tse.lab.model.Empresa;
+import tse.lab.model.EstadoChofer;
+import tse.lab.model.EstadoGuia;
+import tse.lab.model.EventoViaje;
+import tse.lab.model.Guia;
+import tse.lab.model.ModificacionGuia;
+import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.TipoModificacionGuia;
+import tse.lab.model.Vehiculo;
 
 // Gestion de Viajes de Carga: el responsable de una empresa habilitada ingresa guias de viaje y las
 // asigna a un vehiculo y un chofer de la empresa (CU-07). El control de acceso y las reglas se
