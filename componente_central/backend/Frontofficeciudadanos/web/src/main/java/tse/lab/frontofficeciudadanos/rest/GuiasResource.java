@@ -15,15 +15,15 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import tse.lab.frontofficeciudadanos.servicio.ConflictoException;
-import tse.lab.frontofficeciudadanos.servicio.DatosInvalidosException;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.Cancelacion;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.EdicionGuia;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.NuevaGuia;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.Reasignacion;
-import tse.lab.frontofficeciudadanos.servicio.NoAutorizadoException;
-import tse.lab.frontofficeciudadanos.servicio.RecursoNoEncontradoException;
+import tse.lab.frontofficeciudadanos.service.ConflictoException;
+import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.GuiasService;
+import tse.lab.frontofficeciudadanos.service.GuiasService.Cancelacion;
+import tse.lab.frontofficeciudadanos.service.GuiasService.EdicionGuia;
+import tse.lab.frontofficeciudadanos.service.GuiasService.NuevaGuia;
+import tse.lab.frontofficeciudadanos.service.GuiasService.Reasignacion;
+import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
+import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 
 // Gestion de Viajes de Carga y CU-07 Asignar vehiculo y chofer a guia de viaje. Quien llama se
 // identifica con X-Usuario-Ci (ver ChoferesResource para el criterio de confianza).

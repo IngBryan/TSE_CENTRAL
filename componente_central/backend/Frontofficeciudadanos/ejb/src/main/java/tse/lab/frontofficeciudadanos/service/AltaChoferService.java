@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 import java.util.List;
 import java.util.logging.Logger;
@@ -16,7 +16,7 @@ import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
 import tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona;
 import tse.lab.frontofficeciudadanos.pdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.pdi.ValidacionPdiService;
-import tse.lab.frontofficeciudadanos.servicio.ResultadoAltaChofer.Resultado;
+import tse.lab.frontofficeciudadanos.service.ResultadoAltaChofer.Resultado;
 
 // CU-02 Dar de alta chofer en la empresa, en dos pasos:
 // - consultar (pasos 2 a 7): busca o crea a la persona, la valida contra la PDI si hace falta y

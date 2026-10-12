@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -34,7 +34,7 @@ import tse.lab.frontofficeciudadanos.pdi.ClientePdi;
 import tse.lab.frontofficeciudadanos.pdi.DatosPersonaPdi;
 import tse.lab.frontofficeciudadanos.pdi.PdiNoDisponibleException;
 import tse.lab.frontofficeciudadanos.pdi.ValidacionPdiService;
-import tse.lab.frontofficeciudadanos.servicio.ResultadoAltaChofer.Resultado;
+import tse.lab.frontofficeciudadanos.service.ResultadoAltaChofer.Resultado;
 
 // CU-02 contra H2 con los DAOs reales y una PDI simulada.
 class AltaChoferServiceTest {

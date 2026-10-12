@@ -14,9 +14,9 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
-import tse.lab.frontofficeciudadanos.servicio.IngresoService;
-import tse.lab.frontofficeciudadanos.servicio.ResultadoIngreso;
-import tse.lab.frontofficeciudadanos.servicio.RolPersona;
+import tse.lab.frontofficeciudadanos.service.IngresoService;
+import tse.lab.frontofficeciudadanos.service.ResultadoIngreso;
+import tse.lab.frontofficeciudadanos.service.RolPersona;
 
 // CU-01: el frontoffice de Next llama aca despues de validar el login con gub.uy.
 @Path("/ciudadanos")

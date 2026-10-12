@@ -13,10 +13,10 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import tse.lab.frontofficeciudadanos.servicio.DatosInvalidosException;
-import tse.lab.frontofficeciudadanos.servicio.NoAutorizadoException;
-import tse.lab.frontofficeciudadanos.servicio.PerfilEmpresaService;
-import tse.lab.frontofficeciudadanos.servicio.PerfilEmpresaService.CambiosEmpresa;
+import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
+import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService;
+import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.CambiosEmpresa;
 
 // Perfil de la Empresa: el responsable consulta y actualiza los datos de su empresa. Quien llama se
 // identifica con X-Usuario-Ci (ver ChoferesResource para el criterio de confianza).

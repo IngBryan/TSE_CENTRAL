@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 // Rol de una persona en una empresa. estado solo aplica a CHOFER (HABILITADO o PENDIENTE_VALIDACION).
 public record RolPersona(Rol rol, Long nroEmpresa, String empresa, String estado) {

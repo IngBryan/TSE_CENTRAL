@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -34,9 +34,9 @@ import tse.lab.frontofficeciudadanos.model.Guia;
 import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
 import tse.lab.frontofficeciudadanos.model.Responsable;
 import tse.lab.frontofficeciudadanos.model.Vehiculo;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.GuiaVista;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.NuevaGuia;
-import tse.lab.frontofficeciudadanos.servicio.GuiasService.OpcionesAsignacion;
+import tse.lab.frontofficeciudadanos.service.GuiasService.GuiaVista;
+import tse.lab.frontofficeciudadanos.service.GuiasService.NuevaGuia;
+import tse.lab.frontofficeciudadanos.service.GuiasService.OpcionesAsignacion;
 
 // Gestion de Viajes de Carga y CU-07 contra H2 con los DAOs reales.
 class GuiasServiceTest {

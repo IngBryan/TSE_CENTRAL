@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 // Respuesta de los dos pasos de CU-02. Por la Ley 18.331 solo lleva primer nombre y primer
 // apellido; nunca la fecha de nacimiento ni el resto de los datos de DNIC.

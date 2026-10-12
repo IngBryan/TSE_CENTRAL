@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,9 +33,9 @@ import tse.lab.frontofficeciudadanos.model.Guia;
 import tse.lab.frontofficeciudadanos.model.ResultadoEventoViaje;
 import tse.lab.frontofficeciudadanos.model.TipoEventoViaje;
 import tse.lab.frontofficeciudadanos.model.Vehiculo;
-import tse.lab.frontofficeciudadanos.servicio.ViajesChoferService.NuevoEvento;
-import tse.lab.frontofficeciudadanos.servicio.ViajesChoferService.ResultadoEvento;
-import tse.lab.frontofficeciudadanos.servicio.ViajesChoferService.ViajeVista;
+import tse.lab.frontofficeciudadanos.service.ViajesChoferService.NuevoEvento;
+import tse.lab.frontofficeciudadanos.service.ViajesChoferService.ResultadoEvento;
+import tse.lab.frontofficeciudadanos.service.ViajesChoferService.ViajeVista;
 
 // API de la app movil (viajes del chofer y eventos del viaje) contra H2 con los DAOs reales.
 class ViajesChoferServiceTest {

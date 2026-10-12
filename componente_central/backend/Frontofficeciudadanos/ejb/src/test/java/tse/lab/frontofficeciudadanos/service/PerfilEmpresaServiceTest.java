@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.servicio;
+package tse.lab.frontofficeciudadanos.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -20,8 +20,8 @@ import tse.lab.frontofficeciudadanos.model.Empresa;
 import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
 import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
 import tse.lab.frontofficeciudadanos.model.Responsable;
-import tse.lab.frontofficeciudadanos.servicio.PerfilEmpresaService.CambiosEmpresa;
-import tse.lab.frontofficeciudadanos.servicio.PerfilEmpresaService.DatosEmpresa;
+import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.CambiosEmpresa;
+import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.DatosEmpresa;
 
 // Perfil de la Empresa contra H2 con los DAOs reales.
 class PerfilEmpresaServiceTest {
