@@ -44,16 +44,14 @@ jobs:
           java-version: "24"
           cache: maven
 
-      - name: Compilar y ejecutar tests
-        run: mvn -B -f "${{ inputs.path }}/pom.xml" clean verify
-      
-      - name: Analisis estatico SonarQube
+      - name: Compilar, ejecutar tests y analizar con SonarQube
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
           mvn -B
           -f "${{ inputs.path }}/pom.xml"
-          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          clean verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
           -Dsonar.projectKey="${{ inputs.sonar-project-key }}"
           -Dsonar.organization="${{ vars.SONAR_ORGANIZATION }}"
 
