@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.model.Chofer;
 import tse.lab.frontofficeciudadanos.model.Empresa;
 import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.Responsable;
 import tse.lab.frontofficeciudadanos.model.Vehiculo;
 
 class DAOIntegrationTest {
@@ -50,7 +49,7 @@ class DAOIntegrationTest {
     void empresaDaoPersisteBuscaYListaEmpresas() {
         EmpresaDAO dao = new EmpresaDAO();
         injectEntityManager(dao);
-        Empresa empresa = new Empresa(10L, "Empresa de prueba", "Razón social", "Dirección", null);
+        Empresa empresa = new Empresa(10L, "Empresa de prueba", "Razón social", "Dirección");
 
         beginTransaction();
         dao.guardar(empresa);
@@ -68,33 +67,10 @@ class DAOIntegrationTest {
     }
 
     @Test
-    void responsableDaoPersisteBuscaYActualiza() {
-        ResponsableDAO dao = new ResponsableDAO();
-        injectEntityManager(dao);
-        Empresa empresa = new Empresa(11L, "Empresa responsable", "Razón social", "Dirección", null);
-        Responsable responsable = new Responsable("CI-3", "responsable@example.com", empresa);
-
-        beginTransaction();
-        entityManager.persist(empresa);
-        dao.guardar(responsable);
-        commitTransaction();
-
-        beginTransaction();
-        Responsable encontrada = dao.buscarPorCi("CI-3");
-        encontrada.setEmail("actualizado@example.com");
-        Responsable actualizada = dao.actualizar(encontrada);
-        commitTransaction();
-
-        assertNotNull(actualizada);
-        assertEquals("actualizado@example.com", actualizada.getEmail());
-        assertSame(empresa, actualizada.getEmpresa());
-    }
-
-    @Test
     void choferDaoPersisteBuscaEliminaYBuscaPorEmpresa() {
         ChoferDAO dao = new ChoferDAO();
         injectEntityManager(dao);
-        Empresa empresa = new Empresa(12L, "Empresa choferes", "Razón social", "Dirección", null);
+        Empresa empresa = new Empresa(12L, "Empresa choferes", "Razón social", "Dirección");
         Chofer chofer = new Chofer("CI-4", "chofer@example.com", empresa);
 
         beginTransaction();
@@ -118,7 +94,7 @@ class DAOIntegrationTest {
     void vehiculoDaoPersisteBuscaEliminaYBuscaPorEmpresa() {
         VehiculoDAO dao = new VehiculoDAO();
         injectEntityManager(dao);
-        Empresa empresa = new Empresa(13L, "Empresa vehículos", "Razón social", "Dirección", null);
+        Empresa empresa = new Empresa(13L, "Empresa vehículos", "Razón social", "Dirección");
         Vehiculo vehiculo = new Vehiculo("ABC-456", "Ford", "EcoSport", 1200L, 500L, empresa);
 
         beginTransaction();
@@ -142,7 +118,7 @@ class DAOIntegrationTest {
     void guiaDaoPersisteBuscaActualizaYFiltraLasGuias() {
         GuiaDAO dao = new GuiaDAO();
         injectEntityManager(dao);
-        Empresa empresa = new Empresa(14L, "Empresa guías", "Razón social", "Dirección", null);
+        Empresa empresa = new Empresa(14L, "Empresa guías", "Razón social", "Dirección");
         Guia guia = new Guia("GUIA-2", "Transporte", 100L,
                 LocalDate.of(2026, 10, 7), "La Plata", "Buenos Aires", empresa);
 

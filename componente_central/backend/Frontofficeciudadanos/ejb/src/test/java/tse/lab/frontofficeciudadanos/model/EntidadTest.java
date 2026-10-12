@@ -32,16 +32,6 @@ class EntidadTest {
     }
 
     @Test
-    void responsableMantieneSusPropiedades() {
-        Empresa empresa = new Empresa();
-        Responsable responsable = new Responsable("CI-2", "responsable@example.com", empresa);
-
-        assertEquals("CI-2", responsable.getCi());
-        assertEquals("responsable@example.com", responsable.getEmail());
-        assertSame(empresa, responsable.getEmpresa());
-    }
-
-    @Test
     void vehiculoMantieneSusPropiedades() {
         Empresa empresa = new Empresa();
         Vehiculo vehiculo = new Vehiculo("ABC-123", "Toyota", "Corolla", 1200L, 500L, empresa);

@@ -17,6 +17,11 @@ on:
         description: Archivo a guardar, relativo a la carpeta del proyecto
         type: string
         required: true
+      install-first:
+        description: Proyecto Maven del que depende y que se instala antes (por ejemplo un api de EJB remoto)
+        type: string
+        required: false
+        default: ""
 
 jobs:
   build:
@@ -33,6 +38,10 @@ jobs:
           distribution: temurin
           java-version: "24"
           cache: maven
+
+      - name: Instalar proyecto del que depende
+        if: inputs.install-first != ''
+        run: mvn -B -f "${{ inputs.install-first }}/pom.xml" install -DskipTests
 
       - name: Compilar y ejecutar tests
         run: mvn -B -f "${{ inputs.path }}/pom.xml" clean verify

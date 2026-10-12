@@ -17,11 +17,11 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
-import tse.lab.frontofficeciudadanos.service.GuiasService;
-import tse.lab.frontofficeciudadanos.service.GuiasService.Cancelacion;
-import tse.lab.frontofficeciudadanos.service.GuiasService.EdicionGuia;
-import tse.lab.frontofficeciudadanos.service.GuiasService.NuevaGuia;
-import tse.lab.frontofficeciudadanos.service.GuiasService.Reasignacion;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.Cancelacion;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.EdicionGuia;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.NuevaGuia;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.Reasignacion;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -29,15 +28,13 @@ class EmpresaTest {
 
     @Test
     void constructorConDatosInicializaPropiedadesYColeccionesVacias() {
-        Responsable responsable = new Responsable("CI-1", "responsable@example.com", null);
-        Empresa empresa = new Empresa(42L, "Nombre de la empresa", "Razón social", "Dirección", responsable);
+        Empresa empresa = new Empresa(42L, "Nombre de la empresa", "Razón social", "Dirección");
 
         assertAll(
                 () -> assertEquals(42L, empresa.getNroEmpresa()),
                 () -> assertEquals("Nombre de la empresa", empresa.getNombrePublico()),
                 () -> assertEquals("Razón social", empresa.getRazonSocial()),
                 () -> assertEquals("Dirección", empresa.getDireccion()),
-                () -> assertSame(responsable, empresa.getResponsable()),
                 () -> assertTrue(empresa.getChoferes().isEmpty()),
                 () -> assertTrue(empresa.getGuias().isEmpty()),
                 () -> assertTrue(empresa.getVehiculos().isEmpty()));
@@ -46,7 +43,6 @@ class EmpresaTest {
     @Test
     void settersActualizanLosDatosYLasRelacionesDeLaEmpresa() {
         Empresa empresa = new Empresa();
-        Responsable responsable = new Responsable("CI-2", "otro@example.com", empresa);
         Chofer chofer = new Chofer("CI-3", "chofer@example.com", empresa);
         Guia guia = new Guia("GUIA-1", "Transporte", 100L, null, "Orígen", "Destino", empresa);
         Vehiculo vehiculo = new Vehiculo("ABC-123", "Toyota", "Corolla", 1200L, 500L, empresa);
@@ -55,7 +51,6 @@ class EmpresaTest {
         empresa.setNombrePublico("Nueva empresa");
         empresa.setRazonSocial("Nueva razón social");
         empresa.setDireccion("Nueva dirección");
-        empresa.setResponsable(responsable);
         empresa.setChoferes(new ArrayList<>(List.of(chofer)));
         empresa.setGuias(new ArrayList<>(List.of(guia)));
         empresa.setVehiculos(new ArrayList<>(List.of(vehiculo)));
@@ -65,7 +60,6 @@ class EmpresaTest {
                 () -> assertEquals("Nueva empresa", empresa.getNombrePublico()),
                 () -> assertEquals("Nueva razón social", empresa.getRazonSocial()),
                 () -> assertEquals("Nueva dirección", empresa.getDireccion()),
-                () -> assertSame(responsable, empresa.getResponsable()),
                 () -> assertEquals(List.of(chofer), empresa.getChoferes()),
                 () -> assertEquals(List.of(guia), empresa.getGuias()),
                 () -> assertEquals(List.of(vehiculo), empresa.getVehiculos()));

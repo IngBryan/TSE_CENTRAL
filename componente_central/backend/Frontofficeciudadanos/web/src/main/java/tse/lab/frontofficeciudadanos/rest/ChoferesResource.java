@@ -14,7 +14,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import tse.lab.frontofficeciudadanos.service.AltaChoferService;
+import tse.lab.frontofficeciudadanos.service.gestionchoferes.AltaChoferService;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 
 // CU-02 Dar de alta chofer en la empresa. Lo consume el frontoffice de Next.

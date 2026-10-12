@@ -14,12 +14,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
-import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.model.Empresa;
 import tse.lab.frontofficeciudadanos.model.EstadoValidacion;
 import tse.lab.frontofficeciudadanos.model.PerfilCiudadano;
-import tse.lab.frontofficeciudadanos.model.Responsable;
 import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.CambiosEmpresa;
 import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.DatosEmpresa;
 
@@ -37,18 +36,18 @@ class PerfilEmpresaServiceTest {
         emf = Persistence.createEntityManagerFactory("frontofficeciudadanosTestPersistenceUnit");
         em = emf.createEntityManager();
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
-        set(autorizacion, "responsables", conEm(new ResponsableDAO()));
+        set(autorizacion, "responsables", new ResponsablesFalsos().con(RESPONSABLE, 1L));
+        set(autorizacion, "empresas", conEm(new EmpresaDAO()));
         set(autorizacion, "perfiles", conEm(new PerfilCiudadanoDAO()));
         servicio = new PerfilEmpresaService();
         set(servicio, "autorizacion", autorizacion);
 
         // Empresa NO habilitada: el responsable igual puede ver y editar sus datos
-        Empresa empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", null);
+        Empresa empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29");
         PerfilCiudadano perfil = new PerfilCiudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
         perfil.setEstado(EstadoValidacion.VALIDADO);
         em.getTransaction().begin();
         em.persist(empresa);
-        em.persist(new Responsable(RESPONSABLE, "r@prueba.uy", empresa));
         em.persist(perfil);
         em.getTransaction().commit();
     }

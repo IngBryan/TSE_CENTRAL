@@ -12,9 +12,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import tse.lab.frontofficeciudadanos.service.ViajesChoferService;
-import tse.lab.frontofficeciudadanos.service.ViajesChoferService.NuevoEvento;
-import tse.lab.frontofficeciudadanos.service.ViajesChoferService.ResultadoEvento;
+import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService;
+import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.NuevoEvento;
+import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.ResultadoEvento;
 
 // API de la app movil del chofer. No la llama el movil directamente: pasa por el servidor de Next
 // (BFF), que valida el token del movil y manda la cedula en X-Usuario-Ci junto con la X-Api-Key

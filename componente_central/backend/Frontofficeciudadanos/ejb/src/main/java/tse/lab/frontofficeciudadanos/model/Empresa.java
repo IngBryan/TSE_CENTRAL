@@ -6,7 +6,6 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import java.util.ArrayList;
@@ -24,9 +23,7 @@ public class Empresa implements Serializable {
     private String direccion;
     // La habilita un funcionario del MTOP; solo una empresa habilitada puede dar de alta choferes (CU-02)
     private boolean habilitada;
-    @OneToOne(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE }) // lo defini como one to one,
-                                                                                          // comenten si les parece
-    private Responsable responsable;
+    // El responsable vive en Frontofficefuncionarios (tabla responsables, columna nro_empresa)
     @OneToMany(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<Chofer> choferes;
     @OneToMany(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
@@ -40,13 +37,11 @@ public class Empresa implements Serializable {
         this.vehiculos = new ArrayList<>();
     }
 
-    public Empresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            Responsable responsable) {
+    public Empresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion) {
         this.nroEmpresa = nroEmpresa;
         this.nombrePublico = nombrePublico;
         this.razonSocial = razonSocial;
         this.direccion = direccion;
-        this.responsable = responsable;
         this.choferes = new ArrayList<>(); /* inicialmente no tiene choferes asignados */
         this.guias = new ArrayList<>(); /* inicialmente no tiene guias asignadas */
         this.vehiculos = new ArrayList<>(); /* inicialmente no tiene vehiculos asignados */
@@ -76,10 +71,6 @@ public class Empresa implements Serializable {
         this.habilitada = habilitada;
     }
 
-    public Responsable getResponsable() {
-        return responsable;
-    }
-
     public List<Chofer> getChoferes() {
         return choferes;
     }
@@ -106,10 +97,6 @@ public class Empresa implements Serializable {
 
     public void setDireccion(String direccion) {
         this.direccion = direccion;
-    }
-
-    public void setResponsable(Responsable responsable) {
-        this.responsable = responsable;
     }
 
     public void setChoferes(List<Chofer> choferes) {

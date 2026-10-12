@@ -7,7 +7,6 @@
         <class>tse.lab.frontofficeciudadanos.model.Guia</class>
         <class>tse.lab.frontofficeciudadanos.model.Vehiculo</class>
         <class>tse.lab.frontofficeciudadanos.model.Chofer</class>
-        <class>tse.lab.frontofficeciudadanos.model.Responsable</class>
         <class>tse.lab.frontofficeciudadanos.model.PerfilCiudadano</class>
         <class>tse.lab.frontofficeciudadanos.model.RegistroConsultaPersona</class>
         <class>tse.lab.frontofficeciudadanos.model.EventoViaje</class>

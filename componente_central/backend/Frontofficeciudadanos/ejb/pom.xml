@@ -14,6 +14,14 @@
 
     <dependencies>
 
+        <!-- Vista remota (EJB) de los responsables de empresa, que viven en Frontofficefuncionarios.
+            Hay que instalarla antes: mvn -f ../Frontofficefuncionarios/pom.xml install -->
+        <dependency>
+            <groupId>tse.lab.frontofficefuncionarios</groupId>
+            <artifactId>frontofficefuncionarios-api</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+
         <!-- Import the CDI API, we use provided scope as the API is included in WildFly / JBoss EAP -->
         <dependency>
             <groupId>jakarta.enterprise</groupId>

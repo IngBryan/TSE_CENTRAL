@@ -14,6 +14,13 @@
 
     <dependencies>
 
+        <!-- Interfaces remotas que implementa este modulo (va en el lib del EAR) -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>frontofficefuncionarios-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Import the CDI API, we use provided scope as the API is included in WildFly / JBoss EAP -->
         <dependency>
             <groupId>jakarta.enterprise</groupId>
@@ -25,6 +32,18 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>7.4.5.Final</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.4.240</version>
             <scope>test</scope>
         </dependency>
 

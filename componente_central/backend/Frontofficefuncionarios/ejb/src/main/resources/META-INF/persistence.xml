@@ -12,6 +12,8 @@
          <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
          <property name="jakarta.persistence.schema-generation.create-source" value="metadata"/>
          <property name="jakarta.persistence.schema-generation.drop-source" value="metadata"/>
+         <!-- Solo desarrollo: responsable de prueba (se recarga en cada deploy) -->
+         <property name="jakarta.persistence.sql-load-script-source" value="META-INF/datos-prueba.sql"/>
 
          <property name="hibernate.show_sql" value="true" />
       </properties>

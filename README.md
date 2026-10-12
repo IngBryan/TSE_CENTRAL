@@ -46,6 +46,11 @@ mvn clean install
 mvn wildfly:deploy -pl ear
 ```
 
+Frontofficeciudadanos consulta los responsables de empresa a Frontofficefuncionarios por EJB remoto
+(modulo `Frontofficefuncionarios/api`). Para compilarlo, instalar antes Frontofficefuncionarios
+(`mvn -f componente_central/backend/Frontofficefuncionarios/pom.xml install`) y, para que funcione,
+desplegar los dos EAR en el mismo WildFly.
+
 ### componente_central/frontend
 
 Tres apps Next.js (una por cada frontend de negocio del backend), mismo stack que

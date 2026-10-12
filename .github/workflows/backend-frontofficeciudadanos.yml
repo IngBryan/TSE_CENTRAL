@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - componente_central/backend/Frontofficeciudadanos/**
+      # Usa el api de EJB remoto de Frontofficefuncionarios
+      - componente_central/backend/Frontofficefuncionarios/api/**
       - .github/workflows/backend-frontofficeciudadanos.yml
       - .github/workflows/_build-backend.yml
   workflow_dispatch:
@@ -18,3 +20,4 @@ jobs:
       path: componente_central/backend/Frontofficeciudadanos
       artifact-name: backend-frontofficeciudadanos
       artifact: ear/target/*.ear
+      install-first: componente_central/backend/Frontofficefuncionarios
