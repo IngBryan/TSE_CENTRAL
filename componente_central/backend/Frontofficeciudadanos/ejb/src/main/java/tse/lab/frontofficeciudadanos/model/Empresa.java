@@ -22,8 +22,6 @@ public class Empresa implements Serializable {
     private String nombrePublico;
     private String razonSocial;
     private String direccion;
-    // La habilita un funcionario del MTOP; solo una empresa habilitada puede dar de alta choferes (CU-02)
-    private boolean habilitada;
     @OneToOne(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE }) // lo defini como one to one,
                                                                                           // comenten si les parece
     private Responsable responsable;
@@ -66,14 +64,6 @@ public class Empresa implements Serializable {
 
     public String getDireccion() {
         return direccion;
-    }
-
-    public boolean isHabilitada() {
-        return habilitada;
-    }
-
-    public void setHabilitada(boolean habilitada) {
-        this.habilitada = habilitada;
     }
 
     public Responsable getResponsable() {
