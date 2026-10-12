@@ -18,3 +18,7 @@ jobs:
       path: componente_central/backend/Fiscalizacionautomatica
       artifact-name: backend-fiscalizacionautomatica
       artifact: target/*.jar
+      sonar-project-key: tse-central-backend-fiscalizacionautomatica
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

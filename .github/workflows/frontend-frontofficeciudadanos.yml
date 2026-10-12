@@ -18,6 +18,10 @@ jobs:
     with:
       path: componente_central/frontend/frontofficeciudadanos
       artifact-name: frontend-frontofficeciudadanos
+      sonar-project-key: tse-central-frontend-frontofficeciudadanos
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   docker:
     needs: frontend

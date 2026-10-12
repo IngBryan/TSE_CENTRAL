@@ -18,6 +18,10 @@ jobs:
     with:
       path: componente_central/frontend/backofficeautoridadesadministradores
       artifact-name: frontend-backofficeautoridadesadministradores
+      sonar-project-key: tse-central-frontend-backofficeautoridadesadm
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   docker:
     needs: frontend
