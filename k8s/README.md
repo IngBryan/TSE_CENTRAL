@@ -23,18 +23,32 @@ Cada frontend dispone de su propio Deployment, Service e Ingress.
 
 **Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ y los persiste en MongoDB. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP.
 
-### Infraestructura
+### Infraestructura externa
 
-- PostgreSQL
-- MongoDB
-- RabbitMQ
+PostgreSQL, MongoDB y RabbitMQ se encuentran alojados en ANTEL Elastic Cloud, fuera del cluster Kubernetes.
 
-Los tres servicios disponen de almacenamiento persistente mediante PVC.
+Para acceder a estos servicios, Kubernetes utiliza Services de tipo `ExternalName`, definidos en `k8s/infrastructure/`.
+
+| Service | Destino | Puerto |
+|---|---|---|
+| `postgres` | `tse-postgres.web.elasticloud.uy` | 5432 |
+| `mongodb` | `tse-mongo.web.elasticloud.uy` | 27017 |
+| `rabbitmq` | `tse-rabbitmq.web.elasticloud.uy` | 5672 |
+
+Las aplicaciones utilizan los nombres internos `postgres`, `mongodb` y `rabbitmq`, sin depender directamente de los dominios externos.
+
+La configuración inicial de RabbitMQ se encuentra en `rabbitmq/definitions.json`, que define el exchange `tracking`, la cola `tracking.events` y su binding con routing key `tracking.event`.
+
+La inicialización de MongoDB se encuentra en `mongodb/init/01-tracking.js`, que crea la colección `tracking`.
+
+Estas configuraciones deben estar aplicadas en las instancias correspondientes de Elastic Cloud.
+
+Las credenciales de conexión se proporcionan mediante el Secret Kubernetes `tse-runtime-secrets`.
 
 ## Organización
 
 - `k8s/apps/`: manifiestos de cada aplicación y sus archivos Kustomize.
-- `k8s/infrastructure/`: PostgreSQL, MongoDB y RabbitMQ.
+- `k8s/infrastructure/`: Services `ExternalName` para conectar con PostgreSQL, MongoDB y RabbitMQ alojados en ANTEL Elastic Cloud.
 - `k8s/argocd/`: Applications de Argo CD y configuraciones de Image Updater.
 
 ## Publicación y actualización
@@ -50,7 +64,7 @@ sha-<commit>
 
 Argo CD Image Updater detecta las nuevas imágenes y actualiza la aplicación correspondiente. Argo CD sincroniza los cambios con Kubernetes.
 
-Las imágenes de PostgreSQL, MongoDB y RabbitMQ se definen directamente en los manifiestos y no utilizan Image Updater.
+PostgreSQL, MongoDB y RabbitMQ se administran externamente en ANTEL Elastic Cloud, por lo que sus imágenes y actualizaciones no son gestionadas mediante los manifiestos Kubernetes de este repositorio ni por Image Updater.
 
 ## Configuración inicial
 
@@ -85,6 +99,8 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=rabbitmq-user='<RABBITMQ_USER>' \
   --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>'
 ```
+
+Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.
 
 ### 3. Instalar Argo CD e Image Updater
 
@@ -169,8 +185,25 @@ kubectl -n tse get deployments
 kubectl -n tse get pods
 kubectl -n tse get services
 kubectl -n tse get ingress
-kubectl -n tse get pvc
 ```
+
+### Comprobar servicios externos
+
+Verificar que los Services Kubernetes apunten a los destinos configurados en Elastic Cloud:
+
+```bash
+kubectl -n tse get svc postgres mongodb rabbitmq -o wide
+```
+
+Para validar la conectividad real, se deben comprobar desde un pod del cluster las conexiones TCP a los siguientes servicios:
+
+- PostgreSQL: `postgres:5432`
+- MongoDB: `mongodb:27017`
+- RabbitMQ: `rabbitmq:5672`
+
+Los Services de tipo `ExternalName` proporcionan resolución DNS, pero no garantizan por sí solos que los destinos externos acepten conexiones TCP.
+
+También deben verificarse las credenciales y la inicialización correspondiente de MongoDB y RabbitMQ.
 
 ### Consultar logs
 
@@ -237,6 +270,6 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 - **Argo CD no accede al repositorio:** verificar `repo-tse-central`.
 - **Image Updater no detecta imágenes:** revisar sus logs y `ghcr-credentials` en `argocd`.
 - **Contenedores sin credenciales:** verificar las claves de `tse-runtime-secrets`.
-- **PVC en Pending:** comprobar la StorageClass y el almacenamiento disponible.
+- **Error de conexión con infraestructura externa:** comprobar resolución DNS, conectividad TCP, puertos, credenciales y disponibilidad de los servicios en Elastic Cloud.
 - **WildFly no inicia:** revisar logs y conectividad con PostgreSQL.
 - **Fiscalización no consume eventos:** revisar la conexión a RabbitMQ, la cola `tracking.events` y MongoDB.

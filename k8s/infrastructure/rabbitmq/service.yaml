@@ -3,12 +3,8 @@ kind: Service
 metadata:
   name: rabbitmq
 spec:
-  selector:
-    app: rabbitmq
+  type: ExternalName
+  externalName: tse-rabbitmq.web.elasticloud.uy
   ports:
     - name: amqp
       port: 5672
-      targetPort: amqp
-    - name: management
-      port: 15672
-      targetPort: management

@@ -3,9 +3,8 @@ kind: Service
 metadata:
   name: mongodb
 spec:
-  selector:
-    app: mongodb
+  type: ExternalName
+  externalName: tse-mongo.web.elasticloud.uy
   ports:
     - name: mongodb
       port: 27017
-      targetPort: mongodbnun

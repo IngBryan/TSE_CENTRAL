@@ -4,7 +4,4 @@ kind: Kustomization
 namespace: tse
 
 resources:
-  - configmap.yaml
-  - pvc.yaml
-  - deployment.yaml
   - service.yaml
