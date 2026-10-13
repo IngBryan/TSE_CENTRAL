@@ -5,6 +5,15 @@ on:
   push:
     branches:
       - main
+      - dev
+    paths:
+      - componente_central/frontend/backofficeautoridadesadministradores/**
+      - .github/workflows/frontend-backofficeautoridadesadministradores.yml
+      - .github/workflows/_build-frontend.yml
+      - .github/workflows/_docker-image.yml
+  pull_request:
+    branches:
+      - dev
     paths:
       - componente_central/frontend/backofficeautoridadesadministradores/**
       - .github/workflows/frontend-backofficeautoridadesadministradores.yml

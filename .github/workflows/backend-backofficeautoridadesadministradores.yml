@@ -5,12 +5,23 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - componente_central/backend/Backofficeautoridadesadministradores/**
       - .github/workflows/backend-backofficeautoridadesadministradores.yml
       - .github/workflows/_build-backend.yml
-  workflow_dispatch:
+  
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/Backofficeautoridadesadministradores/**
+      - .github/workflows/backend-backofficeautoridadesadministradores.yml
+      - .github/workflows/_build-backend.yml
 
+  workflow_dispatch:
+  
+    
 jobs:
   backend:
     uses: ./.github/workflows/_build-backend.yml
