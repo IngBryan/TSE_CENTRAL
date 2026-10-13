@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.model.Chofer;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.Guia;
 import tse.lab.model.Responsable;
@@ -72,21 +73,22 @@ class DAOIntegrationTest {
         ResponsableDAO dao = new ResponsableDAO();
         injectEntityManager(dao);
         Empresa empresa = new Empresa(11L, "Empresa responsable", "Razón social", "Dirección", null);
-        Responsable responsable = new Responsable("CI-3", "responsable@example.com", empresa);
+        Ciudadano persona = new Ciudadano("CI-3", "responsable@example.com", null);
+        Responsable responsable = new Responsable(persona, empresa);
 
         beginTransaction();
         entityManager.persist(empresa);
+        entityManager.persist(persona);
         dao.guardar(responsable);
         commitTransaction();
 
         beginTransaction();
         Responsable encontrada = dao.buscarPorCi("CI-3");
-        encontrada.setEmail("actualizado@example.com");
         Responsable actualizada = dao.actualizar(encontrada);
         commitTransaction();
 
         assertNotNull(actualizada);
-        assertEquals("actualizado@example.com", actualizada.getEmail());
+        assertEquals("responsable@example.com", actualizada.getCiudadano().getEmail());
         assertSame(empresa, actualizada.getEmpresa());
     }
 
@@ -95,10 +97,12 @@ class DAOIntegrationTest {
         ChoferDAO dao = new ChoferDAO();
         injectEntityManager(dao);
         Empresa empresa = new Empresa(12L, "Empresa choferes", "Razón social", "Dirección", null);
-        Chofer chofer = new Chofer("CI-4", "chofer@example.com", empresa);
+        Ciudadano persona = new Ciudadano("CI-4", "chofer@example.com", null);
+        Chofer chofer = new Chofer(persona, empresa);
 
         beginTransaction();
         entityManager.persist(empresa);
+        entityManager.persist(persona);
         dao.guardar(chofer);
         commitTransaction();
 

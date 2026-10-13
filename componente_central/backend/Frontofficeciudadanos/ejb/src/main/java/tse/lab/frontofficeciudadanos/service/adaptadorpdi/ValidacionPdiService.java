@@ -10,10 +10,10 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.inject.Inject;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.model.Chofer;
 import tse.lab.model.EstadoValidacion;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 
 // CU-03 Validar ciudadano contra PDI. Lo incluyen CU-01 (ingreso con gub.uy), CU-02 (alta de
 // chofer) y CU-04 (reintento de validaciones pendientes).
@@ -26,7 +26,7 @@ public class ValidacionPdiService {
     private ClientePdi clientePdi;
 
     @EJB
-    private PerfilCiudadanoDAO perfiles;
+    private CiudadanoDAO perfiles;
 
     @EJB
     private ChoferDAO choferes;
@@ -34,7 +34,7 @@ public class ValidacionPdiService {
     // Lo que CU-01 y CU-02 hacen con una persona que ya tiene registro: VALIDADO no consulta la
     // PDI; PENDIENTE_VALIDACION la consulta; RECHAZADO es NO_EXISTE; NO_HABILITADO es MENOR_DE_EDAD
     // salvo que ya haya cumplido 18 desde la ultima validacion, en cuyo caso se vuelve a consultar.
-    public ResultadoValidacion validarSiCorresponde(PerfilCiudadano perfil, String correlationId) {
+    public ResultadoValidacion validarSiCorresponde(Ciudadano perfil, String correlationId) {
         return switch (perfil.getEstado()) {
             case VALIDADO -> ResultadoValidacion.VALIDADO;
             case PENDIENTE_VALIDACION -> validar(perfil, correlationId);
@@ -45,7 +45,7 @@ public class ValidacionPdiService {
         };
     }
 
-    public ResultadoValidacion validar(PerfilCiudadano perfil, String correlationId) {
+    public ResultadoValidacion validar(Ciudadano perfil, String correlationId) {
         ResultadoValidacion resultado;
         Optional<DatosPersonaPdi> datos;
         try {
@@ -93,7 +93,7 @@ public class ValidacionPdiService {
         return resultado;
     }
 
-    private static void log(String correlationId, PerfilCiudadano perfil, ResultadoValidacion resultado) {
+    private static void log(String correlationId, Ciudadano perfil, ResultadoValidacion resultado) {
         LOG.log(resultado == ResultadoValidacion.NO_DISPONIBLE ? Level.WARNING : Level.INFO,
                 () -> "evento=pdi.validacion correlationId=" + correlationId + " ci=" + perfil.getCi()
                         + " resultado=" + resultado + " estado=" + perfil.getEstado());

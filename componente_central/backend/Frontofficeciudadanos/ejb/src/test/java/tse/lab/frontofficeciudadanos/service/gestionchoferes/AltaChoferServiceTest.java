@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ClientePdi;
@@ -35,7 +35,7 @@ import tse.lab.model.Chofer;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoValidacion;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
 
 // CU-02 contra H2 con los DAOs reales y una PDI simulada.
@@ -76,7 +76,7 @@ class AltaChoferServiceTest {
         pdi.personas.put("33333333", persona("Lucía", "Fernández", LocalDate.now().minusYears(16)));
 
         ResponsableDAO responsables = inyectarEm(new ResponsableDAO());
-        PerfilCiudadanoDAO perfiles = inyectarEm(new PerfilCiudadanoDAO());
+        CiudadanoDAO perfiles = inyectarEm(new CiudadanoDAO());
         ChoferDAO choferes = inyectarEm(new ChoferDAO());
         RegistroConsultaPersonaDAO auditoria = inyectarEm(new RegistroConsultaPersonaDAO());
         validacion = new ValidacionPdiService();
@@ -95,12 +95,12 @@ class AltaChoferServiceTest {
 
         empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Pando", null);
         empresa.setHabilitada(true);
-        PerfilCiudadano perfilResponsable = new PerfilCiudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
+        Ciudadano perfilResponsable = new Ciudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
         perfilResponsable.setEstado(EstadoValidacion.VALIDADO);
         enTransaccion(() -> {
             em.persist(empresa);
-            em.persist(new Responsable(RESPONSABLE, "r@prueba.uy", empresa));
             em.persist(perfilResponsable);
+            em.persist(new Responsable(perfilResponsable, empresa));
         });
     }
 
@@ -137,7 +137,7 @@ class AltaChoferServiceTest {
 
     @Test
     void fa2PersonaValidadaNoConsultaLaPdi() throws Exception {
-        PerfilCiudadano validada = new PerfilCiudadano("22222222", "m@prueba.uy", "sub-m");
+        Ciudadano validada = new Ciudadano("22222222", "m@prueba.uy", "sub-m");
         validada.setEstado(EstadoValidacion.VALIDADO);
         validada.setPrimerNombre("María");
         validada.setPrimerApellido("Rodríguez");
@@ -151,7 +151,7 @@ class AltaChoferServiceTest {
 
     @Test
     void fa3PersonaPendienteSeValida() throws Exception {
-        enTransaccion(() -> em.persist(new PerfilCiudadano("56087406", null, null)));
+        enTransaccion(() -> em.persist(new Ciudadano("56087406", null, null)));
         assertEquals(Resultado.CONFIRMAR,
                 enTransaccion(() -> servicio.consultar(RESPONSABLE, "56087406", "t")).resultado());
         assertEquals(1, pdi.consultas);
@@ -180,7 +180,7 @@ class AltaChoferServiceTest {
 
         // CU-04 (o un ingreso de la persona) la valida: la asociacion queda habilitada
         pdi.caida = false;
-        enTransaccion(() -> validacion.validar(em.find(PerfilCiudadano.class, "56087406"), "t"));
+        enTransaccion(() -> validacion.validar(em.find(Ciudadano.class, "56087406"), "t"));
         em.clear();
         assertEquals(EstadoChofer.HABILITADO, chofer("56087406").getEstado());
     }
@@ -191,7 +191,9 @@ class AltaChoferServiceTest {
         otra.setHabilitada(true);
         enTransaccion(() -> {
             em.persist(otra);
-            em.persist(new Chofer("56087406", null, otra));
+            Ciudadano persona = new Ciudadano("56087406", null, null);
+            em.persist(persona);
+            em.persist(new Chofer(persona, otra));
         });
         enTransaccion(() -> servicio.consultar(RESPONSABLE, "56087406", "t"));
         assertEquals(Resultado.ALTA_CONFIRMADA,
@@ -204,11 +206,11 @@ class AltaChoferServiceTest {
         assertThrows(NoAutorizadoException.class, () -> servicio.consultar("11111111", "56087406", "t"));
         assertThrows(NoAutorizadoException.class, () -> servicio.listar(null, "t"));
 
-        enTransaccion(() -> em.find(PerfilCiudadano.class, RESPONSABLE).setEstado(EstadoValidacion.PENDIENTE_VALIDACION));
+        enTransaccion(() -> em.find(Ciudadano.class, RESPONSABLE).setEstado(EstadoValidacion.PENDIENTE_VALIDACION));
         assertThrows(NoAutorizadoException.class, () -> servicio.consultar(RESPONSABLE, "56087406", "t"));
 
         enTransaccion(() -> {
-            em.find(PerfilCiudadano.class, RESPONSABLE).setEstado(EstadoValidacion.VALIDADO);
+            em.find(Ciudadano.class, RESPONSABLE).setEstado(EstadoValidacion.VALIDADO);
             em.find(Empresa.class, 1L).setHabilitada(false);
         });
         assertThrows(NoAutorizadoException.class, () -> servicio.confirmar(RESPONSABLE, "56087406", "t"));

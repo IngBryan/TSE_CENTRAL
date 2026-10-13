@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
@@ -17,7 +17,7 @@ import tse.lab.model.Chofer;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoValidacion;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.RegistroConsultaPersona;
 
 // CU-02 Dar de alta chofer en la empresa, en dos pasos:
@@ -36,7 +36,7 @@ public class AltaChoferService {
     @EJB
     private AutorizacionResponsable autorizacion;
     @EJB
-    private PerfilCiudadanoDAO perfiles;
+    private CiudadanoDAO perfiles;
     @EJB
     private ChoferDAO choferes;
     @EJB
@@ -59,9 +59,9 @@ public class AltaChoferService {
         }
 
         // Pasos 4 y 5: la persona puede existir por haber entrado con gub.uy o por ser chofer de otra empresa
-        PerfilCiudadano persona = perfiles.buscarPorCi(ciChofer);
+        Ciudadano persona = perfiles.buscarPorCi(ciChofer);
         if (persona == null) {
-            persona = new PerfilCiudadano(ciChofer, null, null);
+            persona = new Ciudadano(ciChofer, null, null);
             perfiles.guardar(persona);
         }
 
@@ -74,7 +74,7 @@ public class AltaChoferService {
             case MENOR_DE_EDAD -> ResultadoAltaChofer.de(Resultado.MENOR_DE_EDAD, ciChofer);
             case NO_DISPONIBLE -> {
                 // FA5: no hay nombre para confirmar; se asocia pendiente y no se puede asignar a viajes
-                choferes.guardar(new Chofer(ciChofer, persona.getEmail(), empresa, EstadoChofer.PENDIENTE_VALIDACION));
+                choferes.guardar(new Chofer(persona, empresa, EstadoChofer.PENDIENTE_VALIDACION));
                 yield new ResultadoAltaChofer(Resultado.ASOCIADO_PENDIENTE, ciChofer, null, null,
                         EstadoChofer.PENDIENTE_VALIDACION.name());
             }
@@ -92,14 +92,14 @@ public class AltaChoferService {
                     new ResultadoAltaChofer(Resultado.YA_ES_CHOFER, ciChofer, null, null, existente.getEstado().name()));
         }
         // Solo se confirma a alguien que la consulta dejo validado
-        PerfilCiudadano persona = perfiles.buscarPorCi(ciChofer);
+        Ciudadano persona = perfiles.buscarPorCi(ciChofer);
         if (persona == null || persona.getEstado() != EstadoValidacion.VALIDADO) {
             return registrar(ciResponsable, ciChofer, OP_CONFIRMACION, correlationId,
                     ResultadoAltaChofer.de(Resultado.DEBE_CONSULTAR, ciChofer));
         }
 
         // Paso 9: rol chofer, estado habilitado
-        Chofer chofer = new Chofer(ciChofer, persona.getEmail(), empresa, EstadoChofer.HABILITADO);
+        Chofer chofer = new Chofer(persona, empresa, EstadoChofer.HABILITADO);
         choferes.guardar(chofer);
         return registrar(ciResponsable, ciChofer, OP_CONFIRMACION, correlationId,
                 new ResultadoAltaChofer(Resultado.ALTA_CONFIRMADA, ciChofer, persona.getPrimerNombre(),
@@ -109,7 +109,7 @@ public class AltaChoferService {
     public List<ChoferVista> listar(String ciResponsable, String correlationId) throws NoAutorizadoException {
         Empresa empresa = empresaDelResponsable(ciResponsable, correlationId);
         return choferes.buscarPorEmpresa(empresa).stream().map(c -> {
-            PerfilCiudadano p = perfiles.buscarPorCi(c.getCi());
+            Ciudadano p = perfiles.buscarPorCi(c.getCi());
             return new ChoferVista(c.getCi(), p == null ? null : p.getPrimerNombre(),
                     p == null ? null : p.getPrimerApellido(), c.getEstado().name());
         }).toList();

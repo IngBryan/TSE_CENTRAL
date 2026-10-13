@@ -31,6 +31,7 @@ import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.Chofer;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoGuia;
@@ -65,13 +66,18 @@ class ViajesChoferServiceTest {
         Empresa norte = empresa(2L, "Fletes del Norte");
         Vehiculo camion = new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, este);
         Vehiculo otro = new Vehiculo("SNO 0001", "Volvo", "FH", 9000, 26000, norte);
-        Chofer enEste = new Chofer(CHOFER, null, este, EstadoChofer.HABILITADO);
-        Chofer enNorte = new Chofer(CHOFER, null, norte, EstadoChofer.HABILITADO);
-        Chofer otroChofer = new Chofer("33333333", null, este, EstadoChofer.HABILITADO);
-        Chofer pendiente = new Chofer("22222222", null, este, EstadoChofer.PENDIENTE_VALIDACION);
-        Chofer sinViajes = new Chofer("44444444", null, este, EstadoChofer.HABILITADO);
+        Ciudadano persona = new Ciudadano(CHOFER, null, null);
+        Ciudadano otraPersona = new Ciudadano("33333333", null, null);
+        Ciudadano personaPendiente = new Ciudadano("22222222", null, null);
+        Ciudadano personaSinViajes = new Ciudadano("44444444", null, null);
+        Chofer enEste = new Chofer(persona, este, EstadoChofer.HABILITADO);
+        Chofer enNorte = new Chofer(persona, norte, EstadoChofer.HABILITADO);
+        Chofer otroChofer = new Chofer(otraPersona, este, EstadoChofer.HABILITADO);
+        Chofer pendiente = new Chofer(personaPendiente, este, EstadoChofer.PENDIENTE_VALIDACION);
+        Chofer sinViajes = new Chofer(personaSinViajes, este, EstadoChofer.HABILITADO);
         em.getTransaction().begin();
-        for (Object o : List.of(este, norte, camion, otro, enEste, enNorte, otroChofer, pendiente, sinViajes)) {
+        for (Object o : List.of(este, norte, camion, otro, persona, otraPersona, personaPendiente, personaSinViajes,
+                enEste, enNorte, otroChofer, pendiente, sinViajes)) {
             em.persist(o);
         }
         em.persist(guia("GV-1", este, camion, enEste, LocalDate.of(2026, 10, 12)));

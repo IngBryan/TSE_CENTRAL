@@ -3,7 +3,6 @@ package tse.lab.model;
 import java.io.Serializable;
 import java.time.Instant;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,19 +14,20 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
-// Asociacion de una persona (por cedula) como chofer de una empresa. Una persona puede ser chofer
-// de varias empresas (CU-02), por eso la clave es un id propio y (ci, empresa) es unico. Las guias
-// (CU-07) referencian esta asociacion, asi el chofer asignado siempre es de la empresa de la guia.
+// Rol de un ciudadano como chofer de una empresa. Una persona puede ser chofer de varias empresas
+// (CU-02), por eso la clave es un id propio y (ci, empresa) es unico. Los datos de la persona estan en
+// Ciudadano. Las guias (CU-07) referencian esta asociacion, asi el chofer asignado siempre es de la
+// empresa de la guia.
 @Entity
 @Table(name = "choferes", uniqueConstraints = @UniqueConstraint(columnNames = { "ci", "nro_empresa" }))
-public class Chofer implements Serializable, Ciudadano {
+public class Chofer implements Serializable {
     private static final long serialVersionUID = 1L;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false)
-    private String ci;
-    private String email;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "ci", nullable = false)
+    private Ciudadano ciudadano;
     @ManyToOne
     @JoinColumn(name = "nro_empresa")
     private Empresa empresa;
@@ -38,13 +38,12 @@ public class Chofer implements Serializable, Ciudadano {
     public Chofer() {
     }
 
-    public Chofer(String ci, String email, Empresa empresa) {
-        this(ci, email, empresa, EstadoChofer.HABILITADO);
+    public Chofer(Ciudadano ciudadano, Empresa empresa) {
+        this(ciudadano, empresa, EstadoChofer.HABILITADO);
     }
 
-    public Chofer(String ci, String email, Empresa empresa, EstadoChofer estado) {
-        this.ci = ci;
-        this.email = email;
+    public Chofer(Ciudadano ciudadano, Empresa empresa, EstadoChofer estado) {
+        this.ciudadano = ciudadano;
         this.empresa = empresa;
         this.estado = estado;
         this.fechaAlta = Instant.now();
@@ -54,28 +53,20 @@ public class Chofer implements Serializable, Ciudadano {
         return id;
     }
 
+    public Ciudadano getCiudadano() {
+        return ciudadano;
+    }
+
     public String getCi() {
-        return ci;
+        return ciudadano == null ? null : ciudadano.getCi();
     }
 
     public Empresa getEmpresa() {
         return empresa;
     }
 
-    public void setCi(String ci) {
-        this.ci = ci;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public EstadoChofer getEstado() {

@@ -8,7 +8,7 @@
         <class>tse.lab.model.Vehiculo</class>
         <class>tse.lab.model.Chofer</class>
         <class>tse.lab.model.Responsable</class>
-        <class>tse.lab.model.PerfilCiudadano</class>
+        <class>tse.lab.model.Ciudadano</class>
         <class>tse.lab.model.RegistroConsultaPersona</class>
         <class>tse.lab.model.EventoViaje</class>
         <class>tse.lab.model.ModificacionGuia</class>

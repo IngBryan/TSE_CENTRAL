@@ -20,13 +20,13 @@ public class ChoferDAO {
 
     // Una persona puede ser chofer de varias empresas: devuelve todas sus asociaciones.
     public List<Chofer> buscarPorCi(String ci) {
-        return em.createQuery("SELECT c FROM Chofer c WHERE c.ci = :ci", Chofer.class)
+        return em.createQuery("SELECT c FROM Chofer c WHERE c.ciudadano.ci = :ci", Chofer.class)
                 .setParameter("ci", ci)
                 .getResultList();
     }
 
     public Chofer buscarPorCiYEmpresa(String ci, Empresa empresa) {
-        return em.createQuery("SELECT c FROM Chofer c WHERE c.ci = :ci AND c.empresa = :empresa", Chofer.class)
+        return em.createQuery("SELECT c FROM Chofer c WHERE c.ciudadano.ci = :ci AND c.empresa = :empresa", Chofer.class)
                 .setParameter("ci", ci)
                 .setParameter("empresa", empresa)
                 .getResultStream()
@@ -56,7 +56,7 @@ public class ChoferDAO {
     // CU-02 FA5 6c: cuando la persona queda validada se habilitan sus asociaciones pendientes.
     public List<Chofer> habilitarPendientes(String ci) {
         List<Chofer> pendientes = em.createQuery(
-                "SELECT c FROM Chofer c WHERE c.ci = :ci AND c.estado = :pendiente", Chofer.class)
+                "SELECT c FROM Chofer c WHERE c.ciudadano.ci = :ci AND c.estado = :pendiente", Chofer.class)
                 .setParameter("ci", ci)
                 .setParameter("pendiente", EstadoChofer.PENDIENTE_VALIDACION)
                 .getResultList();

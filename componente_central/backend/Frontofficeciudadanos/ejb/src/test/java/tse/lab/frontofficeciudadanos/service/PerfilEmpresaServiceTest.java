@@ -14,13 +14,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.CambiosEmpresa;
 import tse.lab.frontofficeciudadanos.service.PerfilEmpresaService.DatosEmpresa;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
 
 // Perfil de la Empresa contra H2 con los DAOs reales.
@@ -38,18 +38,18 @@ class PerfilEmpresaServiceTest {
         em = emf.createEntityManager();
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
         set(autorizacion, "responsables", conEm(new ResponsableDAO()));
-        set(autorizacion, "perfiles", conEm(new PerfilCiudadanoDAO()));
+        set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));
         servicio = new PerfilEmpresaService();
         set(servicio, "autorizacion", autorizacion);
 
         // Empresa NO habilitada: el responsable igual puede ver y editar sus datos
         Empresa empresa = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", null);
-        PerfilCiudadano perfil = new PerfilCiudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
+        Ciudadano perfil = new Ciudadano(RESPONSABLE, "r@prueba.uy", "sub-r");
         perfil.setEstado(EstadoValidacion.VALIDADO);
         em.getTransaction().begin();
         em.persist(empresa);
-        em.persist(new Responsable(RESPONSABLE, "r@prueba.uy", empresa));
         em.persist(perfil);
+        em.persist(new Responsable(perfil, empresa));
         em.getTransaction().commit();
     }
 
@@ -97,7 +97,7 @@ class PerfilEmpresaServiceTest {
                 () -> servicio.actualizar(null, new CambiosEmpresa("a", "b", "c"), "t"));
 
         em.getTransaction().begin();
-        em.find(PerfilCiudadano.class, RESPONSABLE).setEstado(EstadoValidacion.PENDIENTE_VALIDACION);
+        em.find(Ciudadano.class, RESPONSABLE).setEstado(EstadoValidacion.PENDIENTE_VALIDACION);
         em.getTransaction().commit();
         assertThrows(NoAutorizadoException.class, () -> servicio.obtener(RESPONSABLE, "t"));
     }

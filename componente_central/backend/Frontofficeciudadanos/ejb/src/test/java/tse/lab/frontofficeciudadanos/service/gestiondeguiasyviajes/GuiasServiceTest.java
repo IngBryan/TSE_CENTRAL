@@ -22,7 +22,7 @@ import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService;
@@ -40,7 +40,7 @@ import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoGuia;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Guia;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
 import tse.lab.model.Vehiculo;
 
@@ -61,7 +61,7 @@ class GuiasServiceTest {
     void setUp() throws Exception {
         emf = Persistence.createEntityManagerFactory("frontofficeciudadanosTestPersistenceUnit");
         em = emf.createEntityManager();
-        PerfilCiudadanoDAO perfiles = conEm(new PerfilCiudadanoDAO());
+        CiudadanoDAO perfiles = conEm(new CiudadanoDAO());
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
         set(autorizacion, "responsables", conEm(new ResponsableDAO()));
         set(autorizacion, "perfiles", perfiles);
@@ -78,16 +78,21 @@ class GuiasServiceTest {
         empresa.setHabilitada(true);
         Empresa otra = new Empresa(2L, "Otra", "Otra S.A.", "Montevideo", null);
         otra.setHabilitada(true);
-        PerfilCiudadano responsable = validado(RESPONSABLE, "Emiliano", "Tomas");
-        Chofer habilitado = new Chofer("56087406", null, empresa, EstadoChofer.HABILITADO);
-        Chofer pendiente = new Chofer("22222222", null, empresa, EstadoChofer.PENDIENTE_VALIDACION);
-        Chofer deOtra = new Chofer("77777777", null, otra, EstadoChofer.HABILITADO);
+        Ciudadano responsable = validado(RESPONSABLE, "Emiliano", "Tomas");
+        Ciudadano bryan = validado("56087406", "Bryan", "Salamone");
+        Ciudadano personaPendiente = new Ciudadano("22222222", null, null);
+        Ciudadano personaDeOtra = new Ciudadano("77777777", null, null);
+        Chofer habilitado = new Chofer(bryan, empresa, EstadoChofer.HABILITADO);
+        Chofer pendiente = new Chofer(personaPendiente, empresa, EstadoChofer.PENDIENTE_VALIDACION);
+        Chofer deOtra = new Chofer(personaDeOtra, otra, EstadoChofer.HABILITADO);
         em.getTransaction().begin();
         em.persist(empresa);
         em.persist(otra);
-        em.persist(new Responsable(RESPONSABLE, null, empresa));
         em.persist(responsable);
-        em.persist(validado("56087406", "Bryan", "Salamone"));
+        em.persist(new Responsable(responsable, empresa));
+        em.persist(bryan);
+        em.persist(personaPendiente);
+        em.persist(personaDeOtra);
         em.persist(new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, empresa));
         em.persist(new Vehiculo("OTR 0001", "Ford", "Cargo", 5000, 8000, otra));
         em.persist(habilitado);
@@ -369,7 +374,9 @@ class GuiasServiceTest {
 
     private Long otroChoferHabilitado() throws Exception {
         return enTx(() -> {
-            Chofer c = new Chofer("33333333", null, em.find(Empresa.class, 1L), EstadoChofer.HABILITADO);
+            Ciudadano persona = new Ciudadano("33333333", null, null);
+            em.persist(persona);
+            Chofer c = new Chofer(persona, em.find(Empresa.class, 1L), EstadoChofer.HABILITADO);
             em.persist(c);
             return c;
         }).getId();
@@ -394,8 +401,8 @@ class GuiasServiceTest {
         return enTx(() -> servicio.crear(RESPONSABLE, new NuevaGuia("Forestal", "Rollizos", 20000L, MANANA, "Rivera", "Montevideo"), "t"));
     }
 
-    private static PerfilCiudadano validado(String ci, String nombre, String apellido) {
-        PerfilCiudadano p = new PerfilCiudadano(ci, null, null);
+    private static Ciudadano validado(String ci, String nombre, String apellido) {
+        Ciudadano p = new Ciudadano(ci, null, null);
         p.setEstado(EstadoValidacion.VALIDADO);
         p.setPrimerNombre(nombre);
         p.setPrimerApellido(apellido);

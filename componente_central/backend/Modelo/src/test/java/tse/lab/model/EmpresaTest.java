@@ -29,7 +29,7 @@ class EmpresaTest {
 
     @Test
     void constructorConDatosInicializaPropiedadesYColeccionesVacias() {
-        Responsable responsable = new Responsable("CI-1", "responsable@example.com", null);
+        Responsable responsable = new Responsable(new Ciudadano("CI-1", "responsable@example.com", null), null);
         Empresa empresa = new Empresa(42L, "Nombre de la empresa", "Razón social", "Dirección", responsable);
 
         assertAll(
@@ -46,8 +46,8 @@ class EmpresaTest {
     @Test
     void settersActualizanLosDatosYLasRelacionesDeLaEmpresa() {
         Empresa empresa = new Empresa();
-        Responsable responsable = new Responsable("CI-2", "otro@example.com", empresa);
-        Chofer chofer = new Chofer("CI-3", "chofer@example.com", empresa);
+        Responsable responsable = new Responsable(new Ciudadano("CI-2", "otro@example.com", null), empresa);
+        Chofer chofer = new Chofer(new Ciudadano("CI-3", "chofer@example.com", null), empresa);
         Guia guia = new Guia("GUIA-1", "Transporte", 100L, null, "Orígen", "Destino", empresa);
         Vehiculo vehiculo = new Vehiculo("ABC-123", "Toyota", "Corolla", 1200L, 500L, empresa);
 
@@ -74,7 +74,7 @@ class EmpresaTest {
     @Test
     void lasColeccionesPuedenSerModificadasPorElConsumidor() {
         Empresa empresa = new Empresa();
-        Chofer chofer = new Chofer("CI-4", "chofer@example.com", empresa);
+        Chofer chofer = new Chofer(new Ciudadano("CI-4", "chofer@example.com", null), empresa);
         Guia guia = new Guia("GUIA-2", "Carga", 10L, null, "Orígen", "Destino", empresa);
         Vehiculo vehiculo = new Vehiculo("XYZ-789", "Ford", "Fiesta", 1000L, 200L, empresa);
 

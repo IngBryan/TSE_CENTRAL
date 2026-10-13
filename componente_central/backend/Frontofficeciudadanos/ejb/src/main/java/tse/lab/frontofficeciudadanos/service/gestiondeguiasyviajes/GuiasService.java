@@ -18,7 +18,7 @@ import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
-import tse.lab.frontofficeciudadanos.data.PerfilCiudadanoDAO;
+import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
@@ -32,7 +32,7 @@ import tse.lab.model.EstadoGuia;
 import tse.lab.model.EventoViaje;
 import tse.lab.model.Guia;
 import tse.lab.model.ModificacionGuia;
-import tse.lab.model.PerfilCiudadano;
+import tse.lab.model.Ciudadano;
 import tse.lab.model.TipoModificacionGuia;
 import tse.lab.model.Vehiculo;
 
@@ -58,7 +58,7 @@ public class GuiasService {
     @EJB
     private ChoferDAO choferes;
     @EJB
-    private PerfilCiudadanoDAO perfiles;
+    private CiudadanoDAO perfiles;
     @EJB
     private EventoViajeDAO eventos;
     @EJB
@@ -341,7 +341,7 @@ public class GuiasService {
     private EventoVista vista(EventoViaje e) {
         Chofer chofer = e.getGuia().getEmpresa() == null ? null
                 : choferes.buscarPorCiYEmpresa(e.getCiChofer(), e.getGuia().getEmpresa());
-        PerfilCiudadano p = perfiles.buscarPorCi(e.getCiChofer());
+        Ciudadano p = perfiles.buscarPorCi(e.getCiChofer());
         ChoferResumen resumen = new ChoferResumen(chofer == null ? null : chofer.getId(), e.getCiChofer(),
                 p == null ? null : p.getPrimerNombre(), p == null ? null : p.getPrimerApellido());
         return new EventoVista(e.getIdEvento(), e.getTipo().name(), e.getFechaHoraDispositivo().toString(),
@@ -375,7 +375,7 @@ public class GuiasService {
     }
 
     private ChoferResumen resumen(Chofer c) {
-        PerfilCiudadano p = perfiles.buscarPorCi(c.getCi());
+        Ciudadano p = perfiles.buscarPorCi(c.getCi());
         return new ChoferResumen(c.getId(), c.getCi(), p == null ? null : p.getPrimerNombre(),
                 p == null ? null : p.getPrimerApellido());
     }

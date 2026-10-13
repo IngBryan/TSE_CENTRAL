@@ -24,20 +24,20 @@ class EntidadTest {
     @Test
     void choferMantieneSusPropiedades() {
         Empresa empresa = new Empresa();
-        Chofer chofer = new Chofer("CI-1", "chofer@example.com", empresa);
+        Chofer chofer = new Chofer(new Ciudadano("CI-1", "chofer@example.com", null), empresa);
 
         assertEquals("CI-1", chofer.getCi());
-        assertEquals("chofer@example.com", chofer.getEmail());
+        assertEquals("chofer@example.com", chofer.getCiudadano().getEmail());
         assertSame(empresa, chofer.getEmpresa());
     }
 
     @Test
     void responsableMantieneSusPropiedades() {
         Empresa empresa = new Empresa();
-        Responsable responsable = new Responsable("CI-2", "responsable@example.com", empresa);
+        Responsable responsable = new Responsable(new Ciudadano("CI-2", "responsable@example.com", null), empresa);
 
         assertEquals("CI-2", responsable.getCi());
-        assertEquals("responsable@example.com", responsable.getEmail());
+        assertEquals("responsable@example.com", responsable.getCiudadano().getEmail());
         assertSame(empresa, responsable.getEmpresa());
     }
 
@@ -58,7 +58,7 @@ class EntidadTest {
     void guiaMantieneSusPropiedadesYRelaciones() {
         Empresa empresa = new Empresa();
         Vehiculo vehiculo = new Vehiculo("ABC-123", "Toyota", "Corolla", 1200L, 500L, empresa);
-        Chofer chofer = new Chofer("CI-1", "chofer@example.com", empresa);
+        Chofer chofer = new Chofer(new Ciudadano("CI-1", "chofer@example.com", null), empresa);
         Guia guia = new Guia("GUIA-1", "Transporte", 100L, LocalDate.of(2026, 10, 7),
                 "La Plata", "Buenos Aires", empresa);
 
