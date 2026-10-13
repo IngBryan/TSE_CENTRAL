@@ -1,55 +1,73 @@
 package tse.lab.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
-@Entity
-@Table(name = "eventos_tracking")
+// Posicion de un vehiculo reportada por el GPS del nodo de tracking. NO es una entidad JPA: esta en
+// MongoDB (base main_db, coleccion tracking) y la guarda Fiscalizacionautomatica al consumir la cola
+// tracking.events. Campos del documento:
+//   _id -> id (message_id de RabbitMQ), eventId, gpsId, licensePlate -> matricula,
+//   location {type: Point, coordinates: [longitud, latitud]}, timestamp -> fechaHora
+// Las entidades de PostgreSQL lo referencian por id (CasoFiscalizacion.idsEventosTracking) y el nodo
+// queda referenciado por gpsId: no hay relaciones JPA entre las dos bases.
 public class EventoTracking implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    public static final String COLECCION = "tracking";
 
-    private Double latitud;
-
-    private Double longitud;
-
+    private String id;
+    private Long eventId;
+    // Id del GPS = id del NodoTracking (PostgreSQL) que reporto el evento
+    private Long gpsId;
     private String matricula;
-
+    private Double latitud;
+    private Double longitud;
     private Instant fechaHora;
-
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "id_nodo_tracking", nullable = false)
-    private NodoTracking nodoTracking;
-
-    @ManyToMany(mappedBy = "eventosTracking")
-    private List<CasoFiscalizacion> casosFiscalizacion = new ArrayList<>();
 
     public EventoTracking() {
     }
 
-    public EventoTracking(Double latitud, Double longitud, String matricula, Instant fechaHora, NodoTracking nodoTracking) {
+    public EventoTracking(String id, Long eventId, Long gpsId, String matricula, Double latitud, Double longitud,
+            Instant fechaHora) {
+        this.id = id;
+        this.eventId = eventId;
+        this.gpsId = gpsId;
+        this.matricula = matricula;
         this.latitud = latitud;
         this.longitud = longitud;
-        this.matricula = matricula;
         this.fechaHora = fechaHora;
-        this.nodoTracking = nodoTracking;
     }
 
-    public Long getId() {
+    public String getId() {
         return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public Long getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(Long eventId) {
+        this.eventId = eventId;
+    }
+
+    public Long getGpsId() {
+        return gpsId;
+    }
+
+    public void setGpsId(Long gpsId) {
+        this.gpsId = gpsId;
+    }
+
+    public String getMatricula() {
+        return matricula;
+    }
+
+    public void setMatricula(String matricula) {
+        this.matricula = matricula;
     }
 
     public Double getLatitud() {
@@ -68,14 +86,6 @@ public class EventoTracking implements Serializable {
         this.longitud = longitud;
     }
 
-    public String getMatricula() {
-        return matricula;
-    }
-
-    public void setMatricula(String matricula) {
-        this.matricula = matricula;
-    }
-
     public Instant getFechaHora() {
         return fechaHora;
     }
@@ -83,17 +93,4 @@ public class EventoTracking implements Serializable {
     public void setFechaHora(Instant fechaHora) {
         this.fechaHora = fechaHora;
     }
-
-    public NodoTracking getNodoTracking() {
-        return nodoTracking;
-    }
-
-    public void setNodoTracking(NodoTracking nodoTracking) {
-        this.nodoTracking = nodoTracking;
-    }
-
-    public List<CasoFiscalizacion> getCasosFiscalizacion() {
-        return casosFiscalizacion;
-    }
 }
-
