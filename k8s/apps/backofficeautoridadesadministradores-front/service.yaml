@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backofficeautoridadesadministradores-front
+  labels:
+    app: backofficeautoridadesadministradores-front
+spec:
+  selector:
+    app: backofficeautoridadesadministradores-front
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

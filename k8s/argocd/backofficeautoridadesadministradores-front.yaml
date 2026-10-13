@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backofficeautoridadesadministradores-front
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/IngBryan/TSE_CENTRAL.git
+    targetRevision: main
+    path: k8s/apps/backofficeautoridadesadministradores-front
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tse
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: backofficeautoridadesadministradores-front
+  namespace: argocd
+spec:
+  writeBackConfig:
+    method: argocd
+  applicationRefs:
+    - namePattern: "backofficeautoridadesadministradores-front"
+      images:
+        - alias: front
+          imageName: ghcr.io/ingbryan/tse_central/backofficeautoridadesadministradores-front
+          commonUpdateSettings:
+            updateStrategy: newest-build
+            allowTags: "regexp:^sha-[0-9a-f]{7}$"
+            pullSecret: pullsecret:argocd/ghcr-credentials

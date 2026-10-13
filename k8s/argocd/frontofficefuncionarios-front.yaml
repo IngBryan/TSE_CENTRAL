@@ -20,7 +20,8 @@ spec:
     syncOptions:
       - CreateNamespace=true
 ---
-# ImageUpdater: cada 2 minutos revisa ghcr.io y, si el CI publico una imagen nueva
+# ImageUpdater: revisa GHCR y actualiza la aplicación
+# cuando se publica una nueva imagen compatible.
 # (tag sha-<commit>), actualiza solo esta app.
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater

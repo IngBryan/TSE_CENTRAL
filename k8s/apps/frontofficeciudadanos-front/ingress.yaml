@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontofficeciudadanos-front
+  labels:
+    app: frontofficeciudadanos-front
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: env-6537388.web.elasticloud.uy
+      http:
+        paths:
+          - path: /ciudadanos
+            pathType: Prefix
+            backend:
+              service:
+                name: frontofficeciudadanos-front
+                port:
+                  name: http
