@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fiscalizacionautomatica
+  labels:
+    app: fiscalizacionautomatica
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: fiscalizacionautomatica
+
+  template:
+    metadata:
+      labels:
+        app: fiscalizacionautomatica
+
+    spec:
+      imagePullSecrets:
+        - name: ghcr-credentials
+
+      containers:
+        - name: fiscalizacionautomatica
+          image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:latest
+
+          env:
+            # RabbitMQ
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+
+            - name: RABBITMQ_PORT
+              value: "5672"
+
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: rabbitmq-user
+
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: rabbitmq-password
+
+            # MongoDB
+            - name: MONGO_HOST
+              value: mongodb
+
+            - name: MONGO_PORT
+              value: "27017"
+
+            - name: MONGO_DB
+              value: main_db
+
+            - name: MONGO_AUTH_DB
+              value: admin
+
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: mongo-user
+
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: mongo-password
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false

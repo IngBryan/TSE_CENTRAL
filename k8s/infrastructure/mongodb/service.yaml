@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+spec:
+  type: ExternalName
+  externalName: tse-mongo.web.elasticloud.uy
+  ports:
+    - name: mongodb
+      port: 27017
