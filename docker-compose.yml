@@ -36,8 +36,21 @@ services:
       context: ./componente_central/frontend/frontofficeciudadanos
     ports:
       - "3002:3000"
+      # Login con gub.uy: la redirect URI registrada en ID Uruguay es http://localhost (puerto 80)
+      - "80:3000"
     environment:
       - NODE_ENV=production
+      - APP_BASE_URL=http://localhost
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
+      - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      # Firma el token (JWT HS256) de la app movil del chofer (TSE_MOVIL): /api/movil/*
+      - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
+    depends_on:
+      - wildfly
     restart: unless-stopped
   frontofficefuncionarios-front:
     hostname: frontofficefuncionarios
@@ -137,6 +150,8 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
+      # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
@@ -17,11 +18,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import tse.lab.frontofficeciudadanos.model.Chofer;
-import tse.lab.frontofficeciudadanos.model.Empresa;
-import tse.lab.frontofficeciudadanos.model.Guia;
-import tse.lab.frontofficeciudadanos.model.Responsable;
-import tse.lab.frontofficeciudadanos.model.Vehiculo;
+import tse.lab.model.Chofer;
+import tse.lab.model.Ciudadano;
+import tse.lab.model.Empresa;
+import tse.lab.model.Guia;
+import tse.lab.model.Responsable;
+import tse.lab.model.Vehiculo;
 
 class DAOIntegrationTest {
 
@@ -71,21 +73,22 @@ class DAOIntegrationTest {
         ResponsableDAO dao = new ResponsableDAO();
         injectEntityManager(dao);
         Empresa empresa = new Empresa(11L, "Empresa responsable", "Razón social", "Dirección", null);
-        Responsable responsable = new Responsable("CI-3", "responsable@example.com", empresa);
+        Ciudadano persona = new Ciudadano("CI-3", "responsable@example.com", null);
+        Responsable responsable = new Responsable(persona, empresa);
 
         beginTransaction();
         entityManager.persist(empresa);
+        entityManager.persist(persona);
         dao.guardar(responsable);
         commitTransaction();
 
         beginTransaction();
         Responsable encontrada = dao.buscarPorCi("CI-3");
-        encontrada.setEmail("actualizado@example.com");
         Responsable actualizada = dao.actualizar(encontrada);
         commitTransaction();
 
         assertNotNull(actualizada);
-        assertEquals("actualizado@example.com", actualizada.getEmail());
+        assertEquals("responsable@example.com", actualizada.getCiudadano().getEmail());
         assertSame(empresa, actualizada.getEmpresa());
     }
 
@@ -94,15 +97,17 @@ class DAOIntegrationTest {
         ChoferDAO dao = new ChoferDAO();
         injectEntityManager(dao);
         Empresa empresa = new Empresa(12L, "Empresa choferes", "Razón social", "Dirección", null);
-        Chofer chofer = new Chofer("CI-4", "chofer@example.com", empresa);
+        Ciudadano persona = new Ciudadano("CI-4", "chofer@example.com", null);
+        Chofer chofer = new Chofer(persona, empresa);
 
         beginTransaction();
         entityManager.persist(empresa);
+        entityManager.persist(persona);
         dao.guardar(chofer);
         commitTransaction();
 
         beginTransaction();
-        Chofer encontrado = dao.buscarPorCi("CI-4");
+        Chofer encontrado = dao.buscarPorCi("CI-4").get(0);
         List<Chofer> resultados = dao.buscarPorEmpresa(empresa);
         dao.eliminar(encontrado);
         commitTransaction();
@@ -110,7 +115,7 @@ class DAOIntegrationTest {
         assertNotNull(encontrado);
         assertEquals(1, resultados.size());
         assertEquals("CI-4", resultados.get(0).getCi());
-        assertNull(dao.buscarPorCi("CI-4"));
+        assertTrue(dao.buscarPorCi("CI-4").isEmpty());
     }
 
     @Test

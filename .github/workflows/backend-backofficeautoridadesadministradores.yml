@@ -5,12 +5,24 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - componente_central/backend/Backofficeautoridadesadministradores/**
       - .github/workflows/backend-backofficeautoridadesadministradores.yml
       - .github/workflows/_build-backend.yml
-  workflow_dispatch:
+  
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/Backofficeautoridadesadministradores/**
+      - componente_central/backend/Modelo/**
+      - .github/workflows/backend-backofficeautoridadesadministradores.yml
+      - .github/workflows/_build-backend.yml
 
+  workflow_dispatch:
+  
+    
 jobs:
   backend:
     uses: ./.github/workflows/_build-backend.yml
@@ -18,3 +30,8 @@ jobs:
       path: componente_central/backend/Backofficeautoridadesadministradores
       artifact-name: backend-backofficeautoridadesadministradores
       artifact: ear/target/*.ear
+      sonar-project-key: tse-central-backend-backofficeautoridadesadm
+      install-first: componente_central/backend/Modelo
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
