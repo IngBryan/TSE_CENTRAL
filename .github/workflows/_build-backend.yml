@@ -17,11 +17,19 @@ on:
         description: Archivo a guardar, relativo a la carpeta del proyecto
         type: string
         required: true
+      sonar-project-key:
+        description: Project Key de SonarQube Cloud
+        type: string
+        required: true
       install-first:
         description: Proyecto Maven del que depende y que se instala antes (por ejemplo Modelo)
         type: string
         required: false
         default: ""
+
+    secrets:
+      SONAR_TOKEN:
+        required: true
 
 jobs:
   build:
@@ -31,6 +39,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Java 24
         uses: actions/setup-java@v4
@@ -44,7 +54,10 @@ jobs:
         run: mvn -B -f "${{ inputs.install-first }}/pom.xml" install -DskipTests
 
       - name: Compilar y ejecutar tests
-        run: mvn -B -f "${{ inputs.path }}/pom.xml" clean verify
+        run: >
+          mvn -B
+          -f "${{ inputs.path }}/pom.xml"
+          clean verify
 
       # El .ear (o el .jar de Fiscalizacion) queda descargable en la pagina de la corrida.
       - name: Guardar build
@@ -54,3 +67,18 @@ jobs:
           path: ${{ inputs.path }}/${{ inputs.artifact }}
           if-no-files-found: error
           retention-days: 14
+      
+      # SonarCloud solo en dev y sin bloquear el build.
+      - name: Analisis estatico SonarQube
+        if: github.ref == 'refs/heads/dev' || (github.event_name == 'pull_request' && github.base_ref == 'dev')
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B
+          -f "${{ inputs.path }}/pom.xml"
+          verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
+          -DskipTests
+          -Dsonar.projectKey="${{ inputs.sonar-project-key }}"
+          -Dsonar.organization="${{ vars.SONAR_ORGANIZATION }}"

@@ -5,11 +5,20 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - componente_central/backend/Frontofficeciudadanos/**
       - componente_central/backend/Modelo/**
       - .github/workflows/backend-frontofficeciudadanos.yml
       - .github/workflows/_build-backend.yml
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/Frontofficeciudadanos/**
+      - .github/workflows/backend-frontofficeciudadanos.yml
+      - .github/workflows/_build-backend.yml
+
   workflow_dispatch:
 
 jobs:
@@ -19,4 +28,8 @@ jobs:
       path: componente_central/backend/Frontofficeciudadanos
       artifact-name: backend-frontofficeciudadanos
       artifact: ear/target/*.ear
+      sonar-project-key: tse-central-backend-frontofficeciudadanos
       install-first: componente_central/backend/Modelo
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
