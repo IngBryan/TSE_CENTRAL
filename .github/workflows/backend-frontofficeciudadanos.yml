@@ -8,6 +8,7 @@ on:
       - dev
     paths:
       - componente_central/backend/Frontofficeciudadanos/**
+      - componente_central/backend/Modelo/**
       - .github/workflows/backend-frontofficeciudadanos.yml
       - .github/workflows/_build-backend.yml
   pull_request:
@@ -28,6 +29,7 @@ jobs:
       artifact-name: backend-frontofficeciudadanos
       artifact: ear/target/*.ear
       sonar-project-key: tse-central-backend-frontofficeciudadanos
+      install-first: componente_central/backend/Modelo
 
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
