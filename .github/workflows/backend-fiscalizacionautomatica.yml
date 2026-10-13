@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - main
+      - dev
+    paths:
+      - componente_central/backend/Fiscalizacionautomatica/**
+      - .github/workflows/backend-fiscalizacionautomatica.yml
+      - .github/workflows/_build-backend.yml
+  pull_request:
+    branches:
+      - dev
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
       - .github/workflows/backend-fiscalizacionautomatica.yml

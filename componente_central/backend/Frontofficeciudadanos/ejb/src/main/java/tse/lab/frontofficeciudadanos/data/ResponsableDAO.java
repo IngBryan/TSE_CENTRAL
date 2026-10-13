@@ -3,7 +3,7 @@ package tse.lab.frontofficeciudadanos.data;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import tse.lab.frontofficeciudadanos.model.Responsable;
+import tse.lab.model.Responsable;
 
 @Stateless
 public class ResponsableDAO {

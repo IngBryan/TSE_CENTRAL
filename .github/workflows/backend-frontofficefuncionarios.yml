@@ -5,8 +5,17 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - componente_central/backend/Frontofficefuncionarios/**
+      - .github/workflows/backend-frontofficefuncionarios.yml
+      - .github/workflows/_build-backend.yml
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/Frontofficefuncionarios/**
+      - componente_central/backend/Modelo/**
       - .github/workflows/backend-frontofficefuncionarios.yml
       - .github/workflows/_build-backend.yml
   workflow_dispatch:
@@ -19,6 +28,7 @@ jobs:
       artifact-name: backend-frontofficefuncionarios
       artifact: ear/target/*.ear
       sonar-project-key: tse-central-backend-frontofficefuncionarios
-    
+      install-first: componente_central/backend/Modelo
+
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

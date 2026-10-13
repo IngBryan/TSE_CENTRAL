@@ -8,10 +8,16 @@
       <!-- Datasource unico (base main_db), compartido por los 3 proyectos: wildfly/datasources.cli -->
       <jta-data-source>java:/MainDS</jta-data-source>
       <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+      <!-- Entidades compartidas (proyecto Modelo), en el lib/ del EAR -->
+      <jar-file>lib/modelo.jar</jar-file>
       <properties>
+         <!-- Este persistence unit es el UNICO que genera el esquema de main_db; los de
+              Frontofficefuncionarios y Backofficeautoridadesadministradores usan "none" -->
          <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
          <property name="jakarta.persistence.schema-generation.create-source" value="metadata"/>
          <property name="jakarta.persistence.schema-generation.drop-source" value="metadata"/>
+         <!-- Solo desarrollo: empresa y responsable de prueba (se recargan en cada deploy) -->
+         <property name="jakarta.persistence.sql-load-script-source" value="META-INF/datos-prueba.sql"/>
 
          <property name="hibernate.show_sql" value="true" />
       </properties>

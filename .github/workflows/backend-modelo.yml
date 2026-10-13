@@ -1,0 +1,34 @@
+name: Backend - Modelo (entidades compartidas)
+
+# Ejecuta CI en pushes a main/dev y Pull Requests hacia dev.
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - componente_central/backend/Modelo/**
+      - .github/workflows/backend-modelo.yml
+      - .github/workflows/_build-backend.yml
+
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/Modelo/**
+      - .github/workflows/backend-modelo.yml
+      - .github/workflows/_build-backend.yml
+
+  workflow_dispatch:
+
+jobs:
+  backend:
+    uses: ./.github/workflows/_build-backend.yml
+    with:
+      path: componente_central/backend/Modelo
+      artifact-name: backend-modelo
+      artifact: target/*.jar
+      sonar-project-key: tse-central-backend-modelo
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
