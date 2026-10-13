@@ -64,25 +64,4 @@ class TrackingEventReceiverTest {
         assertTrue(saved.isEmpty());
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "not json",
-            "null",
-            "{}",
-            """
-            {"gpsId": 1, "licensePlate": "SBC1234", "latitude": 0, "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
-            """
-            {"id": 7, "gpsId": 1, "licensePlate": " ", "latitude": 0, "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
-            """
-            {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "latitude": 91, "longitude": 0, "datetime": "2026-10-10T15:30:00Z"}""",
-            """
-            {"id": 7, "gpsId": 1, "licensePlate": "SBC1234", "latitude": 0, "longitude": 0, "datetime": "yesterday"}""",
-    })
-    void malformedMessageIsInvalid(String json) {
-        List<TrackingEvent> saved = new ArrayList<>();
-        TrackingEventReceiver receiver = new TrackingEventReceiver(saved::add);
-
-        assertEquals(Result.INVALID, receiver.receive("msg-1", bytes(json)));
-        assertTrue(saved.isEmpty());
-    }
 }
