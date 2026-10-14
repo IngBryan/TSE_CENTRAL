@@ -5,9 +5,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 
 /** In-memory storage for tests, discarding duplicates the same way the MongoDB unique index does. */
@@ -19,8 +17,7 @@ public class InMemoryTrackingEventDAO implements TrackingEventDAO {
         }
     }
 
-    /** @param situations null while the detection is pending */
-    private record Stored(TrackingEvent event, Instant receivedAt, List<Situation> situations) {
+    private record Stored(TrackingEvent event, Instant receivedAt, boolean detected) {
     }
 
     private final Map<Key, Stored> events = new ConcurrentHashMap<>();
@@ -36,19 +33,18 @@ public class InMemoryTrackingEventDAO implements TrackingEventDAO {
 
     @Override
     public boolean save(TrackingEvent event) {
-        return events.putIfAbsent(Key.of(event), new Stored(event, clock.instant(), null)) == null;
+        return events.putIfAbsent(Key.of(event), new Stored(event, clock.instant(), false)) == null;
     }
 
     @Override
-    public void saveDetection(TrackingEvent event, List<Situation> situations) {
-        events.computeIfPresent(Key.of(event), (key, stored) -> stored.situations() != null ? stored
-                : new Stored(stored.event(), stored.receivedAt(), List.copyOf(situations)));
+    public void markDetected(TrackingEvent event) {
+        events.computeIfPresent(Key.of(event), (key, stored) -> new Stored(stored.event(), stored.receivedAt(), true));
     }
 
     @Override
     public List<TrackingEvent> findPendingDetection(Instant receivedBefore, int limit) {
         return events.values().stream()
-                .filter(stored -> stored.situations() == null && stored.receivedAt().isBefore(receivedBefore))
+                .filter(stored -> !stored.detected() && stored.receivedAt().isBefore(receivedBefore))
                 .sorted(Comparator.comparing(Stored::receivedAt))
                 .limit(limit)
                 .map(Stored::event)
@@ -59,8 +55,8 @@ public class InMemoryTrackingEventDAO implements TrackingEventDAO {
         return events.values().stream().map(Stored::event).toList();
     }
 
-    /** @return the detected situations; empty while the detection is pending */
-    public Optional<List<Situation>> situationsOf(TrackingEvent event) {
-        return Optional.ofNullable(events.get(Key.of(event))).map(Stored::situations);
+    public boolean isDetected(TrackingEvent event) {
+        Stored stored = events.get(Key.of(event));
+        return stored != null && stored.detected();
     }
 }

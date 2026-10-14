@@ -14,9 +14,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.stream.IntStream;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.TrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 
 /**
  * Runs the detection of the saved tracking events in background threads, so it doesn't slow down
@@ -34,6 +36,7 @@ public class TrackingDetectionWorker implements AutoCloseable {
 
     private final SituationDetector detector;
     private final TrackingEventDAO dao;
+    private final BiConsumer<VehicleEvent, List<Situation>> onDetected;
     private final Clock clock;
     private final List<ThreadPoolExecutor> lanes;
     /** Events queued or being evaluated: the recovery doesn't queue them twice. */
@@ -41,10 +44,15 @@ public class TrackingDetectionWorker implements AutoCloseable {
     private final ScheduledExecutorService recovery = Executors.newSingleThreadScheduledExecutor(
             daemonThreads("detection-recovery"));
 
-    public TrackingDetectionWorker(SituationDetector detector, TrackingEventDAO dao, Clock clock, int lanes,
-            int queueCapacityPerLane) {
+    /**
+     * @param onDetected what is done with the situations of an event (only logged for now; it will
+     *                   create the cases). If it fails, the event stays pending.
+     */
+    public TrackingDetectionWorker(SituationDetector detector, TrackingEventDAO dao,
+            BiConsumer<VehicleEvent, List<Situation>> onDetected, Clock clock, int lanes, int queueCapacityPerLane) {
         this.detector = detector;
         this.dao = dao;
+        this.onDetected = onDetected;
         this.clock = clock;
         this.lanes = IntStream.range(0, lanes)
                 .mapToObj(i -> new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
@@ -75,11 +83,8 @@ public class TrackingDetectionWorker implements AutoCloseable {
 
     void detect(TrackingEvent event) {
         try {
-            List<Situation> situations = detector.detect(event);
-            dao.saveDetection(event, situations);
-            if (!situations.isEmpty()) {
-                System.out.printf("Detected %s for %s at %s%n", situations, event.licensePlate(), event.timestamp());
-            }
+            onDetected.accept(event, detector.detect(event));
+            dao.markDetected(event);
         } catch (IOException | RuntimeException e) {
             System.err.printf("Could not evaluate the event of %s at %s, it stays pending: %s%n",
                     event.licensePlate(), event.timestamp(), e.getMessage());

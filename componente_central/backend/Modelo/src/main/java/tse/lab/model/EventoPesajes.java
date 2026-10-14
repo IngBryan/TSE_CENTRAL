@@ -14,7 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 // La clave es (matricula, fecha_hora): si el poller trae el mismo pesaje dos veces no se duplica.
-// id_externo es el id del pesaje en el nodo de balanzas.
+// id_externo es el id del pesaje en el nodo de balanzas. Los guarda el poller de fiscalizacion automatica
+// (EJB remoto PesajesService) pendientes de deteccion.
 @Entity
 @Table(name = "eventos_pesajes")
 @IdClass(ClaveEvento.class)
@@ -32,6 +33,9 @@ public class EventoPesajes implements Serializable {
     private Long idExterno;
 
     private long peso;
+
+    // false al guardarlo; la fiscalizacion automatica lo marca cuando lo evaluo
+    private boolean detectado;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_nodo_balanza", nullable = false)
@@ -57,6 +61,14 @@ public class EventoPesajes implements Serializable {
 
     public Long getIdExterno() {
         return idExterno;
+    }
+
+    public boolean isDetectado() {
+        return detectado;
+    }
+
+    public void marcarDetectado() {
+        this.detectado = true;
     }
 
     public void setIdExterno(Long idExterno) {

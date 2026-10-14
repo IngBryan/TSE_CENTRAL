@@ -2,10 +2,9 @@ package tse.lab.fiscalizacionautomatica.ruleengine.data;
 
 import java.time.Instant;
 import java.util.List;
-import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 
-/** Storage of the received tracking events and their detection result (see {@link MongoTrackingEventDAO}). */
+/** Storage of the received tracking events and whether they were evaluated (see {@link MongoTrackingEventDAO}). */
 public interface TrackingEventDAO {
 
     /**
@@ -16,8 +15,8 @@ public interface TrackingEventDAO {
      */
     boolean save(TrackingEvent event);
 
-    /** Saves the situations that apply to the event (none is a result too) and marks it as detected. */
-    void saveDetection(TrackingEvent event, List<Situation> situations);
+    /** Marks the event as evaluated by the detection. */
+    void markDetected(TrackingEvent event);
 
     /** @return events still pending detection that were received before {@code receivedBefore}, oldest first */
     List<TrackingEvent> findPendingDetection(Instant receivedBefore, int limit);

@@ -365,11 +365,12 @@ en varios modos, segun el argumento:
   indice y no se guarda dos veces. El `_id` lo genera MongoDB y el id del evento en tracking
   queda en `externalId` (no sirve como clave: tracking lo reinicia al reiniciarse). Documento:
   `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp, receivedAt,
-  detected, situations, detectedAt }`.
+  detected, detectedAt }`.
 - **Deteccion asincronica:** el evento se guarda con `detected: false` y se pasa a la deteccion,
-  que corre en otros hilos (sin demorar la recepcion). Al terminar se guardan `situations` (las que
-  aplican, en orden de prioridad, p. ej. `["TRIP_WITHOUT_GUIDE"]`; `[]` si ninguna o si el vehiculo
-  no existe en el central), `detected: true` y `detectedAt`.
+  que corre en otros hilos (sin demorar la recepcion). Las situaciones que aplican no se guardan en
+  el evento: por ahora solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for SBC1234 at
+  ...`); cuando se creen los casos, cada caso tendra su situacion y el evento quedara asociado a el.
+  Al terminar se marca `detected: true` y `detectedAt`.
   - Los eventos de un vehiculo van siempre al mismo hilo (4 hilos, elegidos por la matricula): se
     evaluan en orden y nunca dos a la vez dentro del pod.
   - Si un evento no se pudo evaluar (WildFly caido, cola llena, el pod se reinicio), queda en
@@ -398,21 +399,31 @@ en varios modos, segun el argumento:
   `NodoBalanza` (el id de la balanza en ese nodo). Si no hay balanzas activas, termina sin
   consultar (codigo `0`).
 - Despues pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza activa
-  (fechas en hora de Uruguay, `-03:00`), imprime
-  `Fetched N weighings of scales [..] from <url> (until <to>)` y termina. El proceso no guarda
-  estado en memoria: la frecuencia la define el cron que lo lanza.
+  (fechas en hora de Uruguay, `-03:00`) y **guarda los pesajes en PostgreSQL** (`eventos_pesajes`)
+  pendientes de deteccion (`detectado = false`), por EJB remoto (`PesajesRemote.guardarPesajes`,
+  Frontofficeciudadanos, `service.gestiondeguiasyviajes`). Los que ya estaban guardados (misma
+  matricula y fecha y hora) se ignoran, asi repetir un rango no duplica nada.
+- **Deteccion:** al final de cada ejecucion evalua todos los pesajes pendientes, tambien los que
+  quedaron de ejecuciones anteriores (`PendingWeighingsDetection`), y marca cada uno como
+  detectado. Las situaciones solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for ...`).
+  No usa hilos: hay un solo poller y cuando detecta ya termino de recibir. Un pesaje que no se pudo
+  evaluar (WildFly caido) queda pendiente para la proxima ejecucion.
+- Imprime `Fetched N weighings (M new) of scales [..] from <url> (until <to>)` y termina. El proceso
+  no guarda estado en memoria: la frecuencia la define el cron que lo lanza.
 - **Rango consultado, por balanza:** desde la ultima consulta exitosa de esa balanza hasta ahora.
   Se guarda en MongoDB, en la coleccion `balanzas_metadata`, un documento por balanza:
   `{ _id: <id de la balanza>, balanzas_last_timestamp: <Date> }`. Si el documento de una balanza
   no existe (primera consulta), su rango arranca al inicio del dia de hoy en hora de Uruguay.
-  Cuando la balanza responde se guarda el `to` de esa ejecucion, asi la proxima arranca donde
-  termino esta.
-- **Si falla una balanza**, se sigue con las demas: solo esa no actualiza su
-  `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
+  Cuando los pesajes de la balanza quedan guardados se guarda el `to` de esa ejecucion, asi la
+  proxima arranca donde termino esta (la deteccion no hace falta para avanzar: los pesajes ya
+  quedaron pendientes).
+- **Si falla una balanza** (la API o el guardado), se sigue con las demas: solo esa no actualiza
+  su `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
   se vuelven a consultar las que respondieron).
-- Codigo de salida: `0` si consulto todas las balanzas, `1` si fallo alguna, si no pudo pedir las
-  balanzas activas a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra
-  como ejecucion fallida).
+- Codigo de salida: `0` si consulto y guardo todas las balanzas y evaluo todos los pendientes, `1`
+  si fallo alguna balanza o algun pesaje quedo sin evaluar, si no pudo pedir las balanzas activas
+  a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra como ejecucion
+  fallida).
 - Cliente con MicroProfile Rest Client (RESTEasy) y OAuth 2.0 client credentials: pide un token
   por ejecucion y, ante un `401`, pide otro y reintenta una vez.
 - Variables: `BALANZAS_URL` (`http://localhost:3001`; en el compose
@@ -421,7 +432,7 @@ en varios modos, segun el argumento:
   `MONGO_AUTH_DB`, igual que el consumidor) y del EJB remoto (`WILDFLY_URL`, `EJB_USER`,
   `EJB_PASSWORD`).
 - **Por ahora:** la matricula esta hardcodeada en `Main` (`LICENSE_PLATE = "SBC1234"`; se va a
-  definir que vehiculos consultar) y los pesajes no se guardan.
+  definir que vehiculos consultar).
 
 **Viajes en curso (EJB remoto de Frontofficeciudadanos):**
 
@@ -433,7 +444,8 @@ dos es `ruleengine/vehicles/VehicleFactsClient`.
 
 - **Contrato:** fiscalizacion no depende del ejb entero sino de `frontofficeciudadanos-ejb-client.jar`
   (lo genera el `maven-ejb-plugin` con `generateClient`), que trae solo las interfaces remotas y sus
-  DTOs: `ViajesEnCurso`, `ViajesEnCursoRemote`, `DatosViaje` y, de `service.gestionvehiculos`,
+  DTOs: `ViajesEnCurso`, `ViajesEnCursoRemote`, `DatosViaje`, `Pesajes`, `PesajesRemote`,
+  `DatosPesaje` y, de `service.gestionvehiculos`,
   `Vehiculos`, `VehiculosRemote` y `DatosVehiculo` (`buscarVehiculo(matricula)`: matricula y
   empresa, o `null` si el vehiculo no existe). Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
   (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`). Por eso, antes de compilar
@@ -504,7 +516,8 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
 - Agregar una situacion = agregar su regla en `Main.createDetector`.
 - Implementada: Viaje sin guia (`TripWithoutGuideRule`: el vehiculo no tiene guias `ASIGNADA` ni
   `EN_CURSO`). Todavia no se crean casos: eso, y saltear las situaciones que ya tienen un caso
-  abierto del vehiculo, viene despues; por ahora el resultado queda en el documento del evento.
+  abierto del vehiculo, viene despues; por ahora el resultado solo se escribe en el log
+  (`Main.logDetection`, que despues se reemplaza por la creacion de casos).
 - Eventos de tracking: los evalua el consumidor en segundo plano (`TrackingDetectionWorker`, ver
   *Consumidor de tracking*).
 

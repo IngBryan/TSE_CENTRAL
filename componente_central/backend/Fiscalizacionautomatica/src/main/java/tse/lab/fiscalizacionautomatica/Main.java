@@ -23,11 +23,15 @@ import java.util.stream.Stream;
 import org.bson.Document;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.RemoteWeighingDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.PendingWeighingsDetection;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationDetector;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveNodesClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
@@ -83,8 +87,8 @@ public class Main {
         dao.createIndexes();
         VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"));
-        TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao, Clock.systemUTC(),
-                DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
+        TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
+                Main::logDetection, Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
         detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
 
         ConnectionFactory factory = createRabbitConnectionFactory();
@@ -122,9 +126,11 @@ public class Main {
     }
 
     /**
-     * Polls the active scales (asked to the backoffice by remote EJB).
+     * Polls the active scales (asked to the backoffice by remote EJB), saves their weighings pending
+     * detection and then evaluates every pending weighing.
      *
-     * @return exit code: 0 if every scale was polled, 1 otherwise (so the cron sees the failure)
+     * @return exit code: 0 if every scale was polled and every pending weighing evaluated, 1 otherwise
+     *         (so the cron sees the failure)
      */
     private static int pollWeighings() {
         requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER",
@@ -144,25 +150,45 @@ public class Main {
             return 0;
         }
 
-        try (MongoClient mongo = createMongoClient()) {
+        String user = System.getenv("EJB_USER");
+        String password = System.getenv("EJB_PASSWORD");
+        try (MongoClient mongo = createMongoClient();
+                RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
+                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
-            PollResult result = new WeighingsPoller(scaleIds, LICENSE_PLATE, api,
+            PollResult result = new WeighingsPoller(scaleIds, LICENSE_PLATE, api, weighingDAO,
                     new MongoScalesMetadataDAO(database), Clock.systemUTC()).poll();
 
-            System.out.printf("Fetched %d weighings of scales %s from %s (until %s)%n", result.weighings().size(),
-                    scaleIds, url, result.to());
+            System.out.printf("Fetched %d weighings (%d new) of scales %s from %s (until %s)%n",
+                    result.weighings().size(), result.saved(), scaleIds, url, result.to());
             if (!result.failedScaleIds().isEmpty()) {
-                System.err.println("Could not poll scales " + result.failedScaleIds()
+                System.err.println("Could not poll or save scales " + result.failedScaleIds()
                         + ": their last timestamp was not updated");
-                return 1;
             }
-            return 0;
+
+            // Also the ones left pending by previous runs
+            int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO, Main::logDetection)
+                    .detectPending();
+            if (notEvaluated > 0) {
+                System.err.println(notEvaluated + " weighings could not be evaluated: they stay pending");
+            }
+            return result.failedScaleIds().isEmpty() && notEvaluated == 0 ? 0 : 1;
         } catch (MongoException e) {
             // Without the last timestamp the range is unknown: the next run retries
             System.err.println("MongoDB unavailable: " + e.getMessage());
             return 1;
+        } catch (IOException e) {
+            System.err.println("Could not evaluate the pending weighings: " + e.getMessage() + ": " + e.getCause());
+            return 1;
+        }
+    }
+
+    /** What is done with the situations of an event: for now only logged (the cases come later). */
+    private static void logDetection(VehicleEvent event, List<Situation> situations) {
+        if (!situations.isEmpty()) {
+            System.out.printf("Detected %s for %s at %s%n", situations, event.licensePlate(), event.timestamp());
         }
     }
 

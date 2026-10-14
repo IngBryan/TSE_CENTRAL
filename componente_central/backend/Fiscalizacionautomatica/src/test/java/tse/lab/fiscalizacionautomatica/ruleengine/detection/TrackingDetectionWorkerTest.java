@@ -1,6 +1,8 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.detection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -9,10 +11,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryTrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.MutableClock;
 
 class TrackingDetectionWorkerTest {
@@ -20,10 +24,14 @@ class TrackingDetectionWorkerTest {
     private static final Instant NOW = Instant.parse("2026-10-13T15:00:00Z");
     private static final Duration PENDING_FOR = Duration.ofMinutes(1);
 
+    record Detection(VehicleEvent event, List<Situation> situations) {
+    }
+
     private final MutableClock clock = new MutableClock(NOW);
     private final InMemoryTrackingEventDAO dao = new InMemoryTrackingEventDAO(clock);
     private final Map<String, VehicleFacts> central = new HashMap<>();
     private volatile boolean wildFlyDown;
+    private final List<Detection> detections = new CopyOnWriteArrayList<>();
 
     private final VehicleFactsSource facts = licensePlate -> {
         if (wildFlyDown) {
@@ -32,7 +40,8 @@ class TrackingDetectionWorkerTest {
         return Optional.ofNullable(central.get(licensePlate));
     };
     private final TrackingDetectionWorker worker = new TrackingDetectionWorker(
-            new SituationDetector(facts, List.of(new TripWithoutGuideRule())), dao, clock, 2, 100);
+            new SituationDetector(facts, List.of(new TripWithoutGuideRule())), dao,
+            (event, situations) -> detections.add(new Detection(event, situations)), clock, 2, 100);
 
     private TrackingEvent saved(String licensePlate) {
         TrackingEvent event = new TrackingEvent("msg-1", 7, 1, licensePlate, -34.9, -56.1, clock.instant());
@@ -41,14 +50,15 @@ class TrackingDetectionWorkerTest {
     }
 
     @Test
-    void savesTheSituationsOfASubmittedEvent() {
+    void evaluatesASubmittedEventAndMarksItAsDetected() {
         central.put("SBC1234", SituationDetectorTest.withoutTrips("SBC1234"));
         TrackingEvent event = saved("SBC1234");
 
         worker.submit(event);
         worker.close();
 
-        assertEquals(Optional.of(List.of(Situation.TRIP_WITHOUT_GUIDE)), dao.situationsOf(event));
+        assertEquals(List.of(new Detection(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
+        assertTrue(dao.isDetected(event));
     }
 
     @Test
@@ -59,7 +69,8 @@ class TrackingDetectionWorkerTest {
         worker.submit(event);
         worker.close();
 
-        assertEquals(Optional.of(List.of()), dao.situationsOf(event));
+        assertEquals(List.of(new Detection(event, List.of())), detections);
+        assertTrue(dao.isDetected(event));
     }
 
     @Test
@@ -70,7 +81,8 @@ class TrackingDetectionWorkerTest {
         worker.submit(event);
         worker.close();
 
-        assertEquals(Optional.empty(), dao.situationsOf(event));
+        assertEquals(List.of(), detections);
+        assertFalse(dao.isDetected(event));
     }
 
     @Test
@@ -83,7 +95,8 @@ class TrackingDetectionWorkerTest {
         worker.recoverPending(PENDING_FOR);
         worker.close();
 
-        assertEquals(Optional.of(List.of(Situation.TRIP_WITHOUT_GUIDE)), dao.situationsOf(event));
+        assertEquals(List.of(new Detection(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
+        assertTrue(dao.isDetected(event));
     }
 
     @Test
@@ -95,6 +108,7 @@ class TrackingDetectionWorkerTest {
         worker.recoverPending(PENDING_FOR);
         worker.close();
 
-        assertEquals(Optional.empty(), dao.situationsOf(event));
+        assertEquals(List.of(), detections);
+        assertFalse(dao.isDetected(event));
     }
 }

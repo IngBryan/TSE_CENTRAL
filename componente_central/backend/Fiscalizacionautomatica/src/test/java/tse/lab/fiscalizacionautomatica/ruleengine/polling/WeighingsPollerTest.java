@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryScalesMetadataDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryWeighingDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
 
@@ -37,14 +38,17 @@ class WeighingsPollerTest {
             if (failing.contains(scaleId)) {
                 throw new IOException("scale " + scaleId + " unavailable");
             }
-            return List.of(new Weighing(scaleId * 10, scaleId, "SBC1234", to, 18_000));
+            // A vehicle is weighed in each scale at a different moment
+            return List.of(new Weighing(scaleId * 10, scaleId, licensePlate, to.minusSeconds(scaleId), 18_000));
         }
     }
 
     private final FakeScalesApi api = new FakeScalesApi();
     private final InMemoryScalesMetadataDAO metadata = new InMemoryScalesMetadataDAO();
     private final MutableClock clock = new MutableClock(NOW);
-    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), "SBC1234", api, metadata, clock);
+    private final InMemoryWeighingDAO weighingDAO = new InMemoryWeighingDAO();
+    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), "SBC1234", api, weighingDAO, metadata,
+            clock);
 
     @Test
     void firstPollStartsAtTheBeginningOfTodayInUruguay() {
@@ -63,7 +67,7 @@ class WeighingsPollerTest {
         // 23:30 of October 9 in Uruguay, already October 10 in UTC
         MutableClock lateClock = new MutableClock(Instant.parse("2026-10-10T02:30:00Z"));
 
-        new WeighingsPoller(List.of(1L), "SBC1234", api, metadata, lateClock).poll();
+        new WeighingsPoller(List.of(1L), "SBC1234", api, weighingDAO, metadata, lateClock).poll();
 
         assertEquals(Instant.parse("2026-10-09T03:00:00Z"), api.requests.getFirst().from());
     }
@@ -104,7 +108,7 @@ class WeighingsPollerTest {
         PollResult result = poller.poll();
 
         assertEquals(List.of(2L), result.failedScaleIds());
-        assertEquals(List.of(new Weighing(10, 1, "SBC1234", NOW, 18_000)), result.weighings());
+        assertEquals(List.of(new Weighing(10, 1, "SBC1234", NOW.minusSeconds(1), 18_000)), result.weighings());
         assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
         assertEquals(Optional.of(last), metadata.findLastTimestamp(2));
 
@@ -116,5 +120,27 @@ class WeighingsPollerTest {
         Instant now = NOW.plus(Duration.ofMinutes(5));
         assertEquals(List.of(new Request(1, "SBC1234", NOW, now), new Request(2, "SBC1234", last, now)),
                 api.requests);
+    }
+
+    @Test
+    void savesTheFetchedWeighingsPendingDetection() throws IOException {
+        PollResult result = poller.poll();
+
+        List<Weighing> fetched = List.of(new Weighing(10, 1, "SBC1234", NOW.minusSeconds(1), 18_000),
+                new Weighing(20, 2, "SBC1234", NOW.minusSeconds(2), 18_000));
+        assertEquals(fetched, weighingDAO.saved());
+        assertEquals(fetched.reversed(), weighingDAO.findPending(100));
+        assertEquals(2, result.saved());
+    }
+
+    @Test
+    void ifTheWeighingsCanNotBeSavedTheTimestampDoesNotMove() {
+        weighingDAO.down = true;
+
+        PollResult result = poller.poll();
+
+        assertEquals(List.of(1L, 2L), result.failedScaleIds());
+        assertEquals(Optional.empty(), metadata.findLastTimestamp(1));
+        assertEquals(Optional.empty(), metadata.findLastTimestamp(2));
     }
 }
