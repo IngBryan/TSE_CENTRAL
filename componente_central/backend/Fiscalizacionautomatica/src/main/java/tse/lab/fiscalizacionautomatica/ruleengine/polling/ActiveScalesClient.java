@@ -26,12 +26,12 @@ public class ActiveScalesClient implements AutoCloseable {
         }
     }
 
-    /** @return ids of the active scales, the same ids the balanzas API uses */
+    /** @return external ids of the active scales: the ids the balanzas API uses */
     public List<Long> findActiveScaleIds() throws IOException {
         try {
             return nodes.listarNodos().stream()
                     .filter(node -> node.tipo() == TipoNodo.BALANZA)
-                    .map(DatosNodo::id)
+                    .map(DatosNodo::idExterno)
                     .toList();
         } catch (EJBException e) {
             // WildFly down, wrong credentials or the EAR not deployed

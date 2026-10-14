@@ -19,7 +19,7 @@ public class EventoTracking implements Serializable {
 
     private String messageId;
     private Long idExterno;
-    // Id del GPS = id del NodoTracking (PostgreSQL) que reporto el evento
+    // Id del GPS = idExterno del NodoTracking (PostgreSQL) que reporto el evento
     private Long gpsId;
     private String matricula;
     private Double latitud;

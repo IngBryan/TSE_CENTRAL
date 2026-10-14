@@ -24,6 +24,6 @@ public class NodosActivosService implements NodosActivosRemote {
 
     private static DatosNodo datos(NodoPeriferico n) {
         TipoNodo tipo = n instanceof NodoBalanza ? TipoNodo.BALANZA : TipoNodo.TRACKING;
-        return new DatosNodo(n.getId(), n.getNombre(), tipo);
+        return new DatosNodo(n.getId(), n.getIdExterno(), n.getNombre(), tipo);
     }
 }

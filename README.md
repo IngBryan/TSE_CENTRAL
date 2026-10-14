@@ -376,8 +376,9 @@ en varios modos, segun el argumento:
 
 - **Balanzas a consultar:** al empezar cada ejecucion le pide al backoffice, por EJB remoto
   (`NodosActivosRemote.listarNodos()`, ver *Nodos activos* abajo), los nodos perifericos activos y
-  se queda con los de tipo `BALANZA`. Se asume que el `id` del `NodoBalanza` es el mismo id de la
-  balanza en la API de balanzas. Si no hay balanzas activas, termina sin consultar (codigo `0`).
+  se queda con los de tipo `BALANZA`. A la API de balanzas le pasa el `idExterno` de cada
+  `NodoBalanza` (el id de la balanza en ese nodo). Si no hay balanzas activas, termina sin
+  consultar (codigo `0`).
 - Despues pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza activa
   (fechas en hora de Uruguay, `-03:00`), imprime
   `Fetched N weighings of scales [..] from <url> (until <to>)` y termina. El proceso no guarda
@@ -426,9 +427,13 @@ vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`). El cliente es
 
 **Nodos activos (EJB remoto de Backofficeautoridadesadministradores):** `NodosActivosService`
 (paquete `service.gestionnodosperifericos`) devuelve los nodos perifericos con `activo = true`
-(`List<DatosNodo>` con `id`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). El poller de balanzas lo
-usa con el cliente `ruleengine/polling/ActiveScalesClient`; usuario, URL y errores igual que en
-*Viajes en curso*.
+(`List<DatosNodo>` con `id`, `idExterno`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). El poller de
+balanzas lo usa con el cliente `ruleengine/polling/ActiveScalesClient`; usuario, URL y errores igual
+que en *Viajes en curso*.
+
+`id` es el que genera el central e `idExterno` el del nodo en su propio sistema (id de la balanza
+en la API de balanzas, `gpsId` en tracking). Balanzas y GPS repiten ids entre si (hay balanza 1 y
+GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no puede ser el `id`.
 
 
   Si se agrega otra interfaz remota o DTO, hay que sumarlo a `clientIncludes` en
@@ -482,7 +487,8 @@ de RabbitMQ (Exchanges → `tracking` → *Publish message*, routing key `tracki
 
 **Poller de balanzas** (con `balanzas` arriba: `docker compose up -d balanzas` en `TSE_NODOS`,
 `BALANZAS_CLIENT_ID` / `BALANZAS_CLIENT_SECRET` y `EJB_USER` / `EJB_PASSWORD` en el `.env`, y al
-menos un `NodoBalanza` activo cuyo id exista en balanzas; levanta MongoDB y WildFly si no estan
+menos un `NodoBalanza` activo cuyo `idExterno` exista en balanzas, como la balanza 4 de
+`datos-prueba.sql`; levanta MongoDB y WildFly si no estan
 arriba):
 
 ```bash
