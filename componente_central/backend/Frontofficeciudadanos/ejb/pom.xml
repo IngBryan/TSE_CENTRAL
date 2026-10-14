@@ -104,6 +104,14 @@
                     <version>${version.ejb.plugin}</version>
                     <configuration>
                         <ejbVersion>4.0</ejbVersion>
+                        <!-- frontofficeciudadanos-ejb-client.jar: solo las interfaces remotas y sus DTOs,
+                            para clientes fuera de WildFly (Fiscalizacionautomatica) -->
+                        <generateClient>true</generateClient>
+                        <clientIncludes>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCurso.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCursoRemote.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/DatosViaje.class</clientInclude>
+                        </clientIncludes>
                     </configuration>
                 </plugin>
         </plugins>

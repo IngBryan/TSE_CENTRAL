@@ -8,15 +8,18 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
 
 class WeighingsPollerTest {
 
+    // 09:00 in Uruguay (UTC-3)
     private static final Instant NOW = Instant.parse("2026-10-10T12:00:00Z");
-    private static final Duration WINDOW = Duration.ofHours(1);
+    private static final Instant START_OF_TODAY = Instant.parse("2026-10-10T03:00:00Z");
 
     record Request(long scaleId, String licensePlate, Instant from, Instant to) {
     }
@@ -39,42 +42,79 @@ class WeighingsPollerTest {
     }
 
     private final FakeScalesApi api = new FakeScalesApi();
+    private final InMemoryScalesMetadataDAO metadata = new InMemoryScalesMetadataDAO();
     private final MutableClock clock = new MutableClock(NOW);
-    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), "SBC1234", WINDOW, api, clock);
+    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), "SBC1234", api, metadata, clock);
 
     @Test
-    void queriesEveryScaleForTheWindowEndingNow() {
+    void firstPollStartsAtTheBeginningOfTodayInUruguay() {
         PollResult result = poller.poll();
 
-        Instant from = NOW.minus(WINDOW);
-        assertEquals(List.of(new Request(1, "SBC1234", from, NOW), new Request(2, "SBC1234", from, NOW)), api.requests);
+        assertEquals(List.of(new Request(1, "SBC1234", START_OF_TODAY, NOW),
+                new Request(2, "SBC1234", START_OF_TODAY, NOW)), api.requests);
         assertEquals(2, result.weighings().size());
         assertEquals(List.of(), result.failedScaleIds());
+        assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
+        assertEquals(Optional.of(NOW), metadata.findLastTimestamp(2));
     }
 
     @Test
-    void reportsTheScalesThatFailedAndKeepsTheRest() {
+    void beforeMidnightInUruguayTodayIsStillTheDayBefore() {
+        // 23:30 of October 9 in Uruguay, already October 10 in UTC
+        MutableClock lateClock = new MutableClock(Instant.parse("2026-10-10T02:30:00Z"));
+
+        new WeighingsPoller(List.of(1L), "SBC1234", api, metadata, lateClock).poll();
+
+        assertEquals(Instant.parse("2026-10-09T03:00:00Z"), api.requests.getFirst().from());
+    }
+
+    @Test
+    void eachScaleIsQueriedFromItsOwnLastTimestamp() {
+        Instant lastOfScale1 = NOW.minus(Duration.ofMinutes(5));
+        Instant lastOfScale2 = NOW.minus(Duration.ofHours(1));
+        metadata.saveLastTimestamp(1, lastOfScale1);
+        metadata.saveLastTimestamp(2, lastOfScale2);
+
+        poller.poll();
+
+        assertEquals(List.of(new Request(1, "SBC1234", lastOfScale1, NOW),
+                new Request(2, "SBC1234", lastOfScale2, NOW)), api.requests);
+    }
+
+    @Test
+    void eachPollStartsWhereThePreviousOneEnded() {
+        poller.poll();
+        clock.advance(Duration.ofMinutes(5));
+        api.requests.clear();
+
+        poller.poll();
+
+        Instant now = NOW.plus(Duration.ofMinutes(5));
+        assertEquals(List.of(new Request(1, "SBC1234", NOW, now), new Request(2, "SBC1234", NOW, now)),
+                api.requests);
+    }
+
+    @Test
+    void aFailedScaleRepeatsItsRangeWithoutHoldingBackTheOthers() {
+        Instant last = NOW.minus(Duration.ofMinutes(5));
+        metadata.saveLastTimestamp(1, last);
+        metadata.saveLastTimestamp(2, last);
         api.failing.add(2L);
 
         PollResult result = poller.poll();
 
         assertEquals(List.of(2L), result.failedScaleIds());
         assertEquals(List.of(new Weighing(10, 1, "SBC1234", NOW, 18_000)), result.weighings());
-    }
+        assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
+        assertEquals(Optional.of(last), metadata.findLastTimestamp(2));
 
-    @Test
-    void eachPollIsIndependent() {
-        // No state between runs: a later poll (even after a failure) only depends on the current time
-        api.failing.add(2L);
-        poller.poll();
         clock.advance(Duration.ofMinutes(5));
         api.failing.clear();
         api.requests.clear();
-
         poller.poll();
 
         Instant now = NOW.plus(Duration.ofMinutes(5));
-        Instant from = now.minus(WINDOW);
-        assertEquals(List.of(new Request(1, "SBC1234", from, now), new Request(2, "SBC1234", from, now)), api.requests);
+        assertEquals(List.of(new Request(1, "SBC1234", NOW, now), new Request(2, "SBC1234", last, now)),
+                api.requests);
     }
 }

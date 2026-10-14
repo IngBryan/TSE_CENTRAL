@@ -8,6 +8,10 @@ on:
       - dev
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
+      # El contrato del EJB remoto (ejb-client de Frontofficeciudadanos) y Modelo, del que depende
+      - componente_central/backend/Modelo/**
+      - componente_central/backend/Frontofficeciudadanos/pom.xml
+      - componente_central/backend/Frontofficeciudadanos/ejb/**
       - .github/workflows/backend-fiscalizacionautomatica.yml
       - .github/workflows/_build-backend.yml
   pull_request:
@@ -15,6 +19,10 @@ on:
       - dev
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
+      # El contrato del EJB remoto (ejb-client de Frontofficeciudadanos) y Modelo, del que depende
+      - componente_central/backend/Modelo/**
+      - componente_central/backend/Frontofficeciudadanos/pom.xml
+      - componente_central/backend/Frontofficeciudadanos/ejb/**
       - .github/workflows/backend-fiscalizacionautomatica.yml
       - .github/workflows/_build-backend.yml
   workflow_dispatch:
@@ -27,6 +35,7 @@ jobs:
       artifact-name: backend-fiscalizacionautomatica
       artifact: target/*.jar
       sonar-project-key: tse-central-backend-fiscalizacionautomatica
+      install-first: componente_central/backend/Modelo componente_central/backend/Frontofficeciudadanos
 
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

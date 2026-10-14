@@ -70,6 +70,22 @@ spec:
                   name: tse-runtime-secrets
                   key: rabbitmq-password
 
+            # Usuario de aplicacion para EJB remoto (lo crea start.sh al arrancar).
+            # optional: sin las claves en el Secret, WildFly arranca igual pero sin el usuario.
+            - name: EJB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ejb-user
+                  optional: true
+
+            - name: EJB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ejb-password
+                  optional: true
+
           # WildFly puede tardar bastante en desplegar los 3 EAR.
           startupProbe:
             exec:

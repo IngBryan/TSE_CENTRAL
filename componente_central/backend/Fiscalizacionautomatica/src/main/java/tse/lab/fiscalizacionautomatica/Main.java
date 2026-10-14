@@ -2,6 +2,7 @@ package tse.lab.fiscalizacionautomatica;
 
 import com.mongodb.MongoClientSettings;
 import com.mongodb.MongoCredential;
+import com.mongodb.MongoException;
 import com.mongodb.MongoSecurityException;
 import com.mongodb.MongoTimeoutException;
 import com.mongodb.ServerAddress;
@@ -13,27 +14,28 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.bson.Document;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingConsumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ActiveTripsClient;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
 
 public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
 
-    /** Hardcoded test values: what to query (scales, vehicles, range) is still to be defined. */
+    /** Hardcoded test values: what to query (scales, vehicles) is still to be defined. */
     private static final List<Long> SCALE_IDS = List.of(4L);
     private static final String LICENSE_PLATE = "SBC1234";
-    private static final Duration WEIGHINGS_WINDOW = Duration.ofDays(30);
 
     /**
      * The same jar runs as the tracking consumer (default: keeps running, scalable) or as the
@@ -44,8 +46,9 @@ public class Main {
         switch (mode) {
             case "tracking-consumer" -> startTrackingConsumer();
             case "weighings-poller" -> System.exit(pollWeighings());
+            case "active-trips" -> System.exit(printActiveTrips());
             default -> throw new IllegalArgumentException(
-                    "Unknown mode: " + mode + " (expected tracking-consumer or weighings-poller)");
+                    "Unknown mode: " + mode + " (expected tracking-consumer, weighings-poller or active-trips)");
         }
     }
 
@@ -72,20 +75,46 @@ public class Main {
 
     /** @return exit code: 0 if every scale was polled, 1 otherwise (so the cron sees the failure) */
     private static int pollWeighings() {
-        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET");
+        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD");
         String url = env("BALANZAS_URL", "http://localhost:3001");
 
-        ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
-                System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
-        PollResult result = new WeighingsPoller(SCALE_IDS, LICENSE_PLATE, WEIGHINGS_WINDOW, api, Clock.systemUTC())
-                .poll();
+        try (MongoClient mongo = createMongoClient()) {
+            MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
+            ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
+                    System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
+            PollResult result = new WeighingsPoller(SCALE_IDS, LICENSE_PLATE, api,
+                    new MongoScalesMetadataDAO(database), Clock.systemUTC()).poll();
 
-        System.out.printf("Fetched %d weighings from %s%n", result.weighings().size(), url);
-        if (!result.failedScaleIds().isEmpty()) {
-            System.err.println("Could not poll scales " + result.failedScaleIds());
+            System.out.printf("Fetched %d weighings from %s (until %s)%n", result.weighings().size(), url,
+                    result.to());
+            if (!result.failedScaleIds().isEmpty()) {
+                System.err.println("Could not poll scales " + result.failedScaleIds()
+                        + ": their last timestamp was not updated");
+                return 1;
+            }
+            return 0;
+        } catch (MongoException e) {
+            // Without the last timestamp the range is unknown: the next run retries
+            System.err.println("MongoDB unavailable: " + e.getMessage());
             return 1;
         }
-        return 0;
+    }
+
+    /** Test of the remote EJB call: prints the active trips of LICENSE_PLATE. */
+    private static int printActiveTrips() {
+        requireEnv("EJB_USER", "EJB_PASSWORD");
+        String url = env("WILDFLY_URL", "remote+http://localhost:8080");
+
+        try (ActiveTripsClient client = new ActiveTripsClient(url, System.getenv("EJB_USER"),
+                System.getenv("EJB_PASSWORD"))) {
+            List<DatosViaje> trips = client.findActiveTrips(LICENSE_PLATE);
+            System.out.printf("%d active trips for %s from %s%n", trips.size(), LICENSE_PLATE, url);
+            trips.forEach(System.out::println);
+            return 0;
+        } catch (IOException e) {
+            System.err.println(e.getMessage() + ": " + e.getCause());
+            return 1;
+        }
     }
 
     private static String env(String name, String defaultValue) {

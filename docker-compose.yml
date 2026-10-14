@@ -152,6 +152,9 @@ services:
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
       # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
       - BACKEND_API_KEY=${BACKEND_API_KEY}
+      # Usuario de aplicacion para EJB remoto (lo crea wildfly/start.sh al arrancar)
+      - EJB_USER=${EJB_USER}
+      - EJB_PASSWORD=${EJB_PASSWORD}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:
@@ -169,6 +172,9 @@ services:
   fiscalizacionautomatica:
     build:
       context: ./componente_central/backend/Fiscalizacionautomatica
+      # Modelo y Frontofficeciudadanos: de ahi sale el contrato del EJB remoto (ejb-client)
+      additional_contexts:
+        backend: ./componente_central/backend
     hostname: fiscalizacionautomatica
     container_name: fiscalizacion-server
     restart: unless-stopped
@@ -185,6 +191,10 @@ services:
       - MONGO_DB=main_db
       - MONGO_USER=${MONGO_USER}
       - MONGO_PASSWORD=${MONGO_PASSWORD}
+      # EJB remoto de Frontofficeciudadanos (viajes en curso); mismo usuario que crea WildFly
+      - WILDFLY_URL=remote+http://wildfly:8080
+      - EJB_USER=${EJB_USER}
+      - EJB_PASSWORD=${EJB_PASSWORD}
 
   # Misma imagen, en modo poller: consulta una vez la API de balanzas (TSE_NODOS) y termina.
   # No queda corriendo: lo lanza un cron con "docker compose run --rm fiscalizacionautomatica-poller".
@@ -192,12 +202,22 @@ services:
   fiscalizacionautomatica-poller:
     build:
       context: ./componente_central/backend/Fiscalizacionautomatica
+      additional_contexts:
+        backend: ./componente_central/backend
     profiles: ["cron"]
     command: ["weighings-poller"]
+    # La ultima consulta exitosa (balanzas_metadata) se guarda en MongoDB
+    depends_on:
+      mongodb:
+        condition: service_healthy
     environment:
       - BALANZAS_URL=${BALANZAS_URL:-http://host.docker.internal:3001}
       - BALANZAS_CLIENT_ID=${BALANZAS_CLIENT_ID}
       - BALANZAS_CLIENT_SECRET=${BALANZAS_CLIENT_SECRET}
+      - MONGO_HOST=mongodb
+      - MONGO_DB=main_db
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
 
