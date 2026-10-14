@@ -66,7 +66,9 @@ public class Main {
             mongo.close();
         }));
 
-        TrackingEventReceiver receiver = new TrackingEventReceiver(new MongoTrackingEventDAO(database));
+        MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database);
+        dao.createIndexes();
+        TrackingEventReceiver receiver = new TrackingEventReceiver(dao);
 
         new TrackingConsumer(connection.createChannel(), receiver).start();
         System.out.printf("Consuming %s from %s:%d, saving to %s.%s%n", TrackingConsumer.QUEUE,

@@ -18,7 +18,7 @@ public class TrackingEventReceiver {
     public enum Result {
         /** New event, saved. */
         SAVED,
-        /** Already received (same message_id): discarded. */
+        /** Already received (same license plate and timestamp): discarded. */
         DUPLICATE,
         /** Can't be parsed or is missing data: discarded. */
         INVALID
@@ -39,7 +39,7 @@ public class TrackingEventReceiver {
     }
 
     /**
-     * @param messageId RabbitMQ message_id
+     * @param messageId RabbitMQ message_id (required)
      * @param body      JSON published by tracking
      */
     public Result receive(String messageId, byte[] body) {
@@ -54,7 +54,7 @@ public class TrackingEventReceiver {
 
     private static TrackingEvent parse(String messageId, byte[] body) throws IOException {
         if (messageId == null || messageId.isBlank()) {
-            throw new IllegalArgumentException("Missing message_id: duplicates can't be detected");
+            throw new IllegalArgumentException("Missing message_id");
         }
         TrackingMessage m = JSON.readValue(body, TrackingMessage.class);
         if (m == null || m.id() == null || m.gpsId() == null || m.datetime() == null

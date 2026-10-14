@@ -360,8 +360,13 @@ en varios modos, segun el argumento:
 - Confirmacion manual: el mensaje se confirma recien despues de guardarlo. Duplicado → se
   confirma sin guardar; invalido → se descarta; si falla el guardado (por ejemplo, Mongo
   caido) vuelve a la cola y se reintenta.
-- El `_id` del documento es el `message_id` de RabbitMQ, asi una reentrega no se guarda dos
-  veces. Documento: `{ _id, eventId, gpsId, licensePlate, location (GeoJSON), timestamp }`.
+- Un evento se identifica por `(licensePlate, timestamp)` (matricula y fecha_hora), con un indice
+  unico `licensePlate_timestamp` que el consumidor crea al arrancar: una reentrega choca con el
+  indice y no se guarda dos veces. El `_id` lo genera MongoDB y el id del evento en tracking
+  queda en `externalId` (no sirve como clave: tracking lo reinicia al reiniciarse). Documento:
+  `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp }`.
+- El `message_id` de RabbitMQ es obligatorio: un mensaje sin el se descarta como invalido (sin
+  reencolar). Se guarda en `messageId` para rastrear el evento hasta su mensaje.
 - Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
   `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
   (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`). Si RabbitMQ o Mongo
@@ -601,8 +606,8 @@ consume; no hay respuesta ni cola de retorno. Cada mensaje lo procesa un unico c
   compose el host es `rabbitmq`.
 - **Mensajes:** JSON persistente (`content_type: application/json`, `type: tracking.event`):
   `{ id, gpsId, licensePlate, latitude, longitude, datetime }`. La entrega es *at-least-once*:
-  ante un reintento puede llegar un duplicado con el mismo `message_id`, que el consumidor
-  debe descartar.
+  ante un reintento puede llegar un duplicado, que el consumidor descarta porque tiene la misma
+  matricula y fecha (`licensePlate`, `datetime`).
 
 ## Requisitos
 

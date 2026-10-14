@@ -6,7 +6,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 public interface TrackingEventDAO {
 
     /**
-     * Saves the event, unless one with the same {@code messageId} was already saved.
+     * Saves the event, unless one with the same license plate and timestamp was already saved.
      *
      * @return {@code true} if it was saved; {@code false} if it already existed (RabbitMQ redelivery)
      */

@@ -4,15 +4,16 @@ import java.time.Instant;
 
 /**
  * Position reported by a GPS of the tracking node, received through the tracking.events queue.
+ * Identified by (licensePlate, timestamp): a redelivered message has the same key and is not saved
+ * twice. {@code externalId} alone can't identify it because tracking generates it in memory and
+ * resets it when the service restarts.
  *
- * @param messageId RabbitMQ message_id. Identifies the event: it is stable across retries, so it
- *                  is used to discard duplicates. {@code eventId} can't be used for that because
- *                  tracking generates it in memory and resets it when the service restarts.
- * @param eventId   event id in tracking
+ * @param messageId  RabbitMQ message_id (required; kept to trace the event back to its message)
+ * @param externalId event id in the tracking node
  */
 public record TrackingEvent(
         String messageId,
-        long eventId,
+        long externalId,
         long gpsId,
         String licensePlate,
         double latitude,

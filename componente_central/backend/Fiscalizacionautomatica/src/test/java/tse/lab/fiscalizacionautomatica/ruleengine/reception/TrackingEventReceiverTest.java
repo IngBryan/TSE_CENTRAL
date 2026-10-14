@@ -47,7 +47,7 @@ class TrackingEventReceiverTest {
     }
 
     @Test
-    void discardsRedeliveryOfSameMessage() {
+    void discardsRedeliveryOfSameEvent() {
         TrackingEventReceiver receiver = new TrackingEventReceiver(new InMemoryTrackingEventDAO());
 
         assertEquals(Result.SAVED, receiver.receive("msg-1", bytes(MESSAGE)));
@@ -55,12 +55,20 @@ class TrackingEventReceiverTest {
     }
 
     @Test
-    void trackingIdDoesNotIdentifyEvent() {
-        // tracking resets its ids on restart: same id with another message_id is another event
+    void sameLicensePlateAndTimeIsTheSameEventEvenWithAnotherExternalId() {
         TrackingEventReceiver receiver = new TrackingEventReceiver(new InMemoryTrackingEventDAO());
 
         assertEquals(Result.SAVED, receiver.receive("msg-1", bytes(MESSAGE)));
-        assertEquals(Result.SAVED, receiver.receive("msg-2", bytes(MESSAGE)));
+        assertEquals(Result.DUPLICATE, receiver.receive("msg-2", bytes(MESSAGE.replace("\"id\": 7", "\"id\": 8"))));
+    }
+
+    @Test
+    void externalIdDoesNotIdentifyEvent() {
+        // tracking resets its ids on restart: the same id at another time is another event
+        TrackingEventReceiver receiver = new TrackingEventReceiver(new InMemoryTrackingEventDAO());
+
+        assertEquals(Result.SAVED, receiver.receive("msg-1", bytes(MESSAGE)));
+        assertEquals(Result.SAVED, receiver.receive("msg-2", bytes(MESSAGE.replace("15:30:00.000Z", "15:31:00.000Z"))));
     }
 
     @ParameterizedTest

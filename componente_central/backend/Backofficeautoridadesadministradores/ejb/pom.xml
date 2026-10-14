@@ -92,6 +92,15 @@
                     <version>${version.ejb.plugin}</version>
                     <configuration>
                         <ejbVersion>4.0</ejbVersion>
+                        <!-- backofficeautoridadesadministradores-ejb-client.jar: solo las interfaces remotas
+                            y sus DTOs, para clientes fuera de WildFly (Fiscalizacionautomatica) -->
+                        <generateClient>true</generateClient>
+                        <clientIncludes>
+                            <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/NodosActivos.class</clientInclude>
+                            <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/NodosActivosRemote.class</clientInclude>
+                            <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/DatosNodo.class</clientInclude>
+                            <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/TipoNodo.class</clientInclude>
+                        </clientIncludes>
                     </configuration>
                 </plugin>
         </plugins>
