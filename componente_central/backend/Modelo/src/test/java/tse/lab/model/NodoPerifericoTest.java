@@ -1,3 +1,4 @@
+
 package tse.lab.model;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -11,13 +12,13 @@ class NodoPerifericoTest {
         NodoBalanza balanza = new NodoBalanza(
             "Balanza Ruta 5",
             "Ruta 5 km 30",
-            "BAL-005"
+            5L
         );
 
         assertNull(balanza.getId());
         assertEquals("Balanza Ruta 5", balanza.getNombre());
         assertEquals("Ruta 5 km 30", balanza.getUbicacion());
-        assertEquals("BAL-005", balanza.getIdExterno());
+        assertEquals(5L, balanza.getIdExterno());
         assertTrue(balanza.isActivo());
         assertNull(balanza.getUltimaComunicacionExitosa());
         assertNotNull(balanza.getEventos());
@@ -29,14 +30,32 @@ class NodoPerifericoTest {
         NodoTracking tracking = new NodoTracking(
             "Tracking Norte",
             "Artigas",
-            "GPS-001"
+            1L
         );
 
         assertNull(tracking.getId());
         assertEquals("Tracking Norte", tracking.getNombre());
         assertEquals("Artigas", tracking.getUbicacion());
-        assertEquals("GPS-001", tracking.getIdExterno());
+        assertEquals(1L, tracking.getIdExterno());
         assertTrue(tracking.isActivo());
         assertNull(tracking.getUltimaComunicacionExitosa());
+    }
+
+    @Test
+    void distintosTiposPuedenCompartirIdExterno() {
+        NodoBalanza balanza = new NodoBalanza(
+            "Balanza Ruta 5",
+            "Ruta 5 km 30",
+            100L
+        );
+
+        NodoTracking tracking = new NodoTracking(
+            "Tracking Norte",
+            "Artigas",
+            100L
+        );
+
+        assertEquals(balanza.getIdExterno(), tracking.getIdExterno());
+        assertNotEquals(balanza.getClass(), tracking.getClass());
     }
 }

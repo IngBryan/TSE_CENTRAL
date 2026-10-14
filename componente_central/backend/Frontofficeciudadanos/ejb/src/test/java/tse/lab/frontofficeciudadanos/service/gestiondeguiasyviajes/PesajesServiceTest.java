@@ -42,7 +42,11 @@ class PesajesServiceTest {
         set(servicio, "balanzas", balanzas);
 
         em.getTransaction().begin();
-        em.persist(new NodoBalanza(4L, "Ruta 8 - Km 150", true));
+        em.persist(new NodoBalanza(
+            "Balanza Ruta 8",
+            "Ruta 8 - Km 150",
+            4L
+        ));
         em.getTransaction().commit();
     }
 
