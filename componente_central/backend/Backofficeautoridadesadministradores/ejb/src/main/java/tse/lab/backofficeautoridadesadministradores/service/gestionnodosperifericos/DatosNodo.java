@@ -1,23 +1,41 @@
+
 package tse.lab.backofficeautoridadesadministradores.service.gestionnodosperifericos;
 
 import java.io.Serializable;
-import java.util.Objects;
+import java.time.Instant;
 
-// id: el del central. idExterno: el del nodo en su sistema (balanza en la API de balanzas, gpsId en tracking).
-// Es una clase y no un record: el cliente de EJB remoto (JBoss Marshalling) no puede deserializar records.
+// id: identificador interno del central.
+// idExterno: identificador del nodo en su sistema de origen.
+// Es una clase y no un record: el cliente de EJB remoto
+// utiliza JBoss Marshalling para la deserializacion.
 public final class DatosNodo implements Serializable {
+
     private static final long serialVersionUID = 1L;
 
     private final Long id;
     private final Long idExterno;
     private final String nombre;
     private final TipoNodo tipo;
+    private final String ubicacion;
+    private final boolean activo;
+    private final Instant ultimaComunicacionExitosa;
 
-    public DatosNodo(Long id, Long idExterno, String nombre, TipoNodo tipo) {
+    public DatosNodo(
+            Long id,
+            Long idExterno,
+            String nombre,
+            TipoNodo tipo,
+            String ubicacion,
+            boolean activo,
+            Instant ultimaComunicacionExitosa) {
+
         this.id = id;
         this.idExterno = idExterno;
         this.nombre = nombre;
         this.tipo = tipo;
+        this.ubicacion = ubicacion;
+        this.activo = activo;
+        this.ultimaComunicacionExitosa = ultimaComunicacionExitosa;
     }
 
     public Long getId() {
@@ -36,19 +54,29 @@ public final class DatosNodo implements Serializable {
         return tipo;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof DatosNodo otro && Objects.equals(id, otro.id) && Objects.equals(idExterno, otro.idExterno)
-                && Objects.equals(nombre, otro.nombre) && tipo == otro.tipo;
+    public String getUbicacion() {
+        return ubicacion;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, idExterno, nombre, tipo);
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public Instant getUltimaComunicacionExitosa() {
+        return ultimaComunicacionExitosa;
     }
 
     @Override
     public String toString() {
-        return "DatosNodo[id=" + id + ", idExterno=" + idExterno + ", nombre=" + nombre + ", tipo=" + tipo + "]";
+        return "DatosNodo["
+                + "id=" + id
+                + ", idExterno=" + idExterno
+                + ", nombre=" + nombre
+                + ", tipo=" + tipo
+                + ", ubicacion=" + ubicacion
+                + ", activo=" + activo
+                + ", ultimaComunicacionExitosa="
+                + ultimaComunicacionExitosa
+                + "]";
     }
 }

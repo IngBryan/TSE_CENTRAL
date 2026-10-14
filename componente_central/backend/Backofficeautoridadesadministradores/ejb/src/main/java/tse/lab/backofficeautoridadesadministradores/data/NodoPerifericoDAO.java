@@ -20,6 +20,7 @@ public class NodoPerifericoDAO {
     // Registrar un nuevo nodo periférico.
     public void guardar(NodoPeriferico nodo) {
         em.persist(nodo);
+        em.flush();
     }
 
     // Buscar un nodo por su identificador interno.
@@ -47,7 +48,7 @@ public class NodoPerifericoDAO {
     // con el identificador externo indicado.
     public boolean existePorTipoEIdExterno(
             Class<? extends NodoPeriferico> subtipo,
-            String idExterno) {
+            Long idExterno) {
 
         Long cantidad = em.createQuery(
             """
