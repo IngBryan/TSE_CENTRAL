@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import org.bson.Document;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.polling.ActiveScalesClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
@@ -33,8 +34,7 @@ public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
 
-    /** Hardcoded test values: what to query (scales, vehicles) is still to be defined. */
-    private static final List<Long> SCALE_IDS = List.of(4L);
+    /** Hardcoded test value: which vehicles to query is still to be defined. */
     private static final String LICENSE_PLATE = "SBC1234";
 
     /**
@@ -75,20 +75,38 @@ public class Main {
                 factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION);
     }
 
-    /** @return exit code: 0 if every scale was polled, 1 otherwise (so the cron sees the failure) */
+    /**
+     * Polls the active scales (asked to the backoffice by remote EJB).
+     *
+     * @return exit code: 0 if every scale was polled, 1 otherwise (so the cron sees the failure)
+     */
     private static int pollWeighings() {
-        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD");
+        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER",
+                "EJB_PASSWORD");
         String url = env("BALANZAS_URL", "http://localhost:3001");
+
+        List<Long> scaleIds;
+        try (ActiveScalesClient nodes = new ActiveScalesClient(wildFlyUrl(), System.getenv("EJB_USER"),
+                System.getenv("EJB_PASSWORD"))) {
+            scaleIds = nodes.findActiveScaleIds();
+        } catch (IOException e) {
+            System.err.println("Could not get the active scales: " + e.getMessage() + ": " + e.getCause());
+            return 1;
+        }
+        if (scaleIds.isEmpty()) {
+            System.out.println("No active scales: nothing to poll");
+            return 0;
+        }
 
         try (MongoClient mongo = createMongoClient()) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
-            PollResult result = new WeighingsPoller(SCALE_IDS, LICENSE_PLATE, api,
+            PollResult result = new WeighingsPoller(scaleIds, LICENSE_PLATE, api,
                     new MongoScalesMetadataDAO(database), Clock.systemUTC()).poll();
 
-            System.out.printf("Fetched %d weighings from %s (until %s)%n", result.weighings().size(), url,
-                    result.to());
+            System.out.printf("Fetched %d weighings of scales %s from %s (until %s)%n", result.weighings().size(),
+                    scaleIds, url, result.to());
             if (!result.failedScaleIds().isEmpty()) {
                 System.err.println("Could not poll scales " + result.failedScaleIds()
                         + ": their last timestamp was not updated");
@@ -105,7 +123,7 @@ public class Main {
     /** Test of the remote EJB call: prints the active trips of LICENSE_PLATE. */
     private static int printActiveTrips() {
         requireEnv("EJB_USER", "EJB_PASSWORD");
-        String url = env("WILDFLY_URL", "remote+http://localhost:8080");
+        String url = wildFlyUrl();
 
         try (ActiveTripsClient client = new ActiveTripsClient(url, System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
@@ -117,6 +135,10 @@ public class Main {
             System.err.println(e.getMessage() + ": " + e.getCause());
             return 1;
         }
+    }
+
+    private static String wildFlyUrl() {
+        return env("WILDFLY_URL", "remote+http://localhost:8080");
     }
 
     private static String env(String name, String defaultValue) {

@@ -20,3 +20,9 @@ INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('56087406', 1,
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('54074380', 1, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA 1234', (SELECT id FROM choferes WHERE ci = '56087406' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB 5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+-- Nodo de balanza activo para el poller de fiscalizacion automatica. El id es el de la balanza en la API de
+-- balanzas (TSE_NODOS, balanza 4 "Ruta 8 - Km 150"): se fija a mano y se corre la identidad para que los
+-- nodos que se den de alta despues no choquen con el.
+INSERT INTO nodos_perifericos (id, nombre, activo) VALUES (4, 'Ruta 8 - Km 150', true);
+INSERT INTO nodos_balanza (id) VALUES (4);
+ALTER TABLE nodos_perifericos ALTER COLUMN id RESTART WITH 5;

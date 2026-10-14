@@ -3,10 +3,9 @@ package tse.lab.fiscalizacionautomatica.ruleengine.trips;
 import jakarta.ejb.EJBException;
 import java.io.IOException;
 import java.util.List;
-import java.util.Properties;
 import javax.naming.Context;
-import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import tse.lab.fiscalizacionautomatica.ruleengine.remote.WildFlyContexts;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.ViajesEnCursoRemote;
 
@@ -18,13 +17,8 @@ public class ActiveTripsClient implements AutoCloseable {
 
     /** @param url WildFly HTTP port, e.g. remote+http://wildfly:8080 */
     public ActiveTripsClient(String url, String user, String password) throws IOException {
-        Properties props = new Properties();
-        props.put(Context.INITIAL_CONTEXT_FACTORY, "org.wildfly.naming.client.WildFlyInitialContextFactory");
-        props.put(Context.PROVIDER_URL, url);
-        props.put(Context.SECURITY_PRINCIPAL, user);
-        props.put(Context.SECURITY_CREDENTIALS, password);
         try {
-            context = new InitialContext(props);
+            context = WildFlyContexts.create(url, user, password);
             // Only builds the proxy: the connection is opened on the first call
             trips = (ViajesEnCursoRemote) context.lookup(ViajesEnCursoRemote.LOOKUP);
         } catch (NamingException e) {
@@ -43,10 +37,6 @@ public class ActiveTripsClient implements AutoCloseable {
 
     @Override
     public void close() {
-        try {
-            context.close();
-        } catch (NamingException e) {
-            // shutting down: nothing else to do
-        }
+        WildFlyContexts.closeQuietly(context);
     }
 }

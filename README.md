@@ -374,10 +374,14 @@ en varios modos, segun el argumento:
 
 **Poller de balanzas:**
 
-- Cada ejecucion pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza
+- **Balanzas a consultar:** al empezar cada ejecucion le pide al backoffice, por EJB remoto
+  (`NodosActivosRemote.listarNodos()`, ver *Nodos activos* abajo), los nodos perifericos activos y
+  se queda con los de tipo `BALANZA`. Se asume que el `id` del `NodoBalanza` es el mismo id de la
+  balanza en la API de balanzas. Si no hay balanzas activas, termina sin consultar (codigo `0`).
+- Despues pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza activa
   (fechas en hora de Uruguay, `-03:00`), imprime
-  `Fetched N weighings from <url> (until <to>)` y termina. El proceso no guarda estado en
-  memoria: la frecuencia la define el cron que lo lanza.
+  `Fetched N weighings of scales [..] from <url> (until <to>)` y termina. El proceso no guarda
+  estado en memoria: la frecuencia la define el cron que lo lanza.
 - **Rango consultado, por balanza:** desde la ultima consulta exitosa de esa balanza hasta ahora.
   Se guarda en MongoDB, en la coleccion `balanzas_metadata`, un documento por balanza:
   `{ _id: <id de la balanza>, balanzas_last_timestamp: <Date> }`. Si el documento de una balanza
@@ -387,17 +391,18 @@ en varios modos, segun el argumento:
 - **Si falla una balanza**, se sigue con las demas: solo esa no actualiza su
   `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
   se vuelven a consultar las que respondieron).
-- Codigo de salida: `0` si consulto todas las balanzas, `1` si fallo alguna o si MongoDB no esta
-  disponible (el cron o el CronJob lo registra como ejecucion fallida).
+- Codigo de salida: `0` si consulto todas las balanzas, `1` si fallo alguna, si no pudo pedir las
+  balanzas activas a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra
+  como ejecucion fallida).
 - Cliente con MicroProfile Rest Client (RESTEasy) y OAuth 2.0 client credentials: pide un token
   por ejecucion y, ante un `401`, pide otro y reintenta una vez.
 - Variables: `BALANZAS_URL` (`http://localhost:3001`; en el compose
   `http://host.docker.internal:3001`), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET`, y las de
   MongoDB (`MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`,
-  `MONGO_AUTH_DB`, igual que el consumidor).
-- **Por ahora:** que consultar esta hardcodeado en `Main` (`SCALE_IDS` y matricula
-  `LICENSE_PLATE = "SBC1234"`; se va a definir que balanzas y vehiculos consultar) y los pesajes
-  no se guardan.
+  `MONGO_AUTH_DB`, igual que el consumidor) y del EJB remoto (`WILDFLY_URL`, `EJB_USER`,
+  `EJB_PASSWORD`).
+- **Por ahora:** la matricula esta hardcodeada en `Main` (`LICENSE_PLATE = "SBC1234"`; se va a
+  definir que vehiculos consultar) y los pesajes no se guardan.
 
 **Viajes en curso (EJB remoto de Frontofficeciudadanos):**
 
@@ -408,13 +413,23 @@ vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`). El cliente es
 
 - **Contrato:** fiscalizacion no depende del ejb entero sino de `frontofficeciudadanos-ejb-client.jar`
   (lo genera el `maven-ejb-plugin` con `generateClient`), que trae solo `ViajesEnCurso`,
-  `ViajesEnCursoRemote` y `DatosViaje`. Por eso, antes de compilar fiscalizacion hay que instalar
-  Modelo y Frontofficeciudadanos en el `.m2` (el `Dockerfile` y el workflow de CI ya lo hacen):
+  `ViajesEnCursoRemote` y `DatosViaje`. Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
+  (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`). Por eso, antes de compilar
+  fiscalizacion hay que instalar Modelo y los dos proyectos en el `.m2` (el `Dockerfile` y el
+  workflow de CI ya lo hacen):
 
   ```bash
   mvn -f componente_central/backend/Modelo/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Frontofficeciudadanos/pom.xml install -Dmaven.test.skip=true
+  mvn -f componente_central/backend/Backofficeautoridadesadministradores/pom.xml install -Dmaven.test.skip=true
   ```
+
+**Nodos activos (EJB remoto de Backofficeautoridadesadministradores):** `NodosActivosService`
+(paquete `service.gestionnodosperifericos`) devuelve los nodos perifericos con `activo = true`
+(`List<DatosNodo>` con `id`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). El poller de balanzas lo
+usa con el cliente `ruleengine/polling/ActiveScalesClient`; usuario, URL y errores igual que en
+*Viajes en curso*.
+
 
   Si se agrega otra interfaz remota o DTO, hay que sumarlo a `clientIncludes` en
   `Frontofficeciudadanos/ejb/pom.xml`.
@@ -465,12 +480,14 @@ de RabbitMQ (Exchanges → `tracking` → *Publish message*, routing key `tracki
 `message_id` con cualquier valor y el JSON del evento como payload). El documento aparece en
 `main_db.tracking` (Compass).
 
-**Poller de balanzas** (con `balanzas` arriba: `docker compose up -d balanzas` en `TSE_NODOS`, y
-`BALANZAS_CLIENT_ID` / `BALANZAS_CLIENT_SECRET` en el `.env`; levanta MongoDB si no esta arriba):
+**Poller de balanzas** (con `balanzas` arriba: `docker compose up -d balanzas` en `TSE_NODOS`,
+`BALANZAS_CLIENT_ID` / `BALANZAS_CLIENT_SECRET` y `EJB_USER` / `EJB_PASSWORD` en el `.env`, y al
+menos un `NodoBalanza` activo cuyo id exista en balanzas; levanta MongoDB y WildFly si no estan
+arriba):
 
 ```bash
-docker compose run --rm --build fiscalizacionautomatica-poller   # una ejecucion; "Fetched N weighings from ... (until <to>)"
-echo $?                                                         # 0 = ok, 1 = fallo alguna balanza o MongoDB
+docker compose run --rm --build fiscalizacionautomatica-poller   # una ejecucion; "Fetched N weighings of scales [4] from ... (until <to>)"
+echo $?                                                         # 0 = ok, 1 = fallo alguna balanza, WildFly o MongoDB
 ```
 
 La ultima consulta de cada balanza queda en `main_db.balanzas_metadata` (Compass). Para volver a
@@ -523,7 +540,7 @@ manifiesto. Para el EJB remoto, el `Deployment` necesita ademas `WILDFLY_URL`
 |---|---|---|
 | Recurso | `Deployment` (escala con el largo de la cola, p. ej. con KEDA) | `CronJob` (corre una vez por ejecucion) |
 | Argumentos | ninguno | `["weighings-poller"]` |
-| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `BALANZAS_URL` (URL de balanzas en produccion), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) y las mismas `MONGO_*` del consumidor (guarda la ultima consulta en `balanzas_metadata`) |
+| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `BALANZAS_URL` (URL de balanzas en produccion), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) y las mismas `MONGO_*` del consumidor (guarda la ultima consulta en `balanzas_metadata`), y `WILDFLY_URL`, `EJB_USER`, `EJB_PASSWORD` (pide las balanzas activas al backoffice) |
 
 Puntos del `CronJob` del poller:
 
@@ -559,6 +576,18 @@ spec:
                     secretKeyRef:
                       name: tse-runtime-secrets
                       key: mongo-password
+                - name: WILDFLY_URL                # balanzas activas (EJB remoto del backoffice)
+                  value: remote+http://wildfly:8080
+                - name: EJB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-user
+                - name: EJB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-password
 ```
 
 Un codigo de salida `1` deja el `Job` como fallido (`kubectl -n tse get jobs`).
