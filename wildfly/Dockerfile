@@ -46,8 +46,10 @@ COPY --from=builder --chown=jboss:jboss /out/*.ear /opt/jboss/wildfly/standalone
 # Fiscalizacionautomatica no va aca: es un jar standalone con su propia imagen
 # (componente_central/backend/Fiscalizacionautomatica/Dockerfile).
 
+COPY --chown=jboss:jboss --chmod=755 start.sh /opt/jboss/start.sh
+
 EXPOSE 8080
 # Se reemplaza solo el CMD: el ENTRYPOINT de la imagen base (certificados) se conserva.
-# -b 0.0.0.0: escuchar en todas las interfaces, no solo dentro del contenedor.
-CMD ["/opt/jboss/wildfly/bin/standalone.sh", "-b", "0.0.0.0"]
+# start.sh crea el usuario de EJB remoto (EJB_USER / EJB_PASSWORD) y arranca standalone.sh.
+CMD ["/opt/jboss/start.sh"]
 

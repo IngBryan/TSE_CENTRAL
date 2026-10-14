@@ -35,6 +35,14 @@ public class NodoPerifericoDAO {
         ).getResultList();
     }
 
+    // Obtener únicamente los nodos activos.
+    public List<NodoPeriferico> listarActivos() {
+        return em.createQuery(
+            "SELECT n FROM NodoPeriferico n WHERE n.activo = true ORDER BY n.id",
+            NodoPeriferico.class
+        ).getResultList();
+    }
+
     // Verificar si existe otro nodo del mismo tipo
     // con el identificador externo indicado.
     public boolean existePorTipoEIdExterno(

@@ -1,7 +1,6 @@
 package tse.lab.model;
 
 import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -46,14 +45,16 @@ public class CasoFiscalizacion implements Serializable {
     @ManyToMany
     @JoinTable(name = "casos_eventos_pesajes",
             joinColumns = @JoinColumn(name = "id_caso"),
-            inverseJoinColumns = @JoinColumn(name = "id_evento_pesaje"))
+            inverseJoinColumns = {
+                    @JoinColumn(name = "matricula", referencedColumnName = "matricula"),
+                    @JoinColumn(name = "fecha_hora", referencedColumnName = "fecha_hora") })
     private List<EventoPesajes> eventosPesajes = new ArrayList<>();
 
-    // Los eventos de tracking estan en MongoDB (EventoTracking): aca solo se guarda el _id de cada uno
+    // Los eventos de tracking estan en MongoDB (EventoTracking): aca solo se guarda la clave
+    // (matricula, fecha_hora) de cada uno
     @ElementCollection
     @CollectionTable(name = "casos_eventos_tracking", joinColumns = @JoinColumn(name = "id_caso"))
-    @Column(name = "id_evento_tracking")
-    private List<String> idsEventosTracking = new ArrayList<>();
+    private List<ClaveEvento> clavesEventosTracking = new ArrayList<>();
 
     public CasoFiscalizacion() {
     }
@@ -121,8 +122,8 @@ public class CasoFiscalizacion implements Serializable {
         return eventosPesajes;
     }
 
-    public List<String> getIdsEventosTracking() {
-        return idsEventosTracking;
+    public List<ClaveEvento> getClavesEventosTracking() {
+        return clavesEventosTracking;
     }
 }
 

@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
+      - componente_central/backend/Modelo/**
+      - componente_central/backend/Frontofficeciudadanos/pom.xml
+      - componente_central/backend/Frontofficeciudadanos/ejb/**
+      - componente_central/backend/Backofficeautoridadesadministradores/pom.xml
+      - componente_central/backend/Backofficeautoridadesadministradores/ejb/**
       - docker-compose.yml
       - .github/workflows/docker-fiscalizacionautomatica.yml
       - .github/workflows/_docker-image.yml

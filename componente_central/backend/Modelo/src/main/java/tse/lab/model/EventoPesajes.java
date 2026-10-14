@@ -1,9 +1,9 @@
 package tse.lab.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
@@ -13,20 +13,29 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+// La clave es (matricula, fecha_hora): si el poller trae el mismo pesaje dos veces no se duplica.
+// id_externo es el id del pesaje en el nodo de balanzas. Los guarda el poller de fiscalizacion automatica
+// (EJB remoto PesajesService) pendientes de deteccion.
 @Entity
 @Table(name = "eventos_pesajes")
+@IdClass(ClaveEvento.class)
 public class EventoPesajes implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String matricula;
+
+    @Id
+    @Column(name = "fecha_hora")
+    private Instant fechaHora;
+
+    @Column(name = "id_externo")
+    private Long idExterno;
 
     private long peso;
 
-    private String matricula;
-
-    private Instant fechaHora;
+    // false al guardarlo; la fiscalizacion automatica lo marca cuando lo evaluo
+    private boolean detectado;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_nodo_balanza", nullable = false)
@@ -38,15 +47,40 @@ public class EventoPesajes implements Serializable {
     public EventoPesajes() {
     }
 
-    public EventoPesajes(long peso, String matricula, Instant fechaHora, NodoBalanza nodoBalanza) {
-        this.peso = peso;
+    public EventoPesajes(Long idExterno, String matricula, Instant fechaHora, long peso, NodoBalanza nodoBalanza) {
+        this.idExterno = idExterno;
         this.matricula = matricula;
         this.fechaHora = fechaHora;
+        this.peso = peso;
         this.nodoBalanza = nodoBalanza;
     }
 
-    public Long getId() {
-        return id;
+    public ClaveEvento getClave() {
+        return new ClaveEvento(matricula, fechaHora);
+    }
+
+    public Long getIdExterno() {
+        return idExterno;
+    }
+
+    public boolean isDetectado() {
+        return detectado;
+    }
+
+    public void marcarDetectado() {
+        this.detectado = true;
+    }
+
+    public void setIdExterno(Long idExterno) {
+        this.idExterno = idExterno;
+    }
+
+    public String getMatricula() {
+        return matricula;
+    }
+
+    public Instant getFechaHora() {
+        return fechaHora;
     }
 
     public long getPeso() {
@@ -55,22 +89,6 @@ public class EventoPesajes implements Serializable {
 
     public void setPeso(long peso) {
         this.peso = peso;
-    }
-
-    public String getMatricula() {
-        return matricula;
-    }
-
-    public void setMatricula(String matricula) {
-        this.matricula = matricula;
-    }
-
-    public Instant getFechaHora() {
-        return fechaHora;
-    }
-
-    public void setFechaHora(Instant fechaHora) {
-        this.fechaHora = fechaHora;
     }
 
     public NodoBalanza getNodoBalanza() {
@@ -85,4 +103,3 @@ public class EventoPesajes implements Serializable {
         return casosFiscalizacion;
     }
 }
-

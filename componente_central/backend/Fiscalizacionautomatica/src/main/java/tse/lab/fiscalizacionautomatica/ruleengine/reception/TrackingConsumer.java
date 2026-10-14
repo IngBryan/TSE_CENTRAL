@@ -42,7 +42,7 @@ public class TrackingConsumer extends DefaultConsumer {
         switch (result) {
             case SAVED, DUPLICATE -> getChannel().basicAck(tag, false);
             // Retrying would give the same result: discard it (there is no dead letter queue)
-            case INVALID -> getChannel().basicReject(tag, false);
+            case INVALID, UNKNOWN_GPS -> getChannel().basicReject(tag, false);
         }
     }
 }

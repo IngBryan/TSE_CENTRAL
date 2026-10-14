@@ -20,3 +20,20 @@ INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('56087406', 1,
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('54074380', 1, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA 1234', (SELECT id FROM choferes WHERE ci = '56087406' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB 5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+-- Nodo de balanza activo para el poller de fiscalizacion automatica: id_externo es el id de la balanza en la
+-- API de balanzas (TSE_NODOS, balanza 4 "Ruta 8 - Km 150"); el id lo genera la base.
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('BALANZA', 4, 'Ruta 8 - Km 150', true);
+INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 4;
+-- Fiscalizacion automatica (Viaje sin guia): vehiculos y GPS del nodo de tracking (TSE_NODOS: GPS 1 = SBC1234,
+-- GPS 2 = STU5678; el GPS 3 no se carga, asi sus eventos se descartan). SBC1234 no tiene guia: sus eventos
+-- deben detectar Viaje sin guia. STU5678 tiene una guia EN_CURSO, con un chofer ficticio propio para no sumarle
+-- viajes a los choferes de la app movil: no debe detectar nada.
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('SBC1234', 'Mercedes-Benz', 'Actros', 8500, 25000, 1);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('STU5678', 'Volvo', 'FH 460', 9200, 27000, 1);
+INSERT INTO ciudadanos (ci, estado, creado) VALUES ('11111111', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
+INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('11111111', 1, 'HABILITADO', CURRENT_TIMESTAMP);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-FISC001', 'Agropecuario', 'Soja a granel', 20000, CURRENT_DATE, 'Mercedes', 'Nueva Palmira', 1, 'STU5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'EN_CURSO', CURRENT_TIMESTAMP, 0);
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('TRACKING', 1, 'GPS SBC1234', true);
+INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'TRACKING' AND id_externo = 1;
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('TRACKING', 2, 'GPS STU5678', true);
+INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'TRACKING' AND id_externo = 2;
