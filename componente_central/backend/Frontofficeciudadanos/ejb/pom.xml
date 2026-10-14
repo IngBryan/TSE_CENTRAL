@@ -111,6 +111,9 @@
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCurso.class</clientInclude>
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCursoRemote.class</clientInclude>
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/DatosViaje.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestionvehiculos/Vehiculos.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestionvehiculos/VehiculosRemote.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestionvehiculos/DatosVehiculo.class</clientInclude>
                         </clientIncludes>
                     </configuration>
                 </plugin>

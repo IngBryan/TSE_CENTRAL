@@ -353,7 +353,7 @@ en varios modos, segun el argumento:
 |------|----------------------|----------|------------|
 | `tracking-consumer` (por defecto) | `fiscalizacionautomatica` (`fiscalizacion-server`) | Consume la cola `tracking.events` y guarda cada evento en MongoDB (`main_db.tracking`) | Siempre arriba; puede escalar (varias replicas consumen la misma cola) |
 | `weighings-poller` | `fiscalizacionautomatica-poller` (perfil `cron`) | Consulta la API de balanzas (`TSE_NODOS`) desde la ultima consulta exitosa (`main_db.balanzas_metadata`) hasta ahora | Corre **una vez y termina**: lo lanza un cron |
-| `active-trips` | (ninguno, prueba manual) | Pide por EJB remoto los viajes en curso de `SBC1234` y los imprime | Corre una vez y termina; codigo de salida `1` si falla la llamada |
+| `detect-situations [matricula]` | (ninguno, prueba manual) | Evalua un evento de ese vehiculo (por defecto `SBC1234`) en este momento: imprime lo que sabe el central del vehiculo (EJB remotos) y las situaciones que aplican | Corre una vez y termina; codigo de salida `1` si falla la llamada a WildFly |
 
 **Consumidor de tracking:**
 
@@ -364,13 +364,31 @@ en varios modos, segun el argumento:
   unico `licensePlate_timestamp` que el consumidor crea al arrancar: una reentrega choca con el
   indice y no se guarda dos veces. El `_id` lo genera MongoDB y el id del evento en tracking
   queda en `externalId` (no sirve como clave: tracking lo reinicia al reiniciarse). Documento:
-  `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp }`.
+  `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp, receivedAt,
+  detected, situations, detectedAt }`.
+- **Deteccion asincronica:** el evento se guarda con `detected: false` y se pasa a la deteccion,
+  que corre en otros hilos (sin demorar la recepcion). Al terminar se guardan `situations` (las que
+  aplican, en orden de prioridad, p. ej. `["TRIP_WITHOUT_GUIDE"]`; `[]` si ninguna o si el vehiculo
+  no existe en el central), `detected: true` y `detectedAt`.
+  - Los eventos de un vehiculo van siempre al mismo hilo (4 hilos, elegidos por la matricula): se
+    evaluan en orden y nunca dos a la vez dentro del pod.
+  - Si un evento no se pudo evaluar (WildFly caido, cola llena, el pod se reinicio), queda en
+    `detected: false`. Cada 60 s (y al arrancar) se vuelven a encolar los que llevan mas de 1 minuto
+    pendientes (indice parcial `pending_receivedAt`).
+  - Al apagar, deja de consumir y espera hasta 10 s a que terminen las detecciones encoladas; las
+    que no terminan quedan pendientes.
 - El `message_id` de RabbitMQ es obligatorio: un mensaje sin el se descarta como invalido (sin
   reencolar). Se guarda en `messageId` para rastrear el evento hasta su mensaje.
+- **GPS dados de alta:** solo se aceptan eventos de GPS dados de alta como `NodoTracking` activo
+  (su `gpsId` es el `idExterno` del nodo). Los de un GPS desconocido o inactivo se descartan sin
+  guardar y sin reencolar. La lista de GPS activos se pide al backoffice por EJB remoto
+  (`NodosActivosRemote`, ver *Nodos activos*) y se guarda en memoria para no llamar a WildFly por
+  cada mensaje: se refresca cada 60 s y, si un refresco falla, se sigue con la ultima lista.
 - Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
   `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
-  (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`). Si RabbitMQ o Mongo
-  no estan arriba al arrancar, reintenta cada 5 s.
+  (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`), `WILDFLY_URL`,
+  `EJB_USER`, `EJB_PASSWORD`. Si Mongo, WildFly (la lista de GPS) o RabbitMQ no estan arriba al
+  arrancar, reintenta cada 5 s; no consume hasta tener la lista de GPS.
 
 **Poller de balanzas:**
 
@@ -409,12 +427,15 @@ en varios modos, segun el argumento:
 
 Para saber si un vehiculo tiene guia, fiscalizacion llama por EJB remoto a `ViajesEnCursoService`
 (Frontofficeciudadanos, paquete `service.gestiondeguiasyviajes`), que devuelve las guias del
-vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`). El cliente es
-`ruleengine/trips/ActiveTripsClient`.
+vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`), y a `VehiculosService` (paquete
+`service.gestionvehiculos`) para saber si el vehiculo existe y de que empresa es. El cliente de los
+dos es `ruleengine/vehicles/VehicleFactsClient`.
 
 - **Contrato:** fiscalizacion no depende del ejb entero sino de `frontofficeciudadanos-ejb-client.jar`
-  (lo genera el `maven-ejb-plugin` con `generateClient`), que trae solo `ViajesEnCurso`,
-  `ViajesEnCursoRemote` y `DatosViaje`. Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
+  (lo genera el `maven-ejb-plugin` con `generateClient`), que trae solo las interfaces remotas y sus
+  DTOs: `ViajesEnCurso`, `ViajesEnCursoRemote`, `DatosViaje` y, de `service.gestionvehiculos`,
+  `Vehiculos`, `VehiculosRemote` y `DatosVehiculo` (`buscarVehiculo(matricula)`: matricula y
+  empresa, o `null` si el vehiculo no existe). Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
   (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`). Por eso, antes de compilar
   fiscalizacion hay que instalar Modelo y los dos proyectos en el `.m2` (el `Dockerfile` y el
   workflow de CI ya lo hacen):
@@ -427,9 +448,10 @@ vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`). El cliente es
 
 **Nodos activos (EJB remoto de Backofficeautoridadesadministradores):** `NodosActivosService`
 (paquete `service.gestionnodosperifericos`) devuelve los nodos perifericos con `activo = true`
-(`List<DatosNodo>` con `id`, `idExterno`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). El poller de
-balanzas lo usa con el cliente `ruleengine/polling/ActiveScalesClient`; usuario, URL y errores igual
-que en *Viajes en curso*.
+(`List<DatosNodo>` con `id`, `idExterno`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). Fiscalizacion
+lo usa con el cliente `ruleengine/nodes/ActiveNodesClient`: el poller para saber que balanzas
+consultar y el consumidor de tracking para saber de que GPS aceptar eventos
+(`ruleengine/nodes/ActiveGpsRegistry`). Usuario, URL y errores igual que en *Viajes en curso*.
 
 `id` es el que genera el central e `idExterno` el del nodo en su propio sistema (id de la balanza
 en la API de balanzas, `gpsId` en tracking). Balanzas y GPS repiten ids entre si (hay balanza 1 y
@@ -467,6 +489,24 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
   llamada lanza `EJBException`, que el cliente convierte en `IOException`.
 - En Kubernetes los valores salen de las claves `ejb-user` / `ejb-password` de
   `tse-runtime-secrets` (ver `k8s/README.md`).
+
+**Deteccion de situaciones (`ruleengine/detection`):**
+
+- Situaciones, en orden de prioridad (`Situation`): Viaje sin guia, Exceso de carga, Vehiculo sin
+  habilitacion vigente y Desvio de ruta. Sin viaje en curso solo pueden aplicar Viaje sin guia y
+  Habilitacion.
+- Cada situacion es una regla (`SituationRule`, en `detection/rules`) que dice si aplica a un
+  evento (`VehicleEvent`: un `TrackingEvent` o un `Weighing`) segun lo que el central sabe del
+  vehiculo (`VehicleFacts`: el vehiculo y sus viajes en curso, por EJB remoto).
+- `SituationDetector` devuelve las situaciones que aplican, en orden de prioridad. Si el vehiculo no
+  existe en el central no devuelve ninguna (no hay empresa a la que notificar). Si WildFly no
+  responde, falla: el evento se vuelve a evaluar despues.
+- Agregar una situacion = agregar su regla en `Main.createDetector`.
+- Implementada: Viaje sin guia (`TripWithoutGuideRule`: el vehiculo no tiene guias `ASIGNADA` ni
+  `EN_CURSO`). Todavia no se crean casos: eso, y saltear las situaciones que ya tienen un caso
+  abierto del vehiculo, viene despues; por ahora el resultado queda en el documento del evento.
+- Eventos de tracking: los evalua el consumidor en segundo plano (`TrackingDetectionWorker`, ver
+  *Consumidor de tracking*).
 
 El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
 `META-INF/services` con los que RESTEasy registra sus providers.
@@ -511,13 +551,14 @@ Para que se ejecute solo cada 5 minutos en la maquina de desarrollo (opcional):
 schtasks /Create /SC MINUTE /MO 5 /TN tse-weighings-poller /TR "docker compose -f C:\ruta\a\TSE_CENTRAL\docker-compose.yml run --rm fiscalizacionautomatica-poller"
 ```
 
-**Viajes en curso por EJB remoto** (con `EJB_USER` / `EJB_PASSWORD` en el `.env`; WildFly tiene
+**Deteccion por EJB remoto** (con `EJB_USER` / `EJB_PASSWORD` en el `.env`; WildFly tiene
 que haber arrancado con esas variables para crear el usuario):
 
 ```bash
 docker compose up -d --build wildfly
 docker logs wildfly-server | grep "Usuario de aplicacion"                 # el usuario se creo
-docker compose run --rm --build fiscalizacionautomatica active-trips     # "N active trips for SBC1234 from remote+http://wildfly:8080"
+docker compose run --rm --build fiscalizacionautomatica detect-situations           # SBC1234: "Situations: [TRIP_WITHOUT_GUIDE]"
+docker compose run --rm --build fiscalizacionautomatica detect-situations STU5678   # con guia EN_CURSO: "Situations: []"
 ```
 
 **Fuera de Docker** (con las variables de cada modo definidas, y Modelo y Frontofficeciudadanos
@@ -528,7 +569,7 @@ cd componente_central/backend/Fiscalizacionautomatica
 mvn clean package
 java -jar target/fiscalizacionautomatica.jar                     # consumidor de tracking
 java -jar target/fiscalizacionautomatica.jar weighings-poller    # poller de balanzas (una ejecucion)
-java -jar target/fiscalizacionautomatica.jar active-trips        # viajes en curso de SBC1234 (EJB remoto)
+java -jar target/fiscalizacionautomatica.jar detect-situations [matricula]   # deteccion para un vehiculo (EJB remotos)
 ```
 
 Si el contenedor `fiscalizacion-server` esta arriba, el consumidor local y el del contenedor se

@@ -14,6 +14,8 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -21,58 +23,102 @@ import java.util.stream.Stream;
 import org.bson.Document;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
-import tse.lab.fiscalizacionautomatica.ruleengine.polling.ActiveScalesClient;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationDetector;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
+import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveNodesClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingConsumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver;
-import tse.lab.fiscalizacionautomatica.ruleengine.trips.ActiveTripsClient;
-import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
+import tse.lab.fiscalizacionautomatica.ruleengine.vehicles.VehicleFactsClient;
 
 public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
+    private static final Duration ACTIVE_GPS_REFRESH = Duration.ofSeconds(60);
+    /** Detection threads of the tracking consumer: the events of a vehicle always go to the same one. */
+    private static final int DETECTION_LANES = 4;
+    private static final int DETECTION_QUEUE_PER_LANE = 1_000;
+    /** Events still pending detection after PENDING_RECOVERY_AFTER are queued again every period. */
+    private static final Duration PENDING_RECOVERY_PERIOD = Duration.ofSeconds(60);
+    private static final Duration PENDING_RECOVERY_AFTER = Duration.ofMinutes(1);
 
     /** Hardcoded test value: which vehicles to query is still to be defined. */
     private static final String LICENSE_PLATE = "SBC1234";
 
     /**
-     * The same jar runs as the tracking consumer (default: keeps running, scalable) or as the
-     * weighings poller (polls once and exits, launched by a cron).
+     * The same jar runs as the tracking consumer (default: keeps running, scalable), as the weighings
+     * poller (polls once and exits, launched by a cron) or as a manual test of the detection.
      */
     public static void main(String[] args) throws Exception {
         String mode = args.length == 0 ? "tracking-consumer" : args[0];
         switch (mode) {
             case "tracking-consumer" -> startTrackingConsumer();
             case "weighings-poller" -> System.exit(pollWeighings());
-            case "active-trips" -> System.exit(printActiveTrips());
-            default -> throw new IllegalArgumentException(
-                    "Unknown mode: " + mode + " (expected tracking-consumer, weighings-poller or active-trips)");
+            case "detect-situations" -> System.exit(detectSituations(args.length > 1 ? args[1] : LICENSE_PLATE));
+            default -> throw new IllegalArgumentException("Unknown mode: " + mode
+                    + " (expected tracking-consumer, weighings-poller or detect-situations [license plate])");
         }
     }
 
     private static void startTrackingConsumer() throws IOException, InterruptedException {
-        requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD");
+        requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER", "EJB_PASSWORD");
 
         MongoClient mongo = createMongoClient();
         MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
         waitForMongo(database);
 
+        ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
+                System.getenv("EJB_PASSWORD"));
+        ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
+        waitForActiveGps(activeGps);
+        activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
+
+        MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
+        dao.createIndexes();
+        VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
+                System.getenv("EJB_PASSWORD"));
+        TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao, Clock.systemUTC(),
+                DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
+        detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
+
         ConnectionFactory factory = createRabbitConnectionFactory();
         Connection connection = connectToRabbit(factory);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            // First stop receiving, then let the queued detections finish
             closeQuietly(connection);
+            detection.close();
+            facts.close();
+            activeGps.close();
+            nodes.close();
             mongo.close();
         }));
 
-        MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database);
-        dao.createIndexes();
-        TrackingEventReceiver receiver = new TrackingEventReceiver(dao);
+        TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, detection::submit);
 
         new TrackingConsumer(connection.createChannel(), receiver).start();
-        System.out.printf("Consuming %s from %s:%d, saving to %s.%s%n", TrackingConsumer.QUEUE,
-                factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION);
+        System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n", TrackingConsumer.QUEUE,
+                factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION,
+                activeGps.size());
+    }
+
+    /** Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked. */
+    private static void waitForActiveGps(ActiveGpsRegistry activeGps) throws InterruptedException {
+        while (true) {
+            try {
+                activeGps.load();
+                return;
+            } catch (IOException e) {
+                System.err.printf("Could not get the active GPS from WildFly (%s), retrying in %d s%n",
+                        e.getCause(), RETRY_DELAY_MS / 1000);
+                Thread.sleep(RETRY_DELAY_MS);
+            }
+        }
     }
 
     /**
@@ -86,7 +132,7 @@ public class Main {
         String url = env("BALANZAS_URL", "http://localhost:3001");
 
         List<Long> scaleIds;
-        try (ActiveScalesClient nodes = new ActiveScalesClient(wildFlyUrl(), System.getenv("EJB_USER"),
+        try (ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
             scaleIds = nodes.findActiveScaleIds();
         } catch (IOException e) {
@@ -120,16 +166,23 @@ public class Main {
         }
     }
 
-    /** Test of the remote EJB call: prints the active trips of LICENSE_PLATE. */
-    private static int printActiveTrips() {
-        requireEnv("EJB_USER", "EJB_PASSWORD");
-        String url = wildFlyUrl();
+    /** The situations that are detected; adding a situation means adding its rule here. */
+    private static SituationDetector createDetector(VehicleFactsSource facts) {
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule()));
+    }
 
-        try (ActiveTripsClient client = new ActiveTripsClient(url, System.getenv("EJB_USER"),
+    /**
+     * Manual test of the detection against WildFly: evaluates an event of the vehicle at this moment
+     * (default LICENSE_PLATE) and prints what the central knows about it and the situations that apply.
+     */
+    private static int detectSituations(String licensePlate) {
+        requireEnv("EJB_USER", "EJB_PASSWORD");
+
+        try (VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
-            List<DatosViaje> trips = client.findActiveTrips(LICENSE_PLATE);
-            System.out.printf("%d active trips for %s from %s%n", trips.size(), LICENSE_PLATE, url);
-            trips.forEach(System.out::println);
+            System.out.println("Vehicle facts: " + facts.find(licensePlate).map(Object::toString).orElse("not registered"));
+            TrackingEvent event = new TrackingEvent("manual", 0, 0, licensePlate, 0, 0, Instant.now());
+            System.out.println("Situations: " + createDetector(facts).detect(event));
             return 0;
         } catch (IOException e) {
             System.err.println(e.getMessage() + ": " + e.getCause());

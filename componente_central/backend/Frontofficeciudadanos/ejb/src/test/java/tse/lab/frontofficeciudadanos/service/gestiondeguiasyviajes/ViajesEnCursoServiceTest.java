@@ -81,15 +81,15 @@ class ViajesEnCursoServiceTest {
     void devuelveLasGuiasAsignadasYEnCursoDelVehiculo() {
         List<DatosViaje> viajes = servicio.buscarViajesEnCurso("SBC1234");
 
-        assertEquals(List.of("G-EN-CURSO", "G-ASIGNADA"), viajes.stream().map(DatosViaje::idGuia).toList());
+        assertEquals(List.of("G-EN-CURSO", "G-ASIGNADA"), viajes.stream().map(DatosViaje::getIdGuia).toList());
         DatosViaje enCurso = viajes.getFirst();
-        assertEquals("SBC1234", enCurso.matricula());
-        assertEquals(1L, enCurso.nroEmpresa());
-        assertEquals("EN_CURSO", enCurso.estado());
-        assertEquals(LocalDate.of(2026, 10, 12), enCurso.fecha());
-        assertEquals("Rivera", enCurso.origen());
-        assertEquals("Montevideo", enCurso.destino());
-        assertEquals(18000, enCurso.pesoCargaKg());
+        assertEquals("SBC1234", enCurso.getMatricula());
+        assertEquals(1L, enCurso.getNroEmpresa());
+        assertEquals("EN_CURSO", enCurso.getEstado());
+        assertEquals(LocalDate.of(2026, 10, 12), enCurso.getFecha());
+        assertEquals("Rivera", enCurso.getOrigen());
+        assertEquals("Montevideo", enCurso.getDestino());
+        assertEquals(18000, enCurso.getPesoCargaKg());
     }
 
     @Test

@@ -1,8 +1,8 @@
-package tse.lab.fiscalizacionautomatica.ruleengine.polling;
+package tse.lab.fiscalizacionautomatica.ruleengine.nodes;
 
-import jakarta.ejb.EJBException;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionnodosperifericos.DatosNodo;
@@ -10,14 +10,17 @@ import tse.lab.backofficeautoridadesadministradores.service.gestionnodosperiferi
 import tse.lab.backofficeautoridadesadministradores.service.gestionnodosperifericos.TipoNodo;
 import tse.lab.fiscalizacionautomatica.ruleengine.remote.WildFlyContexts;
 
-/** Active scales (NodoBalanza with activo = true), through the Backofficeautoridadesadministradores remote EJB. */
-public class ActiveScalesClient implements AutoCloseable {
+/**
+ * Active peripheral nodes (activo = true), through the Backofficeautoridadesadministradores remote EJB.
+ * Nodes are identified by their external id: the id in their own system.
+ */
+public class ActiveNodesClient implements AutoCloseable {
 
     private final Context context;
     private final NodosActivosRemote nodes;
 
     /** @param url WildFly HTTP port, e.g. remote+http://wildfly:8080 */
-    public ActiveScalesClient(String url, String user, String password) throws IOException {
+    public ActiveNodesClient(String url, String user, String password) throws IOException {
         try {
             context = WildFlyContexts.create(url, user, password);
             nodes = (NodosActivosRemote) context.lookup(NodosActivosRemote.LOOKUP);
@@ -26,15 +29,24 @@ public class ActiveScalesClient implements AutoCloseable {
         }
     }
 
-    /** @return external ids of the active scales: the ids the balanzas API uses */
+    /** @return ids of the active scales in the balanzas API */
     public List<Long> findActiveScaleIds() throws IOException {
+        return findActive(TipoNodo.BALANZA);
+    }
+
+    /** @return ids of the active GPS in the tracking node (gpsId of its events) */
+    public Set<Long> findActiveGpsIds() throws IOException {
+        return Set.copyOf(findActive(TipoNodo.TRACKING));
+    }
+
+    private List<Long> findActive(TipoNodo type) throws IOException {
         try {
             return nodes.listarNodos().stream()
-                    .filter(node -> node.tipo() == TipoNodo.BALANZA)
-                    .map(DatosNodo::idExterno)
+                    .filter(node -> node.getTipo() == type)
+                    .map(DatosNodo::getIdExterno)
                     .toList();
-        } catch (EJBException e) {
-            // WildFly down, wrong credentials or the EAR not deployed
+        } catch (RuntimeException e) {
+            // EJBException (WildFly down, wrong credentials, EAR not deployed) or a failure reading the answer
             throw new IOException("Remote call to NodosActivosService failed", e);
         }
     }

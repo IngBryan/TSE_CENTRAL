@@ -92,8 +92,9 @@ ejb-password
 
 `ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
 llama por EJB remoto a Frontofficeciudadanos: WildFly lo crea al arrancar (`wildfly/start.sh`) y
-fiscalizacion se autentica con el. Son opcionales: sin ellas los pods arrancan, pero la llamada remota
-falla al autenticarse.
+fiscalizacion se autentica con el. En WildFly son opcionales (sin ellas arranca, sin el usuario), pero
+el consumidor de tracking de fiscalizacion las necesita: al arrancar pide la lista de GPS activos por EJB
+remoto y no consume hasta tenerla. Hay que cargarlas en el Secret antes de desplegar.
 
 Crearlo con los valores correspondientes al entorno:
 

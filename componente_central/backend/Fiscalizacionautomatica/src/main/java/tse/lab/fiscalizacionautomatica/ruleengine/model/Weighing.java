@@ -7,5 +7,6 @@ import java.time.Instant;
  *
  * @param weighingId id in the balanzas node (generated in memory: it resets when the node restarts)
  */
-public record Weighing(long weighingId, long scaleId, String licensePlate, Instant timestamp, long weightKg) {
+public record Weighing(long weighingId, long scaleId, String licensePlate, Instant timestamp, long weightKg)
+        implements VehicleEvent {
 }

@@ -22,5 +22,5 @@ FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app
 COPY --from=builder /build/Fiscalizacionautomatica/target/fiscalizacionautomatica.jar /app/fiscalizacionautomatica.jar
 USER app
-# The mode goes as argument: tracking-consumer (default), weighings-poller or active-trips
+# The mode goes as argument: tracking-consumer (default), weighings-poller or detect-situations
 ENTRYPOINT ["java", "-jar", "/app/fiscalizacionautomatica.jar"]

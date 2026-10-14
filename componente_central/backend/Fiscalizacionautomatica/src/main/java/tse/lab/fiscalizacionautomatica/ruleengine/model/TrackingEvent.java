@@ -18,5 +18,5 @@ public record TrackingEvent(
         String licensePlate,
         double latitude,
         double longitude,
-        Instant timestamp) {
+        Instant timestamp) implements VehicleEvent {
 }

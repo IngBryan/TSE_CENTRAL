@@ -69,7 +69,8 @@ spec:
                   name: tse-runtime-secrets
                   key: mongo-password
 
-            # EJB remoto de Frontofficeciudadanos (viajes en curso); mismo usuario que crea WildFly
+            # EJB remotos en WildFly (GPS activos, viajes en curso); mismo usuario que crea WildFly.
+            # Obligatorios: sin la lista de GPS activos el consumidor no arranca.
             - name: WILDFLY_URL
               value: remote+http://wildfly:8080
 
@@ -78,14 +79,12 @@ spec:
                 secretKeyRef:
                   name: tse-runtime-secrets
                   key: ejb-user
-                  optional: true
 
             - name: EJB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: tse-runtime-secrets
                   key: ejb-password
-                  optional: true
 
           resources:
             requests:
