@@ -25,6 +25,9 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+
+            - name: BACKOFFICE_API_URL
+              value: "http://wildfly/backofficeautoridadesadministradores-web/api"
           readinessProbe:
             httpGet:
               path: /backoffice
