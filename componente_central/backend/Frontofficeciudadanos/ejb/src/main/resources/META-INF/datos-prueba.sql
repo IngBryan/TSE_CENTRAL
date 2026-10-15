@@ -22,7 +22,7 @@ INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, dest
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB 5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
 -- Nodo de balanza activo para el poller de fiscalizacion automatica: id_externo es el id de la balanza en la
 -- API de balanzas (TSE_NODOS, balanza 4 "Ruta 8 - Km 150"); el id lo genera la base.
-INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('BALANZA', 4, 'Ruta 8 - Km 150', true);
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 4, 'Ruta 8 - Km 150', 'Ruta 8 - Km 150', true);
 INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 4;
 -- Fiscalizacion automatica (Viaje sin guia): vehiculos y GPS del nodo de tracking (TSE_NODOS: GPS 1 = SBC1234,
 -- GPS 2 = STU5678; el GPS 3 no se carga, asi sus eventos se descartan). SBC1234 no tiene guia: sus eventos
@@ -33,7 +33,12 @@ INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_emp
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('11111111', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('11111111', 1, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-FISC001', 'Agropecuario', 'Soja a granel', 20000, CURRENT_DATE, 'Mercedes', 'Nueva Palmira', 1, 'STU5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'EN_CURSO', CURRENT_TIMESTAMP, 0);
-INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('TRACKING', 1, 'GPS SBC1234', true);
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('TRACKING', 1, 'GPS SBC1234', 'Vehiculo SBC1234', true);
 INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'TRACKING' AND id_externo = 1;
-INSERT INTO nodos_perifericos (tipo, id_externo, nombre, activo) VALUES ('TRACKING', 2, 'GPS STU5678', true);
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('TRACKING', 2, 'GPS STU5678', 'Vehiculo STU5678', true);
 INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'TRACKING' AND id_externo = 2;
+-- Administrador de prueba para el Backoffice.
+-- CI: 99999999
+-- Contrasena: AdminPrueba2026!
+INSERT INTO usuarios_backoffice (ci, contrasena) VALUES ('99999999', 'pbkdf2-sha256:600000:XVb3i-u34NGRGh8VpALJ9A:PR0-5o08j6128R_8qPTGWP3rPuwuDBHRBrVpEloWM74');
+INSERT INTO administradores (ci) VALUES ('99999999');
