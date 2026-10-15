@@ -35,11 +35,14 @@ public class CasosResource {
     @EJB
     private GestionCasosService casos;
 
-    // Bandeja de trabajo; ?estado=EN_DESCARGO filtra por estado
+    // Bandeja de trabajo paginada: ?estado=EN_DESCARGO filtra por estado, ?pagina=2&tamanio=20 (pagina
+    // desde 1, tamanio hasta 100). pagina y tamanio llegan como texto y los valida el servicio: con
+    // Integer, un valor no numerico daria 404 (regla de JAX-RS) en vez de 400.
     @GET
     public Response bandeja(@HeaderParam(USUARIO_CI) String usuario, @QueryParam("estado") String estado,
+            @QueryParam("pagina") String pagina, @QueryParam("tamanio") String tamanio,
             @Context HttpServletRequest req) {
-        return ejecutar(() -> casos.bandeja(usuario, estado, correlationId(req)));
+        return ejecutar(() -> casos.bandeja(usuario, estado, pagina, tamanio, correlationId(req)));
     }
 
     @GET

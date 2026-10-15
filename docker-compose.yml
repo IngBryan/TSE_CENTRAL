@@ -61,6 +61,16 @@ services:
       - "3003:3000"
     environment:
       - NODE_ENV=production
+      # Sin la redirect URI registrada en ID Uruguay el login con gub.uy no completa (ver .env.example)
+      - APP_BASE_URL=http://localhost:3003/funcionarios
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      # Backend Frontofficefuncionarios (CU Gestionar casos de fiscalizacion)
+      - BACKEND_URL=http://wildfly:8080/frontofficefuncionarios-web/api
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
+    depends_on:
+      - wildfly
     restart: unless-stopped
   backofficeautoridadesadministradores-front:
     hostname: backofficeautoridadesadministradores
@@ -150,7 +160,7 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
-      # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
+      # Clave que exigen las API REST de frontofficeciudadanos-web y frontofficefuncionarios-web (header X-Api-Key)
       - BACKEND_API_KEY=${BACKEND_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe

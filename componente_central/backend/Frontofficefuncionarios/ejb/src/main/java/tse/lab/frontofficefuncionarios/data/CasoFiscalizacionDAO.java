@@ -3,9 +3,11 @@ package tse.lab.frontofficefuncionarios.data;
 import java.util.List;
 
 import jakarta.ejb.Stateless;
+import jakarta.persistence.EntityGraph;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.Descargo;
 import tse.lab.model.EstadoCaso;
@@ -17,10 +19,7 @@ import tse.lab.model.Vehiculo;
 @Stateless
 public class CasoFiscalizacionDAO {
 
-    // Trae en la misma consulta lo que muestra la bandeja (evita una consulta por caso)
-    private static final String BANDEJA = "SELECT c FROM CasoFiscalizacion c JOIN FETCH c.guia g"
-            + " LEFT JOIN FETCH g.empresa LEFT JOIN FETCH g.vehiculo"
-            + " LEFT JOIN FETCH c.descargo LEFT JOIN FETCH c.fundamentoResolucion";
+    private static final String BANDEJA = "SELECT c FROM CasoFiscalizacion c";
     private static final String ORDEN = " ORDER BY c.fechaDeteccion DESC, c.id DESC";
 
     @PersistenceContext(unitName = "frontofficefuncionariosPersistenceUnit")
@@ -43,13 +42,31 @@ public class CasoFiscalizacionDAO {
         return caso;
     }
 
-    public List<CasoFiscalizacion> bandeja(EstadoCaso estado) {
-        if (estado == null) {
-            return em.createQuery(BANDEJA + ORDEN, CasoFiscalizacion.class).getResultList();
-        }
-        return em.createQuery(BANDEJA + " WHERE c.estado = :estado" + ORDEN, CasoFiscalizacion.class)
-                .setParameter("estado", estado)
+    // Una pagina de la bandeja. Lo que muestra cada fila (guia con empresa y vehiculo, descargo y
+    // resolucion) se trae en la misma consulta con un entity graph, para no hacer una consulta por caso.
+    // No se usa "JOIN FETCH c.guia g ...": WildFly corre Hibernate con JPQL estricto, que no admite
+    // alias en un fetch join. Las relaciones son todas a-uno, asi que el limite se aplica en el SQL.
+    public List<CasoFiscalizacion> bandeja(EstadoCaso estado, int desde, int cantidad) {
+        EntityGraph<CasoFiscalizacion> grafo = em.createEntityGraph(CasoFiscalizacion.class);
+        grafo.addAttributeNodes("descargo", "fundamentoResolucion");
+        grafo.addSubgraph("guia").addAttributeNodes("empresa", "vehiculo");
+        TypedQuery<CasoFiscalizacion> q = estado == null
+                ? em.createQuery(BANDEJA + ORDEN, CasoFiscalizacion.class)
+                : em.createQuery(BANDEJA + " WHERE c.estado = :estado" + ORDEN, CasoFiscalizacion.class)
+                        .setParameter("estado", estado);
+        return q.setHint("jakarta.persistence.fetchgraph", grafo)
+                .setFirstResult(desde)
+                .setMaxResults(cantidad)
                 .getResultList();
+    }
+
+    public long contarBandeja(EstadoCaso estado) {
+        if (estado == null) {
+            return em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c", Long.class).getSingleResult();
+        }
+        return em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c WHERE c.estado = :estado", Long.class)
+                .setParameter("estado", estado)
+                .getSingleResult();
     }
 
     // Por el lado duenio de la relacion: no depende de que el caso tenga la referencia cargada

@@ -26,6 +26,9 @@
             <property name="jakarta.persistence.jdbc.user" value="sa"/>
             <property name="jakarta.persistence.jdbc.password" value=""/>
             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+            <!-- JPQL estricto, como en WildFly: una consulta que solo anda con extensiones de Hibernate
+                 (p. ej. alias en un JOIN FETCH) tiene que fallar aca y no recien en el servidor -->
+            <property name="hibernate.jpa.compliance.query" value="true"/>
         </properties>
     </persistence-unit>
 </persistence>

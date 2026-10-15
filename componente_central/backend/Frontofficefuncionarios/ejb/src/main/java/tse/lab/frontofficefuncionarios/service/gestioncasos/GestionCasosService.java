@@ -11,7 +11,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
-import tse.lab.frontofficefuncionarios.service.AutorizacionFuncionario;
+import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
@@ -39,6 +39,9 @@ public class GestionCasosService {
 
     private static final Logger LOG = Logger.getLogger(GestionCasosService.class.getName());
 
+    static final int TAMANIO_POR_DEFECTO = 20;
+    static final int TAMANIO_MAXIMO = 100;
+
     @EJB
     private AutorizacionFuncionario autorizacion;
     @EJB
@@ -64,6 +67,10 @@ public class GestionCasosService {
     public record CasoResumen(Long id, String tipoCaso, String descripcion, String estado, String fechaDeteccion,
             String idGuia, Long nroEmpresa, String empresa, String matricula, boolean tieneDescargo,
             boolean puedeResolverse) {
+    }
+
+    // pagina empieza en 1; totalPaginas es 0 si no hay casos
+    public record PaginaCasos(List<CasoResumen> casos, int pagina, int tamanio, long total, int totalPaginas) {
     }
 
     public record GuiaVista(String id, String fecha, String origen, String destino, String rubroCliente,
@@ -106,23 +113,42 @@ public class GestionCasosService {
     public record ResolucionRegistrada(String mensaje, CasoDetalle caso) {
     }
 
-    // bandeja con los casos, opcionalmente filtrada por estado
-    public List<CasoResumen> bandeja(String ci, String estado, String correlationId)
+    // bandeja paginada con los casos, opcionalmente filtrada por estado. pagina (desde 1) y tamanio son
+    // opcionales: por defecto la primera pagina de TAMANIO_POR_DEFECTO casos. Una pagina posterior a la
+    // ultima devuelve la lista vacia (con el total, para que el cliente pueda volver).
+    public PaginaCasos bandeja(String ci, String estado, String pagina, String tamanio, String correlationId)
             throws NoAutorizadoException, DatosInvalidosException {
         autorizacion.funcionario(ci, correlationId);
+        Map<String, String> errores = new LinkedHashMap<>();
         EstadoCaso filtro = null;
         if (estado != null && !estado.isBlank()) {
             filtro = estadoValido(estado);
             if (filtro == null) {
-                throw new DatosInvalidosException(Map.of("estado", "El estado tiene que ser uno de "
-                        + List.of(EstadoCaso.values()) + "."));
+                errores.put("estado", "El estado tiene que ser uno de " + List.of(EstadoCaso.values()) + ".");
             }
         }
-        List<CasoResumen> lista = casos.bandeja(filtro).stream().map(GestionCasosService::resumen).toList();
+        Integer nroPagina = entero(pagina, 1);
+        if (nroPagina == null || nroPagina < 1) {
+            errores.put("pagina", "La página tiene que ser un número entero mayor o igual a 1.");
+        }
+        Integer cantidad = entero(tamanio, TAMANIO_POR_DEFECTO);
+        if (cantidad == null || cantidad < 1 || cantidad > TAMANIO_MAXIMO) {
+            errores.put("tamanio", "El tamaño de página tiene que ser un número entero entre 1 y " + TAMANIO_MAXIMO + ".");
+        }
+        if (!errores.isEmpty()) {
+            throw new DatosInvalidosException(errores);
+        }
+
+        long total = casos.contarBandeja(filtro);
+        int totalPaginas = (int) ((total + cantidad - 1) / cantidad);
+        // long: con paginas muy altas (nroPagina - 1) * cantidad desborda un int
+        long desde = (long) (nroPagina - 1) * cantidad;
+        List<CasoResumen> lista = desde >= total ? List.of()
+                : casos.bandeja(filtro, (int) desde, cantidad).stream().map(GestionCasosService::resumen).toList();
         final EstadoCaso f = filtro;
         LOG.info(() -> "evento=casos.bandeja correlationId=" + correlationId + " usuario=" + ci + " estado=" + f
-                + " cantidad=" + lista.size());
-        return lista;
+                + " pagina=" + nroPagina + " tamanio=" + cantidad + " cantidad=" + lista.size() + " total=" + total);
+        return new PaginaCasos(lista, nroPagina, cantidad, total, totalPaginas);
     }
 
     public CasoDetalle detalle(String ci, Long idCaso, String correlationId)
@@ -286,6 +312,18 @@ public class GestionCasosService {
     private static GuiaVista guia(Guia g) {
         return new GuiaVista(g.getId(), texto(g.getFecha()), g.getOrigen(), g.getDestino(), g.getRubroCliente(),
                 g.getTipoCarga(), g.getPesoCargaKg(), texto(g.getEstado()));
+    }
+
+    // null si no es un entero; porDefecto si no vino
+    private static Integer entero(String valor, int porDefecto) {
+        if (valor == null || valor.isBlank()) {
+            return porDefecto;
+        }
+        try {
+            return Integer.valueOf(valor.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static EstadoCaso estadoValido(String valor) {

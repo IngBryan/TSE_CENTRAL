@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.EntityManager;
@@ -23,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
-import tse.lab.frontofficefuncionarios.service.AutorizacionFuncionario;
+import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
@@ -32,6 +33,7 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.CasoResumen;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.DescargoVista;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.EvidenciaVista;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.PaginaCasos;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.Resolucion;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.ResolucionRegistrada;
 import tse.lab.model.AccionAuditoriaCaso;
@@ -124,7 +126,7 @@ class GestionCasosServiceTest {
     @Test
     void quienNoEsFuncionarioNoAccedeANingunaOperacion() {
         for (String ci : new String[] { NO_FUNCIONARIO, null, " " }) {
-            assertThrows(NoAutorizadoException.class, () -> servicio.bandeja(ci, null, "t"));
+            assertThrows(NoAutorizadoException.class, () -> servicio.bandeja(ci, null, null, null, "t"));
             assertThrows(NoAutorizadoException.class, () -> servicio.detalle(ci, enDescargo, "t"));
             assertThrows(NoAutorizadoException.class, () -> servicio.evidencia(ci, enDescargo, "t"));
             assertThrows(NoAutorizadoException.class, () -> servicio.descargo(ci, enDescargo, "t"));
@@ -138,7 +140,7 @@ class GestionCasosServiceTest {
 
     @Test
     void bandejaListaLosCasosYFiltraPorEstado() throws Exception {
-        List<CasoResumen> todos = servicio.bandeja(FUNCIONARIO, null, "t");
+        List<CasoResumen> todos = bandeja(null);
         assertEquals(4, todos.size());
         CasoResumen r = todos.stream().filter(c -> c.id().equals(enDescargo)).findFirst().orElseThrow();
         assertEquals("EN_DESCARGO", r.estado());
@@ -148,13 +150,68 @@ class GestionCasosServiceTest {
         assertTrue(r.tieneDescargo());
         assertTrue(r.puedeResolverse());
 
-        List<CasoResumen> enDescargoLista = servicio.bandeja(FUNCIONARIO, " en_descargo ", "t");
+        List<CasoResumen> enDescargoLista = bandeja(" en_descargo ");
         assertEquals(2, enDescargoLista.size());
         assertTrue(enDescargoLista.stream().allMatch(c -> c.estado().equals("EN_DESCARGO")));
-        assertEquals(List.of(detectado), servicio.bandeja(FUNCIONARIO, "DETECTADA", "t").stream()
-                .map(CasoResumen::id).toList());
-        assertTrue(assertThrows(DatosInvalidosException.class, () -> servicio.bandeja(FUNCIONARIO, "ABIERTO", "t"))
+        assertEquals(List.of(detectado), bandeja("DETECTADA").stream().map(CasoResumen::id).toList());
+        assertTrue(assertThrows(DatosInvalidosException.class, () -> bandeja("ABIERTO"))
                 .getErrores().containsKey("estado"));
+    }
+
+    @Test
+    void bandejaPaginada() throws Exception {
+        PaginaCasos primera = servicio.bandeja(FUNCIONARIO, null, null, null, "t");
+        assertEquals(1, primera.pagina());
+        assertEquals(GestionCasosService.TAMANIO_POR_DEFECTO, primera.tamanio());
+        assertEquals(4, primera.total());
+        assertEquals(1, primera.totalPaginas());
+
+        PaginaCasos p1 = servicio.bandeja(FUNCIONARIO, null, "1", "3", "t");
+        PaginaCasos p2 = servicio.bandeja(FUNCIONARIO, null, "2", "3", "t");
+        assertEquals(3, p1.casos().size());
+        assertEquals(1, p2.casos().size());
+        assertEquals(2, p1.totalPaginas());
+        assertEquals(4, p2.total());
+        // Las paginas no se superponen y juntas son la bandeja completa, en el mismo orden
+        List<Long> ids = new ArrayList<>(p1.casos().stream().map(CasoResumen::id).toList());
+        ids.addAll(p2.casos().stream().map(CasoResumen::id).toList());
+        assertEquals(bandeja(null).stream().map(CasoResumen::id).toList(), ids);
+
+        // Con filtro el total es el del estado
+        PaginaCasos filtrada = servicio.bandeja(FUNCIONARIO, "EN_DESCARGO", "1", "1", "t");
+        assertEquals(1, filtrada.casos().size());
+        assertEquals(2, filtrada.total());
+        assertEquals(2, filtrada.totalPaginas());
+
+        // Despues de la ultima pagina: vacia, pero con el total
+        PaginaCasos fuera = servicio.bandeja(FUNCIONARIO, null, "99", "3", "t");
+        assertTrue(fuera.casos().isEmpty());
+        assertEquals(4, fuera.total());
+
+        PaginaCasos vacia = servicio.bandeja(FUNCIONARIO, "CONFIRMADA", null, null, "t");
+        assertTrue(vacia.casos().isEmpty());
+        assertEquals(0, vacia.totalPaginas());
+    }
+
+    @Test
+    void bandejaRechazaPaginacionInvalida() {
+        for (String pagina : new String[] { "0", "-1", "dos", "1.5" }) {
+            assertTrue(assertThrows(DatosInvalidosException.class,
+                    () -> servicio.bandeja(FUNCIONARIO, null, pagina, null, "t")).getErrores().containsKey("pagina"));
+        }
+        for (String tamanio : new String[] { "0", "101", "x" }) {
+            assertTrue(assertThrows(DatosInvalidosException.class,
+                    () -> servicio.bandeja(FUNCIONARIO, null, null, tamanio, "t")).getErrores().containsKey("tamanio"));
+        }
+        // Informa todos los errores juntos
+        assertEquals(3, assertThrows(DatosInvalidosException.class,
+                () -> servicio.bandeja(FUNCIONARIO, "ABIERTO", "0", "0", "t")).getErrores().size());
+    }
+
+    // Todos los casos (o los del estado) en una sola pagina
+    private List<CasoResumen> bandeja(String estado) throws Exception {
+        return servicio.bandeja(FUNCIONARIO, estado, "1", String.valueOf(GestionCasosService.TAMANIO_MAXIMO), "t")
+                .casos();
     }
 
     @Test
