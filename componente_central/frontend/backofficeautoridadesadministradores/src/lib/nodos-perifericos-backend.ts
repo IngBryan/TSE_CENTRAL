@@ -1,6 +1,9 @@
 
 import type { AltaNodo, DatosNodo } from "./nodos-perifericos";
-
+import {
+  cookieWildFly,
+  idSesion,
+} from "./backoffice-sesion";
 
 type ResultadoListado =
   | { ok: true; nodos: DatosNodo[] }
@@ -12,11 +15,20 @@ type ResultadoListado =
  */
 export async function listarNodos(): Promise<ResultadoListado> {
   const baseUrl = process.env.BACKOFFICE_API_URL;
-
+  
   if (!baseUrl) {
     return {
       ok: false,
       mensaje: "No se configuró la URL del backend.",
+    };
+  }
+
+  const sesion = await idSesion();
+
+  if (!sesion) {
+    return {
+      ok: false,
+      mensaje: "La sesión venció. Vuelve a iniciar sesión.",
     };
   }
 
@@ -27,6 +39,7 @@ export async function listarNodos(): Promise<ResultadoListado> {
         method: "GET",
         headers: {
           Accept: "application/json",
+          Cookie: cookieWildFly(sesion),
         },
         cache: "no-store",
       }
@@ -35,7 +48,7 @@ export async function listarNodos(): Promise<ResultadoListado> {
     if (respuesta.status === 401) {
       return {
         ok: false,
-        mensaje: "Se requiere autenticación.",
+        mensaje: "La sesión venció. Vuelve a iniciar sesión.",
       };
     }
 
@@ -95,6 +108,15 @@ export async function registrarNodo(
     };
   }
 
+  const sesion = await idSesion();
+
+  if (!sesion) {
+    return {
+      ok: false,
+      mensaje: "La sesión venció. Vuelve a iniciar sesión.",
+    };
+  }
+
   try {
     const respuesta = await fetch(
       `${baseUrl.replace(/\/$/, "")}/nodos-perifericos`,
@@ -103,6 +125,7 @@ export async function registrarNodo(
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          Cookie: cookieWildFly(sesion),
         },
         body: JSON.stringify(datos),
         cache: "no-store",
@@ -116,7 +139,7 @@ export async function registrarNodo(
     if (respuesta.status === 401) {
       return {
         ok: false,
-        mensaje: "Se requiere autenticación.",
+        mensaje: "La sesión venció. Vuelve a iniciar sesión.",
       };
     }
 

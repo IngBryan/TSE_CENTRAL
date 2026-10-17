@@ -1,6 +1,9 @@
 
 import { listarNodos } from "@/lib/nodos-perifericos-backend";
 import PanelAltaNodo from "./PanelAltaNodo";
+import { redirect } from "next/navigation";
+import { consultarIdentidad } from "@/lib/backoffice-sesion";
+import { cerrarSesionAction } from "@/app/login/actions";
 
 function formatearFecha(valor: string | null): string {
   if (!valor) return "Sin comunicaciones";
@@ -19,18 +22,39 @@ function formatearFecha(valor: string | null): string {
 }
 
 export default async function GestionNodosPerifericosPage() {
+  const identidad = await consultarIdentidad();
+
+  if (identidad?.rol !== "ADMINISTRADOR") {
+    redirect("/login");
+  }
+
   const resultado = await listarNodos();
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-6 py-10">
-      <header>
-        <h1 className="text-3xl font-semibold">
-          Gestión de nodos periféricos
-        </h1>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold">
+            Gestión de nodos periféricos
+          </h1>
 
-        <p className="mt-2 text-muted-foreground">
-          Administración de balanzas y dispositivos de tracking.
-        </p>
+          <p className="mt-2 text-muted-foreground">
+            Administración de balanzas y dispositivos de tracking.
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sesión: {identidad.ci} · Administrador
+          </p>
+        </div>
+
+        <form action={cerrarSesionAction}>
+          <button
+            type="submit"
+            className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
+          >
+            Cerrar sesión
+          </button>
+        </form>
       </header>
       
       <PanelAltaNodo />
