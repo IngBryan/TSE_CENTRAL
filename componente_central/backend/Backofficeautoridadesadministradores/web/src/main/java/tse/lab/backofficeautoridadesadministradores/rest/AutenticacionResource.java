@@ -33,6 +33,11 @@ public class AutenticacionResource {
         this.seguridad = seguridad;
     }
 
+    // RESTEasy makes the resource @RequestScoped: the CDI proxy needs a no-args constructor
+    protected AutenticacionResource() {
+        this.seguridad = null;
+    }
+
     @Context
     private HttpServletRequest solicitud;
 

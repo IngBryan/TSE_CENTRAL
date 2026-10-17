@@ -3,6 +3,7 @@ import type { AltaNodo, DatosNodo } from "./nodos-perifericos";
 import {
   cookieWildFly,
   idSesion,
+  urlBackend,
 } from "./backoffice-sesion";
 
 type ResultadoListado =
@@ -14,15 +15,6 @@ type ResultadoListado =
  * mediante la API REST del Backoffice.
  */
 export async function listarNodos(): Promise<ResultadoListado> {
-  const baseUrl = process.env.BACKOFFICE_API_URL;
-  
-  if (!baseUrl) {
-    return {
-      ok: false,
-      mensaje: "No se configuró la URL del backend.",
-    };
-  }
-
   const sesion = await idSesion();
 
   if (!sesion) {
@@ -34,7 +26,7 @@ export async function listarNodos(): Promise<ResultadoListado> {
 
   try {
     const respuesta = await fetch(
-      `${baseUrl.replace(/\/$/, "")}/nodos-perifericos`,
+      urlBackend("nodos-perifericos"),
       {
         method: "GET",
         headers: {
@@ -99,15 +91,6 @@ type ResultadoAlta =
 export async function registrarNodo(
   datos: AltaNodo
 ): Promise<ResultadoAlta> {
-  const baseUrl = process.env.BACKOFFICE_API_URL;
-
-  if (!baseUrl) {
-    return {
-      ok: false,
-      mensaje: "No se configuró la URL del backend.",
-    };
-  }
-
   const sesion = await idSesion();
 
   if (!sesion) {
@@ -119,7 +102,7 @@ export async function registrarNodo(
 
   try {
     const respuesta = await fetch(
-      `${baseUrl.replace(/\/$/, "")}/nodos-perifericos`,
+      urlBackend("nodos-perifericos"),
       {
         method: "POST",
         headers: {

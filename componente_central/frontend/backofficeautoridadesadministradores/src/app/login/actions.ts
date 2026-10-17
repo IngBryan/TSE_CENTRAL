@@ -127,12 +127,12 @@ export async function iniciarSesionAction(
     };
   }
 
+  // Sin maxAge: el vencimiento lo decide la sesión de WildFly, que se renueva con cada uso.
   (await cookies()).set(NOMBRE_COOKIE_SESION, sesion, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: RUTA_COOKIE_SESION,
-    maxAge: 30 * 60,
   });
 
   redirect("/nodos-perifericos");
