@@ -135,4 +135,6 @@ spec:
 
           securityContext:
             runAsNonRoot: true
+            # jboss user of the WildFly base image (non-numeric USER in the Dockerfile)
+            runAsUser: 1000
             allowPrivilegeEscalation: false
