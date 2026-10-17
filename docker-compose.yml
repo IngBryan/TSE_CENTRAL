@@ -50,8 +50,6 @@ services:
       # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
       - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
       - BACKEND_API_KEY=${BACKEND_API_KEY}
-      # Firma el token (JWT HS256) de la app movil del chofer (TSE_MOVIL): /api/movil/*
-      - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
     depends_on:
       - wildfly
     restart: unless-stopped
@@ -155,6 +153,13 @@ services:
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
       # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
       - BACKEND_API_KEY=${BACKEND_API_KEY}
+      # App movil del chofer (TSE_MOVIL): login con gub.uy en POST /api/movil/auth/token. El canje
+      # del code lo hace WildFly con el mismo cliente de ID Uruguay que la web.
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_REDIRECT_URIS_MOVIL=${OIDC_REDIRECT_URIS_MOVIL:-uy.carga.movil:/oauth2redirect,http://localhost:8080}
+      # Firma el token (JWT HS256, 8 h) que la app manda en /api/movil/*: 32+ caracteres aleatorios
+      - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:

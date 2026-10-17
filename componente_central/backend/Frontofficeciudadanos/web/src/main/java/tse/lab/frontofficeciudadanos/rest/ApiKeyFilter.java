@@ -16,6 +16,7 @@ import jakarta.ws.rs.ext.Provider;
 
 // El puerto 8080 esta publicado: toda la API exige la clave compartida con el frontoffice de Next
 // en el header X-Api-Key (BACKEND_API_KEY, del .env raiz). Sin clave configurada no atiende nada.
+// Excepcion: /movil/*, que llama la app del chofer con su propio token (MovilTokenFilter).
 // Tambien toma el X-Correlation-Id que manda el front (o genera uno) y lo devuelve en la respuesta.
 @Provider
 public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFilter {
@@ -30,6 +31,10 @@ public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFi
         req.setProperty(CORRELATION_ID,
                 recibido != null && ID_VALIDO.matcher(recibido).matches() ? recibido : UUID.randomUUID().toString());
 
+        // La app movil llama directo (sin el front de Next): se autentica con su token en MovilTokenFilter
+        if (MovilTokenFilter.esApiMovil(req)) {
+            return;
+        }
         String clave = req.getHeaderString("X-Api-Key");
         if (CLAVE.length == 0 || clave == null
                 || !MessageDigest.isEqual(CLAVE, clave.getBytes(StandardCharsets.UTF_8))) {

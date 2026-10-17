@@ -116,8 +116,9 @@ SESSION_SECRET=<string largo y aleatorio>   # cifra la cookie de sesion
 #API del backend Frontofficeciudadanos (la consume el front de Next)
 BACKEND_API_KEY=<string largo y aleatorio>  # clave compartida front <-> WildFly (header X-Api-Key)
 
-#App movil del chofer (TSE_MOVIL) - frontofficeciudadanos
+#App movil del chofer (TSE_MOVIL) - WildFly (usa tambien OIDC_CLIENT_ID / OIDC_CLIENT_SECRET)
 MOVIL_TOKEN_SECRET=<string largo y aleatorio, 32+ caracteres>  # firma el token (JWT HS256) de la app
+#OIDC_REDIRECT_URIS_MOVIL=uy.carga.movil:/oauth2redirect,http://localhost:8080  # redirect URIs de la app
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -190,19 +191,22 @@ ve una cookie de sesion cifrada.
   solo los choferes `HABILITADO` de la empresa; `POST /{id}/asignacion` con `matricula` e `idChofer`
   la deja `ASIGNADA` (409 si ya lo estaba, 400 si el vehiculo o el chofer no son de la empresa o el
   chofer esta pendiente). `Guia` tiene `@Version` para que dos asignaciones simultaneas no ganen las dos.
-- **App movil del chofer (`TSE_MOVIL`):** el servidor de Next hace de BFF; la app nunca habla con
-  WildFly ni tiene la `BACKEND_API_KEY`.
-  - **Login:** la app abre `/auth/movil/login?redirect=cargauy://auth&code_challenge=<S256>` en un
-    Custom Tab. Es el mismo login con gub.uy (misma redirect URI `http://localhost`); la cookie de la
-    transaccion marca que el flujo es movil. En `/auth/callback`, si el ingreso es valido y la persona
-    es `CHOFER` `HABILITADO`, no se crea la sesion web: se emite un codigo de un solo uso (60 s, en
-    memoria del proceso de Next, atado al `code_challenge` por PKCE) y se vuelve a
-    `cargauy://auth?code=...` (o `?error=no_chofer|cancelado|...`). La app lo canjea en
-    `POST /api/movil/token` (`{ code, codeVerifier }`) por un JWT HS256 firmado con
-    `MOVIL_TOKEN_SECRET` (`sub` = cedula, `nombre`, `roles`, vence a las 8 h). El token no viaja en la URL.
-  - **API (Next):** `GET /api/movil/viajes` y `POST /api/movil/eventos` validan el `Authorization: Bearer`
-    (401 `token_vencido` / `token_invalido`) y llaman al backend con `X-Api-Key`, `X-Usuario-Ci` (la cedula
-    del token) y `X-Correlation-Id` (el que mande la app, por ejemplo el `idEvento`, o uno nuevo).
+- **App movil del chofer (`TSE_MOVIL`):** la app habla directo con gub.uy y con WildFly por REST; no
+  pasa por el front de Next ni tiene la `BACKEND_API_KEY` (ver `TSE_MOVIL/docs/adr/0003-login-movil-directo-gubuy.md`).
+  - **Login (`MovilAuthResource` + `LoginMovilService`):** la app abre el `authorize` de ID Uruguay en
+    un Custom Tab (PKCE S256, `state`, `nonce`) y recibe el `code` en su redirect URI
+    (`uy.carga.movil:/oauth2redirect`, o el loopback `http://localhost:8080` mientras no este
+    registrada). Lo manda a `POST /api/movil/auth/token` (`{ code, codeVerifier, nonce, redirectUri }`).
+    WildFly canjea el `code` con el `client_secret` (`ClienteGubUy`), valida el `id_token`
+    (`VerificadorIdToken`: firma contra el JWKS, iss, aud, exp y el `nonce` de la app), llama a userinfo,
+    aplica el mismo ingreso que la web (`IngresoService`: perfil, PDI, roles), exige `CHOFER`
+    `HABILITADO` y devuelve un JWT HS256 firmado con `MOVIL_TOKEN_SECRET` (`TokenMovil`: `sub` = cedula,
+    `nombre`, 8 h). Errores: `{ "error": "token_invalido" | "no_chofer" | "no_existe" | "menor_de_edad" |
+    "idp_no_disponible" | ... }` con 400/403/503. Sin `OIDC_CLIENT_SECRET` o `MOVIL_TOKEN_SECRET` responde
+    503 `ingreso_no_disponible`.
+  - **Autorizacion (`MovilTokenFilter`):** el resto de `/api/movil/*` exige `Authorization: Bearer`
+    (401 `token_vencido` / `token_invalido`); la cedula sale del token, no de un header del cliente.
+    `/api/movil/*` no pide `X-Api-Key`.
   - **API (WildFly, `MovilResource` + `ViajesChoferService`):** `GET /api/movil/viajes` devuelve las guias
     `ASIGNADA` o `EN_CURSO` del chofer en todas las empresas donde esta `HABILITADO` (lista vacia si no
     tiene; 403 si no es chofer habilitado). `POST /api/movil/eventos` recibe

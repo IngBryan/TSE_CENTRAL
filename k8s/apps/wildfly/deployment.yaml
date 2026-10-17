@@ -70,6 +70,28 @@ spec:
                   name: tse-runtime-secrets
                   key: rabbitmq-password
 
+            # App movil del chofer: login con gub.uy (POST /api/movil/auth/token) y token de la app.
+            # Sin estos valores el login de la app responde 503 ingreso_no_disponible.
+            - name: OIDC_CLIENT_ID
+              value: "890192"
+
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: oidc-client-secret
+                  optional: true
+
+            - name: OIDC_REDIRECT_URIS_MOVIL
+              value: "uy.carga.movil:/oauth2redirect,http://localhost:8080"
+
+            - name: MOVIL_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: movil-token-secret
+                  optional: true
+
           # WildFly puede tardar bastante en desplegar los 3 EAR.
           startupProbe:
             exec:
