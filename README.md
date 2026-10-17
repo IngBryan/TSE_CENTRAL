@@ -260,12 +260,37 @@ ve una cookie de sesion cifrada.
       venir en `GET /api/movil/viajes`.
   - Tests: `GuiasServiceTest` (un caso por regla y uno integrado: editar -> evento con version vieja ->
     `guiaModificada`; reasignar -> `CONFLICTO`; cancelar -> `CONFLICTO`).
+- **ABM de Vehiculos (frontoffice ciudadanos):** el responsable da de alta, consulta, modifica y da de
+  baja los vehiculos de su empresa en `/empresa/vehiculos` (boton *Vehiculos* en Mi cuenta), y registra
+  el Permiso Nacional de Circulacion y las ITV desde `/empresa/vehiculos/{matricula}`. Codigo:
+  `GestionVehiculosService` (paquete `gestionvehiculos`), `VehiculosResource`, `PermisoCirculacionDAO`,
+  `ITVDAO`.
+  - **Reglas:** control de acceso con `AutorizacionResponsable` (responsable validado de una empresa
+    habilitada; 403). Matricula obligatoria, **normalizada** (mayusculas, sin espacios ni guiones:
+    `sba 1234` -> `SBA1234`, `Vehiculo.normalizarMatricula`, para cruzarla con balanzas y tracking), de 4
+    a 10 letras o numeros y unica en todo el sistema (si es de otra empresa no se dice cual); no se
+    modifica. Marca y modelo obligatorios (hasta 50), peso del vehiculo 1..60.000 kg y capacidad de carga
+    1..100.000 kg. Un vehiculo de otra empresa responde 404, igual que uno inexistente.
+  - **Permiso:** uno por vehiculo (`nro` unico, emision < vencimiento); guardar otro numero lo reemplaza.
+    **ITV:** se agregan y se conserva el historial (no dos con el mismo vencimiento); la vigente es la de
+    vencimiento mas lejano. **Habilitado** = activo, permiso vigente hoy (emision <= hoy <= vencimiento) e ITV
+    sin vencer; se muestra en el listado y en el detalle.
+  - **Baja logica** (`Vehiculo.activo`): el vehiculo sigue en el listado como *Dado de baja*, no se ofrece
+    ni se acepta en guias nuevas o reasignaciones, y ya no se modifica (409 `VEHICULO_DADO_DE_BAJA`). No
+    se puede dar de baja con guias `ASIGNADA` o `EN_CURSO` (409 `VEHICULO_CON_VIAJES`). Guias, permiso e
+    ITV lo referencian y la fiscalizacion necesita su historia, por eso no se borra.
+  - **Endpoints** (con `X-Api-Key` y `X-Usuario-Ci`): `GET|POST /api/empresa/vehiculos`
+    (`{ matricula, marca, modelo, peso, capacidadCargaKg }`), `GET|PUT /api/empresa/vehiculos/{matricula}`
+    (`{ marca, modelo, peso, capacidadCargaKg }`), `PUT .../{matricula}/permiso`
+    (`{ nro, fechaEmision, fechaVencimiento }`, fechas `yyyy-MM-dd`), `POST .../{matricula}/itv`
+    (`{ fechaVencimiento }`) y `POST .../{matricula}/baja`. Logs `evento=vehiculo.alta|modificado|permiso|itv|baja`.
+  - Tests: `GestionVehiculosServiceTest` (un caso por regla, contra H2).
 - **Modelo:** `Chofer` es la asociacion persona-empresa (id propio, `(ci, nro_empresa)` unico), asi
   una persona puede ser chofer de varias empresas; las guias referencian esa asociacion.
 - **Datos de prueba (solo desarrollo):** `ejb/src/main/resources/META-INF/datos-prueba.sql` carga en
-  cada deploy (despues del drop-and-create) la empresa 1 habilitada y su responsable, dos vehiculos,
-  y para la app movil a `56087406` y `54074380` como choferes `HABILITADO` de la empresa 1 con una
-  guia `ASIGNADA` cada uno (`GV-MOVIL001` y `GV-MOVIL002`). Las otras
+  cada deploy (despues del drop-and-create) la empresa 1 habilitada, su responsable (`54074380`) y dos
+  vehiculos: `SBA1234` habilitado (permiso `PNC-0001` e ITV vigentes) y `SAB5678` sin permiso ni ITV.
+  No precarga choferes ni guias: se crean desde el frontoffice. Las otras
   aplicaciones no tienen tablas propias en `main_db`, asi que el script no choca con nada.
 
 ### Backend (WildFly + PostgreSQL)

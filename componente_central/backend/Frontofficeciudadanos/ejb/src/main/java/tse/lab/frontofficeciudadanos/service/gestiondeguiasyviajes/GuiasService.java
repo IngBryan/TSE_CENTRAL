@@ -133,7 +133,7 @@ public class GuiasService {
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
         Guia guia = guiaSinAsignar(empresa, idGuia);
-        List<VehiculoResumen> vs = vehiculos.buscarPorEmpresa(empresa).stream().map(GuiasService::resumen).toList();
+        List<VehiculoResumen> vs = vehiculos.buscarActivosPorEmpresa(empresa).stream().map(GuiasService::resumen).toList();
         // Regla de CU-02: solo se ofrecen los choferes habilitados; no se consulta la PDI
         List<ChoferResumen> cs = choferes.buscarPorEmpresa(empresa).stream()
                 .filter(c -> c.getEstado() == EstadoChofer.HABILITADO)
@@ -150,7 +150,7 @@ public class GuiasService {
 
         Map<String, String> errores = new LinkedHashMap<>();
         Vehiculo vehiculo = matricula == null ? null : vehiculos.buscarPorMatricula(matricula);
-        if (vehiculo == null || !esDe(vehiculo.getEmpresa(), empresa)) {
+        if (vehiculo == null || !vehiculo.isActivo() || !esDe(vehiculo.getEmpresa(), empresa)) {
             errores.put("vehiculo", "Elegí un vehículo de la empresa.");
         }
         Chofer chofer = idChofer == null ? null : choferes.buscarPorId(idChofer);
@@ -279,7 +279,7 @@ public class GuiasService {
 
     private Vehiculo vehiculoValido(Empresa empresa, String matricula) throws DatosInvalidosException {
         Vehiculo vehiculo = matricula == null ? null : vehiculos.buscarPorMatricula(matricula);
-        if (vehiculo == null || !esDe(vehiculo.getEmpresa(), empresa)) {
+        if (vehiculo == null || !vehiculo.isActivo() || !esDe(vehiculo.getEmpresa(), empresa)) {
             throw new DatosInvalidosException(Map.of("vehiculo", "Elegí un vehículo de la empresa."));
         }
         return vehiculo;
@@ -311,7 +311,7 @@ public class GuiasService {
                 .toList();
         boolean modificable = guia.getEstado() == EstadoGuia.ASIGNADA;
         List<VehiculoResumen> vs = modificable
-                ? vehiculos.buscarPorEmpresa(empresa).stream().map(GuiasService::resumen).toList()
+                ? vehiculos.buscarActivosPorEmpresa(empresa).stream().map(GuiasService::resumen).toList()
                 : List.of();
         List<ChoferResumen> cs = modificable ? choferes.buscarPorEmpresa(empresa).stream()
                 .filter(c -> c.getEstado() == EstadoChofer.HABILITADO).map(this::resumen).toList() : List.of();

@@ -34,6 +34,9 @@ services:
     container_name: frontciudadanos-server
     build:
       context: ./componente_central/frontend/frontofficeciudadanos
+      args:
+        # Sin el prefijo /ciudadanos de Kubernetes: gub.uy vuelve a http://localhost
+        NEXT_BASE_PATH: ""
     ports:
       - "3002:3000"
       # Login con gub.uy: la redirect URI registrada en ID Uruguay es http://localhost (puerto 80)

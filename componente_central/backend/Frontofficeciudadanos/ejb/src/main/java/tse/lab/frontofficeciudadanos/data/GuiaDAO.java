@@ -9,6 +9,7 @@ import tse.lab.model.Chofer;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoGuia;
 import tse.lab.model.Guia;
+import tse.lab.model.Vehiculo;
 
 @Stateless
 public class GuiaDAO {
@@ -78,6 +79,13 @@ public class GuiaDAO {
                 .setParameter("choferes", choferes)
                 .setParameter("estados", estados)
                 .getResultList();
+    }
+
+    public long contarPorVehiculoYEstados(Vehiculo vehiculo, List<EstadoGuia> estados) {
+        return em.createQuery("SELECT COUNT(g) FROM Guia g WHERE g.vehiculo = :vehiculo AND g.estado IN :estados", Long.class)
+                .setParameter("vehiculo", vehiculo)
+                .setParameter("estados", estados)
+                .getSingleResult();
     }
 
     public List<Guia> buscarSinVehiculoAsignado() {

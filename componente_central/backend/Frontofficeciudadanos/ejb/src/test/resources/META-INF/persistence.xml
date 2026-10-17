@@ -6,6 +6,8 @@
         <class>tse.lab.model.Empresa</class>
         <class>tse.lab.model.Guia</class>
         <class>tse.lab.model.Vehiculo</class>
+        <class>tse.lab.model.PermisoCirculacion</class>
+        <class>tse.lab.model.ITV</class>
         <class>tse.lab.model.Chofer</class>
         <class>tse.lab.model.Responsable</class>
         <class>tse.lab.model.Ciudadano</class>
