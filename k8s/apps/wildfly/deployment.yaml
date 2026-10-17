@@ -102,6 +102,17 @@ spec:
                   key: ejb-password
                   optional: true
 
+            # PDI: PDI_URL y PDI_ORGANISMO_CODIGO salen de configmap.yaml (envFrom)
+            - name: PDI_ORGANISMO_CLAVE
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: pdi-organismo-clave
+
+          envFrom:
+            - configMapRef:
+                name: wildfly-config
+
           # WildFly puede tardar bastante en desplegar los 3 EAR.
           startupProbe:
             exec:
