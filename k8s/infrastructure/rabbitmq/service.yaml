@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+spec:
+  type: ExternalName
+  externalName: tse-rabbitmq.web.elasticloud.uy
+  ports:
+    - name: amqp
+      port: 5672

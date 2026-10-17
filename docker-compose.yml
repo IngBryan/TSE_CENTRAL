@@ -172,6 +172,28 @@ services:
       retries: 30
       start_period: 30s
 
+  # Script de fiscalizacion automatica (jar standalone, no va en WildFly): consume tracking.events
+  # y guarda los eventos en MongoDB. Imagen: componente_central/backend/Fiscalizacionautomatica/Dockerfile.
+  fiscalizacionautomatica:
+    build:
+      context: ./componente_central/backend/Fiscalizacionautomatica
+    hostname: fiscalizacionautomatica
+    container_name: fiscalizacion-server
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - MONGO_HOST=mongodb
+      - MONGO_DB=main_db
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+
 volumes:
   rabbitmq-data:
   postgres-data:

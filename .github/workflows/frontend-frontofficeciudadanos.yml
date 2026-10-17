@@ -5,6 +5,15 @@ on:
   push:
     branches:
       - main
+      - dev
+    paths:
+      - componente_central/frontend/frontofficeciudadanos/**
+      - .github/workflows/frontend-frontofficeciudadanos.yml
+      - .github/workflows/_build-frontend.yml
+      - .github/workflows/_docker-image.yml
+  pull_request:
+    branches:
+      - dev
     paths:
       - componente_central/frontend/frontofficeciudadanos/**
       - .github/workflows/frontend-frontofficeciudadanos.yml
@@ -18,6 +27,10 @@ jobs:
     with:
       path: componente_central/frontend/frontofficeciudadanos
       artifact-name: frontend-frontofficeciudadanos
+      sonar-project-key: tse-central-frontend-frontofficeciudadanos
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   docker:
     needs: frontend

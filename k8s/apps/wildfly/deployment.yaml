@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wildfly
+  labels:
+    app: wildfly
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: wildfly
+
+  template:
+    metadata:
+      labels:
+        app: wildfly
+
+    spec:
+      imagePullSecrets:
+        - name: ghcr-credentials
+
+      containers:
+        - name: wildfly
+          image: ghcr.io/ingbryan/tse_central/wildfly:latest
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          env:
+            # PostgreSQL
+            - name: DB_HOST
+              value: postgres
+
+            - name: DB_PORT
+              value: "5432"
+
+            - name: DB_NAME
+              value: main_db
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: postgres-user
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: postgres-password
+
+            # RabbitMQ
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+
+            - name: RABBITMQ_PORT
+              value: "5672"
+
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: rabbitmq-user
+
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: rabbitmq-password
+
+          # WildFly puede tardar bastante en desplegar los 3 EAR.
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -sf http://127.0.0.1:9990/health/ready >/dev/null
+            periodSeconds: 10
+            failureThreshold: 30
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -sf http://127.0.0.1:9990/health/ready >/dev/null
+            periodSeconds: 10
+
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false

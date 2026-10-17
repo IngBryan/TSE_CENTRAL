@@ -29,7 +29,7 @@ jobs:
 
       # Si se corre a mano desde otra rama, la imagen se construye pero no se publica.
       - name: Login en GitHub Container Registry
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -39,7 +39,7 @@ jobs:
       # Dos tags: latest (la ultima de main) y sha-<commit> (para poder volver a una version
       # anterior). Docker no acepta mayusculas, por eso el nombre del repo va en minusculas.
       - name: Publicar imagen
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           SERVICE: ${{ inputs.service }}
         run: |

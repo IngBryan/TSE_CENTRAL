@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - main
+      - dev
+    paths:
+      - componente_central/backend/Fiscalizacionautomatica/**
+      - .github/workflows/backend-fiscalizacionautomatica.yml
+      - .github/workflows/_build-backend.yml
+  pull_request:
+    branches:
+      - dev
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
       - .github/workflows/backend-fiscalizacionautomatica.yml
@@ -18,3 +26,7 @@ jobs:
       path: componente_central/backend/Fiscalizacionautomatica
       artifact-name: backend-fiscalizacionautomatica
       artifact: target/*.jar
+      sonar-project-key: tse-central-backend-fiscalizacionautomatica
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

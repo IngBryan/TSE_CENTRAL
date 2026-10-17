@@ -5,6 +5,15 @@ on:
   push:
     branches:
       - main
+      - dev
+    paths:
+      - componente_central/frontend/Frontofficefuncionarios/**
+      - .github/workflows/frontend-frontofficefuncionarios.yml
+      - .github/workflows/_build-frontend.yml
+      - .github/workflows/_docker-image.yml
+  pull_request:
+    branches:
+      - dev
     paths:
       - componente_central/frontend/Frontofficefuncionarios/**
       - .github/workflows/frontend-frontofficefuncionarios.yml
@@ -15,9 +24,13 @@ on:
 jobs:
   frontend:
     uses: ./.github/workflows/_build-frontend.yml
-    with:
+    with: 
       path: componente_central/frontend/Frontofficefuncionarios
       artifact-name: frontend-frontofficefuncionarios
+      sonar-project-key: tse-central-frontend-frontofficefuncionarios
+    
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  
 
   docker:
     needs: frontend
@@ -27,3 +40,5 @@ jobs:
       packages: write
     with:
       service: frontofficefuncionarios-front
+      
+    

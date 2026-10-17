@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontofficeciudadanos-front
+  labels:
+    app: frontofficeciudadanos-front
+spec:
+  selector:
+    app: frontofficeciudadanos-front
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

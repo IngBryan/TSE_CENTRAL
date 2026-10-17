@@ -1,0 +1,21 @@
+name: Docker - Fiscalizacion automatica
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - componente_central/backend/Fiscalizacionautomatica/**
+      - docker-compose.yml
+      - .github/workflows/docker-fiscalizacionautomatica.yml
+      - .github/workflows/_docker-image.yml
+  workflow_dispatch:
+
+jobs:
+  docker:
+    uses: ./.github/workflows/_docker-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service: fiscalizacionautomatica
