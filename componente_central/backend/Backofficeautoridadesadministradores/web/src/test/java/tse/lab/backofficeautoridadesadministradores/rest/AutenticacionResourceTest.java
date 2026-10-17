@@ -36,10 +36,10 @@ class AutenticacionResourceTest {
 
     @BeforeEach
     void preparar() throws Exception {
-        recurso = new AutenticacionResource();
-
         seguridadJakarta = mock(
                 jakarta.security.enterprise.SecurityContext.class);
+
+        recurso = new AutenticacionResource(seguridadJakarta);
 
         seguridadRest = mock(
                 jakarta.ws.rs.core.SecurityContext.class);
@@ -47,7 +47,6 @@ class AutenticacionResourceTest {
         solicitud = mock(HttpServletRequest.class);
         respuestaHttp = mock(HttpServletResponse.class);
 
-        inyectar("seguridad", seguridadJakarta);
         inyectar("seguridadRest", seguridadRest);
         inyectar("solicitud", solicitud);
         inyectar("respuesta", respuestaHttp);

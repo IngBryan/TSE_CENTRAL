@@ -25,8 +25,13 @@ import jakarta.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class AutenticacionResource {
 
+    private final jakarta.security.enterprise.SecurityContext seguridad;
+
     @Inject
-    private jakarta.security.enterprise.SecurityContext seguridad;
+    public AutenticacionResource(
+            jakarta.security.enterprise.SecurityContext seguridad) {
+        this.seguridad = seguridad;
+    }
 
     @Context
     private HttpServletRequest solicitud;
