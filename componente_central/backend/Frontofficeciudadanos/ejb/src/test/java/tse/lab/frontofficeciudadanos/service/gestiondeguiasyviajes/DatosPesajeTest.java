@@ -38,7 +38,8 @@ class DatosPesajeTest {
     void distintosSiCambiaCualquierCampo() {
         DatosPesaje p = pesaje();
         assertNotEquals(p, null);
-        assertNotEquals(p, "SBC1234");
+        Object otraClase = "SBC1234";
+        assertNotEquals(p, otraClase);
         assertNotEquals(p, new DatosPesaje(11, 4, "SBC1234", FECHA, 38500));
         assertNotEquals(p, new DatosPesaje(10, 5, "SBC1234", FECHA, 38500));
         assertNotEquals(p, new DatosPesaje(10, 4, "STU5678", FECHA, 38500));

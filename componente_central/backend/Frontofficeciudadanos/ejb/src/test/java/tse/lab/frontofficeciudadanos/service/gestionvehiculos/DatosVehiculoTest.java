@@ -27,7 +27,8 @@ class DatosVehiculoTest {
     void distintosSiCambiaCualquierCampo() {
         DatosVehiculo v = new DatosVehiculo("SBC1234", 1L);
         assertNotEquals(v, null);
-        assertNotEquals(v, "SBC1234");
+        Object otraClase = "SBC1234";
+        assertNotEquals(v, otraClase);
         assertNotEquals(v, new DatosVehiculo("STU5678", 1L));
         assertNotEquals(v, new DatosVehiculo("SBC1234", 2L));
     }

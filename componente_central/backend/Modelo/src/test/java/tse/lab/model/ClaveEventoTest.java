@@ -34,7 +34,8 @@ class ClaveEventoTest {
     void distintasSiCambiaMatriculaOFecha() {
         ClaveEvento clave = new ClaveEvento("SBC1234", FECHA);
         assertNotEquals(clave, null);
-        assertNotEquals(clave, "SBC1234");
+        Object otraClase = "SBC1234";
+        assertNotEquals(clave, otraClase);
         assertNotEquals(clave, new ClaveEvento("STU5678", FECHA));
         assertNotEquals(clave, new ClaveEvento("SBC1234", FECHA.plusSeconds(1)));
     }

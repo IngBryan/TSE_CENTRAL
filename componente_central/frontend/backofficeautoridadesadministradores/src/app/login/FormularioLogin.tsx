@@ -36,7 +36,6 @@ export default function FormularioLogin() {
           autoComplete="username"
           maxLength={255}
           required
-          autoFocus
           placeholder="Ingresá tu cédula"
           className="w-full rounded-md border border-input bg-background px-3 py-2"
         />

@@ -45,7 +45,8 @@ class DatosViajeTest {
     void distintosSiCambiaCualquierCampo() {
         DatosViaje v = viaje();
         assertNotEquals(v, null);
-        assertNotEquals(v, "GV-1");
+        Object otraClase = "GV-1";
+        assertNotEquals(v, otraClase);
         assertNotEquals(v, new DatosViaje("GV-2", "STU5678", 1L, "EN_CURSO", FECHA, ASIGNACION, "Mercedes",
                 "Nueva Palmira", 20000));
         assertNotEquals(v, new DatosViaje("GV-1", "SBC1234", 1L, "EN_CURSO", FECHA, ASIGNACION, "Mercedes",
