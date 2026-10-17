@@ -97,8 +97,8 @@ class GestionCasosServiceTest {
         em.persist(vehiculo);
         em.persist(guia);
         em.persist(new PermisoCirculacion("PNC-1", LocalDate.of(2025, 1, 1), LocalDate.of(2027, 1, 1), vehiculo));
-        em.persist(new ITV(LocalDate.of(2026, 3, 1), vehiculo));
-        em.persist(new ITV(LocalDate.of(2027, 3, 1), vehiculo));
+        em.persist(new ITV(LocalDate.of(2025, 3, 1), LocalDate.of(2026, 3, 1), vehiculo));
+        em.persist(new ITV(LocalDate.of(2026, 3, 1), LocalDate.of(2027, 3, 1), vehiculo));
         em.persist(balanza);
         em.persist(pesaje);
         em.persist(new Funcionario(FUNCIONARIO, "funcionario@mtop.gub.uy"));
@@ -257,6 +257,20 @@ class GestionCasosServiceTest {
         assertEquals(3500, ev.pesajes().get(0).excesoKg());
         assertEquals("Peaje Pando", ev.pesajes().get(0).balanza());
         assertSinCambios(enDescargo, EstadoCaso.EN_DESCARGO);
+    }
+
+    @Test
+    void evidenciaMuestraLaItvVigenteAlDetectarse() throws Exception {
+        Vehiculo vehiculo = em.find(Vehiculo.class, "SBA 1234");
+        LocalDate hoy = LocalDate.now();
+        em.getTransaction().begin();
+        // Renovada despues de la deteccion: no cuenta. Sin vencimiento: no gana por el orden de los nulos.
+        em.persist(new ITV(hoy.plusDays(1), LocalDate.of(2028, 1, 1), vehiculo));
+        em.persist(new ITV(LocalDate.of(2026, 6, 1), null, vehiculo));
+        em.getTransaction().commit();
+        em.clear();
+
+        assertEquals("2027-03-01", servicio.evidencia(FUNCIONARIO, enDescargo, "t").vehiculo().vencimientoItv());
     }
 
     // ===== FA3 y FA4: descargo =====

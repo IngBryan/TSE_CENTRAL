@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { botonPrimario, botonSecundario } from "@/components/encabezado";
 import type { Decision } from "@/lib/casos";
@@ -17,7 +16,6 @@ const OPCIONES: { valor: Decision; texto: string; ayuda: string }[] = [
 // FA5: el funcionario confirma o desestima el caso con un fundamento obligatorio. Se pide confirmar
 // antes de enviar porque la resolucion es definitiva (CONFIRMADA y DESESTIMADA son estados finales).
 export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDescargo: boolean }) {
-  const router = useRouter();
   const [decision, setDecision] = useState<Decision | null>(null);
   const [fundamento, setFundamento] = useState("");
   const [confirmar, setConfirmar] = useState(false);
@@ -31,10 +29,9 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
     if (!decision) return;
     setError(null);
     iniciar(async () => {
+      // Si sale bien, revalidatePath en la action ya vuelve a renderizar la pagina con la resolucion
       const r = await resolverCaso(idCaso, decision, fundamento);
-      if (r.ok) {
-        router.refresh();
-      } else {
+      if (!r.ok) {
         setError(r.error);
         setCampos(r.campos ?? {});
         setConfirmar(false);

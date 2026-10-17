@@ -33,6 +33,7 @@ public class CasoFiscalizacion implements Serializable {
 
     private String descripcion;
 
+    @Column(nullable = false)
     private String tipoCaso;
 
     @Enumerated(EnumType.STRING)

@@ -1,5 +1,7 @@
 package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,6 +40,8 @@ import tse.lab.model.Vehiculo;
 public class GestionCasosService {
 
     private static final Logger LOG = Logger.getLogger(GestionCasosService.class.getName());
+
+    private static final ZoneId URUGUAY = ZoneId.of("America/Montevideo");
 
     static final int TAMANIO_POR_DEFECTO = 20;
     static final int TAMANIO_MAXIMO = 100;
@@ -90,8 +94,11 @@ public class GestionCasosService {
             List<RegistroVista> historial) {
     }
 
+    // El permiso es uno por vehiculo y se renueva en el lugar: si emisionPermiso es posterior a la deteccion,
+    // no se sabe cual estaba vigente ese dia. vencimientoItv es el de la ITV vigente al detectarse.
     public record VehiculoVista(String matricula, String marca, String modelo, long pesoKg, long capacidadCargaKg,
-            long pesoMaximoKg, String nroPermiso, String vencimientoPermiso, String vencimientoItv) {
+            long pesoMaximoKg, String nroPermiso, String emisionPermiso, String vencimientoPermiso,
+            String vencimientoItv) {
     }
 
     // excesoKg: lo que el pesaje supera al peso del vehiculo mas su capacidad
@@ -171,10 +178,13 @@ public class GestionCasosService {
         long pesoMaximo = v == null ? 0 : v.getPeso() + v.getCapacidadCargaKg();
         VehiculoVista vehiculo = null;
         if (v != null) {
+            // Habilitacion al dia de la deteccion (en Uruguay): una ITV sacada despues no oculta que estaba vencida
+            LocalDate dia = LocalDate.ofInstant(caso.getFechaDeteccion(), URUGUAY);
             PermisoCirculacion permiso = casos.permisoDelVehiculo(v);
-            ITV itv = casos.ultimaItvDelVehiculo(v);
+            ITV itv = casos.itvVigenteAl(v, dia);
             vehiculo = new VehiculoVista(v.getMatricula(), v.getMarca(), v.getModelo(), v.getPeso(),
                     v.getCapacidadCargaKg(), pesoMaximo, permiso == null ? null : permiso.getNro(),
+                    permiso == null ? null : texto(permiso.getFechaEmision()),
                     permiso == null ? null : texto(permiso.getFechaVencimiento()),
                     itv == null ? null : texto(itv.getFechaVencimiento()));
         }

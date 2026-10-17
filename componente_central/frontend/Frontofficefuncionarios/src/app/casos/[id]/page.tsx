@@ -84,6 +84,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
     ? new Date(caso.fechaDeteccion).toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" })
     : null;
   const vencida = (venc: string | null) => venc != null && diaDeteccion != null && venc < diaDeteccion;
+  const posterior = (emision: string | null) => emision != null && diaDeteccion != null && emision > diaDeteccion;
 
   return (
     <Pagina sesion={sesion} id={id} estado={caso.estado} subtitulo={tipoCaso(caso.tipoCaso)}>
@@ -157,10 +158,16 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                     <p>
                       <span className={dato}>Permiso de circulación:</span>{" "}
                       {ev.vehiculo.nroPermiso ? `N° ${ev.vehiculo.nroPermiso}, vence ${fecha(ev.vehiculo.vencimientoPermiso)}` : "sin permiso"}
-                      {vencida(ev.vehiculo.vencimientoPermiso) && <Vencido />}
+                      {posterior(ev.vehiculo.emisionPermiso) ? (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                          renovado después de la detección ({fecha(ev.vehiculo.emisionPermiso)})
+                        </span>
+                      ) : (
+                        vencida(ev.vehiculo.vencimientoPermiso) && <Vencido />
+                      )}
                     </p>
                     <p>
-                      <span className={dato}>ITV:</span>{" "}
+                      <span className={dato}>ITV vigente al detectarse:</span>{" "}
                       {ev.vehiculo.vencimientoItv ? `vence ${fecha(ev.vehiculo.vencimientoItv)}` : "sin ITV"}
                       {vencida(ev.vehiculo.vencimientoItv) && <Vencido />}
                     </p>

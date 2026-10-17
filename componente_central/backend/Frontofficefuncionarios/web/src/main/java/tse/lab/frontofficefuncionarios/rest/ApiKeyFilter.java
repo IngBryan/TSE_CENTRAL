@@ -15,7 +15,9 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
 // Igual que en Frontofficeciudadanos: toda la API exige la clave compartida con el frontoffice de Next
-// en el header X-Api-Key (BACKEND_API_KEY, del .env raiz). Sin clave configurada no atiende nada.
+// en el header X-Api-Key. Es FUNCIONARIOS_API_KEY y no la CIUDADANOS_API_KEY: como quien llama
+// se identifica solo con X-Usuario-Ci, con la de ciudadanos se podria actuar como cualquier funcionario.
+// Sin clave configurada no atiende nada.
 // Tambien toma el X-Correlation-Id que manda el front (o genera uno) y lo devuelve en la respuesta.
 @Provider
 public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFilter {
@@ -49,7 +51,7 @@ public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFi
     }
 
     private static byte[] claveConfigurada() {
-        String valor = System.getenv("BACKEND_API_KEY");
+        String valor = System.getenv("FUNCIONARIOS_API_KEY");
         return valor == null ? new byte[0] : valor.getBytes(StandardCharsets.UTF_8);
     }
 }

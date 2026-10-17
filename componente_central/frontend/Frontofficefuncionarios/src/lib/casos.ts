@@ -69,8 +69,9 @@ export type VehiculoVista = {
   capacidadCargaKg: number;
   pesoMaximoKg: number;
   nroPermiso: string | null;
+  emisionPermiso: string | null; // posterior a la deteccion: el permiso se renovo despues
   vencimientoPermiso: string | null;
-  vencimientoItv: string | null;
+  vencimientoItv: string | null; // de la ITV vigente al detectarse
 };
 
 // excesoKg: lo que el pesaje supera al peso del vehiculo mas su capacidad declarada (0 si no supera)
@@ -122,7 +123,8 @@ const TIPOS_CASO: Record<string, string> = {
   DESVIO_DE_RUTA: "Desvío de ruta",
 };
 
-export function tipoCaso(tipo: string): string {
+export function tipoCaso(tipo: string | null | undefined): string {
+  if (!tipo) return "Sin tipo";
   if (TIPOS_CASO[tipo]) return TIPOS_CASO[tipo];
   const texto = tipo.replace(/_/g, " ").toLowerCase();
   return texto.charAt(0).toUpperCase() + texto.slice(1);

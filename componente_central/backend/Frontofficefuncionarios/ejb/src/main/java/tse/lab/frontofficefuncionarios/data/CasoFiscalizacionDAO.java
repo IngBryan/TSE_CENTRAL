@@ -1,5 +1,6 @@
 package tse.lab.frontofficefuncionarios.data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import jakarta.ejb.Stateless;
@@ -72,7 +73,7 @@ public class CasoFiscalizacionDAO {
         em.persist(resolucion);
     }
 
-    // Evidencia de habilitacion del vehiculo (permiso nacional de circulacion e ITV mas reciente)
+    // Evidencia de habilitacion del vehiculo (permiso nacional de circulacion e ITV vigente al detectarse)
     public PermisoCirculacion permisoDelVehiculo(Vehiculo vehiculo) {
         return em.createQuery("SELECT p FROM PermisoCirculacion p WHERE p.vehiculo = :vehiculo",
                 PermisoCirculacion.class)
@@ -82,10 +83,12 @@ public class CasoFiscalizacionDAO {
                 .orElse(null);
     }
 
-    public ITV ultimaItvDelVehiculo(Vehiculo vehiculo) {
-        return em.createQuery("SELECT i FROM ITV i WHERE i.vehiculo = :vehiculo ORDER BY i.fechaVencimiento DESC",
-                ITV.class)
+    // La ITV emitida hasta ese dia que vence ultima. NULLS LAST: en PostgreSQL DESC pone los nulos primero.
+    public ITV itvVigenteAl(Vehiculo vehiculo, LocalDate dia) {
+        return em.createQuery("SELECT i FROM ITV i WHERE i.vehiculo = :vehiculo AND i.fechaEmision <= :dia"
+                + " ORDER BY i.fechaVencimiento DESC NULLS LAST", ITV.class)
                 .setParameter("vehiculo", vehiculo)
+                .setParameter("dia", dia)
                 .setMaxResults(1)
                 .getResultStream()
                 .findFirst()

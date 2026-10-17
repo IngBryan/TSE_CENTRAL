@@ -27,6 +27,9 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            # Ingreso con cedula sin proveedor de identidad, hasta que se integre gub.uy
+            - name: LOGIN_TESTING
+              value: "true"
           # SESSION_SECRET y BACKEND_API_KEY: el Secret se crea a mano y no va al repo (ver k8s/README.md)
           envFrom:
             - secretRef:

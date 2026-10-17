@@ -33,8 +33,13 @@ export async function llamarBackend<T>(
   } catch (e) {
     throw new BackendNoDisponible(`No se pudo contactar el backend: ${(e as Error).message}`);
   }
-  if (res.status >= 500) {
+  // Solo 502/503/504 son "no disponible" (proxy, WildFly arrancando, timeout). Un 500 es un error del
+  // backend: se registra y la pagina muestra que no se pudo hacer la operacion.
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
     throw new BackendNoDisponible(`El backend respondio ${res.status}`);
+  }
+  if (res.status >= 500) {
+    console.error(`[backend] correlationId=${opciones.correlationId} ${opciones.method ?? "GET"} ${ruta} status=${res.status}`);
   }
   return { status: res.status, data: (await res.json().catch(() => null)) as T };
 }

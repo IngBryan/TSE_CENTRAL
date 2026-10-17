@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Encabezado, botonPrimario } from "@/components/encabezado";
+import { loginTestingHabilitado } from "@/lib/auth/config";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -43,6 +44,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </section>
 
         <section className="flex flex-col gap-4">
+          {!loginTestingHabilitado() ? (
+            <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              El ingreso no está habilitado en este entorno.
+            </p>
+          ) : (
           <form
             method="post"
             action={`${BASE_PATH}/auth/login`}
@@ -61,6 +67,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               Ingresar
             </button>
           </form>
+          )}
         </section>
       </main>
     </div>

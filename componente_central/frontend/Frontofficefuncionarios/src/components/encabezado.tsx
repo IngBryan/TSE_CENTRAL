@@ -18,9 +18,11 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
         {sesion && (
           <nav className="flex items-center gap-3">
             <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">{sesion.usuario.nombre}</span>
-            <a href={`${BASE_PATH}/auth/logout`} className={botonSecundario}>
-              Cerrar sesión
-            </a>
+            <form method="post" action={`${BASE_PATH}/auth/logout`}>
+              <button type="submit" className={botonSecundario}>
+                Cerrar sesión
+              </button>
+            </form>
           </nav>
         )}
       </div>
