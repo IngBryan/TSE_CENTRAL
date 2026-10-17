@@ -66,7 +66,28 @@ kubectl -n argocd create secret docker-registry ghcr-credentials \
   --docker-server=ghcr.io --docker-username=IngBryan --docker-password=<TOKEN_PACKAGES>
 ```
 
-**4. Registrar la app en Argo CD**
+**4. Secretos del front**, en el namespace `tse`. **Nunca se suben al repo.**
+
+`SESSION_SECRET` cifra la cookie de sesion (string largo y aleatorio, distinto del de ciudadanos) y
+`BACKEND_API_KEY` tiene que ser la misma que recibe WildFly.
+
+```bash
+kubectl -n tse create secret generic frontofficefuncionarios-front-secrets \
+  --from-literal=SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+  --from-literal=BACKEND_API_KEY=<BACKEND_API_KEY>
+```
+
+Certificado TLS del host del ingress (`env-6537388.web.elasticloud.uy`), a partir del certificado
+y su clave privada en formato PEM:
+
+```bash
+kubectl -n tse create secret tls frontofficefuncionarios-front-tls --cert=<certificado.pem> --key=<clave.pem>
+```
+
+Las URLs de la app y del backend no son secretas: estan en
+`k8s/apps/frontofficefuncionarios-front/app.json` (se monta como ConfigMap en `/app/config/app.json`).
+
+**5. Registrar la app en Argo CD**
 
 ```bash
 kubectl apply -f k8s/argocd/frontofficefuncionarios-front.yaml

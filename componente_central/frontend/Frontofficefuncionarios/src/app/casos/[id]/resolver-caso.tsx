@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonPrimario, botonSecundario } from "@/components/encabezado";
 import type { Decision } from "@/lib/casos";
 import { resolverCaso } from "../actions";
 
@@ -110,7 +110,7 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
           type="button"
           disabled={!completo || pendiente}
           onClick={() => setConfirmar(true)}
-          className={`${botonGubUy} self-start`}
+          className={`${botonPrimario} self-start`}
         >
           Registrar resolución
         </button>
@@ -121,7 +121,7 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
             queda registrada en la auditoría con tu cédula y el fundamento.
           </p>
           <div className="flex gap-3">
-            <button type="button" disabled={pendiente} onClick={enviar} className={botonGubUy}>
+            <button type="button" disabled={pendiente} onClick={enviar} className={botonPrimario}>
               {pendiente ? "Registrando…" : "Confirmar"}
             </button>
             <button type="button" disabled={pendiente} onClick={() => setConfirmar(false)} className={botonSecundario}>

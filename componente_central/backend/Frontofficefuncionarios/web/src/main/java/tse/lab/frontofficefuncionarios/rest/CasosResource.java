@@ -23,7 +23,7 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.Resolucion;
 
 // CU Gestionar casos de fiscalizacion. Quien llama se identifica con X-Usuario-Ci: la cedula que el
-// frontoffice de Next obtuvo del login con gub.uy. Se confia en ella porque solo el front conoce la
+// frontoffice de Next guarda en la sesion al iniciarla. Se confia en ella porque solo el front conoce la
 // X-Api-Key (ApiKeyFilter); la autorizacion (que sea funcionario) la hace el servicio.
 @Path("/casos")
 @Consumes(MediaType.APPLICATION_JSON)

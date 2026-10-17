@@ -9,3 +9,10 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+
+# URLs de la app y del backend (ver src/lib/config.ts del front). El generador le agrega un hash al
+# nombre: si cambia app.json, el Deployment se reinicia solo y toma la configuracion nueva.
+configMapGenerator:
+  - name: frontofficefuncionarios-front-config
+    files:
+      - app.json

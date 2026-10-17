@@ -37,8 +37,8 @@ export default async function Bandeja({ searchParams }: PageProps<"/casos">) {
   if (!sesion) redirect("/");
   const params = await searchParams;
   const filtro = FILTROS.find((e) => e === params.estado) ?? null;
-  // Una pagina invalida en la URL se trata como la primera (no se le muestra un 400 al usuario)
-  const pedida = typeof params.pagina === "string" && /^\d+$/.test(params.pagina) ? Number(params.pagina) : 1;
+  // Hasta 9 digitos para que siempre entre en el int del backend.
+  const pedida = typeof params.pagina === "string" && /^\d{1,9}$/.test(params.pagina) ? Number(params.pagina) : 1;
   const pagina = pedida >= 1 ? pedida : 1;
 
   const correlationId = randomUUID();

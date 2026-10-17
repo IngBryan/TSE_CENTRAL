@@ -199,7 +199,7 @@ public class GestionCasosService {
             throws NoAutorizadoException, RecursoNoEncontradoException {
         autorizacion.funcionario(ci, correlationId);
         CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
-        Descargo d = casos.descargoDelCaso(caso);
+        Descargo d = caso.getDescargo();
         if (d == null) {
             LOG.info(() -> "evento=caso.descargo correlationId=" + correlationId + " usuario=" + ci + " caso="
                     + idCaso + " resultado=sin_descargo");
@@ -278,7 +278,7 @@ public class GestionCasosService {
     private CasoDetalle detalle(CasoFiscalizacion caso) {
         Guia g = caso.getGuia();
         Empresa e = g.getEmpresa();
-        FundamentoResolucion f = casos.resolucionDelCaso(caso);
+        FundamentoResolucion f = caso.getFundamentoResolucion();
         ResolucionVista resolucion = f == null ? null
                 : new ResolucionVista(caso.getEstado() == EstadoCaso.CONFIRMADA ? Decision.CONFIRMAR.name()
                         : Decision.DESESTIMAR.name(), f.getDescripcion(), f.getFuncionario().getCi(),
@@ -293,7 +293,7 @@ public class GestionCasosService {
                 texto(caso.getFechaDeteccion()), e == null ? null : e.getNroEmpresa(),
                 e == null ? null : e.getNombrePublico(), guia(g),
                 g.getVehiculo() == null ? null : g.getVehiculo().getMatricula(),
-                casos.descargoDelCaso(caso) != null, estado != null && estado.admiteResolucion(),
+                caso.getDescargo() != null, estado != null && estado.admiteResolucion(),
                 estado == null ? List.of() : estado.siguientes().stream().map(Enum::name).sorted().toList(),
                 resolucion, historial);
     }

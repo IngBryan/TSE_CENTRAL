@@ -2,15 +2,13 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { cookies } from "next/headers";
 import { getAuthConfig } from "./config";
 
-// La sesion y la transaccion de login viajan en cookies httpOnly cifradas con AES-256-GCM
-// (clave derivada de SESSION_SECRET): el navegador no puede leerlas ni modificarlas.
-// Las cookies van con path /funcionarios para no mezclarse con las de frontofficeciudadanos si
+// La sesion viaja en una cookie httpOnly cifrada con AES-256-GCM (clave derivada de
+// SESSION_SECRET): el navegador no puede leerla ni modificarla.
+// La cookie va con path /funcionarios para no mezclarse con las de frontofficeciudadanos si
 // ambos quedan publicados en el mismo host.
 
 export const COOKIE_SESION = "funcionarios_session";
-export const COOKIE_TRANSACCION = "funcionarios_gubuy_tx";
 export const DURACION_SESION_S = 60 * 60 * 8;
-export const DURACION_TRANSACCION_S = 60 * 10; // el code de ID Uruguay vence a los 10 minutos
 const PATH_COOKIES = "/funcionarios";
 
 // Quien inicio sesion. El front no decide si es funcionario: lo controla el backend en cada
@@ -19,11 +17,8 @@ export type Usuario = { cedula: string; nombre: string };
 
 export type Sesion = {
   usuario: Usuario;
-  idToken?: string; // se guarda para mandarlo como id_token_hint en el logout
   exp: number; // epoch en segundos
 };
-
-export type TransaccionLogin = { state: string; nonce: string; creada: number };
 
 function clave(): Buffer {
   return createHash("sha256").update(getAuthConfig().sessionSecret).digest();
@@ -53,7 +48,6 @@ export function opcionesCookie(maxAge: number) {
   return {
     httpOnly: true,
     secure: getAuthConfig().cookiesSeguras,
-    // lax: la cookie tiene que viajar en el redirect top-level que vuelve desde gub.uy
     sameSite: "lax" as const,
     path: PATH_COOKIES,
     maxAge,

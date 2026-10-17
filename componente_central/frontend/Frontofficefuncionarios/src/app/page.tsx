@@ -1,24 +1,20 @@
 import { redirect } from "next/navigation";
-import { Encabezado, botonGubUy } from "@/components/encabezado";
-import { loginDesarrolloHabilitado } from "@/lib/auth/desarrollo";
+import { Encabezado, botonPrimario } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
 const MENSAJES: Record<string, string> = {
-  cancelado: "No se completó el ingreso. Podés volver a intentarlo cuando quieras.",
-  estado_invalido: "La solicitud de ingreso venció o no es válida. Volvé a intentarlo.",
-  token_invalido: "No pudimos validar tu identidad con gub.uy. Volvé a intentarlo.",
-  idp_no_disponible: "gub.uy no está disponible en este momento. Probá de nuevo en unos minutos.",
-  error_idp: "gub.uy devolvió un error al ingresar. Volvé a intentarlo.",
+  cedula_invalida: "Ingresá una cédula válida.",
 };
 
-// Inicio del frontoffice de funcionarios: ingreso con gub.uy. Con sesion, la pantalla de trabajo es la
-// bandeja de casos de fiscalizacion.
+// Inicio del frontoffice de funcionarios: ingreso de testing con cedula. Con sesion, la pantalla de
+// trabajo es la bandeja de casos de fiscalizacion.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const sesion = await getSesion();
   if (sesion) redirect("/casos");
   const params = await searchParams;
-  const error = typeof params.error === "string" ? (MENSAJES[params.error] ?? MENSAJES.error_idp) : null;
+  const error =
+    typeof params.error === "string" ? (MENSAJES[params.error] ?? "No se pudo ingresar. Volvé a intentarlo.") : null;
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -47,29 +43,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </section>
 
         <section className="flex flex-col gap-4">
-          <a href={`${BASE_PATH}/auth/login`} className={`${botonGubUy} h-12 self-start px-6 text-base`}>
-            Ingresar con gub.uy
-          </a>
-          {loginDesarrolloHabilitado() && (
-            <form
-              method="post"
-              action={`${BASE_PATH}/auth/desarrollo`}
-              className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-amber-500 p-4 text-sm"
-            >
-              <label className="flex flex-col gap-1 font-medium text-zinc-700 dark:text-zinc-300">
-                Ingreso de desarrollo (sin gub.uy): cédula
-                <input
-                  name="cedula"
-                  inputMode="numeric"
-                  required
-                  className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal dark:border-white/20"
-                />
-              </label>
-              <button type="submit" className={botonGubUy}>
-                Ingresar
-              </button>
-            </form>
-          )}
+          <form
+            method="post"
+            action={`${BASE_PATH}/auth/login`}
+            className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-amber-500 p-4 text-sm"
+          >
+            <label className="flex flex-col gap-1 font-medium text-zinc-700 dark:text-zinc-300">
+              Ingreso de testing: cédula
+              <input
+                name="cedula"
+                inputMode="numeric"
+                required
+                className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal dark:border-white/20"
+              />
+            </label>
+            <button type="submit" className={botonPrimario}>
+              Ingresar
+            </button>
+          </form>
         </section>
       </main>
     </div>

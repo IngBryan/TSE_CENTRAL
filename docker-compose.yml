@@ -61,14 +61,12 @@ services:
       - "3003:3000"
     environment:
       - NODE_ENV=production
-      # Sin la redirect URI registrada en ID Uruguay el login con gub.uy no completa (ver .env.example)
-      - APP_BASE_URL=http://localhost:3003/funcionarios
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - SESSION_SECRET=${SESSION_SECRET}
-      # Backend Frontofficefuncionarios (CU Gestionar casos de fiscalizacion)
-      - BACKEND_URL=http://wildfly:8080/frontofficefuncionarios-web/api
+      # Clave propia: si se filtra la de ciudadanos no sirve para fabricar sesiones de funcionarios
+      - SESSION_SECRET=${FUNCIONARIOS_SESSION_SECRET}
       - BACKEND_API_KEY=${BACKEND_API_KEY}
+    volumes:
+      # URLs de la app y del backend (ver src/lib/config.ts)
+      - ./componente_central/frontend/Frontofficefuncionarios/config/docker.json:/app/config/app.json:ro
     depends_on:
       - wildfly
     restart: unless-stopped

@@ -1,5 +1,7 @@
 package tse.lab.frontofficefuncionarios.service;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import jakarta.ejb.ApplicationException;
@@ -13,7 +15,7 @@ public class DatosInvalidosException extends Exception {
 
     public DatosInvalidosException(Map<String, String> errores) {
         super("Datos invalidos: " + errores.keySet());
-        this.errores = Map.copyOf(errores);
+        this.errores = Collections.unmodifiableMap(new LinkedHashMap<>(errores));
     }
 
     public Map<String, String> getErrores() {

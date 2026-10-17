@@ -8,8 +8,8 @@ import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.model.Funcionario;
 
-// Control de acceso del frontoffice de funcionarios (capa de servicios, no la UI): la cedula autenticada
-// con gub.uy tiene que estar registrada como funcionario del MTOP. Si no, la operacion se rechaza
+// Control de acceso del frontoffice de funcionarios (capa de servicios, no la UI): la cedula de la
+// sesion del front tiene que estar registrada como funcionario del MTOP. Si no, la operacion se rechaza
 // antes de leer o modificar cualquier caso.
 @Stateless
 public class AutorizacionFuncionario {

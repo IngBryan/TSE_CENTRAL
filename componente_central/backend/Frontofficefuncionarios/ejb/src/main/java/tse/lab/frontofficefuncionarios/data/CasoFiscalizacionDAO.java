@@ -9,7 +9,6 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import tse.lab.model.CasoFiscalizacion;
-import tse.lab.model.Descargo;
 import tse.lab.model.EstadoCaso;
 import tse.lab.model.FundamentoResolucion;
 import tse.lab.model.ITV;
@@ -67,24 +66,6 @@ public class CasoFiscalizacionDAO {
         return em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c WHERE c.estado = :estado", Long.class)
                 .setParameter("estado", estado)
                 .getSingleResult();
-    }
-
-    // Por el lado duenio de la relacion: no depende de que el caso tenga la referencia cargada
-    public Descargo descargoDelCaso(CasoFiscalizacion caso) {
-        return em.createQuery("SELECT d FROM Descargo d WHERE d.casoFiscalizacion = :caso", Descargo.class)
-                .setParameter("caso", caso)
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
-    }
-
-    public FundamentoResolucion resolucionDelCaso(CasoFiscalizacion caso) {
-        return em.createQuery("SELECT f FROM FundamentoResolucion f JOIN FETCH f.funcionario"
-                + " WHERE f.casoFiscalizacion = :caso", FundamentoResolucion.class)
-                .setParameter("caso", caso)
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
     }
 
     public void guardarResolucion(FundamentoResolucion resolucion) {

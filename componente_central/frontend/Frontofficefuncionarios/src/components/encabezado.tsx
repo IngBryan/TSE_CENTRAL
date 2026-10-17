@@ -4,7 +4,7 @@ import type { Sesion } from "@/lib/auth/session";
 
 export const linkBoton =
   "flex h-10 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors disabled:opacity-50";
-export const botonGubUy = `${linkBoton} bg-[#0068b3] text-white hover:bg-[#00558f]`;
+export const botonPrimario = `${linkBoton} bg-[#0068b3] text-white hover:bg-[#00558f]`;
 export const botonSecundario = `${linkBoton} border border-black/10 hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10`;
 
 // Barra superior del frontoffice de funcionarios (mismo estilo que el de ciudadanos).
@@ -15,17 +15,13 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
         <Link href="/" className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
           carga.uy <span className="font-normal text-zinc-500">· Funcionarios</span>
         </Link>
-        {sesion ? (
+        {sesion && (
           <nav className="flex items-center gap-3">
             <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">{sesion.usuario.nombre}</span>
             <a href={`${BASE_PATH}/auth/logout`} className={botonSecundario}>
               Cerrar sesión
             </a>
           </nav>
-        ) : (
-          <a href={`${BASE_PATH}/auth/login`} className={botonGubUy}>
-            Ingresar con gub.uy
-          </a>
         )}
       </div>
     </header>
