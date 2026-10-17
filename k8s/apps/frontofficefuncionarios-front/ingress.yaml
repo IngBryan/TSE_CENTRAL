@@ -4,8 +4,16 @@ metadata:
   name: frontofficefuncionarios-front
   labels:
     app: frontofficefuncionarios-front
+  annotations:
+    # Con TLS configurado, las peticiones por http se redirigen a https
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  # El certificado va en un Secret de tipo TLS que se crea a mano (ver k8s/README.md)
+  tls:
+    - hosts:
+        - env-6537388.web.elasticloud.uy
+      secretName: frontofficefuncionarios-front-tls
   rules:
     - host: env-6537388.web.elasticloud.uy
       http:

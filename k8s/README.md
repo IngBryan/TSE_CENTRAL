@@ -86,6 +86,8 @@ mongo-user
 mongo-password
 rabbitmq-user
 rabbitmq-password
+ciudadanos-api-key
+funcionarios-api-key
 ```
 
 Crearlo con los valores correspondientes al entorno:
@@ -97,7 +99,9 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=mongo-user='<MONGO_USER>' \
   --from-literal=mongo-password='<MONGO_PASSWORD>' \
   --from-literal=rabbitmq-user='<RABBITMQ_USER>' \
-  --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>'
+  --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>' \
+  --from-literal=ciudadanos-api-key='<CIUDADANOS_API_KEY>' \
+  --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>'
 ```
 
 Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.
@@ -148,6 +152,30 @@ kubectl -n argocd create secret docker-registry ghcr-credentials \
   --docker-username=IngBryan \
   --docker-password='<TOKEN_PACKAGES>'
 ```
+
+### 6. Secretos del front de funcionarios
+
+Se crean en el namespace `tse` y no deben almacenarse en el repositorio.
+
+`SESSION_SECRET` cifra la cookie de sesión (string largo y aleatorio, distinto del de ciudadanos) y `BACKEND_API_KEY` debe coincidir con `funcionarios-api-key` de `tse-runtime-secrets` (no con la key de ciudadanos).
+
+```bash
+kubectl -n tse create secret generic frontofficefuncionarios-front-secrets \
+  --from-literal=SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+  --from-literal=BACKEND_API_KEY='<FUNCIONARIOS_API_KEY>'
+```
+
+El ingreso de testing con cédula (`LOGIN_TESTING=true` en `deployment.yaml`) está habilitado hasta que se integre gub.uy: mientras tanto cualquiera puede ingresar con la cédula de un funcionario registrado.
+
+Certificado TLS del host del ingress (`env-6537388.web.elasticloud.uy`), a partir del certificado y su clave privada en formato PEM:
+
+```bash
+kubectl -n tse create secret tls frontofficefuncionarios-front-tls \
+  --cert=<certificado.pem> \
+  --key=<clave.pem>
+```
+
+Las URLs de la aplicación y del backend no son secretas: se encuentran en `k8s/apps/frontofficefuncionarios-front/app.json`, que se monta como ConfigMap en `/app/config/app.json`.
 
 ## Registrar aplicaciones en Argo CD
 
@@ -273,3 +301,4 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 - **Error de conexión con infraestructura externa:** comprobar resolución DNS, conectividad TCP, puertos, credenciales y disponibilidad de los servicios en Elastic Cloud.
 - **WildFly no inicia:** revisar logs y conectividad con PostgreSQL.
 - **Fiscalización no consume eventos:** revisar la conexión a RabbitMQ, la cola `tracking.events` y MongoDB.
+- **Front de funcionarios sin sesión o con 401 del backend:** verificar `frontofficefuncionarios-front-secrets` (`SESSION_SECRET` y `BACKEND_API_KEY`).

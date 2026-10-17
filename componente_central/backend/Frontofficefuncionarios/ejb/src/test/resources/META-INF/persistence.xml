@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             version="3.2">
+    <persistence-unit name="frontofficefuncionariosTestPersistenceUnit" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>tse.lab.model.Empresa</class>
+        <class>tse.lab.model.Guia</class>
+        <class>tse.lab.model.Vehiculo</class>
+        <class>tse.lab.model.Chofer</class>
+        <class>tse.lab.model.Responsable</class>
+        <class>tse.lab.model.Ciudadano</class>
+        <class>tse.lab.model.PermisoCirculacion</class>
+        <class>tse.lab.model.ITV</class>
+        <class>tse.lab.model.NodoPeriferico</class>
+        <class>tse.lab.model.NodoBalanza</class>
+        <class>tse.lab.model.EventoPesajes</class>
+        <class>tse.lab.model.CasoFiscalizacion</class>
+        <class>tse.lab.model.Descargo</class>
+        <class>tse.lab.model.FundamentoResolucion</class>
+        <class>tse.lab.model.Funcionario</class>
+        <class>tse.lab.model.RegistroAuditoriaCaso</class>
+        <properties>
+            <property name="jakarta.persistence.validation.mode" value="NONE"/>
+            <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:h2:mem:funcionarios;DB_CLOSE_DELAY=-1"/>
+            <property name="jakarta.persistence.jdbc.user" value="sa"/>
+            <property name="jakarta.persistence.jdbc.password" value=""/>
+            <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+            <!-- JPQL estricto, como en WildFly: una consulta que solo anda con extensiones de Hibernate
+                 (p. ej. alias en un JOIN FETCH) tiene que fallar aca y no recien en el servidor -->
+            <property name="hibernate.jpa.compliance.query" value="true"/>
+        </properties>
+    </persistence-unit>
+</persistence>

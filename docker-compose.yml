@@ -46,7 +46,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
       - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
-      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      - BACKEND_API_KEY=${CIUDADANOS_API_KEY}
       # Firma el token (JWT HS256) de la app movil del chofer (TSE_MOVIL): /api/movil/*
       - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
     depends_on:
@@ -61,6 +61,17 @@ services:
       - "3003:3000"
     environment:
       - NODE_ENV=production
+      # Clave propia: si se filtra la de ciudadanos no sirve para fabricar sesiones de funcionarios
+      - SESSION_SECRET=${FUNCIONARIOS_SESSION_SECRET}
+      # Key propia del backend de funcionarios: la de ciudadanos no sirve para llamar a /casos
+      - BACKEND_API_KEY=${FUNCIONARIOS_API_KEY}
+      # Ingreso con cedula sin proveedor de identidad (hasta que se integre gub.uy)
+      - LOGIN_TESTING=true
+    volumes:
+      # URLs de la app y del backend (ver src/lib/config.ts)
+      - ./componente_central/frontend/Frontofficefuncionarios/config/docker.json:/app/config/app.json:ro
+    depends_on:
+      - wildfly
     restart: unless-stopped
   backofficeautoridadesadministradores-front:
     hostname: backofficeautoridadesadministradores
@@ -150,8 +161,9 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
-      # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
-      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      # Claves que exigen las API REST (header X-Api-Key): una por frontoffice
+      - CIUDADANOS_API_KEY=${CIUDADANOS_API_KEY}
+      - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:

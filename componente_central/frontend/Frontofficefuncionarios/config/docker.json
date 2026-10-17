@@ -1,0 +1,5 @@
+{
+  "appBaseUrl": "http://localhost:3003/funcionarios",
+  "backendUrl": "http://wildfly:8080/frontofficefuncionarios-web/api",
+  "backendTimeoutMs": 10000
+}

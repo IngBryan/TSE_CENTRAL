@@ -70,6 +70,22 @@ spec:
                   name: tse-runtime-secrets
                   key: rabbitmq-password
 
+            # X-Api-Key de frontofficeciudadanos-web (la misma que BACKEND_API_KEY del front de ciudadanos)
+            - name: CIUDADANOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ciudadanos-api-key
+                  optional: true
+
+            # X-Api-Key de frontofficefuncionarios-web (la misma que BACKEND_API_KEY del front de funcionarios)
+            - name: FUNCIONARIOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: funcionarios-api-key
+                  optional: true
+
           # WildFly puede tardar bastante en desplegar los 3 EAR.
           startupProbe:
             exec:
