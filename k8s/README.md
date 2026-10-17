@@ -31,8 +31,8 @@ Para acceder a estos servicios, Kubernetes utiliza Services de tipo `ExternalNam
 
 | Service | Destino | Puerto |
 |---|---|---|
-| `postgres` | `tse-postgres.web.elasticloud.uy` | 5432 |
-| `mongodb` | `tse-mongo.web.elasticloud.uy` | 27017 |
+| `postgres` | `node6259-tse-postgres.web.elasticloud.uy` | 5432 |
+| `mongodb` | `node6260-tse-mongo.web.elasticloud.uy` | 27017 |
 | `rabbitmq` | `tse-rabbitmq.web.elasticloud.uy` | 5672 |
 
 Las aplicaciones utilizan los nombres internos `postgres`, `mongodb` y `rabbitmq`, sin depender directamente de los dominios externos.
