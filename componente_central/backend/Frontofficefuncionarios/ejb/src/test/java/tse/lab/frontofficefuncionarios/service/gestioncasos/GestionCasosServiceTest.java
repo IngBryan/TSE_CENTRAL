@@ -82,8 +82,9 @@ class GestionCasosServiceTest {
                 empresa);
         guia.setTipoCarga("Granos a granel");
         guia.setVehiculo(vehiculo);
-        NodoBalanza balanza = new NodoBalanza("Peaje Pando", true);
-        EventoPesajes pesaje = new EventoPesajes(38500, "SBA 1234", Instant.parse("2026-10-10T12:00:00Z"), balanza);
+        NodoBalanza balanza = new NodoBalanza("Peaje Pando", "Ruta 8 km 32", 1L);
+        EventoPesajes pesaje = new EventoPesajes(1001L, "SBA 1234", Instant.parse("2026-10-10T12:00:00Z"), 38500,
+                balanza);
 
         CasoFiscalizacion cDetectado = new CasoFiscalizacion("Exceso de carga", "EXCESO_CARGA", guia);
         cDetectado.getEventosPesajes().add(pesaje);

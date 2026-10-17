@@ -25,12 +25,23 @@
         <version.amqp.client>5.36.0</version.amqp.client>
         <version.jackson>2.22.3</version.jackson>
         <version.mongodb.driver>5.13.0</version.mongodb.driver>
+        <version.resteasy>7.0.2.Final</version.resteasy>
+        <version.resteasy.microprofile>3.0.1.Final</version.resteasy.microprofile>
+        <version.smallrye.config>3.17.2</version.smallrye.config>
         <version.junit5>6.1.2</version.junit5>
         <version.surefire.plugin>3.5.4</version.surefire.plugin>
+        <version.shade.plugin>3.6.2</version.shade.plugin>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${version.jackson}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.junit</groupId>
                 <artifactId>junit-bom</artifactId>
@@ -61,12 +72,58 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>${version.jackson}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.resteasy.microprofile</groupId>
+            <artifactId>microprofile-rest-client</artifactId>
+            <version>${version.resteasy.microprofile}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-client</artifactId>
+            <version>${version.resteasy}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-jackson2-provider</artifactId>
+            <version>${version.resteasy}</version>
+        </dependency>
+        <!-- MicroProfile Config implementation: the rest client reads its settings through it -->
+        <dependency>
+            <groupId>io.smallrye.config</groupId>
+            <artifactId>smallrye-config</artifactId>
+            <version>${version.smallrye.config}</version>
         </dependency>
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
             <version>${version.mongodb.driver}</version>
+        </dependency>
+        <!-- Remote EJB contracts of Frontofficeciudadanos and Backofficeautoridadesadministradores. Install
+            them first: mvn -f ../Modelo/pom.xml install, then the same for each of the two projects -->
+        <dependency>
+            <groupId>tse.lab.backofficeautoridadesadministradores</groupId>
+            <artifactId>backofficeautoridadesadministradores-ejb</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <type>ejb-client</type>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>tse.lab.frontofficeciudadanos</groupId>
+            <artifactId>frontofficeciudadanos-ejb</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <type>ejb-client</type>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -95,32 +152,37 @@
                 <version>${version.surefire.plugin}</version>
             </plugin>
 
+            <!-- Single jar with all the dependencies. Shade (not assembly) because it merges the
+                 META-INF/services files RESTEasy uses to register its providers. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>tse.lab.fiscalizacionautomatica.Main</mainClass>
-                        </manifest>
-                    </archive>
-
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
-
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${version.shade.plugin}</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
-
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>tse.lab.fiscalizacionautomatica.Main</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

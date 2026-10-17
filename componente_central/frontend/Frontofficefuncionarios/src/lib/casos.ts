@@ -85,8 +85,11 @@ export type EvidenciaVista = {
   guia: GuiaVista;
   vehiculo: VehiculoVista | null;
   pesajes: PesajeVista[];
-  idsEventosTracking: string[];
+  eventosTracking: EventoTrackingVista[];
 };
+
+// Un evento de tracking se identifica por el vehiculo y el momento
+export type EventoTrackingVista = { matricula: string; fechaHora: string };
 
 export type DescargoVista = { idCaso: number; id: number; descripcion: string | null; estado: string | null };
 

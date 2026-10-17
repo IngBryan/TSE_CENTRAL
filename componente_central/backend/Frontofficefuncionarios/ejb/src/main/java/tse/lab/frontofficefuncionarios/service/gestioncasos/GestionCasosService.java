@@ -106,8 +106,13 @@ public class GestionCasosService {
     public record PesajeVista(String fechaHora, String balanza, long pesoKg, long excesoKg) {
     }
 
+    // Un evento de tracking (MongoDB) se identifica por el vehiculo y el momento
+    public record EventoTrackingVista(String matricula, String fechaHora) {
+    }
+
     public record EvidenciaVista(Long idCaso, String tipoCaso, String descripcion, String fechaDeteccion,
-            GuiaVista guia, VehiculoVista vehiculo, List<PesajeVista> pesajes, List<String> idsEventosTracking) {
+            GuiaVista guia, VehiculoVista vehiculo, List<PesajeVista> pesajes,
+            List<EventoTrackingVista> eventosTracking) {
     }
 
     public record DescargoVista(Long idCaso, Long id, String descripcion, String estado) {
@@ -197,9 +202,11 @@ public class GestionCasosService {
                 .toList();
         EvidenciaVista evidencia = new EvidenciaVista(caso.getId(), caso.getTipoCaso(), caso.getDescripcion(),
                 texto(caso.getFechaDeteccion()), guia(guia), vehiculo, pesajes,
-                List.copyOf(caso.getIdsEventosTracking()));
+                caso.getClavesEventosTracking().stream()
+                        .map(t -> new EventoTrackingVista(t.getMatricula(), texto(t.getFechaHora())))
+                        .toList());
         LOG.info(() -> "evento=caso.evidencia correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
-                + " pesajes=" + pesajes.size() + " eventosTracking=" + evidencia.idsEventosTracking().size());
+                + " pesajes=" + pesajes.size() + " eventosTracking=" + evidencia.eventosTracking().size());
         return evidencia;
     }
 

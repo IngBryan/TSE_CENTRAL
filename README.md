@@ -1,8 +1,8 @@
 # TSE Central
 
 Componente central del laboratorio: backend Jakarta EE (desplegado en un unico WildFly), sus
-frontends Next.js y el RabbitMQ al que publican los nodos perifericos. Los nodos (`tracking`,
-`balanzas`) viven en el repo hermano `TSE_NODOS`.
+frontends Next.js, la fiscalizacion automatica y el RabbitMQ al que publican los nodos
+perifericos. Los nodos (`tracking`, `balanzas`, `pdi`) viven en el repo hermano `TSE_NODOS`.
 
 ## Estructura del repositorio
 
@@ -14,7 +14,7 @@ TSE_CENTRAL/
 │   │   ├── Frontofficeciudadanos/
 │   │   ├── Frontofficefuncionarios/
 │   │   ├── Backofficeautoridadesadministradores/
-│   │   └── Fiscalizacionautomatica/   # script standalone (jar), sin ejb/web/ear
+│   │   └── Fiscalizacionautomatica/   # script standalone (jar, imagen propia), sin ejb/web/ear
 │   └── frontend/                # Clientes Next.js que consumen el backend de arriba
 │       ├── frontofficeciudadanos/
 │       ├── Frontofficefuncionarios/
@@ -22,8 +22,8 @@ TSE_CENTRAL/
 │
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
-├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea la coleccion tracking)
-├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly y los 3 frontends
+├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea las colecciones tracking y balanzas_metadata)
+├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y los 3 frontends
 └── .gitignore                   # Reglas a nivel workspace (cada modulo tiene el suyo)
 ```
 
@@ -108,6 +108,14 @@ MONGO_USER=tse
 MONGO_PASSWORD=<un-secreto>           # usuario root; se crea solo en el primer arranque
 #MONGO_PORT=27017                      # opcional: puerto en la maquina (por defecto 27017)
 
+#Balanzas (TSE_NODOS): cliente OAuth con el que el poller de fiscalizacion consulta la API
+BALANZAS_CLIENT_ID=componente-central  # mismo valor que BALANZAS_OAUTH_CLIENT_ID en TSE_NODOS/.env
+BALANZAS_CLIENT_SECRET=<mismo-que-BALANZAS_OAUTH_CLIENT_SECRET-en-TSE_NODOS>
+#BALANZAS_URL=http://host.docker.internal:3001   # opcional: donde corre balanzas
+
+#EJB remoto (fiscalizacion -> Frontofficeciudadanos): usuario de aplicacion de WildFly
+EJB_USER=fiscalizacion
+EJB_PASSWORD=<un-secreto>             # WildFly crea el usuario con estos valores; fiscalizacion se autentica con ellos
 #Login con ID Uruguay (gub.uy, testing) - frontofficeciudadanos
 OIDC_CLIENT_ID=<client id que dieron los docentes>
 OIDC_CLIENT_SECRET=<client secret>
@@ -144,6 +152,7 @@ docker compose up --build
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
 | `frontofficefuncionarios-front`               | http://localhost:3003    |
 | `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
+| `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
 que ambos compose pueden correr a la vez.
@@ -299,9 +308,8 @@ docker compose up -d --build wildfly   # levanta tambien postgres
   vacio); para recrearla hay que borrar el volumen (`docker compose rm -sfv postgres` y
   `docker volume rm tse-central_postgres-data`) o crearla a mano. Los `persistence.xml` usan `drop-and-create`: **cada deploy borra y recrea
   el esquema**.
-- **Fiscalizacionautomatica** no se despliega en WildFly: es un jar standalone (cliente
-  remoto). La imagen lo compila y lo deja en `/opt/fiscalizacionautomatica/`, pero no se
-  ejecuta (todavia no tiene codigo ni clase `Main`).
+- **Fiscalizacionautomatica** no se despliega en WildFly: es un jar standalone con su propia
+  imagen. Ver [Fiscalizacion automatica](#fiscalizacion-automatica).
 - **Logs:** los de WildFly salen por consola (`docker logs wildfly-server`). Ver
   [Observabilidad](#observabilidad).
 - **Memoria:** usa el heap por defecto de WildFly (512 MB maximo).
@@ -310,7 +318,8 @@ docker compose up -d --build wildfly   # levanta tambien postgres
 
 ### MongoDB
 
-MongoDB 8.0.0 (`mongo:8.0.0`) con la base `main_db` y la coleccion `tracking`.
+MongoDB 8.0.0 (`mongo:8.0.0`) con la base `main_db` y las colecciones `tracking` (eventos de
+tracking) y `balanzas_metadata` (ultima consulta del poller de balanzas).
 
 ```bash
 docker compose up -d mongodb
@@ -318,8 +327,10 @@ docker compose up -d mongodb
 
 - **Usuario:** `MONGO_USER` / `MONGO_PASSWORD` es un usuario root, creado en la base `admin`.
   Por eso al conectarse hay que indicar `authSource=admin`.
-- **Coleccion:** `mongodb/init/01-tracking.js` la crea en `main_db`. El servicio queda
-  `healthy` recien cuando la coleccion existe.
+- **Colecciones:** `mongodb/init/01-tracking.js` y `02-balanzas-metadata.js` las crean en
+  `main_db`. El servicio queda `healthy` recien cuando existe `tracking`. Con un volumen que ya
+  existia, `balanzas_metadata` la crea el poller en su primera escritura (no hace falta borrar el
+  volumen).
 - **Primer arranque:** el usuario y la coleccion se crean solo con el volumen
   `tse-central_mongodb-data` vacio. Si se cambian las credenciales en el `.env` o se agrega un
   script en `mongodb/init`, hay que borrar el volumen (se pierden los datos):
@@ -335,6 +346,315 @@ mongodb://<MONGO_USER>:<MONGO_PASSWORD>@localhost:27017/main_db?authSource=admin
 
 O en *Advanced Connection Options*: *General* → Host `localhost:27017`; *Authentication* →
 *Username/Password* con `MONGO_USER` / `MONGO_PASSWORD` y *Authentication Database* `admin`.
+
+### Fiscalizacion automatica
+
+`componente_central/backend/Fiscalizacionautomatica` es un jar standalone (`java -jar`), no se
+despliega en WildFly. Tiene su propia imagen (`Dockerfile` de la carpeta) y el mismo jar corre
+en varios modos, segun el argumento:
+
+| Modo | Servicio del compose | Que hace | Como corre |
+|------|----------------------|----------|------------|
+| `tracking-consumer` (por defecto) | `fiscalizacionautomatica` (`fiscalizacion-server`) | Consume la cola `tracking.events` y guarda cada evento en MongoDB (`main_db.tracking`) | Siempre arriba; puede escalar (varias replicas consumen la misma cola) |
+| `weighings-poller` | `fiscalizacionautomatica-poller` (perfil `cron`) | Consulta la API de balanzas (`TSE_NODOS`) desde la ultima consulta exitosa (`main_db.balanzas_metadata`) hasta ahora | Corre **una vez y termina**: lo lanza un cron |
+| `detect-situations [matricula]` | (ninguno, prueba manual) | Evalua un evento de ese vehiculo (por defecto `SBC1234`) en este momento: imprime lo que sabe el central del vehiculo (EJB remotos) y las situaciones que aplican | Corre una vez y termina; codigo de salida `1` si falla la llamada a WildFly |
+
+**Consumidor de tracking:**
+
+- Confirmacion manual: el mensaje se confirma recien despues de guardarlo. Duplicado → se
+  confirma sin guardar; invalido → se descarta; si falla el guardado (por ejemplo, Mongo
+  caido) vuelve a la cola y se reintenta.
+- Un evento se identifica por `(licensePlate, timestamp)` (matricula y fecha_hora), con un indice
+  unico `licensePlate_timestamp` que el consumidor crea al arrancar: una reentrega choca con el
+  indice y no se guarda dos veces. El `_id` lo genera MongoDB y el id del evento en tracking
+  queda en `externalId` (no sirve como clave: tracking lo reinicia al reiniciarse). Documento:
+  `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp, receivedAt,
+  detected, detectedAt }`.
+- **Deteccion asincronica:** el evento se guarda con `detected: false` y se pasa a la deteccion,
+  que corre en otros hilos (sin demorar la recepcion). Las situaciones que aplican no se guardan en
+  el evento: por ahora solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for SBC1234 at
+  ...`); cuando se creen los casos, cada caso tendra su situacion y el evento quedara asociado a el.
+  Al terminar se marca `detected: true` y `detectedAt`.
+  - Los eventos de un vehiculo van siempre al mismo hilo (4 hilos, elegidos por la matricula): se
+    evaluan en orden y nunca dos a la vez dentro del pod.
+  - Si un evento no se pudo evaluar (WildFly caido, cola llena, el pod se reinicio), queda en
+    `detected: false`. Cada 60 s (y al arrancar) se vuelven a encolar los que llevan mas de 1 minuto
+    pendientes (indice parcial `pending_receivedAt`).
+  - Al apagar, deja de consumir y espera hasta 10 s a que terminen las detecciones encoladas; las
+    que no terminan quedan pendientes.
+- El `message_id` de RabbitMQ es obligatorio: un mensaje sin el se descarta como invalido (sin
+  reencolar). Se guarda en `messageId` para rastrear el evento hasta su mensaje.
+- **GPS dados de alta:** solo se aceptan eventos de GPS dados de alta como `NodoTracking` activo
+  (su `gpsId` es el `idExterno` del nodo). Los de un GPS desconocido o inactivo se descartan sin
+  guardar y sin reencolar. La lista de GPS activos se pide al backoffice por EJB remoto
+  (`NodosActivosRemote`, ver *Nodos activos*) y se guarda en memoria para no llamar a WildFly por
+  cada mensaje: se refresca cada 60 s y, si un refresco falla, se sigue con la ultima lista.
+- Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
+  `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
+  (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`), `WILDFLY_URL`,
+  `EJB_USER`, `EJB_PASSWORD`. Si Mongo, WildFly (la lista de GPS) o RabbitMQ no estan arriba al
+  arrancar, reintenta cada 5 s; no consume hasta tener la lista de GPS.
+
+**Poller de balanzas:**
+
+- **Balanzas a consultar:** al empezar cada ejecucion le pide al backoffice, por EJB remoto
+  (`NodosActivosRemote.listarNodos()`, ver *Nodos activos* abajo), los nodos perifericos activos y
+  se queda con los de tipo `BALANZA`. A la API de balanzas le pasa el `idExterno` de cada
+  `NodoBalanza` (el id de la balanza en ese nodo). Si no hay balanzas activas, termina sin
+  consultar (codigo `0`).
+- Despues pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza activa
+  (fechas en hora de Uruguay, `-03:00`) y **guarda los pesajes en PostgreSQL** (`eventos_pesajes`)
+  pendientes de deteccion (`detectado = false`), por EJB remoto (`PesajesRemote.guardarPesajes`,
+  Frontofficeciudadanos, `service.gestiondeguiasyviajes`). Los que ya estaban guardados (misma
+  matricula y fecha y hora) se ignoran, asi repetir un rango no duplica nada.
+- **Deteccion:** al final de cada ejecucion evalua todos los pesajes pendientes, tambien los que
+  quedaron de ejecuciones anteriores (`PendingWeighingsDetection`), y marca cada uno como
+  detectado. Las situaciones solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for ...`).
+  No usa hilos: hay un solo poller y cuando detecta ya termino de recibir. Un pesaje que no se pudo
+  evaluar (WildFly caido) queda pendiente para la proxima ejecucion.
+- Imprime `Fetched N weighings (M new) of scales [..] from <url> (until <to>)` y termina. El proceso
+  no guarda estado en memoria: la frecuencia la define el cron que lo lanza.
+- **Rango consultado, por balanza:** desde la ultima consulta exitosa de esa balanza hasta ahora.
+  Se guarda en MongoDB, en la coleccion `balanzas_metadata`, un documento por balanza:
+  `{ _id: <id de la balanza>, balanzas_last_timestamp: <Date> }`. Si el documento de una balanza
+  no existe (primera consulta), su rango arranca al inicio del dia de hoy en hora de Uruguay.
+  Cuando los pesajes de la balanza quedan guardados se guarda el `to` de esa ejecucion, asi la
+  proxima arranca donde termino esta (la deteccion no hace falta para avanzar: los pesajes ya
+  quedaron pendientes).
+- **Si falla una balanza** (la API o el guardado), se sigue con las demas: solo esa no actualiza
+  su `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
+  se vuelven a consultar las que respondieron).
+- Codigo de salida: `0` si consulto y guardo todas las balanzas y evaluo todos los pendientes, `1`
+  si fallo alguna balanza o algun pesaje quedo sin evaluar, si no pudo pedir las balanzas activas
+  a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra como ejecucion
+  fallida).
+- Cliente con MicroProfile Rest Client (RESTEasy) y OAuth 2.0 client credentials: pide un token
+  por ejecucion y, ante un `401`, pide otro y reintenta una vez.
+- Variables: `BALANZAS_URL` (`http://localhost:3001`; en el compose
+  `http://host.docker.internal:3001`), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET`, y las de
+  MongoDB (`MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`,
+  `MONGO_AUTH_DB`, igual que el consumidor) y del EJB remoto (`WILDFLY_URL`, `EJB_USER`,
+  `EJB_PASSWORD`).
+- **Por ahora:** la matricula esta hardcodeada en `Main` (`LICENSE_PLATE = "SBC1234"`; se va a
+  definir que vehiculos consultar).
+
+**Viajes en curso (EJB remoto de Frontofficeciudadanos):**
+
+Para saber si un vehiculo tiene guia, fiscalizacion llama por EJB remoto a `ViajesEnCursoService`
+(Frontofficeciudadanos, paquete `service.gestiondeguiasyviajes`), que devuelve las guias del
+vehiculo en estado `ASIGNADA` o `EN_CURSO` (`List<DatosViaje>`), y a `VehiculosService` (paquete
+`service.gestionvehiculos`) para saber si el vehiculo existe y de que empresa es. El cliente de los
+dos es `ruleengine/vehicles/VehicleFactsClient`.
+
+- **Contrato:** fiscalizacion no depende del ejb entero sino de `frontofficeciudadanos-ejb-client.jar`
+  (lo genera el `maven-ejb-plugin` con `generateClient`), que trae solo las interfaces remotas y sus
+  DTOs: `ViajesEnCurso`, `ViajesEnCursoRemote`, `DatosViaje`, `Pesajes`, `PesajesRemote`,
+  `DatosPesaje` y, de `service.gestionvehiculos`,
+  `Vehiculos`, `VehiculosRemote` y `DatosVehiculo` (`buscarVehiculo(matricula)`: matricula y
+  empresa, o `null` si el vehiculo no existe). Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
+  (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`). Por eso, antes de compilar
+  fiscalizacion hay que instalar Modelo y los dos proyectos en el `.m2` (el `Dockerfile` y el
+  workflow de CI ya lo hacen):
+
+  ```bash
+  mvn -f componente_central/backend/Modelo/pom.xml install -Dmaven.test.skip=true
+  mvn -f componente_central/backend/Frontofficeciudadanos/pom.xml install -Dmaven.test.skip=true
+  mvn -f componente_central/backend/Backofficeautoridadesadministradores/pom.xml install -Dmaven.test.skip=true
+  ```
+
+**Nodos activos (EJB remoto de Backofficeautoridadesadministradores):** `NodosActivosService`
+(paquete `service.gestionnodosperifericos`) devuelve los nodos perifericos con `activo = true`
+(`List<DatosNodo>` con `id`, `idExterno`, `nombre` y `tipo`: `BALANZA` o `TRACKING`). Fiscalizacion
+lo usa con el cliente `ruleengine/nodes/ActiveNodesClient`: el poller para saber que balanzas
+consultar y el consumidor de tracking para saber de que GPS aceptar eventos
+(`ruleengine/nodes/ActiveGpsRegistry`). Usuario, URL y errores igual que en *Viajes en curso*.
+
+`id` es el que genera el central e `idExterno` el del nodo en su propio sistema (id de la balanza
+en la API de balanzas, `gpsId` en tracking). Balanzas y GPS repiten ids entre si (hay balanza 1 y
+GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no puede ser el `id`.
+
+
+  Si se agrega otra interfaz remota o DTO, hay que sumarlo a `clientIncludes` en
+  `Frontofficeciudadanos/ejb/pom.xml`.
+- **Conexion:** por el mismo puerto HTTP de WildFly (`remote+http://<host>:8080`); WildFly hace el
+  upgrade a su protocolo de EJB, no hay que abrir otro puerto.
+- **Autenticacion:** WildFly no acepta llamadas remotas anonimas: valida usuario y contrasenia
+  contra su `ApplicationRealm` (`application-users.properties`). Un mismo par de valores
+  (`EJB_USER` / `EJB_PASSWORD`, en el `.env` o en el `Secret` de Kubernetes) llega a los dos
+  contenedores:
+
+  ```
+  .env: EJB_USER / EJB_PASSWORD
+     ├─► wildfly                  → add-user.sh crea el usuario al arrancar
+     └─► fiscalizacionautomatica  → se autentica con ese usuario
+  ```
+
+  El usuario lo crea `wildfly/start.sh` (el `CMD` de la imagen de WildFly) al **arrancar** el
+  contenedor y no al construir la imagen, para que la contrasenia no quede guardada en la imagen
+  (mismo criterio que `DB_USER` / `DB_PASSWORD`). Si `EJB_USER` / `EJB_PASSWORD` no estan
+  definidas, WildFly arranca igual, sin el usuario:
+
+  ```sh
+  /opt/jboss/wildfly/bin/add-user.sh -a -u "$EJB_USER" -p "$EJB_PASSWORD" --silent
+  exec /opt/jboss/wildfly/bin/standalone.sh -b 0.0.0.0
+  ```
+
+- Variables de fiscalizacion: `WILDFLY_URL` (`remote+http://localhost:8080`; en el compose
+  `remote+http://wildfly:8080`), `EJB_USER`, `EJB_PASSWORD`.
+- Errores: si WildFly esta caido, las credenciales son incorrectas o el EAR no esta desplegado, la
+  llamada lanza `EJBException`, que el cliente convierte en `IOException`.
+- En Kubernetes los valores salen de las claves `ejb-user` / `ejb-password` de
+  `tse-runtime-secrets` (ver `k8s/README.md`).
+
+**Deteccion de situaciones (`ruleengine/detection`):**
+
+- Situaciones, en orden de prioridad (`Situation`): Viaje sin guia, Exceso de carga, Vehiculo sin
+  habilitacion vigente y Desvio de ruta. Sin viaje en curso solo pueden aplicar Viaje sin guia y
+  Habilitacion.
+- Cada situacion es una regla (`SituationRule`, en `detection/rules`) que dice si aplica a un
+  evento (`VehicleEvent`: un `TrackingEvent` o un `Weighing`) segun lo que el central sabe del
+  vehiculo (`VehicleFacts`: el vehiculo y sus viajes en curso, por EJB remoto).
+- `SituationDetector` devuelve las situaciones que aplican, en orden de prioridad. Si el vehiculo no
+  existe en el central no devuelve ninguna (no hay empresa a la que notificar). Si WildFly no
+  responde, falla: el evento se vuelve a evaluar despues.
+- Agregar una situacion = agregar su regla en `Main.createDetector`.
+- Implementada: Viaje sin guia (`TripWithoutGuideRule`: el vehiculo no tiene guias `ASIGNADA` ni
+  `EN_CURSO`). Todavia no se crean casos: eso, y saltear las situaciones que ya tienen un caso
+  abierto del vehiculo, viene despues; por ahora el resultado solo se escribe en el log
+  (`Main.logDetection`, que despues se reemplaza por la creacion de casos).
+- Eventos de tracking: los evalua el consumidor en segundo plano (`TrackingDetectionWorker`, ver
+  *Consumidor de tracking*).
+
+El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
+`META-INF/services` con los que RESTEasy registra sus providers.
+
+#### Probar en dev
+
+**Consumidor de tracking** (con RabbitMQ y MongoDB arriba):
+
+```bash
+docker compose up -d --build fiscalizacionautomatica
+docker logs fiscalizacion-server            # "Consuming tracking.events from rabbitmq:5672, ..."
+```
+
+Para mandarle un evento: prender el nodo `tracking` (`TSE_NODOS`) o publicar a mano desde el panel
+de RabbitMQ (Exchanges → `tracking` → *Publish message*, routing key `tracking.event`, property
+`message_id` con cualquier valor y el JSON del evento como payload). El documento aparece en
+`main_db.tracking` (Compass).
+
+**Poller de balanzas** (con `balanzas` arriba: `docker compose up -d balanzas` en `TSE_NODOS`,
+`BALANZAS_CLIENT_ID` / `BALANZAS_CLIENT_SECRET` y `EJB_USER` / `EJB_PASSWORD` en el `.env`, y al
+menos un `NodoBalanza` activo cuyo `idExterno` exista en balanzas, como la balanza 4 de
+`datos-prueba.sql`; levanta MongoDB y WildFly si no estan
+arriba):
+
+```bash
+docker compose run --rm --build fiscalizacionautomatica-poller   # una ejecucion; "Fetched N weighings of scales [4] from ... (until <to>)"
+echo $?                                                         # 0 = ok, 1 = fallo alguna balanza, WildFly o MongoDB
+```
+
+La ultima consulta de cada balanza queda en `main_db.balanzas_metadata` (Compass). Para volver a
+consultar una balanza desde el inicio del dia, borrar su documento (por ejemplo `{ _id: 4 }`).
+
+Para que se ejecute solo cada 5 minutos en la maquina de desarrollo (opcional):
+
+```bash
+# Linux / macOS: agregar con "crontab -e"
+*/5 * * * * docker compose -f /ruta/a/TSE_CENTRAL/docker-compose.yml run --rm fiscalizacionautomatica-poller >> /tmp/weighings-poller.log 2>&1
+```
+
+```powershell
+# Windows (Programador de tareas). Para quitarlo: schtasks /Delete /TN tse-weighings-poller /F
+schtasks /Create /SC MINUTE /MO 5 /TN tse-weighings-poller /TR "docker compose -f C:\ruta\a\TSE_CENTRAL\docker-compose.yml run --rm fiscalizacionautomatica-poller"
+```
+
+**Deteccion por EJB remoto** (con `EJB_USER` / `EJB_PASSWORD` en el `.env`; WildFly tiene
+que haber arrancado con esas variables para crear el usuario):
+
+```bash
+docker compose up -d --build wildfly
+docker logs wildfly-server | grep "Usuario de aplicacion"                 # el usuario se creo
+docker compose run --rm --build fiscalizacionautomatica detect-situations           # SBC1234: "Situations: [TRIP_WITHOUT_GUIDE]"
+docker compose run --rm --build fiscalizacionautomatica detect-situations STU5678   # con guia EN_CURSO: "Situations: []"
+```
+
+**Fuera de Docker** (con las variables de cada modo definidas, y Modelo y Frontofficeciudadanos
+instalados en el `.m2`, ver *Viajes en curso*):
+
+```bash
+cd componente_central/backend/Fiscalizacionautomatica
+mvn clean package
+java -jar target/fiscalizacionautomatica.jar                     # consumidor de tracking
+java -jar target/fiscalizacionautomatica.jar weighings-poller    # poller de balanzas (una ejecucion)
+java -jar target/fiscalizacionautomatica.jar detect-situations [matricula]   # deteccion para un vehiculo (EJB remotos)
+```
+
+Si el contenedor `fiscalizacion-server` esta arriba, el consumidor local y el del contenedor se
+reparten los mensajes de la cola: para debuggear, pararlo antes
+(`docker compose stop fiscalizacionautomatica`).
+
+#### Produccion
+
+Los modos usan la misma imagen, que publica en ghcr.io el workflow
+`docker-fiscalizacionautomatica.yml`. Las credenciales van en un `Secret` de Kubernetes, no en el
+manifiesto. Para el EJB remoto, el `Deployment` necesita ademas `WILDFLY_URL`
+(`remote+http://wildfly:8080`) y `EJB_USER` / `EJB_PASSWORD` del mismo `Secret` que usa WildFly.
+
+| | Consumidor de tracking | Poller de balanzas |
+|---|---|---|
+| Recurso | `Deployment` (escala con el largo de la cola, p. ej. con KEDA) | `CronJob` (corre una vez por ejecucion) |
+| Argumentos | ninguno | `["weighings-poller"]` |
+| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `BALANZAS_URL` (URL de balanzas en produccion), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) y las mismas `MONGO_*` del consumidor (guarda la ultima consulta en `balanzas_metadata`), y `WILDFLY_URL`, `EJB_USER`, `EJB_PASSWORD` (pide las balanzas activas al backoffice) |
+
+Puntos del `CronJob` del poller:
+
+```yaml
+spec:
+  schedule: "*/5 * * * *"          # frecuencia de consulta
+  concurrencyPolicy: Forbid        # nunca dos ejecuciones a la vez
+  jobTemplate:
+    spec:
+      backoffLimit: 0              # si falla, se reintenta en la proxima ejecucion programada
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-credentials
+          containers:
+            - name: poller
+              image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:<tag>
+              args: ["weighings-poller"]
+              envFrom:
+                - secretRef:
+                    name: fiscalizacion-balanzas   # BALANZAS_URL, BALANZAS_CLIENT_ID, BALANZAS_CLIENT_SECRET
+              env:                                 # MongoDB: igual que en el Deployment del consumidor
+                - name: MONGO_HOST
+                  value: mongodb
+                - name: MONGO_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: mongo-user
+                - name: MONGO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: mongo-password
+                - name: WILDFLY_URL                # balanzas activas (EJB remoto del backoffice)
+                  value: remote+http://wildfly:8080
+                - name: EJB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-user
+                - name: EJB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-password
+```
+
+Un codigo de salida `1` deja el `Job` como fallido (`kubectl -n tse get jobs`).
 
 ### Observabilidad
 
@@ -373,16 +693,17 @@ consume; no hay respuesta ni cola de retorno. Cada mensaje lo procesa un unico c
   (volumen `rabbitmq-data` vacio). Si despues se cambian en el `.env`, hay que borrar el
   volumen para que se vuelva a crear (se pierden los mensajes encolados):
   `docker compose rm -sf rabbitmq` y `docker volume rm tse-central_rabbitmq-data`.
-- **Conexion desde el componente central** (WildFly, hoy fuera del compose):
-  `amqp://<RABBITMQ_USER>:<RABBITMQ_PASSWORD>@localhost:5672`, consumiendo de la cola
-  `tracking.events`. Desde un contenedor de este compose el host es `rabbitmq`.
+- **Quien consume:** el servicio `fiscalizacionautomatica` (ver
+  [Fiscalizacion automatica](#fiscalizacion-automatica)). Desde la maquina:
+  `amqp://<RABBITMQ_USER>:<RABBITMQ_PASSWORD>@localhost:5672`; desde un contenedor de este
+  compose el host es `rabbitmq`.
 - **Mensajes:** JSON persistente (`content_type: application/json`, `type: tracking.event`):
   `{ id, gpsId, licensePlate, latitude, longitude, datetime }`. La entrega es *at-least-once*:
-  ante un reintento puede llegar un duplicado con el mismo `message_id`, que el consumidor
-  debe descartar.
+  ante un reintento puede llegar un duplicado, que el consumidor descarta porque tiene la misma
+  matricula y fecha (`licensePlate`, `datetime`).
 
 ## Requisitos
 
 - JDK 24 y Apache Maven 3.9+ (solo para compilar el backend fuera de Docker)
 - Node.js 24 / npm
-- Docker + Docker Compose 2.30+ (RabbitMQ, PostgreSQL, WildFly y las 3 apps Next.js; el compose usa `post_start`)
+- Docker + Docker Compose 2.30+ (RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y las 3 apps Next.js; el compose usa `post_start`)

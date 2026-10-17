@@ -88,7 +88,15 @@ rabbitmq-user
 rabbitmq-password
 ciudadanos-api-key
 funcionarios-api-key
+ejb-user
+ejb-password
 ```
+
+`ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
+llama por EJB remoto a Frontofficeciudadanos: WildFly lo crea al arrancar (`wildfly/start.sh`) y
+fiscalizacion se autentica con el. En WildFly son opcionales (sin ellas arranca, sin el usuario), pero
+el consumidor de tracking de fiscalizacion las necesita: al arrancar pide la lista de GPS activos por EJB
+remoto y no consume hasta tenerla. Hay que cargarlas en el Secret antes de desplegar.
 
 Crearlo con los valores correspondientes al entorno:
 
@@ -101,7 +109,17 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=rabbitmq-user='<RABBITMQ_USER>' \
   --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>' \
   --from-literal=ciudadanos-api-key='<CIUDADANOS_API_KEY>' \
-  --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>'
+  --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>' \
+  --from-literal=ejb-user='<EJB_USER>' \
+  --from-literal=ejb-password='<EJB_PASSWORD>'
+```
+
+Si el Secret ya existe, agregar las claves nuevas sin recrearlo (y reiniciar WildFly para que cree el
+usuario: `kubectl -n tse rollout restart deployment/wildfly`):
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"ejb-user":"<EJB_USER>","ejb-password":"<EJB_PASSWORD>"}}'
 ```
 
 Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.

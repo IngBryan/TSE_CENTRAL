@@ -214,13 +214,16 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
               )}
             </div>
 
-            {ev.idsEventosTracking.length > 0 && (
+            {ev.eventosTracking.length > 0 && (
               <div className={tarjeta}>
                 <h3 className="mb-2 font-medium text-black dark:text-zinc-50">Eventos de tracking asociados</h3>
                 <ul className="flex flex-wrap gap-2">
-                  {ev.idsEventosTracking.map((t) => (
-                    <li key={t} className="rounded bg-zinc-100 px-2 py-1 font-mono text-xs dark:bg-zinc-900">
-                      {t}
+                  {ev.eventosTracking.map((t) => (
+                    <li
+                      key={`${t.matricula}|${t.fechaHora}`}
+                      className="rounded bg-zinc-100 px-2 py-1 font-mono text-xs dark:bg-zinc-900"
+                    >
+                      {t.matricula} · {t.fechaHora}
                     </li>
                   ))}
                 </ul>

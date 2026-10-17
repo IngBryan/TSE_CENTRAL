@@ -23,4 +23,9 @@ embed-server --server-config=standalone.xml --std-out=echo
     valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, \
     background-validation=true)
 
+# Seguridad HTTP del Backoffice.
+# Las identidades se validan mediante Jakarta Security,
+# consultando los usuarios persistidos en PostgreSQL.
+/subsystem=undertow/application-security-domain=BackofficeSecurity:add(security-domain=ApplicationDomain, integrated-jaspi=false)
+
 stop-embedded-server
