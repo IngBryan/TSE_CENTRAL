@@ -27,7 +27,7 @@ spec:
               value: production
 
             - name: BACKOFFICE_API_URL
-              value: "http://wildfly/backofficeautoridadesadministradores-web/api"
+              value: "http://wildfly:8080/backofficeautoridadesadministradores-web/api"
           readinessProbe:
             httpGet:
               path: /backoffice
