@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: tse
 
 resources:
+  - configmap.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml

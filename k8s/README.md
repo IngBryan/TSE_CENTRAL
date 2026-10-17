@@ -90,7 +90,19 @@ ciudadanos-api-key
 funcionarios-api-key
 ejb-user
 ejb-password
+oidc-client-secret
+session-secret
+movil-token-secret
+pdi-organismo-clave
 ```
+
+| Clave | Variable (`.env` local) | La usa |
+|---|---|---|
+| `ciudadanos-api-key` | `CIUDADANOS_API_KEY` | wildfly y frontofficeciudadanos-front (`BACKEND_API_KEY`), el mismo valor |
+| `oidc-client-secret` | `OIDC_CLIENT_SECRET` | frontofficeciudadanos-front |
+| `session-secret` | `SESSION_SECRET` | frontofficeciudadanos-front |
+| `movil-token-secret` | `MOVIL_TOKEN_SECRET` | frontofficeciudadanos-front |
+| `pdi-organismo-clave` | `PDI_ORGANISMO_CLAVE` | wildfly (igual al de la PDI) |
 
 `ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
 llama por EJB remoto a Frontofficeciudadanos: WildFly lo crea al arrancar (`wildfly/start.sh`) y
@@ -111,7 +123,11 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=ciudadanos-api-key='<CIUDADANOS_API_KEY>' \
   --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>' \
   --from-literal=ejb-user='<EJB_USER>' \
-  --from-literal=ejb-password='<EJB_PASSWORD>'
+  --from-literal=ejb-password='<EJB_PASSWORD>' \
+  --from-literal=oidc-client-secret='<OIDC_CLIENT_SECRET>' \
+  --from-literal=session-secret='<SESSION_SECRET>' \
+  --from-literal=movil-token-secret='<MOVIL_TOKEN_SECRET>' \
+  --from-literal=pdi-organismo-clave='<PDI_ORGANISMO_CLAVE>'
 ```
 
 Si el Secret ya existe, agregar las claves nuevas sin recrearlo (y reiniciar WildFly para que cree el
@@ -121,6 +137,30 @@ usuario: `kubectl -n tse rollout restart deployment/wildfly`):
 kubectl -n tse patch secret tse-runtime-secrets --type merge \
   -p '{"stringData":{"ejb-user":"<EJB_USER>","ejb-password":"<EJB_PASSWORD>"}}'
 ```
+
+Lo mismo para las del front de ciudadanos y la PDI:
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"oidc-client-secret":"<OIDC_CLIENT_SECRET>","session-secret":"<SESSION_SECRET>","movil-token-secret":"<MOVIL_TOKEN_SECRET>","pdi-organismo-clave":"<PDI_ORGANISMO_CLAVE>"}}'
+```
+
+Los secretos de produccion deben ser distintos a los de desarrollo local. Despues de cambiar el
+Secret, reiniciar los pods para que tomen los valores nuevos
+(`kubectl -n tse rollout restart deployment/wildfly deployment/frontofficeciudadanos-front`).
+
+La configuracion que no es secreta esta en ConfigMaps junto a cada aplicacion:
+
+- `apps/frontofficeciudadanos-front/configmap.yaml`: `APP_BASE_URL`, `OIDC_CLIENT_ID`, `BACKEND_URL`.
+- `apps/wildfly/configmap.yaml`: `PDI_URL`, `PDI_ORGANISMO_CODIGO`.
+
+**Login con ID Uruguay:** la redirect URI es `APP_BASE_URL` y la de logout `APP_BASE_URL/logout`
+(`https://env-6537388.web.elasticloud.uy/ciudadanos` y `.../ciudadanos/logout`). Ambas tienen que estar
+registradas en ID Uruguay; si no, gub.uy rechaza el login. El ingress no tiene TLS: el HTTPS lo termina
+el proxy de Elastic Cloud que esta delante.
+
+**PDI:** `PDI_URL` tiene que apuntar a donde este desplegada la PDI (`TSE_NODOS`), y
+`PDI_ORGANISMO_CODIGO` / `pdi-organismo-clave` coincidir con los que usa la PDI.
 
 Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.
 

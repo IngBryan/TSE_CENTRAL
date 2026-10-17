@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wildfly-config
+  labels:
+    app: wildfly
+data:
+  # PDI (TSE_NODOS, servicio pdi). Ajustar segun donde se despliegue: Service pdi en el
+  # namespace tse, o la URL publica de la PDI si corre fuera del cluster.
+  PDI_URL: http://pdi:8080/ws/servicioInformacion
+  # Mismo valor que PDI_ORGANISMO_CODIGO de la PDI
+  PDI_ORGANISMO_CODIGO: MTOP-CARGA

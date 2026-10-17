@@ -22,9 +22,38 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          # APP_BASE_URL, OIDC_CLIENT_ID y BACKEND_URL (configmap.yaml)
+          envFrom:
+            - configMapRef:
+                name: frontofficeciudadanos-front-config
+          # Secretos: tse-runtime-secrets (ver k8s/README.md). ciudadanos-api-key es la misma que usa WildFly (CIUDADANOS_API_KEY).
           env:
             - name: NODE_ENV
               value: production
+
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: oidc-client-secret
+
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: session-secret
+
+            - name: BACKEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ciudadanos-api-key
+
+            - name: MOVIL_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: movil-token-secret
           readinessProbe:
             httpGet:
               path: /ciudadanos
