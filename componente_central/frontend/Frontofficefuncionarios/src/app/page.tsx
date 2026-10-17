@@ -1,70 +1,74 @@
-import Image from "next/image";
-import nextLogo from "../../public/next.svg";
-import vercelLogo from "../../public/vercel.svg";
+import { redirect } from "next/navigation";
+import { Encabezado, botonPrimario } from "@/components/encabezado";
+import { loginTestingHabilitado } from "@/lib/auth/config";
+import { getSesion } from "@/lib/auth/session";
+import { BASE_PATH } from "@/lib/base-path";
 
-export default function Home() {
+const MENSAJES: Record<string, string> = {
+  cedula_invalida: "Ingresá una cédula válida.",
+};
+
+// Inicio del frontoffice de funcionarios: ingreso de testing con cedula. Con sesion, la pantalla de
+// trabajo es la bandeja de casos de fiscalizacion.
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const sesion = await getSesion();
+  if (sesion) redirect("/casos");
+  const params = await searchParams;
+  const error =
+    typeof params.error === "string" ? (MENSAJES[params.error] ?? "No se pudo ingresar. Volvé a intentarlo.") : null;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src={nextLogo}
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+      <Encabezado sesion={sesion} />
+
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-12">
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+            {error}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        )}
+        {params.sesion === "cerrada" && (
+          <p className="rounded-lg bg-zinc-100 p-4 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+            Cerraste sesión correctamente.
+          </p>
+        )}
+
+        <section className="flex flex-col gap-4">
+          <h1 className="text-3xl font-semibold tracking-tight text-black sm:text-4xl dark:text-zinc-50">
+            Fiscalización del transporte de carga
+          </h1>
+          <p className="text-lg text-zinc-700 dark:text-zinc-300">
+            Revisá los casos de fiscalización detectados, su evidencia y el descargo de la empresa, y resolvelos
+            con fundamento.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          {!loginTestingHabilitado() ? (
+            <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              El ingreso no está habilitado en este entorno.
+            </p>
+          ) : (
+          <form
+            method="post"
+            action={`${BASE_PATH}/auth/login`}
+            className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-amber-500 p-4 text-sm"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src={vercelLogo}
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <label className="flex flex-col gap-1 font-medium text-zinc-700 dark:text-zinc-300">
+              Ingreso de testing: cédula
+              <input
+                name="cedula"
+                inputMode="numeric"
+                required
+                className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal dark:border-white/20"
+              />
+            </label>
+            <button type="submit" className={botonPrimario}>
+              Ingresar
+            </button>
+          </form>
+          )}
+        </section>
       </main>
     </div>
   );

@@ -1,8 +1,11 @@
 package tse.lab.model;
 
 import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,10 +16,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-// Tipo y estado son textos: el diagrama no define sus valores posibles.
+// El tipo es texto: el diagrama no define sus valores posibles. El estado sigue el ciclo de vida de
+// EstadoCaso y solo cambia con cambiarEstado, que rechaza las transiciones no previstas.
 @Entity
 @Table(name = "casos_fiscalizacion")
 public class CasoFiscalizacion implements Serializable {
@@ -28,9 +33,15 @@ public class CasoFiscalizacion implements Serializable {
 
     private String descripcion;
 
+    @Column(nullable = false)
     private String tipoCaso;
 
-    private String estado;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EstadoCaso estado;
+
+    @Column(nullable = false)
+    private Instant fechaDeteccion;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_guia", nullable = false)
@@ -59,10 +70,12 @@ public class CasoFiscalizacion implements Serializable {
     public CasoFiscalizacion() {
     }
 
-    public CasoFiscalizacion(String descripcion, String tipoCaso, String estado, Guia guia) {
+    // Todo caso nace DETECTADA (lo crea la fiscalizacion automatica)
+    public CasoFiscalizacion(String descripcion, String tipoCaso, Guia guia) {
         this.descripcion = descripcion;
         this.tipoCaso = tipoCaso;
-        this.estado = estado;
+        this.estado = EstadoCaso.DETECTADA;
+        this.fechaDeteccion = Instant.now();
         this.guia = guia;
     }
 
@@ -86,12 +99,20 @@ public class CasoFiscalizacion implements Serializable {
         this.tipoCaso = tipoCaso;
     }
 
-    public String getEstado() {
+    public EstadoCaso getEstado() {
         return estado;
     }
 
-    public void setEstado(String estado) {
-        this.estado = estado;
+    // Unica forma de cambiar el estado: IllegalStateException si la transicion no esta prevista
+    public void cambiarEstado(EstadoCaso nuevo) {
+        if (estado == null || !estado.puedePasarA(nuevo)) {
+            throw new IllegalStateException("Transicion de caso no permitida: " + estado + " -> " + nuevo);
+        }
+        this.estado = nuevo;
+    }
+
+    public Instant getFechaDeteccion() {
+        return fechaDeteccion;
     }
 
     public Guia getGuia() {

@@ -122,7 +122,11 @@ OIDC_CLIENT_SECRET=<client secret>
 SESSION_SECRET=<string largo y aleatorio>   # cifra la cookie de sesion
 
 #API del backend Frontofficeciudadanos (la consume el front de Next)
-BACKEND_API_KEY=<string largo y aleatorio>  # clave compartida front <-> WildFly (header X-Api-Key)
+CIUDADANOS_API_KEY=<string largo y aleatorio>  # clave compartida front <-> WildFly (header X-Api-Key)
+
+#Frontofficefuncionarios: su propia API key y su propio secreto de sesion (distintos de los de ciudadanos)
+FUNCIONARIOS_API_KEY=<string largo y aleatorio>
+FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
 #App movil del chofer (TSE_MOVIL) - frontofficeciudadanos
 MOVIL_TOKEN_SECRET=<string largo y aleatorio, 32+ caracteres>  # firma el token (JWT HS256) de la app
@@ -168,7 +172,7 @@ ve una cookie de sesion cifrada.
   (ver `.env.example`); en Docker, en el `.env` de la raiz. Ninguno se commitea.
 - **Perfil y PDI (CU-01 pasos 6 a 8, CU-03):** despues del login el front llama a
   `POST /frontofficeciudadanos-web/api/ciudadanos/ingreso-gubuy` (header `X-Api-Key` =
-  `BACKEND_API_KEY`, sin ella responde 401) con la cedula, el email y el `sub` de gub.uy. El backend
+  `CIUDADANOS_API_KEY`, sin ella responde 401) con la cedula, el email y el `sub` de gub.uy. El backend
   busca o crea el perfil (tabla `ciudadanos`, entidad `PerfilCiudadano`); si esta pendiente lo
   valida contra la PDI por SOAP (`ClientePdi`: timeout, reintentos y circuit breaker, configurables
   con `PDI_TIMEOUT_MS`, `PDI_REINTENTOS`, `PDI_CB_UMBRAL`, `PDI_CB_ESPERA_S`). Resultados:

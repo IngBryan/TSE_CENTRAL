@@ -42,3 +42,16 @@ INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'T
 -- Contrasena: AdminPrueba2026!
 INSERT INTO usuarios_backoffice (ci, contrasena) VALUES ('99999999', 'pbkdf2-sha256:600000:XVb3i-u34NGRGh8VpALJ9A:PR0-5o08j6128R_8qPTGWP3rPuwuDBHRBrVpEloWM74');
 INSERT INTO administradores (ci) VALUES ('99999999');
+-- Frontoffice de funcionarios (CU Gestionar casos de fiscalizacion): el integrante de gub.uy testing tambien es
+-- funcionario, y hay casos de fiscalizacion en distintos estados hasta que la fiscalizacion automatica los genere.
+INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mtop.gub.uy');
+-- Balanza solo para la evidencia de los casos: inactiva, asi el poller no la consulta en la API de balanzas.
+INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 1, 'Balanza Peaje Pando', 'Peaje Pando', false);
+INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1;
+-- detectado = true: ya origino su caso, la fiscalizacion automatica no lo vuelve a evaluar.
+INSERT INTO eventos_pesajes (matricula, fecha_hora, id_externo, peso, detectado, id_nodo_balanza) VALUES ('SBA 1234', CURRENT_TIMESTAMP, 1001, 38500, true, (SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1));
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia) VALUES ('Pesaje de 38500 kg supera el maximo declarado de 35000 kg', 'EXCESO_CARGA', 'EN_DESCARGO', CURRENT_TIMESTAMP, 'GV-MOVIL001');
+INSERT INTO casos_eventos_pesajes (id_caso, matricula, fecha_hora) SELECT c.id, p.matricula, p.fecha_hora FROM casos_fiscalizacion c, eventos_pesajes p WHERE c.tipoCaso = 'EXCESO_CARGA' AND p.matricula = 'SBA 1234';
+INSERT INTO descargos (descripcion, tipoCaso, estado, id_caso) SELECT 'La balanza del peaje estaba descalibrada ese dia', 'EXCESO_CARGA', 'PRESENTADO', id FROM casos_fiscalizacion WHERE tipoCaso = 'EXCESO_CARGA';
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia) VALUES ('La ruta reportada se aparta del recorrido Rivera - Montevideo', 'DESVIO_RUTA', 'NOTIFICADA', CURRENT_TIMESTAMP, 'GV-MOVIL002');
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia) VALUES ('Tracking del vehiculo sin viaje en curso', 'VIAJE_SIN_GUIA', 'DETECTADA', CURRENT_TIMESTAMP, 'GV-MOVIL002');
