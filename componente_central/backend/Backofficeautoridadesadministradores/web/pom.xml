@@ -119,6 +119,30 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Mockito para simular servicios y dependencias Jakarta EE -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.20.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Implementación JAX-RS para construir Response en tests -->
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Jakarta Authentication API, necesaria para ejecutar
+            las pruebas del mecanismo HTTP fuera de WildFly -->
+        <dependency>
+            <groupId>jakarta.authentication</groupId>
+            <artifactId>jakarta.authentication-api</artifactId>
+            <version>3.1.0</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
