@@ -33,7 +33,7 @@ export default async function Asignar({ params }: PageProps<"/empresa/guias/[id]
   }
 
   // Precondiciones del CU: la empresa tiene al menos un vehiculo y un chofer habilitado
-  if (opciones && opciones.vehiculos.length === 0) error = "La empresa no tiene vehículos registrados.";
+  if (opciones && opciones.vehiculos.length === 0) error = "La empresa no tiene vehículos activos. Registralos en la sección Vehículos.";
   else if (opciones && opciones.choferes.length === 0)
     error = "La empresa no tiene choferes habilitados. Agregá uno en Choferes (si está pendiente de validación, todavía no se le pueden asignar viajes).";
 

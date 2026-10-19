@@ -8,18 +8,20 @@ INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilit
 -- Ciudadanos que tienen un rol. Quedan pendientes sin cuenta gub.uy: su primer ingreso los vincula y valida
 -- contra la PDI (CU-01 FA2). Los roles (responsables, choferes) los referencian por ci.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('54074380', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
-INSERT INTO ciudadanos (ci, estado, creado) VALUES ('56087406', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 -- Responsable de la empresa 1.
 INSERT INTO responsables (ci, nro_empresa) VALUES ('54074380', 1);
--- Vehiculos de la empresa, para probar la asignacion de guias (CU-07) hasta que exista la gestion de vehiculos.
-INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('SBA 1234', 'Scania', 'R 450', 9000, 26000, 1);
-INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('SAB 5678', 'Volvo', 'FH 500', 9500, 28000, 1);
+-- Vehiculos de la empresa (matricula normalizada, como la mandan balanzas y tracking). SBA1234 queda
+-- habilitado (permiso e ITV vigentes); SAB5678 sin permiso ni ITV, para ver el caso no habilitado.
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SBA1234', 'Scania', 'R 450', 9000, 26000, true, 1);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SAB5678', 'Volvo', 'FH 500', 9500, 28000, true, 1);
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-0001', CURRENT_DATE - 30, CURRENT_DATE + 335, 'SBA1234');
+INSERT INTO itv (fechaVencimiento, matricula) VALUES (CURRENT_DATE + 180, 'SBA1234');
 -- App movil del chofer: Bryan (56087406, existe en la PDI) y el propio responsable (54074380, para probar con
 -- su usuario de gub.uy testing) como choferes habilitados de la empresa 1, cada uno con una guia ASIGNADA.
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('56087406', 1, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('54074380', 1, 'HABILITADO', CURRENT_TIMESTAMP);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA 1234', (SELECT id FROM choferes WHERE ci = '56087406' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB 5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA1234', (SELECT id FROM choferes WHERE ci = '56087406' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
 -- Nodo de balanza activo para el poller de fiscalizacion automatica: id_externo es el id de la balanza en la
 -- API de balanzas (TSE_NODOS, balanza 4 "Ruta 8 - Km 150"); el id lo genera la base.
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 4, 'Ruta 8 - Km 150', 'Ruta 8 - Km 150', true);
@@ -49,9 +51,9 @@ INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mto
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 1, 'Balanza Peaje Pando', 'Peaje Pando', false);
 INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1;
 -- detectado = true: ya origino su caso, la fiscalizacion automatica no lo vuelve a evaluar.
-INSERT INTO eventos_pesajes (matricula, fecha_hora, id_externo, peso, detectado, id_nodo_balanza) VALUES ('SBA 1234', CURRENT_TIMESTAMP, 1001, 38500, true, (SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1));
-INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('Pesaje de 38500 kg supera el maximo declarado de 35000 kg', 'EXCESO_CARGA', 'EN_DESCARGO', CURRENT_TIMESTAMP, 'GV-MOVIL001', 'SBA 1234', true);
-INSERT INTO casos_eventos_pesajes (id_caso, matricula, fecha_hora) SELECT c.id, p.matricula, p.fecha_hora FROM casos_fiscalizacion c, eventos_pesajes p WHERE c.tipoCaso = 'EXCESO_CARGA' AND p.matricula = 'SBA 1234';
+INSERT INTO eventos_pesajes (matricula, fecha_hora, id_externo, peso, detectado, id_nodo_balanza) VALUES ('SBA1234', CURRENT_TIMESTAMP, 1001, 38500, true, (SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1));
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('Pesaje de 38500 kg supera el maximo declarado de 35000 kg', 'EXCESO_CARGA', 'EN_DESCARGO', CURRENT_TIMESTAMP, 'GV-MOVIL001', 'SBA1234', true);
+INSERT INTO casos_eventos_pesajes (id_caso, matricula, fecha_hora) SELECT c.id, p.matricula, p.fecha_hora FROM casos_fiscalizacion c, eventos_pesajes p WHERE c.tipoCaso = 'EXCESO_CARGA' AND p.matricula = 'SBA1234';
 INSERT INTO descargos (descripcion, tipoCaso, estado, id_caso) SELECT 'La balanza del peaje estaba descalibrada ese dia', 'EXCESO_CARGA', 'PRESENTADO', id FROM casos_fiscalizacion WHERE tipoCaso = 'EXCESO_CARGA';
-INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('La ruta reportada se aparta del recorrido Rivera - Montevideo', 'DESVIO_RUTA', 'NOTIFICADA', CURRENT_TIMESTAMP, 'GV-MOVIL002', 'SAB 5678', false);
-INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('Actividad del vehículo sin un viaje asignado ni en curso', 'VIAJE_SIN_GUIA', 'DETECTADA', CURRENT_TIMESTAMP, NULL, 'SAB 5678', false);
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('La ruta reportada se aparta del recorrido Rivera - Montevideo', 'DESVIO_RUTA', 'NOTIFICADA', CURRENT_TIMESTAMP, 'GV-MOVIL002', 'SAB5678', false);
+INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('Actividad del vehículo sin un viaje asignado ni en curso', 'VIAJE_SIN_GUIA', 'DETECTADA', CURRENT_TIMESTAMP, NULL, 'SAB5678', false);

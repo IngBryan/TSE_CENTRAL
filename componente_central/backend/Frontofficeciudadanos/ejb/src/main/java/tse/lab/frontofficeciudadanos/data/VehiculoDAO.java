@@ -35,4 +35,12 @@ public class VehiculoDAO {
                 .setParameter("empresa", empresa)
                 .getResultList();
     }
+
+    // Los que no se dieron de baja: los unicos que se pueden asignar a una guia.
+    public List<Vehiculo> buscarActivosPorEmpresa(Empresa empresa) {
+        return em.createQuery(
+                "SELECT v FROM Vehiculo v WHERE v.empresa = :empresa AND v.activo = true ORDER BY v.matricula", Vehiculo.class)
+                .setParameter("empresa", empresa)
+                .getResultList();
+    }
 }

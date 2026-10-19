@@ -15,6 +15,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Prefijo de las rutas (next.config.ts): /ciudadanos para Kubernetes; docker-compose lo pasa vacio
+ARG NEXT_BASE_PATH=/ciudadanos
+ENV NEXT_BASE_PATH=${NEXT_BASE_PATH}
 RUN npm run build
 
 # 3. Production image: copy only the standalone output and run it
