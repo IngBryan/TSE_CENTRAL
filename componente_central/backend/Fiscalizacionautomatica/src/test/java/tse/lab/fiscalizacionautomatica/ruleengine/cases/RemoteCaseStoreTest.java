@@ -17,6 +17,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.CasosAutomaticosRemote;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.EventoFiscalizado;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.OrigenEvento;
 
@@ -42,13 +43,13 @@ class RemoteCaseStoreTest {
     void everyOperationGoesToTheEjb() throws IOException {
         when(remote.casosAbiertos("SBC1234")).thenReturn(List.of(CASE));
         when(remote.casoDelEvento(EVENTO)).thenReturn(CASE);
-        when(remote.crearCaso("VIAJE_SIN_GUIA", null, EVENTO)).thenReturn(CASE);
+        when(remote.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENTO)).thenReturn(CASE);
         DatosCaso notified = new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA");
         when(remote.notificarCaso(4L)).thenReturn(notified);
 
         assertEquals(List.of(CASE), store.openCases("SBC1234"));
         assertEquals(CASE, store.caseOf(EVENT));
-        assertEquals(CASE, store.create("VIAJE_SIN_GUIA", null, EVENT));
+        assertEquals(CASE, store.create(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENT));
         store.addEvidence(4L, EVENT);
         assertEquals(notified, store.notify(4L));
 
@@ -60,7 +61,7 @@ class RemoteCaseStoreTest {
         // e.g. the partial unique index rejected a duplicate open case
         when(remote.crearCaso(any(), any(), any())).thenThrow(new EJBException("uk_caso_abierto"));
 
-        assertThrows(IOException.class, () -> store.create("VIAJE_SIN_GUIA", null, EVENT));
+        assertThrows(IOException.class, () -> store.create(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENT));
     }
 
     @Test

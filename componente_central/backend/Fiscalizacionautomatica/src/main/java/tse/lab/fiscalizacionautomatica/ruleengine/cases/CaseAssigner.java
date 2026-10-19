@@ -51,15 +51,15 @@ public class CaseAssigner implements Consumer<Detection> {
         }
         List<DatosCaso> open = cases.openCases(event.licensePlate());
         for (Situation situation : detection.situations()) {
-            if (open.stream().noneMatch(c -> c.getTipoCaso().equals(situation.caseType()))) {
+            if (open.stream().noneMatch(c -> situation.isTypeOf(c.getTipoCaso()))) {
                 DatosCaso created = cases.create(situation.caseType(), guideId(detection), event);
                 log("Created", created, event);
                 notifyIfDetected(created);
                 return;
             }
         }
-        String highest = detection.situations().get(0).caseType();
-        DatosCaso target = open.stream().filter(c -> c.getTipoCaso().equals(highest)).findFirst().orElseThrow();
+        Situation highest = detection.situations().get(0);
+        DatosCaso target = open.stream().filter(c -> highest.isTypeOf(c.getTipoCaso())).findFirst().orElseThrow();
         cases.addEvidence(target.getId(), event);
         log("Added to", target, event);
         notifyIfDetected(target);

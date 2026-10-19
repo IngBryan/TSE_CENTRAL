@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.MutableClock;
 
@@ -91,6 +92,28 @@ class NodeCommunicationsTest {
         }
         communications.close();
         assertEquals(Map.of(5L, NOW), batches.get(0));
+    }
+
+    @Test
+    void closingWaitsForTheFlushInProgressInsteadOfInterruptingIt() throws InterruptedException {
+        CountDownLatch reporting = new CountDownLatch(1);
+        List<Map<Long, Instant>> sent = new ArrayList<>();
+        NodeCommunications slow = new NodeCommunications(batch -> {
+            reporting.countDown();
+            try {
+                Thread.sleep(200); // the remote call in flight
+            } catch (InterruptedException e) {
+                throw new IOException("interrupted");
+            }
+            sent.add(batch);
+        }, clock);
+        slow.record(7);
+
+        slow.flushEvery(Duration.ofMillis(1));
+        reporting.await();
+        slow.close();
+
+        assertEquals(List.of(Map.of(7L, NOW)), sent);
     }
 
     @Test

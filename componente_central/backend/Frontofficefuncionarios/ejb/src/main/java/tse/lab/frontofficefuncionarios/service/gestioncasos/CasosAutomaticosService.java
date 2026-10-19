@@ -1,7 +1,6 @@
 package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
@@ -25,12 +24,6 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
 
     private static final Logger LOG = Logger.getLogger(CasosAutomaticosService.class.getName());
 
-    private static final Map<String, String> DESCRIPCIONES = Map.of(
-            "VIAJE_SIN_GUIA", "Actividad del vehículo sin un viaje asignado ni en curso",
-            "EXCESO_CARGA", "El pesaje supera el peso del vehículo más su capacidad de carga declarada",
-            "VEHICULO_SIN_HABILITACION", "Actividad del vehículo con el permiso nacional de circulación o la ITV vencidos",
-            "DESVIO_RUTA", "La ruta reportada se aparta del recorrido entre el origen y el destino de la guía");
-
     @EJB
     private CasoFiscalizacionDAO casos;
     @EJB
@@ -51,14 +44,22 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
     }
 
     @Override
-    public DatosCaso crearCaso(String tipoCaso, String idGuia, EventoFiscalizado evento) {
+    public DatosCaso crearCaso(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento) {
+        if (tipoCaso == null) {
+            throw new IllegalArgumentException("Falta el tipo de caso");
+        }
         Vehiculo vehiculo = casos.buscarVehiculo(evento.getMatricula());
         if (vehiculo == null) {
             throw new IllegalArgumentException("El vehiculo no existe: " + evento.getMatricula());
         }
-        Guia guia = idGuia == null ? null : casos.buscarGuia(idGuia);
-        CasoFiscalizacion caso = new CasoFiscalizacion(DESCRIPCIONES.getOrDefault(tipoCaso, tipoCaso), tipoCaso,
-                vehiculo, guia);
+        Guia guia = null;
+        if (idGuia != null) {
+            guia = casos.buscarGuia(idGuia);
+            if (guia == null) {
+                throw new IllegalArgumentException("La guia no existe: " + idGuia);
+            }
+        }
+        CasoFiscalizacion caso = new CasoFiscalizacion(tipoCaso.getDescripcion(), tipoCaso.name(), vehiculo, guia);
         asociar(caso, evento);
         casos.guardar(caso);
         auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,

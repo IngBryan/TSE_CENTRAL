@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 
 /** Operations on the fiscalization cases (see {@link RemoteCaseStore}). They don't decide anything. */
 public interface CaseStore {
@@ -20,7 +21,7 @@ public interface CaseStore {
      *
      * @param guideId null if the case has no guide
      */
-    DatosCaso create(String caseType, String guideId, VehicleEvent event) throws IOException;
+    DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException;
 
     void addEvidence(long caseId, VehicleEvent event) throws IOException;
 

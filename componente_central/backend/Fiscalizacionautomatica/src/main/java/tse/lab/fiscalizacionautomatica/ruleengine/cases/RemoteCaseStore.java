@@ -12,6 +12,7 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.CasosAutomaticosRemo
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.EventoFiscalizado;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.OrigenEvento;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 
 /** Fiscalization cases in PostgreSQL, through the Frontofficefuncionarios remote EJB. */
 public class RemoteCaseStore implements CaseStore, AutoCloseable {
@@ -51,7 +52,7 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
-    public DatosCaso create(String caseType, String guideId, VehicleEvent event) throws IOException {
+    public DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException {
         return call(() -> cases.crearCaso(caseType, guideId, toEventoFiscalizado(event)));
     }
 

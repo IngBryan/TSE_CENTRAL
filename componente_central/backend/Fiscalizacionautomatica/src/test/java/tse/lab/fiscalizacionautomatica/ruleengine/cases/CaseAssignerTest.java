@@ -19,6 +19,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
 
@@ -57,9 +58,9 @@ class CaseAssignerTest {
         }
 
         @Override
-        public DatosCaso create(String caseType, String guideId, VehicleEvent event) throws IOException {
+        public DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException {
             failIfDown();
-            StoredCase created = new StoredCase(cases.size() + 1L, caseType, guideId, new ArrayList<>(),
+            StoredCase created = new StoredCase(cases.size() + 1L, caseType.name(), guideId, new ArrayList<>(),
                     new String[] { "DETECTADA" });
             cases.add(created);
             addEvidence(created.id(), event);

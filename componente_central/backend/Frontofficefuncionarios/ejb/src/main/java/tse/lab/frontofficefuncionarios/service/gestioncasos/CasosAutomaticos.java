@@ -13,9 +13,9 @@ public interface CasosAutomaticos {
     DatosCaso casoDelEvento(EventoFiscalizado evento);
 
     // Crea un caso DETECTADA con el evento como evidencia y lo registra en la auditoria (usuario SISTEMA).
-    // idGuia: null si el caso no tiene guia (Viaje sin guia). Falla si el vehiculo ya tiene un caso abierto de
-    // ese tipo (indice unico parcial de la base).
-    DatosCaso crearCaso(String tipoCaso, String idGuia, EventoFiscalizado evento);
+    // idGuia: null si el caso no tiene guia (Viaje sin guia). Falla si falta el tipo, si el vehiculo o la guia
+    // no existen, o si el vehiculo ya tiene un caso abierto de ese tipo (indice unico parcial de la base).
+    DatosCaso crearCaso(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento);
 
     // Suma el evento como evidencia del caso
     void agregarEvidencia(long idCaso, EventoFiscalizado evento);

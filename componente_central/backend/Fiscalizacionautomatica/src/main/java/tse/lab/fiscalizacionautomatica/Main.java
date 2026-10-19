@@ -105,8 +105,9 @@ public class Main {
                 VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
                 RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
-            waitForMongo(database);
-            waitForActiveGps(activeGps);
+            if (!waitForMongo(database, stopRequested) || !waitForActiveGps(activeGps, stopRequested)) {
+                return; // stopped while waiting
+            }
             activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
             gpsCommunications.flushEvery(GPS_COMMUNICATIONS_FLUSH);
 
@@ -115,7 +116,10 @@ public class Main {
             ConnectionFactory factory = createRabbitConnectionFactory();
             try (TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
                     new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
-                    Connection connection = connectToRabbit(factory)) {
+                    Connection connection = connectToRabbit(factory, stopRequested)) {
+                if (connection == null) {
+                    return; // stopped while waiting
+                }
                 detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
 
                 // A saved event is a successful communication with its GPS
@@ -144,16 +148,23 @@ public class Main {
         }
     }
 
-    /** Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked. */
-    private static void waitForActiveGps(ActiveGpsRegistry activeGps) throws InterruptedException {
+    /**
+     * Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked.
+     *
+     * @return false if the process was stopped while waiting
+     */
+    private static boolean waitForActiveGps(ActiveGpsRegistry activeGps, CountDownLatch stop)
+            throws InterruptedException {
         while (true) {
             try {
                 activeGps.load();
-                return;
+                return true;
             } catch (IOException e) {
                 System.err.printf("Could not get the active GPS from WildFly (%s), retrying in %d s%n",
                         e.getCause(), RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
             }
         }
     }
@@ -307,17 +318,23 @@ public class Main {
                 .build());
     }
 
-    /** Retries until MongoDB is available (the script may start first). */
-    private static void waitForMongo(MongoDatabase database) throws InterruptedException {
+    /**
+     * Retries until MongoDB is available (the script may start first).
+     *
+     * @return false if the process was stopped while waiting
+     */
+    private static boolean waitForMongo(MongoDatabase database, CountDownLatch stop) throws InterruptedException {
         while (true) {
             try {
                 database.runCommand(new Document("ping", 1));
-                return;
+                return true;
             } catch (MongoSecurityException e) {
                 throw e; // wrong credentials: retrying won't help
             } catch (MongoTimeoutException e) {
                 System.err.printf("MongoDB unavailable, retrying in %d s%n", RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
             }
         }
     }
@@ -333,8 +350,13 @@ public class Main {
         return factory;
     }
 
-    /** Retries until RabbitMQ is available (the script may start first). */
-    private static Connection connectToRabbit(ConnectionFactory factory) throws InterruptedException, IOException {
+    /**
+     * Retries until RabbitMQ is available (the script may start first).
+     *
+     * @return null if the process was stopped while waiting
+     */
+    private static Connection connectToRabbit(ConnectionFactory factory, CountDownLatch stop)
+            throws InterruptedException, IOException {
         while (true) {
             try {
                 return factory.newConnection("fiscalizacion-automatica");
@@ -343,7 +365,9 @@ public class Main {
             } catch (IOException | TimeoutException e) {
                 System.err.printf("RabbitMQ unavailable at %s:%d, retrying in %d s%n",
                         factory.getHost(), factory.getPort(), RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return null;
+                }
             }
         }
     }

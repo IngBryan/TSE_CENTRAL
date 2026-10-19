@@ -23,6 +23,8 @@ public class NodeCommunications implements AutoCloseable {
         void report(Map<Long, Instant> lastByExternalId) throws IOException;
     }
 
+    private static final Duration CLOSE_WAIT = Duration.ofSeconds(5);
+
     private final Target target;
     private final Clock clock;
     private final Map<Long, Instant> pending = new ConcurrentHashMap<>();
@@ -66,10 +68,21 @@ public class NodeCommunications implements AutoCloseable {
         }
     }
 
-    /** Stops the periodic flush and sends what is left. */
+    /**
+     * Stops the periodic flush, waiting for one in progress (interrupting it could cut its remote call and
+     * put its batch back after the last flush), and sends what is left.
+     */
     @Override
     public void close() {
-        scheduler.shutdownNow();
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(CLOSE_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
         flush();
     }
 

@@ -33,6 +33,6 @@ spec:
         host: amqp://rabbitmq:5672/
         queueName: tracking.events
         mode: QueueLength
-        value: "200"
+        value: "100"
       authenticationRef:
         name: fiscalizacionautomatica-rabbitmq
