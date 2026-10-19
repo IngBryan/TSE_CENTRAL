@@ -17,11 +17,10 @@ public interface ScalesRestApi {
     record WeighingResponse(Long id, Long scaleId, String licensePlate, String datetime, Long weight) {
     }
 
-    /** Weighings of a vehicle in a scale between {@code from} and {@code to} (ISO 8601, both inclusive). */
+    /** Weighings of every vehicle in a scale between {@code from} and {@code to} (ISO 8601, both inclusive). */
     @GET
     @Path("/scales/{id}/weighings")
     @Produces(MediaType.APPLICATION_JSON)
-    List<WeighingResponse> listWeighings(@PathParam("id") long scaleId,
-            @QueryParam("licensePlate") String licensePlate, @QueryParam("from") String from,
+    List<WeighingResponse> listWeighings(@PathParam("id") long scaleId, @QueryParam("from") String from,
             @QueryParam("to") String to);
 }

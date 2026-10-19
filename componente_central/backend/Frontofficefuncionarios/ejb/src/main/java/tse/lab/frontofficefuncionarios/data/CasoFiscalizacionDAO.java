@@ -10,8 +10,11 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import tse.lab.model.CasoFiscalizacion;
+import tse.lab.model.ClaveEvento;
 import tse.lab.model.EstadoCaso;
+import tse.lab.model.EventoPesajes;
 import tse.lab.model.FundamentoResolucion;
+import tse.lab.model.Guia;
 import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
 import tse.lab.model.Vehiculo;
@@ -50,6 +53,7 @@ public class CasoFiscalizacionDAO {
         EntityGraph<CasoFiscalizacion> grafo = em.createEntityGraph(CasoFiscalizacion.class);
         grafo.addAttributeNodes("descargo", "fundamentoResolucion");
         grafo.addSubgraph("guia").addAttributeNodes("empresa", "vehiculo");
+        grafo.addSubgraph("vehiculo").addAttributeNodes("empresa");
         TypedQuery<CasoFiscalizacion> q = estado == null
                 ? em.createQuery(BANDEJA + ORDEN, CasoFiscalizacion.class)
                 : em.createQuery(BANDEJA + " WHERE c.estado = :estado" + ORDEN, CasoFiscalizacion.class)
@@ -67,6 +71,53 @@ public class CasoFiscalizacionDAO {
         return em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c WHERE c.estado = :estado", Long.class)
                 .setParameter("estado", estado)
                 .getSingleResult();
+    }
+
+    public void guardar(CasoFiscalizacion caso) {
+        em.persist(caso);
+    }
+
+    public Vehiculo buscarVehiculo(String matricula) {
+        return em.find(Vehiculo.class, matricula);
+    }
+
+    public Guia buscarGuia(String id) {
+        return em.find(Guia.class, id);
+    }
+
+    // Casos abiertos (EstadoCaso.ABIERTOS) del vehiculo
+    public List<CasoFiscalizacion> abiertosDelVehiculo(String matricula) {
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.vehiculo.matricula = :matricula"
+                + " AND c.estado IN :abiertos ORDER BY c.fechaDeteccion, c.id", CasoFiscalizacion.class)
+                .setParameter("matricula", matricula)
+                .setParameter("abiertos", EstadoCaso.ABIERTOS)
+                .getResultList();
+    }
+
+    // El caso que ya tiene ese evento de tracking como evidencia; null si ninguno
+    public CasoFiscalizacion casoConEventoTracking(ClaveEvento clave) {
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.clavesEventosTracking t"
+                + " WHERE t.matricula = :matricula AND t.fechaHora = :fechaHora", CasoFiscalizacion.class)
+                .setParameter("matricula", clave.getMatricula())
+                .setParameter("fechaHora", clave.getFechaHora())
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    // El caso que ya tiene ese pesaje como evidencia; null si ninguno
+    public CasoFiscalizacion casoConPesaje(ClaveEvento clave) {
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.eventosPesajes p"
+                + " WHERE p.matricula = :matricula AND p.fechaHora = :fechaHora", CasoFiscalizacion.class)
+                .setParameter("matricula", clave.getMatricula())
+                .setParameter("fechaHora", clave.getFechaHora())
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    public EventoPesajes buscarPesaje(ClaveEvento clave) {
+        return em.find(EventoPesajes.class, clave);
     }
 
     public void guardarResolucion(FundamentoResolucion resolucion) {

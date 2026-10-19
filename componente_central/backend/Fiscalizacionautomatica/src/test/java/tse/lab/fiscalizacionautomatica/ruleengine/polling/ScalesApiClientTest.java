@@ -77,7 +77,7 @@ class ScalesApiClientTest {
     }
 
     private List<Weighing> fetchScale1() throws Exception {
-        return client.listWeighings(1, "SBC1234", Instant.parse("2026-10-10T10:00:00Z"), Instant.parse("2026-10-10T11:00:00Z"));
+        return client.listWeighings(1, Instant.parse("2026-10-10T10:00:00Z"), Instant.parse("2026-10-10T11:00:00Z"));
     }
 
     @Test
@@ -85,7 +85,7 @@ class ScalesApiClientTest {
         List<Weighing> weighings = fetchScale1();
 
         // 10:00Z / 11:00Z travel in Uruguay time
-        assertEquals(List.of("licensePlate=SBC1234&from=2026-10-10T07:00:00.000-03:00&to=2026-10-10T08:00:00.000-03:00"),
+        assertEquals(List.of("from=2026-10-10T07:00:00.000-03:00&to=2026-10-10T08:00:00.000-03:00"),
                 weighingQueries);
         assertEquals(List.of(new Weighing(1, 1, "SBC1234", Instant.parse("2026-10-10T10:15:00Z"), 18450)),
                 weighings);

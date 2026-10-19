@@ -22,7 +22,7 @@ class WeighingsPollerTest {
     private static final Instant NOW = Instant.parse("2026-10-10T12:00:00Z");
     private static final Instant START_OF_TODAY = Instant.parse("2026-10-10T03:00:00Z");
 
-    record Request(long scaleId, String licensePlate, Instant from, Instant to) {
+    record Request(long scaleId, Instant from, Instant to) {
     }
 
     /** Records the requested ranges; the scales in {@code failing} throw. */
@@ -32,14 +32,14 @@ class WeighingsPollerTest {
         final Set<Long> failing = new HashSet<>();
 
         @Override
-        public List<Weighing> listWeighings(long scaleId, String licensePlate, Instant from, Instant to)
+        public List<Weighing> listWeighings(long scaleId, Instant from, Instant to)
                 throws IOException {
-            requests.add(new Request(scaleId, licensePlate, from, to));
+            requests.add(new Request(scaleId, from, to));
             if (failing.contains(scaleId)) {
                 throw new IOException("scale " + scaleId + " unavailable");
             }
             // A vehicle is weighed in each scale at a different moment
-            return List.of(new Weighing(scaleId * 10, scaleId, licensePlate, to.minusSeconds(scaleId), 18_000));
+            return List.of(new Weighing(scaleId * 10, scaleId, "SBC1234", to.minusSeconds(scaleId), 18_000));
         }
     }
 
@@ -47,15 +47,15 @@ class WeighingsPollerTest {
     private final InMemoryScalesMetadataDAO metadata = new InMemoryScalesMetadataDAO();
     private final MutableClock clock = new MutableClock(NOW);
     private final InMemoryWeighingDAO weighingDAO = new InMemoryWeighingDAO();
-    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), "SBC1234", api, weighingDAO, metadata,
+    private final WeighingsPoller poller = new WeighingsPoller(List.of(1L, 2L), api, weighingDAO, metadata,
             clock);
 
     @Test
     void firstPollStartsAtTheBeginningOfTodayInUruguay() {
         PollResult result = poller.poll();
 
-        assertEquals(List.of(new Request(1, "SBC1234", START_OF_TODAY, NOW),
-                new Request(2, "SBC1234", START_OF_TODAY, NOW)), api.requests);
+        assertEquals(List.of(new Request(1, START_OF_TODAY, NOW),
+                new Request(2, START_OF_TODAY, NOW)), api.requests);
         assertEquals(2, result.weighings().size());
         assertEquals(List.of(), result.failedScaleIds());
         assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
@@ -67,7 +67,7 @@ class WeighingsPollerTest {
         // 23:30 of October 9 in Uruguay, already October 10 in UTC
         MutableClock lateClock = new MutableClock(Instant.parse("2026-10-10T02:30:00Z"));
 
-        new WeighingsPoller(List.of(1L), "SBC1234", api, weighingDAO, metadata, lateClock).poll();
+        new WeighingsPoller(List.of(1L), api, weighingDAO, metadata, lateClock).poll();
 
         assertEquals(Instant.parse("2026-10-09T03:00:00Z"), api.requests.getFirst().from());
     }
@@ -81,8 +81,8 @@ class WeighingsPollerTest {
 
         poller.poll();
 
-        assertEquals(List.of(new Request(1, "SBC1234", lastOfScale1, NOW),
-                new Request(2, "SBC1234", lastOfScale2, NOW)), api.requests);
+        assertEquals(List.of(new Request(1, lastOfScale1, NOW),
+                new Request(2, lastOfScale2, NOW)), api.requests);
     }
 
     @Test
@@ -94,7 +94,7 @@ class WeighingsPollerTest {
         poller.poll();
 
         Instant now = NOW.plus(Duration.ofMinutes(5));
-        assertEquals(List.of(new Request(1, "SBC1234", NOW, now), new Request(2, "SBC1234", NOW, now)),
+        assertEquals(List.of(new Request(1, NOW, now), new Request(2, NOW, now)),
                 api.requests);
     }
 
@@ -118,7 +118,7 @@ class WeighingsPollerTest {
         poller.poll();
 
         Instant now = NOW.plus(Duration.ofMinutes(5));
-        assertEquals(List.of(new Request(1, "SBC1234", NOW, now), new Request(2, "SBC1234", last, now)),
+        assertEquals(List.of(new Request(1, NOW, now), new Request(2, last, now)),
                 api.requests);
     }
 

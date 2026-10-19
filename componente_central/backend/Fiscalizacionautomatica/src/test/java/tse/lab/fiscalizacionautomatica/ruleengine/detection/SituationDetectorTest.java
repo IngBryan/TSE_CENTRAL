@@ -27,13 +27,13 @@ class SituationDetectorTest {
     private final SituationDetector detector = new SituationDetector(facts, List.of(new TripWithoutGuideRule()));
 
     static VehicleFacts withoutTrips(String licensePlate) {
-        return new VehicleFacts(new DatosVehiculo(licensePlate, 1L), List.of());
+        return new VehicleFacts(new DatosVehiculo(licensePlate, 1L, 8500, 25000), List.of());
     }
 
     static VehicleFacts withTrip(String licensePlate, String state) {
         DatosViaje trip = new DatosViaje("GV-1", licensePlate, 1L, state, LocalDate.of(2026, 10, 13), NOW,
                 "Mercedes", "Nueva Palmira", 20_000);
-        return new VehicleFacts(new DatosVehiculo(licensePlate, 1L), List.of(trip));
+        return new VehicleFacts(new DatosVehiculo(licensePlate, 1L, 8500, 25000), List.of(trip));
     }
 
     private static TrackingEvent tracking(String licensePlate) {
@@ -58,7 +58,7 @@ class SituationDetectorTest {
     void trackingEventOfAVehicleWithoutTripsIsATripWithoutGuide() throws IOException {
         central.put("SBC1234", withoutTrips("SBC1234"));
 
-        assertEquals(List.of(Situation.TRIP_WITHOUT_GUIDE), detector.detect(tracking("SBC1234")));
+        assertEquals(List.of(Situation.TRIP_WITHOUT_GUIDE), detector.detect(tracking("SBC1234")).situations());
     }
 
     @Test
@@ -66,19 +66,21 @@ class SituationDetectorTest {
         central.put("SBC1234", withoutTrips("SBC1234"));
 
         assertEquals(List.of(Situation.TRIP_WITHOUT_GUIDE),
-                detector.detect(new Weighing(3, 4, "SBC1234", NOW, 18_000)));
+                detector.detect(new Weighing(3, 4, "SBC1234", NOW, 18_000)).situations());
     }
 
     @Test
     void vehicleWithAnActiveTripHasNoSituations() throws IOException {
         central.put("STU5678", withTrip("STU5678", "EN_CURSO"));
 
-        assertEquals(List.of(), detector.detect(tracking("STU5678")));
+        assertEquals(List.of(), detector.detect(tracking("STU5678")).situations());
     }
 
     @Test
     void vehicleNotRegisteredInTheCentralHasNoSituations() throws IOException {
-        assertEquals(List.of(), detector.detect(tracking("AAB9012")));
+        Detection unknown = detector.detect(tracking("AAB9012"));
+        assertEquals(List.of(), unknown.situations());
+        assertEquals(null, unknown.facts());
     }
 
     @Test
@@ -88,7 +90,7 @@ class SituationDetectorTest {
                 new TripWithoutGuideRule(), alwaysApplies(Situation.VEHICLE_WITHOUT_VALID_PERMIT)));
 
         assertEquals(List.of(Situation.TRIP_WITHOUT_GUIDE, Situation.VEHICLE_WITHOUT_VALID_PERMIT,
-                Situation.ROUTE_DEVIATION), allRules.detect(tracking("SBC1234")));
+                Situation.ROUTE_DEVIATION), allRules.detect(tracking("SBC1234")).situations());
     }
 
     @Test

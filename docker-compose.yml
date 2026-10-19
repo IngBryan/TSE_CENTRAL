@@ -226,6 +226,8 @@ services:
       wildfly:
         condition: service_healthy
     environment:
+      # En dev la URL de balanzas y el client id salen de estas variables; fuera de dev, de /app/config/app.json
+      - ENVIRONMENT=dev
       - BALANZAS_URL=${BALANZAS_URL:-http://host.docker.internal:3001}
       - BALANZAS_CLIENT_ID=${BALANZAS_CLIENT_ID}
       - BALANZAS_CLIENT_SECRET=${BALANZAS_CLIENT_SECRET}

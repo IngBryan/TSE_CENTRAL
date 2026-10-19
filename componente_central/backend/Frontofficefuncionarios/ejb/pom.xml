@@ -104,6 +104,16 @@
                     <version>${version.ejb.plugin}</version>
                     <configuration>
                         <ejbVersion>4.0</ejbVersion>
+                        <!-- frontofficefuncionarios-ejb-client.jar: solo las interfaces remotas y sus DTOs,
+                            para clientes fuera de WildFly (Fiscalizacionautomatica) -->
+                        <generateClient>true</generateClient>
+                        <clientIncludes>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/CasosAutomaticos.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/CasosAutomaticosRemote.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/EventoFiscalizado.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/OrigenEvento.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/DatosCaso.class</clientInclude>
+                        </clientIncludes>
                     </configuration>
                 </plugin>
         </plugins>

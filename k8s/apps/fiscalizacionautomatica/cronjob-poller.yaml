@@ -1,0 +1,107 @@
+# Poller de balanzas: misma imagen que el consumidor, en modo weighings-poller. Corre una vez por ejecucion
+# y termina (un codigo de salida 1 deja el Job como fallido); nunca dos a la vez.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: fiscalizacionautomatica-poller
+  labels:
+    app: fiscalizacionautomatica-poller
+spec:
+  schedule: "*/30 * * * *"
+  timeZone: America/Montevideo
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      # Si falla, se reintenta en la proxima ejecucion programada (no guarda estado en memoria)
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: fiscalizacionautomatica-poller
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-credentials
+
+          containers:
+            - name: poller
+              image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:latest
+              args: ["weighings-poller"]
+
+              # BALANZAS_CLIENT_SECRET
+              envFrom:
+                - secretRef:
+                    name: fiscalizacion-balanzas
+
+              env:
+                # Fuera de dev, la URL de balanzas y el client id se leen de /app/config/app.json
+                - name: ENVIRONMENT
+                  value: prod
+
+                # MongoDB: ultima consulta de cada balanza (balanzas_metadata)
+                - name: MONGO_HOST
+                  value: mongodb
+
+                - name: MONGO_PORT
+                  value: "27017"
+
+                - name: MONGO_DB
+                  value: main_db
+
+                - name: MONGO_AUTH_DB
+                  value: admin
+
+                - name: MONGO_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: mongo-user
+
+                - name: MONGO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: mongo-password
+
+                # EJB remotos en WildFly: balanzas activas, pesajes, vehiculos y casos
+                - name: WILDFLY_URL
+                  value: remote+http://wildfly:8080
+
+                - name: EJB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-user
+
+                - name: EJB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: tse-runtime-secrets
+                      key: ejb-password
+
+              volumeMounts:
+                - name: config
+                  mountPath: /app/config
+                  readOnly: true
+
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1001
+                runAsGroup: 1001
+                allowPrivilegeEscalation: false
+
+          volumes:
+            # app.json con la URL de balanzas y el client id (configMapGenerator en kustomization.yaml)
+            - name: config
+              configMap:
+                name: fiscalizacionautomatica-config

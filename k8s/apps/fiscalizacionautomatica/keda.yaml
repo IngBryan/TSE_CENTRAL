@@ -1,0 +1,38 @@
+# Escala el consumidor de tracking (Deployment fiscalizacionautomatica) segun los mensajes pendientes en
+# la cola tracking.events: una replica cada 100 mensajes, entre 1 y 5. Requiere KEDA instalado en el
+# cluster (ver k8s/README.md).
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: fiscalizacionautomatica-rabbitmq
+spec:
+  secretTargetRef:
+    - parameter: username
+      name: tse-runtime-secrets
+      key: rabbitmq-user
+    - parameter: password
+      name: tse-runtime-secrets
+      key: rabbitmq-password
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: fiscalizacionautomatica
+spec:
+  scaleTargetRef:
+    name: fiscalizacionautomatica
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 15
+  # Espera 2 minutos sin carga antes de bajar replicas
+  cooldownPeriod: 120
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        host: amqp://rabbitmq:5672/
+        queueName: tracking.events
+        mode: QueueLength
+        value: "200"
+      authenticationRef:
+        name: fiscalizacionautomatica-rabbitmq

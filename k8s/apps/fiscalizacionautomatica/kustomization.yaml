@@ -5,3 +5,14 @@ namespace: tse
 
 resources:
   - deployment.yaml
+  - keda.yaml
+  - cronjob-poller.yaml
+  - secret-balanzas.yaml
+
+# URL del nodo de balanzas y client id del poller (no son secretos; el client secret esta en el Secret
+# fiscalizacion-balanzas). El generador le agrega un hash al nombre: si cambia app.json, el CronJob
+# toma el ConfigMap nuevo en la proxima ejecucion.
+configMapGenerator:
+  - name: fiscalizacionautomatica-config
+    files:
+      - app.json

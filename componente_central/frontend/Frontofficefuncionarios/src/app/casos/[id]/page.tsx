@@ -94,7 +94,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           <span className={dato}>Empresa:</span> {caso.empresa ?? "-"}
           {caso.nroEmpresa != null && <span className="text-zinc-500"> (N° {caso.nroEmpresa})</span>}
         </p>
-        <p><span className={dato}>Guía:</span> <span className="font-mono">{caso.guia.id}</span></p>
+        <p><span className={dato}>Guía:</span> <span className="font-mono">{caso.guia?.id ?? "Sin guía"}</span></p>
         <p><span className={dato}>Vehículo:</span> <span className="font-mono">{caso.matricula ?? "-"}</span></p>
         {caso.descripcion && (
           <p className="sm:col-span-2"><span className={dato}>Descripción:</span> {caso.descripcion}</p>
@@ -133,14 +133,22 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className={`flex flex-col gap-1 ${tarjeta}`}>
                 <h3 className="font-medium text-black dark:text-zinc-50">Guía de viaje</h3>
-                <p><span className={dato}>Fecha:</span> {fecha(ev.guia.fecha)}</p>
-                <p><span className={dato}>Recorrido:</span> {ev.guia.origen ?? "-"} → {ev.guia.destino ?? "-"}</p>
-                <p>
-                  <span className={dato}>Carga declarada:</span> {kg(ev.guia.pesoCargaKg)}
-                  {ev.guia.tipoCarga ? ` · ${ev.guia.tipoCarga}` : ""}
-                </p>
-                <p><span className={dato}>Rubro:</span> {ev.guia.rubroCliente ?? "-"}</p>
-                <p><span className={dato}>Estado de la guía:</span> {ev.guia.estado ?? "-"}</p>
+                {ev.guia ? (
+                  <>
+                    <p><span className={dato}>Fecha:</span> {fecha(ev.guia.fecha)}</p>
+                    <p><span className={dato}>Recorrido:</span> {ev.guia.origen ?? "-"} → {ev.guia.destino ?? "-"}</p>
+                    <p>
+                      <span className={dato}>Carga declarada:</span> {kg(ev.guia.pesoCargaKg)}
+                      {ev.guia.tipoCarga ? ` · ${ev.guia.tipoCarga}` : ""}
+                    </p>
+                    <p><span className={dato}>Rubro:</span> {ev.guia.rubroCliente ?? "-"}</p>
+                    <p><span className={dato}>Estado de la guía:</span> {ev.guia.estado ?? "-"}</p>
+                  </>
+                ) : (
+                  <p className="text-zinc-600 dark:text-zinc-400">
+                    El vehículo no tenía una guía asignada ni en curso.
+                  </p>
+                )}
               </div>
               <div className={`flex flex-col gap-1 ${tarjeta}`}>
                 <h3 className="font-medium text-black dark:text-zinc-50">Vehículo (datos declarados)</h3>

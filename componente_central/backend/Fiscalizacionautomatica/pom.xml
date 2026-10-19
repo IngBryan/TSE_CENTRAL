@@ -99,8 +99,21 @@
             <artifactId>mongodb-driver-sync</artifactId>
             <version>${version.mongodb.driver}</version>
         </dependency>
-        <!-- Remote EJB contracts of Frontofficeciudadanos and Backofficeautoridadesadministradores. Install
-            them first: mvn -f ../Modelo/pom.xml install, then the same for each of the two projects -->
+        <!-- Remote EJB contracts of Frontofficeciudadanos, Frontofficefuncionarios and
+            Backofficeautoridadesadministradores. Install them first: mvn -f ../Modelo/pom.xml install, then
+            the same for each of the three projects -->
+        <dependency>
+            <groupId>tse.lab.frontofficefuncionarios</groupId>
+            <artifactId>frontofficefuncionarios-ejb</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <type>ejb-client</type>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>tse.lab.backofficeautoridadesadministradores</groupId>
             <artifactId>backofficeautoridadesadministradores-ejb</artifactId>
