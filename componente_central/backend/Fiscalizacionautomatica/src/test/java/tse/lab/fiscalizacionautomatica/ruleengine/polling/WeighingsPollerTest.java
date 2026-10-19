@@ -57,6 +57,7 @@ class WeighingsPollerTest {
         assertEquals(List.of(new Request(1, START_OF_TODAY, NOW),
                 new Request(2, START_OF_TODAY, NOW)), api.requests);
         assertEquals(2, result.weighings().size());
+        assertEquals(List.of(1L, 2L), result.polledScaleIds());
         assertEquals(List.of(), result.failedScaleIds());
         assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
         assertEquals(Optional.of(NOW), metadata.findLastTimestamp(2));
@@ -107,6 +108,7 @@ class WeighingsPollerTest {
 
         PollResult result = poller.poll();
 
+        assertEquals(List.of(1L), result.polledScaleIds());
         assertEquals(List.of(2L), result.failedScaleIds());
         assertEquals(List.of(new Weighing(10, 1, "SBC1234", NOW.minusSeconds(1), 18_000)), result.weighings());
         assertEquals(Optional.of(NOW), metadata.findLastTimestamp(1));
@@ -139,6 +141,7 @@ class WeighingsPollerTest {
 
         PollResult result = poller.poll();
 
+        assertEquals(List.of(), result.polledScaleIds());
         assertEquals(List.of(1L, 2L), result.failedScaleIds());
         assertEquals(Optional.empty(), metadata.findLastTimestamp(1));
         assertEquals(Optional.empty(), metadata.findLastTimestamp(2));

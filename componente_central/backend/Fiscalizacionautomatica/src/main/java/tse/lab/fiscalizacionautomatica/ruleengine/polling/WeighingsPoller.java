@@ -23,9 +23,11 @@ public class WeighingsPoller {
     /**
      * @param weighings      weighings fetched (including the ones already saved by a previous run)
      * @param saved          how many of them were new
+     * @param polledScaleIds scales that answered and whose weighings were saved (communication succeeded)
      * @param failedScaleIds scales that could not be polled or whose weighings could not be saved
      */
-    public record PollResult(Instant to, List<Weighing> weighings, int saved, List<Long> failedScaleIds) {
+    public record PollResult(Instant to, List<Weighing> weighings, int saved, List<Long> polledScaleIds,
+            List<Long> failedScaleIds) {
     }
 
     private final List<Long> scaleIds;
@@ -52,6 +54,7 @@ public class WeighingsPoller {
         Instant to = clock.instant();
         List<Weighing> weighings = new ArrayList<>();
         int saved = 0;
+        List<Long> polledScaleIds = new ArrayList<>();
         List<Long> failedScaleIds = new ArrayList<>();
         for (long scaleId : scaleIds) {
             Instant from = metadata.findLastTimestamp(scaleId).orElseGet(() -> startOfDay(to));
@@ -60,11 +63,12 @@ public class WeighingsPoller {
                 saved += weighingDAO.save(fetched);
                 metadata.saveLastTimestamp(scaleId, to);
                 weighings.addAll(fetched);
+                polledScaleIds.add(scaleId);
             } catch (IOException e) {
                 failedScaleIds.add(scaleId);
             }
         }
-        return new PollResult(to, weighings, saved, failedScaleIds);
+        return new PollResult(to, weighings, saved, polledScaleIds, failedScaleIds);
     }
 
     private static Instant startOfDay(Instant now) {

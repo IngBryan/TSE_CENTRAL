@@ -17,8 +17,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.bson.Document;
 import tse.lab.fiscalizacionautomatica.ruleengine.cases.CaseAssigner;
@@ -35,6 +37,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGui
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveNodesClient;
+import tse.lab.fiscalizacionautomatica.ruleengine.nodes.NodeCommunications;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.BalanzasConfig;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
@@ -47,6 +50,8 @@ public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
     private static final Duration ACTIVE_GPS_REFRESH = Duration.ofSeconds(60);
+    /** How often the last communication of each GPS is sent to the backoffice. */
+    private static final Duration GPS_COMMUNICATIONS_FLUSH = Duration.ofSeconds(60);
     /** Detection threads of the tracking consumer: the events of a vehicle always go to the same one. */
     private static final int DETECTION_LANES = 4;
     private static final int DETECTION_QUEUE_PER_LANE = 1_000;
@@ -84,6 +89,9 @@ public class Main {
         ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
         waitForActiveGps(activeGps);
         activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
+        NodeCommunications gpsCommunications = new NodeCommunications(nodes::reportGpsCommunications,
+                Clock.systemUTC());
+        gpsCommunications.flushEvery(GPS_COMMUNICATIONS_FLUSH);
 
         MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
         dao.createIndexes();
@@ -104,11 +112,16 @@ public class Main {
             cases.close();
             facts.close();
             activeGps.close();
+            gpsCommunications.close();
             nodes.close();
             mongo.close();
         }));
 
-        TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, detection::submit);
+        // A saved event is a successful communication with its GPS
+        TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
+            gpsCommunications.record(event.gpsId());
+            detection.submit(event);
+        });
 
         new TrackingConsumer(connection.createChannel(), receiver).start();
         System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n", TrackingConsumer.QUEUE,
@@ -146,11 +159,19 @@ public class Main {
             System.err.println(e.getMessage());
             return 1;
         }
-        String url = balanzas.url();
-
-        List<Long> scaleIds;
         try (ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
+            return pollWeighings(nodes, balanzas);
+        } catch (IOException e) {
+            System.err.println(e.getMessage() + ": " + e.getCause());
+            return 1;
+        }
+    }
+
+    private static int pollWeighings(ActiveNodesClient nodes, BalanzasConfig balanzas) {
+        String url = balanzas.url();
+        List<Long> scaleIds;
+        try {
             scaleIds = nodes.findActiveScaleIds();
         } catch (IOException e) {
             System.err.println("Could not get the active scales: " + e.getMessage() + ": " + e.getCause());
@@ -179,6 +200,7 @@ public class Main {
                 System.err.println("Could not poll or save scales " + result.failedScaleIds()
                         + ": their last timestamp was not updated");
             }
+            reportScaleCommunications(nodes, result);
 
             // Also the ones left pending by previous runs
             int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO,
@@ -194,6 +216,24 @@ public class Main {
         } catch (IOException e) {
             System.err.println("Could not evaluate the pending weighings: " + e.getMessage() + ": " + e.getCause());
             return 1;
+        }
+    }
+
+    /**
+     * ultimaComunicacionExitosa of the scales that answered: the moment of the poll. A failure loses no
+     * weighing, so it is only logged and the next run records it again.
+     */
+    private static void reportScaleCommunications(ActiveNodesClient nodes, PollResult result) {
+        if (result.polledScaleIds().isEmpty()) {
+            return;
+        }
+        Map<Long, Instant> communications = result.polledScaleIds().stream()
+                .collect(Collectors.toMap(scaleId -> scaleId, scaleId -> result.to()));
+        try {
+            nodes.reportScaleCommunications(communications);
+        } catch (IOException e) {
+            System.err.println("Could not record the last communication of scales " + result.polledScaleIds()
+                    + ": " + e.getMessage() + ": " + e.getCause());
         }
     }
 

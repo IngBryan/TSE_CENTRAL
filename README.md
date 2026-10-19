@@ -388,6 +388,11 @@ en varios modos, segun el argumento:
   guardar y sin reencolar. La lista de GPS activos se pide al backoffice por EJB remoto
   (`NodosActivosRemote`, ver *Nodos activos*) y se guarda en memoria para no llamar a WildFly por
   cada mensaje: se refresca cada 60 s y, si un refresco falla, se sigue con la ultima lista.
+- **Ultima comunicacion exitosa del GPS:** cada evento guardado registra en memoria la hora de
+  recepcion para su GPS, y cada 60 s el lote se manda al backoffice
+  (`NodosActivosRemote.registrarComunicaciones`), que actualiza `ultima_comunicacion_exitosa` del
+  `NodoTracking` (solo la avanza, nunca la retrocede: varios pods mandan lotes). Si el envio falla,
+  el lote se manda con el siguiente; al apagarse, el pod manda lo que le quedaba.
 - Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
   `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
   (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`), `WILDFLY_URL`,
@@ -426,6 +431,10 @@ en varios modos, segun el argumento:
 - **Si falla una balanza** (la API o el guardado), se sigue con las demas: solo esa no actualiza
   su `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
   se vuelven a consultar las que respondieron).
+- **Ultima comunicacion exitosa de la balanza:** las balanzas que respondieron y cuyos pesajes se
+  guardaron quedan con `ultima_comunicacion_exitosa = to` en su `NodoBalanza`, en un solo llamado
+  al final del poll (`NodosActivosRemote.registrarComunicaciones`). Si falla, solo se loguea: no se
+  pierde ningun pesaje y la proxima ejecucion la vuelve a registrar.
 - Codigo de salida: `0` si consulto y guardo todas las balanzas y evaluo todos los pendientes, `1`
   si fallo alguna balanza o algun pesaje quedo sin evaluar, si no pudo pedir las balanzas activas
   a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra como ejecucion

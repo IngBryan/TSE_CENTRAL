@@ -1,6 +1,7 @@
 
 package tse.lab.backofficeautoridadesadministradores.data;
 
+import java.time.Instant;
 import java.util.List;
 
 import jakarta.ejb.Stateless;
@@ -64,5 +65,23 @@ public class NodoPerifericoDAO {
         .getSingleResult();
 
         return cantidad > 0;
+    }
+
+    // Avanza la ultima comunicacion exitosa del nodo (tipo = BALANZA o TRACKING, el discriminador). Nunca la
+    // retrocede: la fiscalizacion la manda en lotes desde varios pods, que pueden llegar desordenados.
+    public int registrarComunicacion(String tipo, Long idExterno, Instant fecha) {
+        return em.createNativeQuery(
+            """
+            UPDATE nodos_perifericos
+            SET ultima_comunicacion_exitosa = ?1
+            WHERE tipo = ?2
+              AND id_externo = ?3
+              AND (ultima_comunicacion_exitosa IS NULL OR ultima_comunicacion_exitosa < ?1)
+            """
+        )
+        .setParameter(1, fecha)
+        .setParameter(2, tipo)
+        .setParameter(3, idExterno)
+        .executeUpdate();
     }
 }
