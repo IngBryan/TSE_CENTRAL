@@ -111,6 +111,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Implementacion de JAX-RS para armar las Response en los tests de los recursos (en WildFly la
+            provee el servidor) -->
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>

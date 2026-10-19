@@ -43,6 +43,9 @@ public class IngresoResource {
     @EJB
     private IngresoService ingreso;
 
+    // INGRESO_TESTING=true habilita /ingreso-testing (se puede fijar en los tests)
+    boolean testingHabilitado = "true".equals(System.getenv("INGRESO_TESTING"));
+
     @POST
     @Path("/ingreso-gubuy")
     public Response ingresoGubUy(IngresoRequest body, @Context HttpServletRequest req) {
@@ -66,7 +69,7 @@ public class IngresoResource {
     @POST
     @Path("/ingreso-testing")
     public Response ingresoTesting(IngresoTestingRequest body, @Context HttpServletRequest req) {
-        if (!"true".equals(System.getenv("INGRESO_TESTING"))) {
+        if (!testingHabilitado) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         if (body == null || body.cedula() == null || !CEDULA.matcher(body.cedula()).matches()) {
