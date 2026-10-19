@@ -33,6 +33,12 @@ public class ActiveNodesClient implements AutoCloseable {
         }
     }
 
+    /** With the remote proxy already looked up (tests). */
+    ActiveNodesClient(Context context, NodosActivosRemote nodes) {
+        this.context = context;
+        this.nodes = nodes;
+    }
+
     /** @return ids of the active scales in the balanzas API */
     public List<Long> findActiveScaleIds() throws IOException {
         return findActive(TipoNodo.BALANZA);

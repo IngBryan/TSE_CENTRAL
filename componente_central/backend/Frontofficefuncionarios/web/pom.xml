@@ -111,6 +111,21 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Mockito para simular el servicio y el contexto de JAX-RS -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.20.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Implementacion JAX-RS para construir Response en tests -->
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -124,6 +139,16 @@
                 <configuration>
                     <!-- Jakarta EE doesn't require web.xml, Maven needs to catch up! -->
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- ApiKeyFilter lee la clave al cargarse: los tests usan esta -->
+                    <environmentVariables>
+                        <FUNCIONARIOS_API_KEY>clave-de-test</FUNCIONARIOS_API_KEY>
+                    </environmentVariables>
                 </configuration>
             </plugin>
         </plugins>

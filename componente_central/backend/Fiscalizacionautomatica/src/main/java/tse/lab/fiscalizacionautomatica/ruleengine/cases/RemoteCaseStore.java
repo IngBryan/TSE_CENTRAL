@@ -34,6 +34,12 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
         }
     }
 
+    /** With the remote proxy already looked up (tests). */
+    RemoteCaseStore(Context context, CasosAutomaticosRemote cases) {
+        this.context = context;
+        this.cases = cases;
+    }
+
     @Override
     public List<DatosCaso> openCases(String licensePlate) throws IOException {
         return call(() -> cases.casosAbiertos(licensePlate));

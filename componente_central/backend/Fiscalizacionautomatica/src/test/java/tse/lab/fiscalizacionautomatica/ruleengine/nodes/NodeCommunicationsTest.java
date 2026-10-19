@@ -18,10 +18,14 @@ class NodeCommunicationsTest {
     private final MutableClock clock = new MutableClock(NOW);
     private final List<Map<Long, Instant>> batches = new ArrayList<>();
     private boolean wildFlyDown;
+    private boolean unexpectedFailure;
 
     private final NodeCommunications communications = new NodeCommunications(batch -> {
         if (wildFlyDown) {
             throw new IOException("WildFly down");
+        }
+        if (unexpectedFailure) {
+            throw new IllegalStateException("bug");
         }
         batches.add(batch);
     }, clock);
@@ -61,6 +65,32 @@ class NodeCommunicationsTest {
         communications.flush();
 
         assertEquals(List.of(Map.of(1L, NOW, 2L, NOW.plusSeconds(60))), batches);
+    }
+
+    @Test
+    void anUnexpectedFailureAlsoKeepsTheBatch() {
+        communications.record(1);
+        unexpectedFailure = true;
+        communications.flush();
+
+        unexpectedFailure = false;
+        communications.flush();
+
+        assertEquals(List.of(Map.of(1L, NOW)), batches);
+    }
+
+    @Test
+    void flushesPeriodically() throws InterruptedException {
+        communications.record(5);
+
+        communications.flushEvery(Duration.ofMillis(10));
+
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (batches.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        communications.close();
+        assertEquals(Map.of(5L, NOW), batches.get(0));
     }
 
     @Test
