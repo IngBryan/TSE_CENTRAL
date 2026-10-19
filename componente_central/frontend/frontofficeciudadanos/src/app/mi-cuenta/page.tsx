@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Encabezado, botonGubUy, botonSecundario } from "@/components/encabezado";
 import type { EstadoPerfil } from "@/lib/auth/perfil";
 import { getSesion } from "@/lib/auth/session";
+import { BASE_PATH } from "@/lib/base-path";
 
 const ESTADOS: Record<EstadoPerfil, string> = {
   VALIDADO: "Identidad validada",
@@ -45,7 +46,7 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
             <dt className="font-medium">Estado</dt>
             <dd>{ESTADOS[perfil.estado] ?? perfil.estado}</dd>
           </dl>
-          <a href="/auth/logout" className={botonSecundario}>
+          <a href={`${BASE_PATH}/auth/logout`} className={botonSecundario}>
             Cerrar sesión
           </a>
         </div>

@@ -31,8 +31,8 @@ Para acceder a estos servicios, Kubernetes utiliza Services de tipo `ExternalNam
 
 | Service | Destino | Puerto |
 |---|---|---|
-| `postgres` | `tse-postgres.web.elasticloud.uy` | 5432 |
-| `mongodb` | `tse-mongo.web.elasticloud.uy` | 27017 |
+| `postgres` | `node6259-tse-postgres.web.elasticloud.uy` | 5432 |
+| `mongodb` | `node6260-tse-mongo.web.elasticloud.uy` | 27017 |
 | `rabbitmq` | `tse-rabbitmq.web.elasticloud.uy` | 5672 |
 
 Las aplicaciones utilizan los nombres internos `postgres`, `mongodb` y `rabbitmq`, sin depender directamente de los dominios externos.
@@ -86,7 +86,29 @@ mongo-user
 mongo-password
 rabbitmq-user
 rabbitmq-password
+ciudadanos-api-key
+funcionarios-api-key
+ejb-user
+ejb-password
+oidc-client-secret
+session-secret
+movil-token-secret
+pdi-organismo-clave
 ```
+
+| Clave | Variable (`.env` local) | La usa |
+|---|---|---|
+| `ciudadanos-api-key` | `CIUDADANOS_API_KEY` | wildfly y frontofficeciudadanos-front (`BACKEND_API_KEY`), el mismo valor |
+| `oidc-client-secret` | `OIDC_CLIENT_SECRET` | frontofficeciudadanos-front |
+| `session-secret` | `SESSION_SECRET` | frontofficeciudadanos-front |
+| `movil-token-secret` | `MOVIL_TOKEN_SECRET` | frontofficeciudadanos-front |
+| `pdi-organismo-clave` | `PDI_ORGANISMO_CLAVE` | wildfly (igual al de la PDI) |
+
+`ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
+llama por EJB remoto a Frontofficeciudadanos: WildFly lo crea al arrancar (`wildfly/start.sh`) y
+fiscalizacion se autentica con el. En WildFly son opcionales (sin ellas arranca, sin el usuario), pero
+el consumidor de tracking de fiscalizacion las necesita: al arrancar pide la lista de GPS activos por EJB
+remoto y no consume hasta tenerla. Hay que cargarlas en el Secret antes de desplegar.
 
 Crearlo con los valores correspondientes al entorno:
 
@@ -97,8 +119,48 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=mongo-user='<MONGO_USER>' \
   --from-literal=mongo-password='<MONGO_PASSWORD>' \
   --from-literal=rabbitmq-user='<RABBITMQ_USER>' \
-  --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>'
+  --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>' \
+  --from-literal=ciudadanos-api-key='<CIUDADANOS_API_KEY>' \
+  --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>' \
+  --from-literal=ejb-user='<EJB_USER>' \
+  --from-literal=ejb-password='<EJB_PASSWORD>' \
+  --from-literal=oidc-client-secret='<OIDC_CLIENT_SECRET>' \
+  --from-literal=session-secret='<SESSION_SECRET>' \
+  --from-literal=movil-token-secret='<MOVIL_TOKEN_SECRET>' \
+  --from-literal=pdi-organismo-clave='<PDI_ORGANISMO_CLAVE>'
 ```
+
+Si el Secret ya existe, agregar las claves nuevas sin recrearlo (y reiniciar WildFly para que cree el
+usuario: `kubectl -n tse rollout restart deployment/wildfly`):
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"ejb-user":"<EJB_USER>","ejb-password":"<EJB_PASSWORD>"}}'
+```
+
+Lo mismo para las del front de ciudadanos y la PDI:
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"oidc-client-secret":"<OIDC_CLIENT_SECRET>","session-secret":"<SESSION_SECRET>","movil-token-secret":"<MOVIL_TOKEN_SECRET>","pdi-organismo-clave":"<PDI_ORGANISMO_CLAVE>"}}'
+```
+
+Los secretos de produccion deben ser distintos a los de desarrollo local. Despues de cambiar el
+Secret, reiniciar los pods para que tomen los valores nuevos
+(`kubectl -n tse rollout restart deployment/wildfly deployment/frontofficeciudadanos-front`).
+
+La configuracion que no es secreta esta en ConfigMaps junto a cada aplicacion:
+
+- `apps/frontofficeciudadanos-front/configmap.yaml`: `APP_BASE_URL`, `OIDC_CLIENT_ID`, `BACKEND_URL`.
+- `apps/wildfly/configmap.yaml`: `PDI_URL`, `PDI_ORGANISMO_CODIGO`.
+
+**Login con ID Uruguay:** la redirect URI es `APP_BASE_URL` y la de logout `APP_BASE_URL/logout`
+(`https://env-6537388.web.elasticloud.uy/ciudadanos` y `.../ciudadanos/logout`). Ambas tienen que estar
+registradas en ID Uruguay; si no, gub.uy rechaza el login. El ingress no tiene TLS: el HTTPS lo termina
+el proxy de Elastic Cloud que esta delante.
+
+**PDI:** `PDI_URL` tiene que apuntar a donde este desplegada la PDI (`TSE_NODOS`), y
+`PDI_ORGANISMO_CODIGO` / `pdi-organismo-clave` coincidir con los que usa la PDI.
 
 Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.
 
@@ -148,6 +210,30 @@ kubectl -n argocd create secret docker-registry ghcr-credentials \
   --docker-username=IngBryan \
   --docker-password='<TOKEN_PACKAGES>'
 ```
+
+### 6. Secretos del front de funcionarios
+
+Se crean en el namespace `tse` y no deben almacenarse en el repositorio.
+
+`SESSION_SECRET` cifra la cookie de sesión (string largo y aleatorio, distinto del de ciudadanos) y `BACKEND_API_KEY` debe coincidir con `funcionarios-api-key` de `tse-runtime-secrets` (no con la key de ciudadanos).
+
+```bash
+kubectl -n tse create secret generic frontofficefuncionarios-front-secrets \
+  --from-literal=SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+  --from-literal=BACKEND_API_KEY='<FUNCIONARIOS_API_KEY>'
+```
+
+El ingreso de testing con cédula (`LOGIN_TESTING=true` en `deployment.yaml`) está habilitado hasta que se integre gub.uy: mientras tanto cualquiera puede ingresar con la cédula de un funcionario registrado.
+
+Certificado TLS del host del ingress (`env-6537388.web.elasticloud.uy`), a partir del certificado y su clave privada en formato PEM:
+
+```bash
+kubectl -n tse create secret tls frontofficefuncionarios-front-tls \
+  --cert=<certificado.pem> \
+  --key=<clave.pem>
+```
+
+Las URLs de la aplicación y del backend no son secretas: se encuentran en `k8s/apps/frontofficefuncionarios-front/app.json`, que se monta como ConfigMap en `/app/config/app.json`.
 
 ## Registrar aplicaciones en Argo CD
 
@@ -273,3 +359,4 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 - **Error de conexión con infraestructura externa:** comprobar resolución DNS, conectividad TCP, puertos, credenciales y disponibilidad de los servicios en Elastic Cloud.
 - **WildFly no inicia:** revisar logs y conectividad con PostgreSQL.
 - **Fiscalización no consume eventos:** revisar la conexión a RabbitMQ, la cola `tracking.events` y MongoDB.
+- **Front de funcionarios sin sesión o con 401 del backend:** verificar `frontofficefuncionarios-front-secrets` (`SESSION_SECRET` y `BACKEND_API_KEY`).

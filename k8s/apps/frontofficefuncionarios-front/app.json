@@ -1,0 +1,5 @@
+{
+  "appBaseUrl": "https://env-6537388.web.elasticloud.uy/funcionarios",
+  "backendUrl": "http://wildfly:8080/frontofficefuncionarios-web/api",
+  "backendTimeoutMs": 10000
+}

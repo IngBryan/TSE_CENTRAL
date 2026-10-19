@@ -49,7 +49,10 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
       - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
-      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      - BACKEND_API_KEY=${CIUDADANOS_API_KEY}
+      # Ingreso de testing con cedula, sin gub.uy (tambien hace falta INGRESO_TESTING en wildfly).
+      # Apagado por defecto: en local anda gub.uy. CIUDADANOS_LOGIN_TESTING=true en el .env lo prende.
+      - LOGIN_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
     depends_on:
       - wildfly
     restart: unless-stopped
@@ -62,6 +65,17 @@ services:
       - "3003:3000"
     environment:
       - NODE_ENV=production
+      # Clave propia: si se filtra la de ciudadanos no sirve para fabricar sesiones de funcionarios
+      - SESSION_SECRET=${FUNCIONARIOS_SESSION_SECRET}
+      # Key propia del backend de funcionarios: la de ciudadanos no sirve para llamar a /casos
+      - BACKEND_API_KEY=${FUNCIONARIOS_API_KEY}
+      # Ingreso con cedula sin proveedor de identidad (hasta que se integre gub.uy)
+      - LOGIN_TESTING=true
+    volumes:
+      # URLs de la app y del backend (ver src/lib/config.ts)
+      - ./componente_central/frontend/Frontofficefuncionarios/config/docker.json:/app/config/app.json:ro
+    depends_on:
+      - wildfly
     restart: unless-stopped
   backofficeautoridadesadministradores-front:
     hostname: backofficeautoridadesadministradores
@@ -151,8 +165,11 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
-      # Clave que exige la API REST de frontofficeciudadanos-web (header X-Api-Key)
-      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      # Claves que exigen las API REST (header X-Api-Key): una por frontoffice
+      - CIUDADANOS_API_KEY=${CIUDADANOS_API_KEY}
+      - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
+      # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy): mismo interruptor que el front
+      - INGRESO_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
       # App movil del chofer (TSE_MOVIL): login con gub.uy en POST /api/movil/auth/token. El canje
       # del code lo hace WildFly con el mismo cliente de ID Uruguay que la web.
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
@@ -160,6 +177,9 @@ services:
       - OIDC_REDIRECT_URIS_MOVIL=${OIDC_REDIRECT_URIS_MOVIL:-uy.carga.movil:/oauth2redirect,http://localhost:8080}
       # Firma el token (JWT HS256, 8 h) que la app manda en /api/movil/*: 32+ caracteres aleatorios
       - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
+      # Usuario de aplicacion para EJB remoto (lo crea wildfly/start.sh al arrancar)
+      - EJB_USER=${EJB_USER}
+      - EJB_PASSWORD=${EJB_PASSWORD}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:
@@ -177,6 +197,9 @@ services:
   fiscalizacionautomatica:
     build:
       context: ./componente_central/backend/Fiscalizacionautomatica
+      # Modelo y Frontofficeciudadanos: de ahi sale el contrato del EJB remoto (ejb-client)
+      additional_contexts:
+        backend: ./componente_central/backend
     hostname: fiscalizacionautomatica
     container_name: fiscalizacion-server
     restart: unless-stopped
@@ -193,6 +216,41 @@ services:
       - MONGO_DB=main_db
       - MONGO_USER=${MONGO_USER}
       - MONGO_PASSWORD=${MONGO_PASSWORD}
+      # EJB remoto de Frontofficeciudadanos (viajes en curso); mismo usuario que crea WildFly
+      - WILDFLY_URL=remote+http://wildfly:8080
+      - EJB_USER=${EJB_USER}
+      - EJB_PASSWORD=${EJB_PASSWORD}
+
+  # Misma imagen, en modo poller: consulta una vez la API de balanzas (TSE_NODOS) y termina.
+  # No queda corriendo: lo lanza un cron con "docker compose run --rm fiscalizacionautomatica-poller".
+  # El perfil "cron" evita que "docker compose up" lo arranque junto con el resto.
+  fiscalizacionautomatica-poller:
+    build:
+      context: ./componente_central/backend/Fiscalizacionautomatica
+      additional_contexts:
+        backend: ./componente_central/backend
+    profiles: ["cron"]
+    command: ["weighings-poller"]
+    # Las balanzas activas las pide por EJB remoto a WildFly (backoffice) y la ultima consulta
+    # exitosa de cada una (balanzas_metadata) se guarda en MongoDB
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      wildfly:
+        condition: service_healthy
+    environment:
+      - BALANZAS_URL=${BALANZAS_URL:-http://host.docker.internal:3001}
+      - BALANZAS_CLIENT_ID=${BALANZAS_CLIENT_ID}
+      - BALANZAS_CLIENT_SECRET=${BALANZAS_CLIENT_SECRET}
+      - MONGO_HOST=mongodb
+      - MONGO_DB=main_db
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - WILDFLY_URL=remote+http://wildfly:8080
+      - EJB_USER=${EJB_USER}
+      - EJB_PASSWORD=${EJB_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
 
 volumes:
   rabbitmq-data:

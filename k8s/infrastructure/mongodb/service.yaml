@@ -4,7 +4,7 @@ metadata:
   name: mongodb
 spec:
   type: ExternalName
-  externalName: tse-mongo.web.elasticloud.uy
+  externalName: node6260-tse-mongo.web.elasticloud.uy
   ports:
     - name: mongodb
       port: 27017

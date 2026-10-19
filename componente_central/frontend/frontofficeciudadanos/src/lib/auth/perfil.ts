@@ -45,22 +45,26 @@ export function nombreDe(claims: ClaimsGubUy): string {
   );
 }
 
-export async function ingresarEnBackend(
-  claims: ClaimsGubUy,
-  correlationId: string,
-): Promise<{ perfil: PerfilCiudadano; resultado: ResultadoValidacion; sesionPermitida: boolean; nuevo: boolean }> {
+type Ingreso = { perfil: PerfilCiudadano; resultado: ResultadoValidacion; sesionPermitida: boolean; nuevo: boolean };
+
+export async function ingresarEnBackend(claims: ClaimsGubUy, correlationId: string): Promise<Ingreso> {
   const cedula = cedulaDe(claims);
   if (!cedula) {
     throw new ErrorLogin("token_invalido", "gub.uy no devolvio la cedula (falta el scope document o personal_info)");
   }
+  return ingresar("/ciudadanos/ingreso-gubuy", { cedula, email: claims.email, sub: claims.sub }, nombreDe(claims), correlationId);
+}
 
+// Ingreso de testing (LOGIN_TESTING=true): el mismo ingreso del backend (perfil, PDI, roles) con la cedula
+// ingresada a mano, sin gub.uy. El backend solo lo atiende con INGRESO_TESTING=true (si no, 404).
+export async function ingresarParaTesting(cedula: string, correlationId: string): Promise<Ingreso> {
+  return ingresar("/ciudadanos/ingreso-testing", { cedula }, `C.I. ${cedula}`, correlationId);
+}
+
+async function ingresar(ruta: string, body: unknown, nombreAlternativo: string, correlationId: string): Promise<Ingreso> {
   let res;
   try {
-    res = await llamarBackend<RespuestaIngreso>("/ciudadanos/ingreso-gubuy", {
-      method: "POST",
-      body: { cedula, email: claims.email, sub: claims.sub },
-      correlationId,
-    });
+    res = await llamarBackend<RespuestaIngreso>(ruta, { method: "POST", body, correlationId });
   } catch (e) {
     if (e instanceof BackendNoDisponible) throw new ErrorLogin("ingreso_no_disponible", e.message);
     throw e;
@@ -74,7 +78,7 @@ export async function ingresarEnBackend(
   return {
     perfil: {
       cedula: r.perfil.cedula,
-      nombre: nombrePdi || nombreDe(claims),
+      nombre: nombrePdi || nombreAlternativo,
       email: r.perfil.email,
       estado: r.perfil.estado,
       roles: r.roles ?? [],

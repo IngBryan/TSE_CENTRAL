@@ -15,7 +15,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
 // El puerto 8080 esta publicado: toda la API exige la clave compartida con el frontoffice de Next
-// en el header X-Api-Key (BACKEND_API_KEY, del .env raiz). Sin clave configurada no atiende nada.
+// en el header X-Api-Key (CIUDADANOS_API_KEY, del .env raiz). Sin clave configurada no atiende nada.
 // Excepcion: /movil/*, que llama la app del chofer con su propio token (MovilTokenFilter).
 // Tambien toma el X-Correlation-Id que manda el front (o genera uno) y lo devuelve en la respuesta.
 @Provider
@@ -54,7 +54,7 @@ public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFi
     }
 
     private static byte[] claveConfigurada() {
-        String valor = System.getenv("BACKEND_API_KEY");
+        String valor = System.getenv("CIUDADANOS_API_KEY");
         return valor == null ? new byte[0] : valor.getBytes(StandardCharsets.UTF_8);
     }
 }

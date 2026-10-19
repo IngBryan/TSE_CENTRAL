@@ -27,6 +27,17 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            # Ingreso con cedula sin proveedor de identidad, hasta que se integre gub.uy
+            - name: LOGIN_TESTING
+              value: "true"
+          # SESSION_SECRET y BACKEND_API_KEY: el Secret se crea a mano y no va al repo (ver k8s/README.md)
+          envFrom:
+            - secretRef:
+                name: frontofficefuncionarios-front-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /funcionarios
@@ -52,3 +63,8 @@ spec:
             runAsUser: 1001
             runAsGroup: 1001
             allowPrivilegeEscalation: false
+      volumes:
+        # app.json con las URLs (configMapGenerator en kustomization.yaml)
+        - name: config
+          configMap:
+            name: frontofficefuncionarios-front-config

@@ -92,6 +92,49 @@ spec:
                   key: movil-token-secret
                   optional: true
 
+            # X-Api-Key de frontofficeciudadanos-web (la misma que BACKEND_API_KEY del front de ciudadanos)
+            - name: CIUDADANOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ciudadanos-api-key
+                  optional: true
+
+            # X-Api-Key de frontofficefuncionarios-web (la misma que BACKEND_API_KEY del front de funcionarios)
+            - name: FUNCIONARIOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: funcionarios-api-key
+                  optional: true
+
+            # Usuario de aplicacion para EJB remoto (lo crea start.sh al arrancar).
+            # optional: sin las claves en el Secret, WildFly arranca igual pero sin el usuario.
+            - name: EJB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ejb-user
+                  optional: true
+
+            - name: EJB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: ejb-password
+                  optional: true
+
+            # PDI: PDI_URL y PDI_ORGANISMO_CODIGO salen de configmap.yaml (envFrom)
+            - name: PDI_ORGANISMO_CLAVE
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: pdi-organismo-clave
+
+          envFrom:
+            - configMapRef:
+                name: wildfly-config
+
           # WildFly puede tardar bastante en desplegar los 3 EAR.
           startupProbe:
             exec:
@@ -125,4 +168,6 @@ spec:
 
           securityContext:
             runAsNonRoot: true
+            # jboss user of the WildFly base image (non-numeric USER in the Dockerfile)
+            runAsUser: 1000
             allowPrivilegeEscalation: false

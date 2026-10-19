@@ -19,6 +19,8 @@ public class ITV implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private LocalDate fechaEmision;
+
     private LocalDate fechaVencimiento;
 
     @ManyToOne(optional = false)
@@ -28,13 +30,27 @@ public class ITV implements Serializable {
     public ITV() {
     }
 
+    // ABM de vehiculos del frontoffice de ciudadanos: la empresa solo declara el vencimiento de la ITV
     public ITV(LocalDate fechaVencimiento, Vehiculo vehiculo) {
+        this(null, fechaVencimiento, vehiculo);
+    }
+
+    public ITV(LocalDate fechaEmision, LocalDate fechaVencimiento, Vehiculo vehiculo) {
+        this.fechaEmision = fechaEmision;
         this.fechaVencimiento = fechaVencimiento;
         this.vehiculo = vehiculo;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public LocalDate getFechaEmision() {
+        return fechaEmision;
+    }
+
+    public void setFechaEmision(LocalDate fechaEmision) {
+        this.fechaEmision = fechaEmision;
     }
 
     public LocalDate getFechaVencimiento() {

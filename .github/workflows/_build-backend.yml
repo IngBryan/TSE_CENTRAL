@@ -22,7 +22,7 @@ on:
         type: string
         required: true
       install-first:
-        description: Proyecto Maven del que depende y que se instala antes (por ejemplo Modelo)
+        description: Proyectos Maven de los que depende, separados por espacio y en orden (por ejemplo Modelo)
         type: string
         required: false
         default: ""
@@ -49,9 +49,12 @@ jobs:
           java-version: "24"
           cache: maven
 
-      - name: Instalar proyecto del que depende
+      - name: Instalar proyectos de los que depende
         if: inputs.install-first != ''
-        run: mvn -B -f "${{ inputs.install-first }}/pom.xml" install -DskipTests
+        run: |
+          for project in ${{ inputs.install-first }}; do
+            mvn -B -f "$project/pom.xml" install -DskipTests
+          done
 
       - name: Compilar y ejecutar tests
         run: >

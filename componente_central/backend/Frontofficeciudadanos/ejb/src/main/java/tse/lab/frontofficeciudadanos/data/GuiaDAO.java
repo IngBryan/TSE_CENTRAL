@@ -88,6 +88,16 @@ public class GuiaDAO {
                 .getSingleResult();
     }
 
+    public List<Guia> buscarPorVehiculoYEstados(String matricula, List<EstadoGuia> estados) {
+        return em.createQuery(
+                "SELECT g FROM Guia g WHERE g.vehiculo.matricula = :matricula AND g.estado IN :estados "
+                        + "ORDER BY g.fecha, g.id",
+                Guia.class)
+                .setParameter("matricula", matricula)
+                .setParameter("estados", estados)
+                .getResultList();
+    }
+
     public List<Guia> buscarSinVehiculoAsignado() {
         return em.createQuery(
                 "SELECT g FROM Guia g WHERE g.vehiculo IS NULL", Guia.class)
