@@ -11,6 +11,8 @@ on:
       - componente_central/backend/Frontofficeciudadanos/ejb/**
       - componente_central/backend/Backofficeautoridadesadministradores/pom.xml
       - componente_central/backend/Backofficeautoridadesadministradores/ejb/**
+      - componente_central/backend/Frontofficefuncionarios/pom.xml
+      - componente_central/backend/Frontofficefuncionarios/ejb/**
       - docker-compose.yml
       - .github/workflows/docker-fiscalizacionautomatica.yml
       - .github/workflows/_docker-image.yml

@@ -7,8 +7,8 @@ import java.util.Optional;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 
 /**
- * Finds the situations that apply to a vehicle event. It doesn't create cases: that step (which also
- * skips the situations that already have an open case of the vehicle) comes later.
+ * Finds the situations that apply to a vehicle event. It doesn't create cases: CaseAssigner does, applying
+ * the hierarchy against the open cases of the vehicle.
  */
 public class SituationDetector {
 
@@ -22,19 +22,19 @@ public class SituationDetector {
     }
 
     /**
-     * @return the situations that apply, in priority order; empty if none does or if the vehicle is not
-     *         registered in the central (there is no company to notify)
+     * @return the situations that apply, in priority order; none if the vehicle is not registered in the
+     *         central (there is no company to notify)
      * @throws IOException if the vehicle facts can't be fetched: the event must be evaluated again later
      */
-    public List<Situation> detect(VehicleEvent event) throws IOException {
+    public Detection detect(VehicleEvent event) throws IOException {
         Optional<VehicleFacts> facts = factsSource.find(event.licensePlate());
         if (facts.isEmpty()) {
-            System.out.println("Vehicle " + event.licensePlate() + " is not registered: no situations");
-            return List.of();
+            return new Detection(event, null, List.of());
         }
-        return rules.stream()
+        List<Situation> situations = rules.stream()
                 .filter(rule -> rule.appliesTo(event, facts.get()))
                 .map(SituationRule::situation)
                 .toList();
+        return new Detection(event, facts.get(), situations);
     }
 }

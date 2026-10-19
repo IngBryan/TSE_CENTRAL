@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,8 +44,19 @@ public class CasoFiscalizacion implements Serializable {
     @Column(nullable = false)
     private Instant fechaDeteccion;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "id_guia", nullable = false)
+    // false al crearse; pasa a true cuando el usuario de la empresa ve la notificacion del caso
+    @Column(name = "notificacion_vista", nullable = false)
+    private boolean notificacionVista;
+
+    // El vehiculo del caso y, a traves de el, la empresa a notificar. Lo tienen todos los casos que crea la
+    // fiscalizacion automatica; la columna admite null por los casos cargados antes de agregarla.
+    @ManyToOne
+    @JoinColumn(name = "id_vehiculo")
+    private Vehiculo vehiculo;
+
+    // Opcional: un caso de Viaje sin guia no tiene guia
+    @ManyToOne
+    @JoinColumn(name = "id_guia")
     private Guia guia;
 
     @OneToOne(mappedBy = "casoFiscalizacion")
@@ -53,29 +65,39 @@ public class CasoFiscalizacion implements Serializable {
     @OneToOne(mappedBy = "casoFiscalizacion")
     private Descargo descargo;
 
+    // Un evento es evidencia de un unico caso: (matricula, fecha_hora) es unico en las dos tablas
     @ManyToMany
     @JoinTable(name = "casos_eventos_pesajes",
             joinColumns = @JoinColumn(name = "id_caso"),
             inverseJoinColumns = {
                     @JoinColumn(name = "matricula", referencedColumnName = "matricula"),
-                    @JoinColumn(name = "fecha_hora", referencedColumnName = "fecha_hora") })
+                    @JoinColumn(name = "fecha_hora", referencedColumnName = "fecha_hora") },
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_pesaje", columnNames = { "matricula",
+                    "fecha_hora" }))
     private List<EventoPesajes> eventosPesajes = new ArrayList<>();
 
     // Los eventos de tracking estan en MongoDB (EventoTracking): aca solo se guarda la clave
     // (matricula, fecha_hora) de cada uno
     @ElementCollection
-    @CollectionTable(name = "casos_eventos_tracking", joinColumns = @JoinColumn(name = "id_caso"))
+    @CollectionTable(name = "casos_eventos_tracking", joinColumns = @JoinColumn(name = "id_caso"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_tracking", columnNames = { "matricula",
+                    "fecha_hora" }))
     private List<ClaveEvento> clavesEventosTracking = new ArrayList<>();
 
     public CasoFiscalizacion() {
     }
 
-    // Todo caso nace DETECTADA (lo crea la fiscalizacion automatica)
+    // Todo caso nace DETECTADA (lo crea la fiscalizacion automatica). El vehiculo es el de la guia.
     public CasoFiscalizacion(String descripcion, String tipoCaso, Guia guia) {
+        this(descripcion, tipoCaso, guia == null ? null : guia.getVehiculo(), guia);
+    }
+
+    public CasoFiscalizacion(String descripcion, String tipoCaso, Vehiculo vehiculo, Guia guia) {
         this.descripcion = descripcion;
         this.tipoCaso = tipoCaso;
         this.estado = EstadoCaso.DETECTADA;
         this.fechaDeteccion = Instant.now();
+        this.vehiculo = vehiculo;
         this.guia = guia;
     }
 
@@ -113,6 +135,18 @@ public class CasoFiscalizacion implements Serializable {
 
     public Instant getFechaDeteccion() {
         return fechaDeteccion;
+    }
+
+    public boolean isNotificacionVista() {
+        return notificacionVista;
+    }
+
+    public void marcarNotificacionVista() {
+        this.notificacionVista = true;
+    }
+
+    public Vehiculo getVehiculo() {
+        return vehiculo;
     }
 
     public Guia getGuia() {

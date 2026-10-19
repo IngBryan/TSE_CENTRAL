@@ -22,7 +22,8 @@ export type CasoResumen = {
   descripcion: string | null;
   estado: EstadoCaso | null;
   fechaDeteccion: string | null;
-  idGuia: string;
+  // null en los casos de Viaje sin guia
+  idGuia: string | null;
   nroEmpresa: number | null;
   empresa: string | null;
   matricula: string | null;
@@ -52,7 +53,7 @@ export type CasoDetalle = {
   fechaDeteccion: string | null;
   nroEmpresa: number | null;
   empresa: string | null;
-  guia: GuiaVista;
+  guia: GuiaVista | null;
   matricula: string | null;
   tieneDescargo: boolean;
   puedeResolverse: boolean;
@@ -82,7 +83,7 @@ export type EvidenciaVista = {
   tipoCaso: string;
   descripcion: string | null;
   fechaDeteccion: string | null;
-  guia: GuiaVista;
+  guia: GuiaVista | null;
   vehiculo: VehiculoVista | null;
   pesajes: PesajeVista[];
   eventosTracking: EventoTrackingVista[];

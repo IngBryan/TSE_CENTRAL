@@ -54,7 +54,7 @@ class VehiculosServiceTest {
 
     @Test
     void devuelveElVehiculoConSuEmpresa() {
-        assertEquals(new DatosVehiculo("SBC1234", 1L), servicio.buscarVehiculo("SBC1234"));
+        assertEquals(new DatosVehiculo("SBC1234", 1L, 9000, 26000), servicio.buscarVehiculo("SBC1234"));
     }
 
     @Test

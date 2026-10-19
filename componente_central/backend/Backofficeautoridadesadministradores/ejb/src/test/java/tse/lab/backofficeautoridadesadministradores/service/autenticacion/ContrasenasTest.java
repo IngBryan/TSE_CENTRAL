@@ -50,4 +50,29 @@ class ContrasenasTest {
         assertFalse(Contrasenas.verificar(
                 "ContrasenaSegura2026!", null));
     }
+
+    @Test
+    void rechazaHashesMalFormados() {
+        String hash = Contrasenas.generarHash("ContrasenaSegura2026!");
+        String[] partes = hash.split(":");
+
+        // otro algoritmo, iteraciones fuera de rango o no numericas, base64 invalido, largos incorrectos
+        for (String invalido : new String[] {
+                "md5:" + partes[1] + ":" + partes[2] + ":" + partes[3],
+                partes[0] + ":99999:" + partes[2] + ":" + partes[3],
+                partes[0] + ":2000001:" + partes[2] + ":" + partes[3],
+                partes[0] + ":muchas:" + partes[2] + ":" + partes[3],
+                partes[0] + ":" + partes[1] + ":%%%:" + partes[3],
+                partes[0] + ":" + partes[1] + ":" + partes[3] + ":" + partes[3],
+                partes[0] + ":" + partes[1] + ":" + partes[2] + ":" + partes[2] }) {
+            assertFalse(Contrasenas.verificar("ContrasenaSegura2026!", invalido), invalido);
+        }
+        assertFalse(Contrasenas.verificar(null, hash));
+    }
+
+    @Test
+    void laContrasenaEsObligatoria() {
+        assertThrows(IllegalArgumentException.class, () -> Contrasenas.generarHash(null));
+        assertThrows(IllegalArgumentException.class, () -> Contrasenas.generarHash(""));
+    }
 }

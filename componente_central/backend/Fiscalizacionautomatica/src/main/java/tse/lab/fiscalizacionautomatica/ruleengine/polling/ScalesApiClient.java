@@ -45,9 +45,9 @@ public class ScalesApiClient implements ScalesApi {
     }
 
     @Override
-    public List<Weighing> listWeighings(long scaleId, String licensePlate, Instant from, Instant to)
+    public List<Weighing> listWeighings(long scaleId, Instant from, Instant to)
             throws IOException {
-        return withTokenRetry(() -> api.listWeighings(scaleId, licensePlate, format(from), format(to))).stream()
+        return withTokenRetry(() -> api.listWeighings(scaleId, format(from), format(to))).stream()
                 .flatMap(w -> toWeighing(w).stream())
                 .toList();
     }

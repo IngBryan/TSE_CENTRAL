@@ -17,23 +17,29 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.bson.Document;
+import tse.lab.fiscalizacionautomatica.ruleengine.cases.CaseAssigner;
+import tse.lab.fiscalizacionautomatica.ruleengine.cases.RemoteCaseStore;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.RemoteWeighingDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.PendingWeighingsDetection;
-import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationDetector;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
-import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveNodesClient;
+import tse.lab.fiscalizacionautomatica.ruleengine.nodes.NodeCommunications;
+import tse.lab.fiscalizacionautomatica.ruleengine.polling.BalanzasConfig;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.ScalesApiClient;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller;
 import tse.lab.fiscalizacionautomatica.ruleengine.polling.WeighingsPoller.PollResult;
@@ -45,14 +51,18 @@ public class Main {
 
     private static final long RETRY_DELAY_MS = 5_000;
     private static final Duration ACTIVE_GPS_REFRESH = Duration.ofSeconds(60);
+    /** How often the last communication of each GPS is sent to the backoffice. */
+    private static final Duration GPS_COMMUNICATIONS_FLUSH = Duration.ofSeconds(60);
     /** Detection threads of the tracking consumer: the events of a vehicle always go to the same one. */
     private static final int DETECTION_LANES = 4;
     private static final int DETECTION_QUEUE_PER_LANE = 1_000;
     /** Events still pending detection after PENDING_RECOVERY_AFTER are queued again every period. */
     private static final Duration PENDING_RECOVERY_PERIOD = Duration.ofSeconds(60);
     private static final Duration PENDING_RECOVERY_AFTER = Duration.ofMinutes(1);
+    /** How long the shutdown hook waits for the consumer to close (the queued detections get 10 s). */
+    private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(20);
 
-    /** Hardcoded test value: which vehicles to query is still to be defined. */
+    /** Default vehicle of the detect-situations manual test. */
     private static final String LICENSE_PLATE = "SBC1234";
 
     /**
@@ -70,57 +80,91 @@ public class Main {
         }
     }
 
+    /**
+     * Consumes until the process is stopped (SIGTERM from Kubernetes or docker stop): the shutdown hook
+     * releases the main thread, which closes everything in reverse order (first RabbitMQ, so nothing new
+     * arrives, then the queued detections, then the clients) before the JVM exits.
+     */
     private static void startTrackingConsumer() throws IOException, InterruptedException {
         requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER", "EJB_PASSWORD");
+        String user = System.getenv("EJB_USER");
+        String password = System.getenv("EJB_PASSWORD");
 
-        MongoClient mongo = createMongoClient();
-        MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
-        waitForMongo(database);
-
-        ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"));
-        ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
-        waitForActiveGps(activeGps);
-        activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
-
-        MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
-        dao.createIndexes();
-        VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"));
-        TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
-                Main::logDetection, Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
-        detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
-
-        ConnectionFactory factory = createRabbitConnectionFactory();
-        Connection connection = connectToRabbit(factory);
+        CountDownLatch stopRequested = new CountDownLatch(1);
+        CountDownLatch stopped = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            // First stop receiving, then let the queued detections finish
-            closeQuietly(connection);
-            detection.close();
-            facts.close();
-            activeGps.close();
-            nodes.close();
-            mongo.close();
+            stopRequested.countDown();
+            awaitQuietly(stopped, SHUTDOWN_WAIT);
         }));
 
-        TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, detection::submit);
+        try (MongoClient mongo = createMongoClient();
+                ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), user, password);
+                ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
+                NodeCommunications gpsCommunications = new NodeCommunications(nodes::reportGpsCommunications,
+                        Clock.systemUTC());
+                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
+                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
+            MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
+            if (!waitForMongo(database, stopRequested) || !waitForActiveGps(activeGps, stopRequested)) {
+                return; // stopped while waiting
+            }
+            activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
+            gpsCommunications.flushEvery(GPS_COMMUNICATIONS_FLUSH);
 
-        new TrackingConsumer(connection.createChannel(), receiver).start();
-        System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n", TrackingConsumer.QUEUE,
-                factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION,
-                activeGps.size());
+            MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
+            dao.createIndexes();
+            ConnectionFactory factory = createRabbitConnectionFactory();
+            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
+                    new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
+                    Connection connection = connectToRabbit(factory, stopRequested)) {
+                if (connection == null) {
+                    return; // stopped while waiting
+                }
+                detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
+
+                // A saved event is a successful communication with its GPS
+                TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
+                    gpsCommunications.record(event.gpsId());
+                    detection.submit(event);
+                });
+                new TrackingConsumer(connection.createChannel(), receiver).start();
+                System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n",
+                        TrackingConsumer.QUEUE, factory.getHost(), factory.getPort(), database.getName(),
+                        MongoTrackingEventDAO.COLLECTION, activeGps.size());
+
+                stopRequested.await();
+                System.out.println("Stopping: closing RabbitMQ, then the queued detections");
+            }
+        } finally {
+            stopped.countDown();
+        }
     }
 
-    /** Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked. */
-    private static void waitForActiveGps(ActiveGpsRegistry activeGps) throws InterruptedException {
+    private static void awaitQuietly(CountDownLatch latch, Duration timeout) {
+        try {
+            latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked.
+     *
+     * @return false if the process was stopped while waiting
+     */
+    private static boolean waitForActiveGps(ActiveGpsRegistry activeGps, CountDownLatch stop)
+            throws InterruptedException {
         while (true) {
             try {
                 activeGps.load();
-                return;
+                return true;
             } catch (IOException e) {
                 System.err.printf("Could not get the active GPS from WildFly (%s), retrying in %d s%n",
                         e.getCause(), RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
             }
         }
     }
@@ -133,13 +177,27 @@ public class Main {
      *         (so the cron sees the failure)
      */
     private static int pollWeighings() {
-        requireEnv("BALANZAS_CLIENT_ID", "BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER",
-                "EJB_PASSWORD");
-        String url = env("BALANZAS_URL", "http://localhost:3001");
-
-        List<Long> scaleIds;
+        requireEnv("BALANZAS_CLIENT_SECRET", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER", "EJB_PASSWORD");
+        BalanzasConfig balanzas;
+        try {
+            balanzas = BalanzasConfig.load();
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
+            return 1;
+        }
         try (ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
+            return pollWeighings(nodes, balanzas);
+        } catch (IOException e) {
+            System.err.println(e.getMessage() + ": " + e.getCause());
+            return 1;
+        }
+    }
+
+    private static int pollWeighings(ActiveNodesClient nodes, BalanzasConfig balanzas) {
+        String url = balanzas.url();
+        List<Long> scaleIds;
+        try {
             scaleIds = nodes.findActiveScaleIds();
         } catch (IOException e) {
             System.err.println("Could not get the active scales: " + e.getMessage() + ": " + e.getCause());
@@ -154,11 +212,12 @@ public class Main {
         String password = System.getenv("EJB_PASSWORD");
         try (MongoClient mongo = createMongoClient();
                 RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
-                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password)) {
+                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
+                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
-            ScalesApiClient api = new ScalesApiClient(url, System.getenv("BALANZAS_CLIENT_ID"),
+            ScalesApiClient api = new ScalesApiClient(url, balanzas.clientId(),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
-            PollResult result = new WeighingsPoller(scaleIds, LICENSE_PLATE, api, weighingDAO,
+            PollResult result = new WeighingsPoller(scaleIds, api, weighingDAO,
                     new MongoScalesMetadataDAO(database), Clock.systemUTC()).poll();
 
             System.out.printf("Fetched %d weighings (%d new) of scales %s from %s (until %s)%n",
@@ -167,10 +226,11 @@ public class Main {
                 System.err.println("Could not poll or save scales " + result.failedScaleIds()
                         + ": their last timestamp was not updated");
             }
+            reportScaleCommunications(nodes, result);
 
             // Also the ones left pending by previous runs
-            int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO, Main::logDetection)
-                    .detectPending();
+            int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO,
+                    new CaseAssigner(cases)).detectPending();
             if (notEvaluated > 0) {
                 System.err.println(notEvaluated + " weighings could not be evaluated: they stay pending");
             }
@@ -185,16 +245,27 @@ public class Main {
         }
     }
 
-    /** What is done with the situations of an event: for now only logged (the cases come later). */
-    private static void logDetection(VehicleEvent event, List<Situation> situations) {
-        if (!situations.isEmpty()) {
-            System.out.printf("Detected %s for %s at %s%n", situations, event.licensePlate(), event.timestamp());
+    /**
+     * ultimaComunicacionExitosa of the scales that answered: the moment of the poll. A failure loses no
+     * weighing, so it is only logged and the next run records it again.
+     */
+    private static void reportScaleCommunications(ActiveNodesClient nodes, PollResult result) {
+        if (result.polledScaleIds().isEmpty()) {
+            return;
+        }
+        Map<Long, Instant> communications = result.polledScaleIds().stream()
+                .collect(Collectors.toMap(scaleId -> scaleId, scaleId -> result.to()));
+        try {
+            nodes.reportScaleCommunications(communications);
+        } catch (IOException e) {
+            System.err.println("Could not record the last communication of scales " + result.polledScaleIds()
+                    + ": " + e.getMessage() + ": " + e.getCause());
         }
     }
 
     /** The situations that are detected; adding a situation means adding its rule here. */
     private static SituationDetector createDetector(VehicleFactsSource facts) {
-        return new SituationDetector(facts, List.of(new TripWithoutGuideRule()));
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()));
     }
 
     /**
@@ -208,7 +279,7 @@ public class Main {
                 System.getenv("EJB_PASSWORD"))) {
             System.out.println("Vehicle facts: " + facts.find(licensePlate).map(Object::toString).orElse("not registered"));
             TrackingEvent event = new TrackingEvent("manual", 0, 0, licensePlate, 0, 0, Instant.now());
-            System.out.println("Situations: " + createDetector(facts).detect(event));
+            System.out.println("Situations: " + createDetector(facts).detect(event).situations());
             return 0;
         } catch (IOException e) {
             System.err.println(e.getMessage() + ": " + e.getCause());
@@ -247,17 +318,23 @@ public class Main {
                 .build());
     }
 
-    /** Retries until MongoDB is available (the script may start first). */
-    private static void waitForMongo(MongoDatabase database) throws InterruptedException {
+    /**
+     * Retries until MongoDB is available (the script may start first).
+     *
+     * @return false if the process was stopped while waiting
+     */
+    private static boolean waitForMongo(MongoDatabase database, CountDownLatch stop) throws InterruptedException {
         while (true) {
             try {
                 database.runCommand(new Document("ping", 1));
-                return;
+                return true;
             } catch (MongoSecurityException e) {
                 throw e; // wrong credentials: retrying won't help
             } catch (MongoTimeoutException e) {
                 System.err.printf("MongoDB unavailable, retrying in %d s%n", RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
             }
         }
     }
@@ -273,8 +350,13 @@ public class Main {
         return factory;
     }
 
-    /** Retries until RabbitMQ is available (the script may start first). */
-    private static Connection connectToRabbit(ConnectionFactory factory) throws InterruptedException, IOException {
+    /**
+     * Retries until RabbitMQ is available (the script may start first).
+     *
+     * @return null if the process was stopped while waiting
+     */
+    private static Connection connectToRabbit(ConnectionFactory factory, CountDownLatch stop)
+            throws InterruptedException, IOException {
         while (true) {
             try {
                 return factory.newConnection("fiscalizacion-automatica");
@@ -283,18 +365,10 @@ public class Main {
             } catch (IOException | TimeoutException e) {
                 System.err.printf("RabbitMQ unavailable at %s:%d, retrying in %d s%n",
                         factory.getHost(), factory.getPort(), RETRY_DELAY_MS / 1000);
-                Thread.sleep(RETRY_DELAY_MS);
+                if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
+                    return null;
+                }
             }
-        }
-    }
-
-    private static void closeQuietly(Connection connection) {
-        try {
-            if (connection.isOpen()) {
-                connection.close();
-            }
-        } catch (IOException e) {
-            // shutting down: nothing else to do
         }
     }
 }

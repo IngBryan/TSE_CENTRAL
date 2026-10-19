@@ -23,13 +23,13 @@ class PendingWeighingsDetectionTest {
     private static final Weighing SBC1234 = new Weighing(3, 4, "SBC1234", Instant.parse("2026-10-13T10:00:00Z"), 18_450);
     private static final Weighing STU5678 = new Weighing(5, 4, "STU5678", Instant.parse("2026-10-13T11:00:00Z"), 21_000);
 
-    record Detection(VehicleEvent event, List<Situation> situations) {
+    record Result(VehicleEvent event, List<Situation> situations) {
     }
 
     private final InMemoryWeighingDAO weighingDAO = new InMemoryWeighingDAO();
     private final Map<String, VehicleFacts> central = new HashMap<>();
     private boolean wildFlyDown;
-    private final List<Detection> detections = new ArrayList<>();
+    private final List<Result> detections = new ArrayList<>();
 
     private final VehicleFactsSource facts = licensePlate -> {
         if (wildFlyDown) {
@@ -39,7 +39,7 @@ class PendingWeighingsDetectionTest {
     };
     private final PendingWeighingsDetection detection = new PendingWeighingsDetection(
             new SituationDetector(facts, List.of(new TripWithoutGuideRule())), weighingDAO,
-            (event, situations) -> detections.add(new Detection(event, situations)));
+            d -> detections.add(new Result(d.event(), d.situations())));
 
     @Test
     void evaluatesEveryPendingWeighingAndMarksItAsDetected() throws IOException {
@@ -49,8 +49,8 @@ class PendingWeighingsDetectionTest {
 
         assertEquals(0, detection.detectPending());
 
-        assertEquals(List.of(new Detection(SBC1234, List.of(Situation.TRIP_WITHOUT_GUIDE)),
-                new Detection(STU5678, List.of())), detections);
+        assertEquals(List.of(new Result(SBC1234, List.of(Situation.TRIP_WITHOUT_GUIDE)),
+                new Result(STU5678, List.of())), detections);
         assertTrue(weighingDAO.isDetected(SBC1234));
         assertTrue(weighingDAO.isDetected(STU5678));
     }
@@ -68,7 +68,7 @@ class PendingWeighingsDetectionTest {
         central.put("SBC1234", SituationDetectorTest.withoutTrips("SBC1234"));
 
         assertEquals(0, detection.detectPending());
-        assertEquals(List.of(new Detection(SBC1234, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
+        assertEquals(List.of(new Result(SBC1234, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
         assertTrue(weighingDAO.isDetected(SBC1234));
     }
 
