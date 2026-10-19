@@ -24,14 +24,14 @@ class TrackingDetectionWorkerTest {
     private static final Instant NOW = Instant.parse("2026-10-13T15:00:00Z");
     private static final Duration PENDING_FOR = Duration.ofMinutes(1);
 
-    record Detection(VehicleEvent event, List<Situation> situations) {
+    record Result(VehicleEvent event, List<Situation> situations) {
     }
 
     private final MutableClock clock = new MutableClock(NOW);
     private final InMemoryTrackingEventDAO dao = new InMemoryTrackingEventDAO(clock);
     private final Map<String, VehicleFacts> central = new HashMap<>();
     private volatile boolean wildFlyDown;
-    private final List<Detection> detections = new CopyOnWriteArrayList<>();
+    private final List<Result> detections = new CopyOnWriteArrayList<>();
 
     private final VehicleFactsSource facts = licensePlate -> {
         if (wildFlyDown) {
@@ -41,7 +41,7 @@ class TrackingDetectionWorkerTest {
     };
     private final TrackingDetectionWorker worker = new TrackingDetectionWorker(
             new SituationDetector(facts, List.of(new TripWithoutGuideRule())), dao,
-            (event, situations) -> detections.add(new Detection(event, situations)), clock, 2, 100);
+            d -> detections.add(new Result(d.event(), d.situations())), clock, 2, 100);
 
     private TrackingEvent saved(String licensePlate) {
         TrackingEvent event = new TrackingEvent("msg-1", 7, 1, licensePlate, -34.9, -56.1, clock.instant());
@@ -57,7 +57,7 @@ class TrackingDetectionWorkerTest {
         worker.submit(event);
         worker.close();
 
-        assertEquals(List.of(new Detection(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
+        assertEquals(List.of(new Result(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
         assertTrue(dao.isDetected(event));
     }
 
@@ -69,7 +69,7 @@ class TrackingDetectionWorkerTest {
         worker.submit(event);
         worker.close();
 
-        assertEquals(List.of(new Detection(event, List.of())), detections);
+        assertEquals(List.of(new Result(event, List.of())), detections);
         assertTrue(dao.isDetected(event));
     }
 
@@ -95,7 +95,7 @@ class TrackingDetectionWorkerTest {
         worker.recoverPending(PENDING_FOR);
         worker.close();
 
-        assertEquals(List.of(new Detection(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
+        assertEquals(List.of(new Result(event, List.of(Situation.TRIP_WITHOUT_GUIDE))), detections);
         assertTrue(dao.isDetected(event));
     }
 

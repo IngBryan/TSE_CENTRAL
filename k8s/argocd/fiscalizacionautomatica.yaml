@@ -15,12 +15,22 @@ spec:
     server: https://kubernetes.default.svc
     namespace: tse
 
+  # Los valores del Secret fiscalizacion-balanzas se cargan a mano en produccion: Argo CD lo crea con las
+  # claves vacias y despues no lo vuelve a sincronizar (si no, el selfHeal los dejaria vacios otra vez)
+  ignoreDifferences:
+    - kind: Secret
+      name: fiscalizacion-balanzas
+      jsonPointers:
+        - /data
+        - /stringData
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
 
 ---
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1

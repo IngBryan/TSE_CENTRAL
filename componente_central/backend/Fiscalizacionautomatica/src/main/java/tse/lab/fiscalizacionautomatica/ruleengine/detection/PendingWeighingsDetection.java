@@ -1,10 +1,8 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.detection;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.WeighingDAO;
-import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 
 /**
@@ -17,14 +15,14 @@ public class PendingWeighingsDetection {
 
     private final SituationDetector detector;
     private final WeighingDAO weighingDAO;
-    private final BiConsumer<VehicleEvent, List<Situation>> onDetected;
+    private final Consumer<Detection> onDetected;
 
     /**
-     * @param onDetected what is done with the situations of a weighing (only logged for now; it will
-     *                   create the cases). If it fails, the weighing stays pending.
+     * @param onDetected what is done with the situations of a weighing (CaseAssigner: assigns it to
+     *                   a case). If it fails, the weighing stays pending.
      */
     public PendingWeighingsDetection(SituationDetector detector, WeighingDAO weighingDAO,
-            BiConsumer<VehicleEvent, List<Situation>> onDetected) {
+            Consumer<Detection> onDetected) {
         this.detector = detector;
         this.weighingDAO = weighingDAO;
         this.onDetected = onDetected;
@@ -38,7 +36,7 @@ public class PendingWeighingsDetection {
         int failed = 0;
         for (Weighing weighing : weighingDAO.findPending(BATCH)) {
             try {
-                onDetected.accept(weighing, detector.detect(weighing));
+                onDetected.accept(detector.detect(weighing));
                 weighingDAO.markDetected(weighing);
             } catch (IOException | RuntimeException e) {
                 failed++;

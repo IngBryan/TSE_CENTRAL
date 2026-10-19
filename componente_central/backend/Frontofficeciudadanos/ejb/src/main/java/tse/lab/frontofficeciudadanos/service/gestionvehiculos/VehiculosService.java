@@ -22,6 +22,6 @@ public class VehiculosService implements VehiculosRemote {
             return null;
         }
         Long nroEmpresa = v.getEmpresa() == null ? null : v.getEmpresa().getNroEmpresa();
-        return new DatosVehiculo(v.getMatricula(), nroEmpresa);
+        return new DatosVehiculo(v.getMatricula(), nroEmpresa, v.getPeso(), v.getCapacidadCargaKg());
     }
 }

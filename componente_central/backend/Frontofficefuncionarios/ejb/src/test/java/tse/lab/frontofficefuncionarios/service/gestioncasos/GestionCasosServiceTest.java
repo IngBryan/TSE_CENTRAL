@@ -85,12 +85,15 @@ class GestionCasosServiceTest {
         NodoBalanza balanza = new NodoBalanza("Peaje Pando", "Ruta 8 km 32", 1L);
         EventoPesajes pesaje = new EventoPesajes(1001L, "SBA 1234", Instant.parse("2026-10-10T12:00:00Z"), 38500,
                 balanza);
+        // Un pesaje es evidencia de un unico caso: cada caso de exceso tiene el suyo
+        EventoPesajes otroPesaje = new EventoPesajes(1002L, "SBA 1234", Instant.parse("2026-10-10T15:00:00Z"),
+                38500, balanza);
 
         CasoFiscalizacion cDetectado = new CasoFiscalizacion("Exceso de carga", "EXCESO_CARGA", guia);
         cDetectado.getEventosPesajes().add(pesaje);
         CasoFiscalizacion cNotificado = caso("Viaje sin guia", guia, EstadoCaso.NOTIFICADA);
         CasoFiscalizacion cEnDescargo = caso("Exceso de carga", guia, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO);
-        cEnDescargo.getEventosPesajes().add(pesaje);
+        cEnDescargo.getEventosPesajes().add(otroPesaje);
         CasoFiscalizacion cSinDescargo = caso("Desvio de ruta", guia, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO);
 
         em.getTransaction().begin();
@@ -102,6 +105,7 @@ class GestionCasosServiceTest {
         em.persist(new ITV(LocalDate.of(2026, 3, 1), LocalDate.of(2027, 3, 1), vehiculo));
         em.persist(balanza);
         em.persist(pesaje);
+        em.persist(otroPesaje);
         em.persist(new Funcionario(FUNCIONARIO, "funcionario@mtop.gub.uy"));
         em.persist(cDetectado);
         em.persist(cNotificado);
@@ -415,6 +419,26 @@ class GestionCasosServiceTest {
     private List<RegistroAuditoriaCaso> auditoria(Long idCaso) {
         return em.createQuery("SELECT r FROM RegistroAuditoriaCaso r WHERE r.idCaso = :id ORDER BY r.id",
                 RegistroAuditoriaCaso.class).setParameter("id", idCaso).getResultList();
+    }
+
+    // ===== Caso de la fiscalizacion automatica sin guia (Viaje sin guia) =====
+
+    @Test
+    void unCasoSinGuiaMuestraElVehiculoYLaEmpresaDelVehiculo() throws Exception {
+        Long id = enTx(() -> {
+            CasoFiscalizacion c = new CasoFiscalizacion("Viaje sin guia", "VIAJE_SIN_GUIA",
+                    em.find(Vehiculo.class, "SBA 1234"), null);
+            em.persist(c);
+            return c.getId();
+        });
+
+        var detalle = servicio.detalle(FUNCIONARIO, id, "t");
+        assertNull(detalle.guia());
+        assertEquals("SBA 1234", detalle.matricula());
+        assertEquals(1L, detalle.nroEmpresa());
+        var evidencia = servicio.evidencia(FUNCIONARIO, id, "t");
+        assertNull(evidencia.guia());
+        assertEquals(35000, evidencia.vehiculo().pesoMaximoKg());
     }
 
     private static CasoFiscalizacion caso(String descripcion, Guia guia, EstadoCaso... camino) {

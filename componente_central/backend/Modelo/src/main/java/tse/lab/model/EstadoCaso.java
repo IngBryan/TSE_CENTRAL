@@ -33,4 +33,12 @@ public enum EstadoCaso {
     public boolean esFinal() {
         return siguientes().isEmpty();
     }
+
+    // Abierto: todavia no paso a descargo ni se resolvio. La fiscalizacion automatica no crea otro caso del
+    // mismo tipo para el vehiculo mientras haya uno abierto: le asocia los eventos nuevos.
+    public static final Set<EstadoCaso> ABIERTOS = Set.of(DETECTADA, NOTIFICADA);
+
+    public boolean esAbierto() {
+        return ABIERTOS.contains(this);
+    }
 }

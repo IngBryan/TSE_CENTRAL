@@ -30,6 +30,13 @@ public class VehicleFactsClient implements VehicleFactsSource, AutoCloseable {
         }
     }
 
+    /** With the remote proxies already looked up (tests). */
+    VehicleFactsClient(Context context, VehiculosRemote vehicles, ViajesEnCursoRemote trips) {
+        this.context = context;
+        this.vehicles = vehicles;
+        this.trips = trips;
+    }
+
     @Override
     public Optional<VehicleFacts> find(String licensePlate) throws IOException {
         try {

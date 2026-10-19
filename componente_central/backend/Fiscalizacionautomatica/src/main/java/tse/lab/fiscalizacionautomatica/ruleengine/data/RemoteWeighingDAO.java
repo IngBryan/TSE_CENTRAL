@@ -25,6 +25,12 @@ public class RemoteWeighingDAO implements WeighingDAO, AutoCloseable {
         }
     }
 
+    /** With the remote proxy already looked up (tests). */
+    RemoteWeighingDAO(Context context, PesajesRemote weighings) {
+        this.context = context;
+        this.weighings = weighings;
+    }
+
     @Override
     public int save(List<Weighing> toSave) throws IOException {
         try {

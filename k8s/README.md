@@ -21,7 +21,7 @@ Cada frontend dispone de su propio Deployment, Service e Ingress.
 - `frontofficefuncionarios.ear`
 - `backofficeautoridadesadministradores.ear`
 
-**Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ y los persiste en MongoDB. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP.
+**Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ, los persiste en MongoDB y detecta los casos de fiscalización. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP; KEDA ajusta sus réplicas (1 a 5) según los mensajes pendientes en la cola. La misma imagen corre como CronJob (`fiscalizacionautomatica-poller`) cada 30 minutos para consultar las balanzas.
 
 ### Infraestructura externa
 
@@ -234,6 +234,28 @@ kubectl -n tse create secret tls frontofficefuncionarios-front-tls \
 ```
 
 Las URLs de la aplicación y del backend no son secretas: se encuentran en `k8s/apps/frontofficefuncionarios-front/app.json`, que se monta como ConfigMap en `/app/config/app.json`.
+
+### 7. Fiscalización automática: KEDA y datos de balanzas
+
+**KEDA** escala el consumidor de tracking (`k8s/apps/fiscalizacionautomatica/keda.yaml`: una réplica cada 100 mensajes pendientes en `tracking.events`, entre 1 y 5). Se instala una vez en el cluster:
+
+```bash
+kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+```
+
+El `ScaledObject` usa las claves `rabbitmq-user` / `rabbitmq-password` de `tse-runtime-secrets`. El Deployment no declara `replicas`: las maneja KEDA.
+
+**Datos del nodo de balanzas** para el CronJob del poller (corre cada 30 minutos con `ENVIRONMENT=prod`):
+
+- La URL de balanzas y el client id están en `k8s/apps/fiscalizacionautomatica/app.json` (`balanzasUrl`, `balanzasClientId`), que el `configMapGenerator` publica como ConfigMap y el CronJob monta en `/app/config/app.json`. Se cambian en el repo y Argo CD los sincroniza.
+- El client secret está en el Secret `fiscalizacion-balanzas` (`secret-balanzas.yaml`), que Argo CD crea con la clave vacía y no vuelve a sincronizar (`ignoreDifferences` en la Application). El valor de producción se carga a mano:
+
+```bash
+kubectl -n tse patch secret fiscalizacion-balanzas --type merge \
+  -p '{"stringData":{"BALANZAS_CLIENT_SECRET":"<client secret>"}}'
+```
+
+Mientras esté vacío, el poller falla al arrancar (`Missing environment variables`) y el Job queda como fallido: `kubectl -n tse get jobs`.
 
 ## Registrar aplicaciones en Argo CD
 

@@ -5,8 +5,7 @@ metadata:
   labels:
     app: fiscalizacionautomatica
 spec:
-  replicas: 1
-
+  # Sin replicas: las maneja KEDA segun los mensajes en la cola tracking.events (keda.yaml)
   selector:
     matchLabels:
       app: fiscalizacionautomatica

@@ -1,10 +1,12 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.nodes;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +49,21 @@ class ActiveGpsRegistryTest {
 
         assertFalse(registry.isActive(1));
         assertTrue(registry.isActive(3));
+    }
+
+    @Test
+    void refreshesPeriodically() throws IOException, InterruptedException {
+        registry.load();
+        wildFlyAnswer = Set.of(1L, 2L, 3L);
+
+        registry.refreshEvery(Duration.ofMillis(10));
+
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (registry.size() < 3 && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        registry.close();
+        assertEquals(3, registry.size());
     }
 
     @Test

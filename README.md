@@ -380,10 +380,9 @@ en varios modos, segun el argumento:
   `{ _id, messageId, externalId, gpsId, licensePlate, location (GeoJSON), timestamp, receivedAt,
   detected, detectedAt }`.
 - **Deteccion asincronica:** el evento se guarda con `detected: false` y se pasa a la deteccion,
-  que corre en otros hilos (sin demorar la recepcion). Las situaciones que aplican no se guardan en
-  el evento: por ahora solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for SBC1234 at
-  ...`); cuando se creen los casos, cada caso tendra su situacion y el evento quedara asociado a el.
-  Al terminar se marca `detected: true` y `detectedAt`.
+  que corre en otros hilos (sin demorar la recepcion). Si aplica alguna situacion, el evento se
+  asigna a un caso de fiscalizacion (ver *Casos de fiscalizacion*); las situaciones no se guardan
+  en el evento. Al terminar se marca `detected: true` y `detectedAt`.
   - Los eventos de un vehiculo van siempre al mismo hilo (4 hilos, elegidos por la matricula): se
     evaluan en orden y nunca dos a la vez dentro del pod.
   - Si un evento no se pudo evaluar (WildFly caido, cola llena, el pod se reinicio), queda en
@@ -398,6 +397,11 @@ en varios modos, segun el argumento:
   guardar y sin reencolar. La lista de GPS activos se pide al backoffice por EJB remoto
   (`NodosActivosRemote`, ver *Nodos activos*) y se guarda en memoria para no llamar a WildFly por
   cada mensaje: se refresca cada 60 s y, si un refresco falla, se sigue con la ultima lista.
+- **Ultima comunicacion exitosa del GPS:** cada evento guardado registra en memoria la hora de
+  recepcion para su GPS, y cada 60 s el lote se manda al backoffice
+  (`NodosActivosRemote.registrarComunicaciones`), que actualiza `ultima_comunicacion_exitosa` del
+  `NodoTracking` (solo la avanza, nunca la retrocede: varios pods mandan lotes). Si el envio falla,
+  el lote se manda con el siguiente; al apagarse, el pod manda lo que le quedaba.
 - Variables: `RABBITMQ_HOST` (`localhost`), `RABBITMQ_PORT` (`5672`), `RABBITMQ_USER`,
   `RABBITMQ_PASSWORD`, `MONGO_HOST` (`localhost`), `MONGO_PORT` (`27017`), `MONGO_DB`
   (`main_db`), `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (`admin`), `WILDFLY_URL`,
@@ -411,14 +415,17 @@ en varios modos, segun el argumento:
   se queda con los de tipo `BALANZA`. A la API de balanzas le pasa el `idExterno` de cada
   `NodoBalanza` (el id de la balanza en ese nodo). Si no hay balanzas activas, termina sin
   consultar (codigo `0`).
-- Despues pide `GET /api/scales/{id}/weighings?licensePlate&from&to` por cada balanza activa
-  (fechas en hora de Uruguay, `-03:00`) y **guarda los pesajes en PostgreSQL** (`eventos_pesajes`)
+- Despues pide `GET /api/scales/{id}/weighings?from&to` por cada balanza activa, **sin filtrar por
+  matricula**: trae los pesajes de todos los vehiculos del rango (fechas en hora de Uruguay, `-03:00`)
+  y **los guarda todos en PostgreSQL** (`eventos_pesajes`), aunque el vehiculo no este registrado en
+  el central (en ese caso no genera ningun caso),
   pendientes de deteccion (`detectado = false`), por EJB remoto (`PesajesRemote.guardarPesajes`,
   Frontofficeciudadanos, `service.gestiondeguiasyviajes`). Los que ya estaban guardados (misma
   matricula y fecha y hora) se ignoran, asi repetir un rango no duplica nada.
 - **Deteccion:** al final de cada ejecucion evalua todos los pesajes pendientes, tambien los que
   quedaron de ejecuciones anteriores (`PendingWeighingsDetection`), y marca cada uno como
-  detectado. Las situaciones solo se escriben en el log (`Detected [TRIP_WITHOUT_GUIDE] for ...`).
+  detectado. Si aplica alguna situacion, el pesaje se asigna a un caso (ver *Casos de
+  fiscalizacion*).
   No usa hilos: hay un solo poller y cuando detecta ya termino de recibir. Un pesaje que no se pudo
   evaluar (WildFly caido) queda pendiente para la proxima ejecucion.
 - Imprime `Fetched N weighings (M new) of scales [..] from <url> (until <to>)` y termina. El proceso
@@ -433,19 +440,24 @@ en varios modos, segun el argumento:
 - **Si falla una balanza** (la API o el guardado), se sigue con las demas: solo esa no actualiza
   su `balanzas_last_timestamp`, y en la proxima ejecucion repite su rango (no se pierden pesajes ni
   se vuelven a consultar las que respondieron).
+- **Ultima comunicacion exitosa de la balanza:** las balanzas que respondieron y cuyos pesajes se
+  guardaron quedan con `ultima_comunicacion_exitosa = to` en su `NodoBalanza`, en un solo llamado
+  al final del poll (`NodosActivosRemote.registrarComunicaciones`). Si falla, solo se loguea: no se
+  pierde ningun pesaje y la proxima ejecucion la vuelve a registrar.
 - Codigo de salida: `0` si consulto y guardo todas las balanzas y evaluo todos los pendientes, `1`
   si fallo alguna balanza o algun pesaje quedo sin evaluar, si no pudo pedir las balanzas activas
   a WildFly o si MongoDB no esta disponible (el cron o el CronJob lo registra como ejecucion
   fallida).
 - Cliente con MicroProfile Rest Client (RESTEasy) y OAuth 2.0 client credentials: pide un token
   por ejecucion y, ante un `401`, pide otro y reintenta una vez.
-- Variables: `BALANZAS_URL` (`http://localhost:3001`; en el compose
-  `http://host.docker.internal:3001`), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET`, y las de
+- URL de balanzas y client id: con `ENVIRONMENT=dev` (por defecto, y en el compose) salen de
+  `BALANZAS_URL` (`http://localhost:3001`; en el compose `http://host.docker.internal:3001`) y
+  `BALANZAS_CLIENT_ID`; con cualquier otro valor, del archivo JSON `CONFIG_FILE` (por defecto
+  `/app/config/app.json`, claves `balanzasUrl` y `balanzasClientId`).
+- Variables: `BALANZAS_CLIENT_SECRET` (siempre variable de entorno), y las de
   MongoDB (`MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`,
   `MONGO_AUTH_DB`, igual que el consumidor) y del EJB remoto (`WILDFLY_URL`, `EJB_USER`,
   `EJB_PASSWORD`).
-- **Por ahora:** la matricula esta hardcodeada en `Main` (`LICENSE_PLATE = "SBC1234"`; se va a
-  definir que vehiculos consultar).
 
 **Viajes en curso (EJB remoto de Frontofficeciudadanos):**
 
@@ -461,13 +473,16 @@ dos es `ruleengine/vehicles/VehicleFactsClient`.
   `DatosPesaje` y, de `service.gestionvehiculos`,
   `Vehiculos`, `VehiculosRemote` y `DatosVehiculo` (`buscarVehiculo(matricula)`: matricula y
   empresa, o `null` si el vehiculo no existe). Lo mismo con `backofficeautoridadesadministradores-ejb-client.jar`
-  (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`). Por eso, antes de compilar
-  fiscalizacion hay que instalar Modelo y los dos proyectos en el `.m2` (el `Dockerfile` y el
-  workflow de CI ya lo hacen):
+  (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`) y con
+  `frontofficefuncionarios-ejb-client.jar` (`CasosAutomaticos`, `CasosAutomaticosRemote`,
+  `EventoFiscalizado`, `OrigenEvento`, `CasoAsignado`). Por eso, antes de compilar fiscalizacion hay
+  que instalar Modelo y los tres proyectos en el `.m2` (el `Dockerfile` y el workflow de CI ya lo
+  hacen):
 
   ```bash
   mvn -f componente_central/backend/Modelo/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Frontofficeciudadanos/pom.xml install -Dmaven.test.skip=true
+  mvn -f componente_central/backend/Frontofficefuncionarios/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Backofficeautoridadesadministradores/pom.xml install -Dmaven.test.skip=true
   ```
 
@@ -527,12 +542,42 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
   existe en el central no devuelve ninguna (no hay empresa a la que notificar). Si WildFly no
   responde, falla: el evento se vuelve a evaluar despues.
 - Agregar una situacion = agregar su regla en `Main.createDetector`.
-- Implementada: Viaje sin guia (`TripWithoutGuideRule`: el vehiculo no tiene guias `ASIGNADA` ni
-  `EN_CURSO`). Todavia no se crean casos: eso, y saltear las situaciones que ya tienen un caso
-  abierto del vehiculo, viene despues; por ahora el resultado solo se escribe en el log
-  (`Main.logDetection`, que despues se reemplaza por la creacion de casos).
+- Implementadas:
+  - Viaje sin guia (`TripWithoutGuideRule`): el vehiculo no tiene guias `ASIGNADA` ni `EN_CURSO`.
+  - Exceso de carga (`OverloadRule`): en un pesaje de un vehiculo con viaje en curso, peso del
+    vehiculo + su capacidad de carga declarada < peso medido por la balanza. La carga declarada en la
+    guia no se usa. La tolerancia sera configurable (requisito 5); por ahora cualquier exceso cuenta.
 - Eventos de tracking: los evalua el consumidor en segundo plano (`TrackingDetectionWorker`, ver
   *Consumidor de tracking*).
+
+**Casos de fiscalizacion:** con las situaciones de un evento, `ruleengine/cases/CaseAssigner` decide
+el caso aplicando la jerarquia, y deja el evento asociado a **un unico caso**:
+
+- Recorre las situaciones en orden de prioridad y crea un caso, en estado **DETECTADA**, para la
+  primera que el vehiculo no tenga **abierta**; a continuacion lo **notifica a la empresa** (pasa a
+  `NOTIFICADA`). Abierto = `DETECTADA` o `NOTIFICADA` (`EstadoCaso.ABIERTOS`); un caso en descargo o
+  resuelto ya no cuenta, y el proximo evento abre uno nuevo.
+- Si todas las situaciones ya tienen un caso abierto, el evento se suma como evidencia al de mayor
+  prioridad.
+- Un evento que ya es evidencia de un caso no se vuelve a asignar (reprocesamiento). La base lo
+  garantiza: `(matricula, fecha_hora)` es unico en `casos_eventos_tracking` y `casos_eventos_pesajes`.
+- Un caso que quedo `DETECTADA` (fallo la notificacion) se notifica con su proximo evento.
+- El caso guarda el vehiculo (y por el, la empresa) y, si hay viaje en curso, su guia (un Viaje sin
+  guia no tiene). Tipos: `VIAJE_SIN_GUIA`, `EXCESO_CARGA`, `VEHICULO_SIN_HABILITACION`, `DESVIO_RUTA`.
+- Los casos se guardan con el EJB remoto `CasosAutomaticosRemote` (Frontofficefuncionarios, paquete
+  `service.gestioncasos`, cliente `ruleengine/cases/RemoteCaseStore`), que no decide nada: devuelve
+  los casos abiertos de un vehiculo y el caso de un evento, crea un caso, agrega evidencia y notifica.
+  La creacion y la notificacion quedan en la auditoria (`auditoria_casos`) con usuario `SISTEMA`
+  (acciones `CREACION` y `CAMBIO_ESTADO`).
+- **Varios pods a la vez:** como la decision la toma fiscalizacion, la base impide dos casos abiertos
+  del mismo tipo para un vehiculo con un indice unico parcial (`uk_caso_abierto`, en
+  `Frontofficeciudadanos/.../META-INF/esquema-adicional.sql`). Si dos pods crean el mismo caso a la
+  vez, el segundo falla, su evento queda pendiente y al reintentarlo se suma al caso que ya existe.
+- Si una llamada falla (WildFly caido), el evento queda pendiente y se vuelve a evaluar.
+- En el log: `Created case 4 (VIAJE_SIN_GUIA) for SBC1234 at ...`, `Notified case 4 (VIAJE_SIN_GUIA)`
+  o `Added to case 4 ...`.
+- La notificacion hoy es el cambio de estado y su auditoria; el envio del aviso a la empresa (correo
+  u otro canal) esta pendiente.
 
 El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
 `META-INF/services` con los que RESTEasy registra sus providers.
@@ -565,16 +610,16 @@ echo $?                                                         # 0 = ok, 1 = fa
 La ultima consulta de cada balanza queda en `main_db.balanzas_metadata` (Compass). Para volver a
 consultar una balanza desde el inicio del dia, borrar su documento (por ejemplo `{ _id: 4 }`).
 
-Para que se ejecute solo cada 5 minutos en la maquina de desarrollo (opcional):
+Para que se ejecute solo cada 30 minutos en la maquina de desarrollo (opcional):
 
 ```bash
 # Linux / macOS: agregar con "crontab -e"
-*/5 * * * * docker compose -f /ruta/a/TSE_CENTRAL/docker-compose.yml run --rm fiscalizacionautomatica-poller >> /tmp/weighings-poller.log 2>&1
+*/30 * * * * docker compose -f /ruta/a/TSE_CENTRAL/docker-compose.yml run --rm fiscalizacionautomatica-poller >> /tmp/weighings-poller.log 2>&1
 ```
 
 ```powershell
 # Windows (Programador de tareas). Para quitarlo: schtasks /Delete /TN tse-weighings-poller /F
-schtasks /Create /SC MINUTE /MO 5 /TN tse-weighings-poller /TR "docker compose -f C:\ruta\a\TSE_CENTRAL\docker-compose.yml run --rm fiscalizacionautomatica-poller"
+schtasks /Create /SC MINUTE /MO 30 /TN tse-weighings-poller /TR "docker compose -f C:\ruta\a\TSE_CENTRAL\docker-compose.yml run --rm fiscalizacionautomatica-poller"
 ```
 
 **Deteccion por EJB remoto** (con `EJB_USER` / `EJB_PASSWORD` en el `.env`; WildFly tiene
@@ -611,59 +656,13 @@ manifiesto. Para el EJB remoto, el `Deployment` necesita ademas `WILDFLY_URL`
 
 | | Consumidor de tracking | Poller de balanzas |
 |---|---|---|
-| Recurso | `Deployment` (escala con el largo de la cola, p. ej. con KEDA) | `CronJob` (corre una vez por ejecucion) |
+| Recurso | `Deployment` + KEDA (`keda.yaml`: 1 a 5 replicas, una cada 100 mensajes en `tracking.events`) | `CronJob` (`cronjob-poller.yaml`: cada 30 minutos, nunca dos a la vez) |
 | Argumentos | ninguno | `["weighings-poller"]` |
-| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `BALANZAS_URL` (URL de balanzas en produccion), `BALANZAS_CLIENT_ID`, `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) y las mismas `MONGO_*` del consumidor (guarda la ultima consulta en `balanzas_metadata`), y `WILDFLY_URL`, `EJB_USER`, `EJB_PASSWORD` (pide las balanzas activas al backoffice) |
+| Variables | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_DB`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_AUTH_DB` (base donde esta definido el usuario de Mongo) | `ENVIRONMENT=prod` (la URL de balanzas y el client id se leen de `app.json`, ConfigMap montado en `/app/config`), `BALANZAS_CLIENT_SECRET` (cliente OAuth dado de alta en balanzas) y las mismas `MONGO_*` del consumidor (guarda la ultima consulta en `balanzas_metadata`), y `WILDFLY_URL`, `EJB_USER`, `EJB_PASSWORD` (pide las balanzas activas al backoffice) |
 
-Puntos del `CronJob` del poller:
-
-```yaml
-spec:
-  schedule: "*/5 * * * *"          # frecuencia de consulta
-  concurrencyPolicy: Forbid        # nunca dos ejecuciones a la vez
-  jobTemplate:
-    spec:
-      backoffLimit: 0              # si falla, se reintenta en la proxima ejecucion programada
-      template:
-        spec:
-          restartPolicy: Never
-          imagePullSecrets:
-            - name: ghcr-credentials
-          containers:
-            - name: poller
-              image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:<tag>
-              args: ["weighings-poller"]
-              envFrom:
-                - secretRef:
-                    name: fiscalizacion-balanzas   # BALANZAS_URL, BALANZAS_CLIENT_ID, BALANZAS_CLIENT_SECRET
-              env:                                 # MongoDB: igual que en el Deployment del consumidor
-                - name: MONGO_HOST
-                  value: mongodb
-                - name: MONGO_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: tse-runtime-secrets
-                      key: mongo-user
-                - name: MONGO_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: tse-runtime-secrets
-                      key: mongo-password
-                - name: WILDFLY_URL                # balanzas activas (EJB remoto del backoffice)
-                  value: remote+http://wildfly:8080
-                - name: EJB_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: tse-runtime-secrets
-                      key: ejb-user
-                - name: EJB_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: tse-runtime-secrets
-                      key: ejb-password
-```
-
-Un codigo de salida `1` deja el `Job` como fallido (`kubectl -n tse get jobs`).
+Los manifiestos estan en `k8s/apps/fiscalizacionautomatica/` (ver `k8s/README.md`, seccion 7: instalar
+KEDA, ajustar `app.json` y cargar el client secret en el Secret `fiscalizacion-balanzas`, que se crea con la clave
+vacia). Un codigo de salida `1` deja el `Job` del poller como fallido (`kubectl -n tse get jobs`).
 
 ### Observabilidad
 

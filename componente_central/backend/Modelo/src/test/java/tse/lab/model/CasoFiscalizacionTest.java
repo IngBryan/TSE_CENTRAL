@@ -31,6 +31,16 @@ class CasoFiscalizacionTest {
     }
 
     @Test
+    void laNotificacionNaceNoVistaYSeMarcaComoVista() {
+        CasoFiscalizacion caso = new CasoFiscalizacion("Viaje sin guia", "VIAJE_SIN_GUIA", null);
+        assertFalse(caso.isNotificacionVista());
+
+        caso.marcarNotificacionVista();
+
+        assertTrue(caso.isNotificacionVista());
+    }
+
+    @Test
     void todasLasCombinacionesDeEstados() {
         for (EstadoCaso desde : EstadoCaso.values()) {
             for (EstadoCaso hacia : EstadoCaso.values()) {

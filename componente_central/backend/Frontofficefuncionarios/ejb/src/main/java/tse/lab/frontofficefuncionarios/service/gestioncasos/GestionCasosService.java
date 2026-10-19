@@ -179,7 +179,7 @@ public class GestionCasosService {
         autorizacion.funcionario(ci, correlationId);
         CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
         Guia guia = caso.getGuia();
-        Vehiculo v = guia.getVehiculo();
+        Vehiculo v = vehiculo(caso);
         long pesoMaximo = v == null ? 0 : v.getPeso() + v.getCapacidadCargaKg();
         VehiculoVista vehiculo = null;
         if (v != null) {
@@ -294,7 +294,8 @@ public class GestionCasosService {
 
     private CasoDetalle detalle(CasoFiscalizacion caso) {
         Guia g = caso.getGuia();
-        Empresa e = g.getEmpresa();
+        Vehiculo v = vehiculo(caso);
+        Empresa e = empresa(caso);
         FundamentoResolucion f = caso.getFundamentoResolucion();
         ResolucionVista resolucion = f == null ? null
                 : new ResolucionVista(caso.getEstado() == EstadoCaso.CONFIRMADA ? Decision.CONFIRMAR.name()
@@ -308,8 +309,7 @@ public class GestionCasosService {
         EstadoCaso estado = caso.getEstado();
         return new CasoDetalle(caso.getId(), caso.getTipoCaso(), caso.getDescripcion(), texto(estado),
                 texto(caso.getFechaDeteccion()), e == null ? null : e.getNroEmpresa(),
-                e == null ? null : e.getNombrePublico(), guia(g),
-                g.getVehiculo() == null ? null : g.getVehiculo().getMatricula(),
+                e == null ? null : e.getNombrePublico(), guia(g), v == null ? null : v.getMatricula(),
                 caso.getDescargo() != null, estado != null && estado.admiteResolucion(),
                 estado == null ? List.of() : estado.siguientes().stream().map(Enum::name).sorted().toList(),
                 resolucion, historial);
@@ -317,16 +317,37 @@ public class GestionCasosService {
 
     private static CasoResumen resumen(CasoFiscalizacion c) {
         Guia g = c.getGuia();
-        Empresa e = g.getEmpresa();
+        Vehiculo v = vehiculo(c);
+        Empresa e = empresa(c);
         EstadoCaso estado = c.getEstado();
         return new CasoResumen(c.getId(), c.getTipoCaso(), c.getDescripcion(), texto(estado),
-                texto(c.getFechaDeteccion()), g.getId(), e == null ? null : e.getNroEmpresa(),
-                e == null ? null : e.getNombrePublico(),
-                g.getVehiculo() == null ? null : g.getVehiculo().getMatricula(), c.getDescargo() != null,
-                estado != null && estado.admiteResolucion());
+                texto(c.getFechaDeteccion()), g == null ? null : g.getId(), e == null ? null : e.getNroEmpresa(),
+                e == null ? null : e.getNombrePublico(), v == null ? null : v.getMatricula(),
+                c.getDescargo() != null, estado != null && estado.admiteResolucion());
     }
 
+    // El vehiculo del caso; los casos cargados antes de que el caso tuviera vehiculo lo toman de la guia
+    private static Vehiculo vehiculo(CasoFiscalizacion c) {
+        if (c.getVehiculo() != null) {
+            return c.getVehiculo();
+        }
+        return c.getGuia() == null ? null : c.getGuia().getVehiculo();
+    }
+
+    // La empresa de la guia o, sin guia (Viaje sin guia), la duenia del vehiculo
+    private static Empresa empresa(CasoFiscalizacion c) {
+        if (c.getGuia() != null) {
+            return c.getGuia().getEmpresa();
+        }
+        Vehiculo v = vehiculo(c);
+        return v == null ? null : v.getEmpresa();
+    }
+
+    // null si el caso no tiene guia (Viaje sin guia)
     private static GuiaVista guia(Guia g) {
+        if (g == null) {
+            return null;
+        }
         return new GuiaVista(g.getId(), texto(g.getFecha()), g.getOrigen(), g.getDestino(), g.getRubroCliente(),
                 g.getTipoCarga(), g.getPesoCargaKg(), texto(g.getEstado()));
     }
