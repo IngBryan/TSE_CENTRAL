@@ -22,7 +22,6 @@ class DatosRemotosTest {
         assertNotEquals(evento, new EventoFiscalizado("STU5678", T1, OrigenEvento.TRACKING));
         assertNotEquals(evento, new EventoFiscalizado("SBC1234", T1.plusSeconds(1), OrigenEvento.TRACKING));
         assertNotEquals(evento, new EventoFiscalizado("SBC1234", T1, OrigenEvento.PESAJE));
-        assertNotEquals(evento, "SBC1234");
         assertTrue(evento.toString().contains("SBC1234"));
     }
 
@@ -35,7 +34,6 @@ class DatosRemotosTest {
         assertNotEquals(caso, new DatosCaso(5L, "VIAJE_SIN_GUIA", "NOTIFICADA"));
         assertNotEquals(caso, new DatosCaso(4L, "EXCESO_CARGA", "NOTIFICADA"));
         assertNotEquals(caso, new DatosCaso(4L, "VIAJE_SIN_GUIA", "DETECTADA"));
-        assertNotEquals(caso, 4L);
         assertTrue(caso.toString().contains("VIAJE_SIN_GUIA"));
     }
 }

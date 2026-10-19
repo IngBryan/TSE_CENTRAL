@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -58,6 +59,8 @@ public class Main {
     /** Events still pending detection after PENDING_RECOVERY_AFTER are queued again every period. */
     private static final Duration PENDING_RECOVERY_PERIOD = Duration.ofSeconds(60);
     private static final Duration PENDING_RECOVERY_AFTER = Duration.ofMinutes(1);
+    /** How long the shutdown hook waits for the consumer to close (the queued detections get 10 s). */
+    private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(20);
 
     /** Default vehicle of the detect-situations manual test. */
     private static final String LICENSE_PLATE = "SBC1234";
@@ -77,56 +80,68 @@ public class Main {
         }
     }
 
+    /**
+     * Consumes until the process is stopped (SIGTERM from Kubernetes or docker stop): the shutdown hook
+     * releases the main thread, which closes everything in reverse order (first RabbitMQ, so nothing new
+     * arrives, then the queued detections, then the clients) before the JVM exits.
+     */
     private static void startTrackingConsumer() throws IOException, InterruptedException {
         requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER", "EJB_PASSWORD");
+        String user = System.getenv("EJB_USER");
+        String password = System.getenv("EJB_PASSWORD");
 
-        MongoClient mongo = createMongoClient();
-        MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
-        waitForMongo(database);
-
-        ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"));
-        ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
-        waitForActiveGps(activeGps);
-        activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
-        NodeCommunications gpsCommunications = new NodeCommunications(nodes::reportGpsCommunications,
-                Clock.systemUTC());
-        gpsCommunications.flushEvery(GPS_COMMUNICATIONS_FLUSH);
-
-        MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
-        dao.createIndexes();
-        VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"));
-        RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"));
-        TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
-                new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
-        detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
-
-        ConnectionFactory factory = createRabbitConnectionFactory();
-        Connection connection = connectToRabbit(factory);
+        CountDownLatch stopRequested = new CountDownLatch(1);
+        CountDownLatch stopped = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            // First stop receiving, then let the queued detections finish
-            closeQuietly(connection);
-            detection.close();
-            cases.close();
-            facts.close();
-            activeGps.close();
-            gpsCommunications.close();
-            nodes.close();
-            mongo.close();
+            stopRequested.countDown();
+            awaitQuietly(stopped, SHUTDOWN_WAIT);
         }));
 
-        // A saved event is a successful communication with its GPS
-        TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
-            gpsCommunications.record(event.gpsId());
-            detection.submit(event);
-        });
+        try (MongoClient mongo = createMongoClient();
+                ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), user, password);
+                ActiveGpsRegistry activeGps = new ActiveGpsRegistry(nodes::findActiveGpsIds);
+                NodeCommunications gpsCommunications = new NodeCommunications(nodes::reportGpsCommunications,
+                        Clock.systemUTC());
+                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
+                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
+            MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
+            waitForMongo(database);
+            waitForActiveGps(activeGps);
+            activeGps.refreshEvery(ACTIVE_GPS_REFRESH);
+            gpsCommunications.flushEvery(GPS_COMMUNICATIONS_FLUSH);
 
-        new TrackingConsumer(connection.createChannel(), receiver).start();
-        System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n", TrackingConsumer.QUEUE,
-                factory.getHost(), factory.getPort(), database.getName(), MongoTrackingEventDAO.COLLECTION,
-                activeGps.size());
+            MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
+            dao.createIndexes();
+            ConnectionFactory factory = createRabbitConnectionFactory();
+            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
+                    new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
+                    Connection connection = connectToRabbit(factory)) {
+                detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
+
+                // A saved event is a successful communication with its GPS
+                TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
+                    gpsCommunications.record(event.gpsId());
+                    detection.submit(event);
+                });
+                new TrackingConsumer(connection.createChannel(), receiver).start();
+                System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n",
+                        TrackingConsumer.QUEUE, factory.getHost(), factory.getPort(), database.getName(),
+                        MongoTrackingEventDAO.COLLECTION, activeGps.size());
+
+                stopRequested.await();
+                System.out.println("Stopping: closing RabbitMQ, then the queued detections");
+            }
+        } finally {
+            stopped.countDown();
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch, Duration timeout) {
+        try {
+            latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** Retries until WildFly answers (it takes a while to deploy): without the list no event can be checked. */
@@ -330,16 +345,6 @@ public class Main {
                         factory.getHost(), factory.getPort(), RETRY_DELAY_MS / 1000);
                 Thread.sleep(RETRY_DELAY_MS);
             }
-        }
-    }
-
-    private static void closeQuietly(Connection connection) {
-        try {
-            if (connection.isOpen()) {
-                connection.close();
-            }
-        } catch (IOException e) {
-            // shutting down: nothing else to do
         }
     }
 }
