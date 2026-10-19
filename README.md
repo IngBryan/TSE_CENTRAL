@@ -165,6 +165,15 @@ servidor de Next (`src/app/auth/*`, `src/lib/auth/*`): el canje del `code` con B
 validacion del `id_token` contra el JWKS (iss, aud, exp, nonce) y el userinfo. El navegador solo
 ve una cookie de sesion cifrada.
 
+- **Ingreso de testing (sin gub.uy):** mientras ID Uruguay no registre la redirect URI del ambiente de
+  Kubernetes (`https://env-6537388.web.elasticloud.uy/ciudadanos`), la portada muestra un formulario
+  *"Modo testing"* para ingresar con una cedula. El backend hace el mismo ingreso que con gub.uy
+  (`IngresoService.ingresarParaTesting`: perfil, validacion contra la PDI y roles), pero no toca el `sub`
+  ni el email de la cuenta gub.uy. Hacen falta los dos interruptores: `LOGIN_TESTING=true` en el front
+  (si no, `POST /auth/testing` da 404) e `INGRESO_TESTING=true` en WildFly (si no,
+  `POST /api/ciudadanos/ingreso-testing` da 404). En Kubernetes estan prendidos en los configmaps del
+  front y de wildfly; en el compose se prenden con `CIUDADANOS_LOGIN_TESTING=true` en el `.env`. Cada
+  ingreso queda en el log (`evento=ingreso.testing`, `[login testing]`). Apagarlo cuando ande gub.uy.
 - **Puerto 80:** las redirect URIs registradas son `http://localhost` y `http://localhost:8080`
   (logout: `/logout`). El 8080 lo usa WildFly, asi que la app tiene que atender en el 80. El compose
   publica `80:3000`; en desarrollo usar `npm run dev:gubuy` (`next dev -p 80`).

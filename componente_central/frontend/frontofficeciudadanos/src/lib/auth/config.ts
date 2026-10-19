@@ -30,8 +30,10 @@ export function getAuthConfig() {
     userinfoEndpoint: opcional("OIDC_USERINFO_ENDPOINT", `${issuer}/userinfo`),
     endSessionEndpoint: opcional("OIDC_END_SESSION_ENDPOINT", `${issuer}/logout`),
     jwksUri: opcional("OIDC_JWKS_URI", `${issuer}/jwks`),
-    clientId: requerida("OIDC_CLIENT_ID"),
-    clientSecret: requerida("OIDC_CLIENT_SECRET"),
+    // Opcionales para que el sitio (y el ingreso de testing) ande aunque gub.uy no este configurado:
+    // sin ellos /auth/login responde idp_no_disponible.
+    clientId: opcional("OIDC_CLIENT_ID", ""),
+    clientSecret: opcional("OIDC_CLIENT_SECRET", ""),
     // Tiene que ser EXACTAMENTE una de las redirect URIs registradas en ID Uruguay
     // (http://localhost o http://localhost:8080).
     redirectUri: opcional("OIDC_REDIRECT_URI", appBaseUrl),
@@ -50,3 +52,15 @@ export function getAuthConfig() {
 }
 
 export type AuthConfig = ReturnType<typeof getAuthConfig>;
+
+// Ingreso de testing con la cedula, sin gub.uy: solo con LOGIN_TESTING=true (y INGRESO_TESTING=true en
+// WildFly). Para mostrar el sistema en Kubernetes mientras no este registrada la redirect URI de ese
+// ambiente en ID Uruguay; apagarlo cuando el login con gub.uy ande ahi.
+export function loginTestingHabilitado(): boolean {
+  return process.env.LOGIN_TESTING === "true";
+}
+
+// Los POST que abren sesion solo se aceptan desde la propia app (CSRF)
+export function mismoOrigen(req: Request): boolean {
+  return req.headers.get("origin") === new URL(getAuthConfig().appBaseUrl).origin;
+}

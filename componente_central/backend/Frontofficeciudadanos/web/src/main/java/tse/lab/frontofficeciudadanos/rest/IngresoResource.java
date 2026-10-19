@@ -18,7 +18,8 @@ import tse.lab.frontofficeciudadanos.service.autenticacion.ResultadoIngreso;
 import tse.lab.frontofficeciudadanos.service.autenticacion.RolPersona;
 import tse.lab.model.Ciudadano;
 
-// CU-01: el frontoffice de Next llama aca despues de validar el login con gub.uy.
+// CU-01: el frontoffice de Next llama aca despues de validar el login con gub.uy (o, en testing, con la
+// cedula ingresada a mano).
 @Path("/ciudadanos")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -42,6 +43,9 @@ public class IngresoResource {
     @EJB
     private IngresoService ingreso;
 
+    // INGRESO_TESTING=true habilita /ingreso-testing (se puede fijar en los tests)
+    boolean testingHabilitado = "true".equals(System.getenv("INGRESO_TESTING"));
+
     @POST
     @Path("/ingreso-gubuy")
     public Response ingresoGubUy(IngresoRequest body, @Context HttpServletRequest req) {
@@ -53,6 +57,31 @@ public class IngresoResource {
         }
         String correlationId = (String) req.getAttribute(ApiKeyFilter.CORRELATION_ID);
         ResultadoIngreso r = ingreso.ingresarConGubUy(body.cedula(), body.email(), body.sub(), correlationId);
+        return respuesta(r);
+    }
+
+    public record IngresoTestingRequest(String cedula) {
+    }
+
+    // Ingreso de testing: el mismo ingreso (perfil, PDI, roles) con la cedula ingresada a mano, sin gub.uy.
+    // Solo con INGRESO_TESTING=true en WildFly; si no, 404 (como si no existiera). Lo llama el front de
+    // Next (con la X-Api-Key) solo si ademas tiene LOGIN_TESTING=true.
+    @POST
+    @Path("/ingreso-testing")
+    public Response ingresoTesting(IngresoTestingRequest body, @Context HttpServletRequest req) {
+        if (!testingHabilitado) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        if (body == null || body.cedula() == null || !CEDULA.matcher(body.cedula()).matches()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "cedula (6 a 8 digitos) obligatoria"))
+                    .build();
+        }
+        String correlationId = (String) req.getAttribute(ApiKeyFilter.CORRELATION_ID);
+        return respuesta(ingreso.ingresarParaTesting(body.cedula(), correlationId));
+    }
+
+    private static Response respuesta(ResultadoIngreso r) {
         return Response.ok(new IngresoResponse(r.resultado().name(), r.sesionPermitida(), r.nuevo(),
                 PerfilResponse.de(r.perfil()), r.roles())).build();
     }

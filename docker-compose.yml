@@ -47,6 +47,9 @@ services:
       # Backend Frontofficeciudadanos (perfil + validacion PDI al ingresar)
       - BACKEND_URL=http://wildfly:8080/frontofficeciudadanos-web/api
       - BACKEND_API_KEY=${CIUDADANOS_API_KEY}
+      # Ingreso de testing con cedula, sin gub.uy (tambien hace falta INGRESO_TESTING en wildfly).
+      # Apagado por defecto: en local anda gub.uy. CIUDADANOS_LOGIN_TESTING=true en el .env lo prende.
+      - LOGIN_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
       # Firma el token (JWT HS256) de la app movil del chofer (TSE_MOVIL): /api/movil/*
       - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
     depends_on:
@@ -164,6 +167,8 @@ services:
       # Claves que exigen las API REST (header X-Api-Key): una por frontoffice
       - CIUDADANOS_API_KEY=${CIUDADANOS_API_KEY}
       - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
+      # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy): mismo interruptor que el front
+      - INGRESO_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
       # Usuario de aplicacion para EJB remoto (lo crea wildfly/start.sh al arrancar)
       - EJB_USER=${EJB_USER}
       - EJB_PASSWORD=${EJB_PASSWORD}

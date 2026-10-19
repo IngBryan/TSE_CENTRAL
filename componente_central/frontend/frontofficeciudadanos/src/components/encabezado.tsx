@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Sesion } from "@/lib/auth/session";
+import { BASE_PATH } from "@/lib/base-path";
 
 export const linkBoton =
   "flex h-10 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors";
@@ -22,7 +23,7 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
             </Link>
           </nav>
         ) : (
-          <a href="/auth/login" className={botonGubUy}>
+          <a href={`${BASE_PATH}/auth/login`} className={botonGubUy}>
             Ingresar con gub.uy
           </a>
         )}
