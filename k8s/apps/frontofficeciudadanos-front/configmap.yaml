@@ -12,3 +12,6 @@ data:
   OIDC_CLIENT_ID: "890192"
   # Service wildfly del namespace tse (puerto 80)
   BACKEND_URL: http://wildfly/frontofficeciudadanos-web/api
+  # Ingreso de testing con cedula, sin gub.uy, mientras ID Uruguay no registre la redirect URI de este
+  # ambiente (APP_BASE_URL). Va junto con INGRESO_TESTING de wildfly. Pasar a "false" cuando ande gub.uy.
+  LOGIN_TESTING: "true"

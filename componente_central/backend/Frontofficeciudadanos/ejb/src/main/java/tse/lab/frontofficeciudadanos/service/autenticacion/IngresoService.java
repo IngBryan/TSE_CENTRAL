@@ -27,6 +27,17 @@ public class IngresoService {
     private RolesService roles;
 
     public ResultadoIngreso ingresarConGubUy(String cedula, String email, String subGubUy, String correlationId) {
+        return ingresar(cedula, email, subGubUy, correlationId, "gubuy");
+    }
+
+    // Ingreso de testing (INGRESO_TESTING=true, mientras no este registrada la redirect URI de gub.uy del
+    // ambiente desplegado): mismos pasos 6 a 9 (perfil, PDI, roles) con la cedula que se ingresa a mano.
+    // No toca el sub ni el email: el vinculo con la cuenta gub.uy queda como estaba.
+    public ResultadoIngreso ingresarParaTesting(String cedula, String correlationId) {
+        return ingresar(cedula, null, null, correlationId, "testing");
+    }
+
+    private ResultadoIngreso ingresar(String cedula, String email, String subGubUy, String correlationId, String via) {
         boolean nuevo = false;
         Ciudadano perfil = perfiles.buscarPorCi(cedula);
 
@@ -36,7 +47,7 @@ public class IngresoService {
             perfil = new Ciudadano(cedula, email, subGubUy);
             perfiles.guardar(perfil);
             nuevo = true;
-        } else {
+        } else if (subGubUy != null) {
             // FA1 (ya habia ingresado) o FA2 (Ciudadano creado al darle un rol, sin cuenta gub.uy todavia)
             if (perfil.getSubGubUy() == null) {
                 LOG.info(() -> "evento=ingreso.vinculacion correlationId=" + correlationId + " ci=" + cedula);
@@ -58,7 +69,7 @@ public class IngresoService {
         List<RolPersona> rolesPersona = sesion ? roles.rolesDe(cedula) : List.of();
         final Ciudadano p = perfil;
         final boolean esNuevo = nuevo;
-        LOG.info(() -> "evento=ingreso.gubuy correlationId=" + correlationId + " ci=" + cedula + " nuevo=" + esNuevo
+        LOG.info(() -> "evento=ingreso." + via + " correlationId=" + correlationId + " ci=" + cedula + " nuevo=" + esNuevo
                 + " resultado=" + resultado + " estado=" + p.getEstado() + " sesion=" + sesion
                 + " roles=" + rolesPersona.stream().map(r -> r.rol() + ":" + r.nroEmpresa()).toList());
         return new ResultadoIngreso(perfil, resultado, nuevo, sesion, rolesPersona);
