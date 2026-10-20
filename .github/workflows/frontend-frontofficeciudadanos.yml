@@ -40,3 +40,5 @@ jobs:
       packages: write
     with:
       service: frontofficeciudadanos-front
+      # La imagen de Kubernetes va con el prefijo del ingress (el compose lo deja vacio para local)
+      build-args: NEXT_BASE_PATH=/ciudadanos
