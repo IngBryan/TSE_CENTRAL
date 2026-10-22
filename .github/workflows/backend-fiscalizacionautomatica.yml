@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - dev
     paths:
       - componente_central/backend/Fiscalizacionautomatica/**
       # Contratos de EJB remoto (ejb-client de Frontofficeciudadanos, Frontofficefuncionarios y Backoffice) y Modelo
