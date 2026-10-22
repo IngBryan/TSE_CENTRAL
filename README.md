@@ -128,8 +128,9 @@ CIUDADANOS_API_KEY=<string largo y aleatorio>  # clave compartida front <-> Wild
 FUNCIONARIOS_API_KEY=<string largo y aleatorio>
 FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
-#App movil del chofer (TSE_MOVIL) - frontofficeciudadanos
+#App movil del chofer (TSE_MOVIL) - WildFly (usa tambien OIDC_CLIENT_ID / OIDC_CLIENT_SECRET)
 MOVIL_TOKEN_SECRET=<string largo y aleatorio, 32+ caracteres>  # firma el token (JWT HS256) de la app
+#OIDC_REDIRECT_URIS_MOVIL=uy.carga.movil:/oauth2redirect,http://localhost:8080  # redirect URIs de la app
 ```
 
 Las credenciales de los nodos (`balanzas`, `tracking`, `pdi`) van en `TSE_NODOS/.env`.
@@ -212,19 +213,22 @@ ve una cookie de sesion cifrada.
   solo los choferes `HABILITADO` de la empresa; `POST /{id}/asignacion` con `matricula` e `idChofer`
   la deja `ASIGNADA` (409 si ya lo estaba, 400 si el vehiculo o el chofer no son de la empresa o el
   chofer esta pendiente). `Guia` tiene `@Version` para que dos asignaciones simultaneas no ganen las dos.
-- **App movil del chofer (`TSE_MOVIL`):** el servidor de Next hace de BFF; la app nunca habla con
-  WildFly ni tiene la `BACKEND_API_KEY`.
-  - **Login:** la app abre `/auth/movil/login?redirect=cargauy://auth&code_challenge=<S256>` en un
-    Custom Tab. Es el mismo login con gub.uy (misma redirect URI `http://localhost`); la cookie de la
-    transaccion marca que el flujo es movil. En `/auth/callback`, si el ingreso es valido y la persona
-    es `CHOFER` `HABILITADO`, no se crea la sesion web: se emite un codigo de un solo uso (60 s, en
-    memoria del proceso de Next, atado al `code_challenge` por PKCE) y se vuelve a
-    `cargauy://auth?code=...` (o `?error=no_chofer|cancelado|...`). La app lo canjea en
-    `POST /api/movil/token` (`{ code, codeVerifier }`) por un JWT HS256 firmado con
-    `MOVIL_TOKEN_SECRET` (`sub` = cedula, `nombre`, `roles`, vence a las 8 h). El token no viaja en la URL.
-  - **API (Next):** `GET /api/movil/viajes` y `POST /api/movil/eventos` validan el `Authorization: Bearer`
-    (401 `token_vencido` / `token_invalido`) y llaman al backend con `X-Api-Key`, `X-Usuario-Ci` (la cedula
-    del token) y `X-Correlation-Id` (el que mande la app, por ejemplo el `idEvento`, o uno nuevo).
+- **App movil del chofer (`TSE_MOVIL`):** la app habla directo con gub.uy y con WildFly por REST; no
+  pasa por el front de Next ni tiene la `BACKEND_API_KEY` (ver `TSE_MOVIL/docs/adr/0003-login-movil-directo-gubuy.md`).
+  - **Login (`MovilAuthResource` + `LoginMovilService`):** la app abre el `authorize` de ID Uruguay en
+    un Custom Tab (PKCE S256, `state`, `nonce`) y recibe el `code` en su redirect URI
+    (`uy.carga.movil:/oauth2redirect`, o el loopback `http://localhost:8080` mientras no este
+    registrada). Lo manda a `POST /api/movil/auth/token` (`{ code, codeVerifier, nonce, redirectUri }`).
+    WildFly canjea el `code` con el `client_secret` (`ClienteGubUy`), valida el `id_token`
+    (`VerificadorIdToken`: firma contra el JWKS, iss, aud, exp y el `nonce` de la app), llama a userinfo,
+    aplica el mismo ingreso que la web (`IngresoService`: perfil, PDI, roles), exige `CHOFER`
+    `HABILITADO` y devuelve un JWT HS256 firmado con `MOVIL_TOKEN_SECRET` (`TokenMovil`: `sub` = cedula,
+    `nombre`, 8 h). Errores: `{ "error": "token_invalido" | "no_chofer" | "no_existe" | "menor_de_edad" |
+    "idp_no_disponible" | ... }` con 400/403/503. Sin `OIDC_CLIENT_SECRET` o `MOVIL_TOKEN_SECRET` responde
+    503 `ingreso_no_disponible`.
+  - **Autorizacion (`MovilTokenFilter`):** el resto de `/api/movil/*` exige `Authorization: Bearer`
+    (401 `token_vencido` / `token_invalido`); la cedula sale del token, no de un header del cliente.
+    `/api/movil/*` no pide `X-Api-Key`.
   - **API (WildFly, `MovilResource` + `ViajesChoferService`):** `GET /api/movil/viajes` devuelve las guias
     `ASIGNADA` o `EN_CURSO` del chofer en todas las empresas donde esta `HABILITADO` (lista vacia si no
     tiene; 403 si no es chofer habilitado). `POST /api/movil/eventos` recibe
@@ -282,12 +286,37 @@ ve una cookie de sesion cifrada.
       venir en `GET /api/movil/viajes`.
   - Tests: `GuiasServiceTest` (un caso por regla y uno integrado: editar -> evento con version vieja ->
     `guiaModificada`; reasignar -> `CONFLICTO`; cancelar -> `CONFLICTO`).
+- **ABM de Vehiculos (frontoffice ciudadanos):** el responsable da de alta, consulta, modifica y da de
+  baja los vehiculos de su empresa en `/empresa/vehiculos` (boton *Vehiculos* en Mi cuenta), y registra
+  el Permiso Nacional de Circulacion y las ITV desde `/empresa/vehiculos/{matricula}`. Codigo:
+  `GestionVehiculosService` (paquete `gestionvehiculos`), `VehiculosResource`, `PermisoCirculacionDAO`,
+  `ITVDAO`.
+  - **Reglas:** control de acceso con `AutorizacionResponsable` (responsable validado de una empresa
+    habilitada; 403). Matricula obligatoria, **normalizada** (mayusculas, sin espacios ni guiones:
+    `sba 1234` -> `SBA1234`, `Vehiculo.normalizarMatricula`, para cruzarla con balanzas y tracking), de 4
+    a 10 letras o numeros y unica en todo el sistema (si es de otra empresa no se dice cual); no se
+    modifica. Marca y modelo obligatorios (hasta 50), peso del vehiculo 1..60.000 kg y capacidad de carga
+    1..100.000 kg. Un vehiculo de otra empresa responde 404, igual que uno inexistente.
+  - **Permiso:** uno por vehiculo (`nro` unico, emision < vencimiento); guardar otro numero lo reemplaza.
+    **ITV:** se agregan y se conserva el historial (no dos con el mismo vencimiento); la vigente es la de
+    vencimiento mas lejano. **Habilitado** = activo, permiso vigente hoy (emision <= hoy <= vencimiento) e ITV
+    sin vencer; se muestra en el listado y en el detalle.
+  - **Baja logica** (`Vehiculo.activo`): el vehiculo sigue en el listado como *Dado de baja*, no se ofrece
+    ni se acepta en guias nuevas o reasignaciones, y ya no se modifica (409 `VEHICULO_DADO_DE_BAJA`). No
+    se puede dar de baja con guias `ASIGNADA` o `EN_CURSO` (409 `VEHICULO_CON_VIAJES`). Guias, permiso e
+    ITV lo referencian y la fiscalizacion necesita su historia, por eso no se borra.
+  - **Endpoints** (con `X-Api-Key` y `X-Usuario-Ci`): `GET|POST /api/empresa/vehiculos`
+    (`{ matricula, marca, modelo, peso, capacidadCargaKg }`), `GET|PUT /api/empresa/vehiculos/{matricula}`
+    (`{ marca, modelo, peso, capacidadCargaKg }`), `PUT .../{matricula}/permiso`
+    (`{ nro, fechaEmision, fechaVencimiento }`, fechas `yyyy-MM-dd`), `POST .../{matricula}/itv`
+    (`{ fechaVencimiento }`) y `POST .../{matricula}/baja`. Logs `evento=vehiculo.alta|modificado|permiso|itv|baja`.
+  - Tests: `GestionVehiculosServiceTest` (un caso por regla, contra H2).
 - **Modelo:** `Chofer` es la asociacion persona-empresa (id propio, `(ci, nro_empresa)` unico), asi
   una persona puede ser chofer de varias empresas; las guias referencian esa asociacion.
 - **Datos de prueba (solo desarrollo):** `ejb/src/main/resources/META-INF/datos-prueba.sql` carga en
-  cada deploy (despues del drop-and-create) la empresa 1 habilitada y su responsable, dos vehiculos,
-  y para la app movil a `56087406` y `54074380` como choferes `HABILITADO` de la empresa 1 con una
-  guia `ASIGNADA` cada uno (`GV-MOVIL001` y `GV-MOVIL002`). Las otras
+  cada deploy (despues del drop-and-create) la empresa 1 habilitada, su responsable (`54074380`) y dos
+  vehiculos: `SBA1234` habilitado (permiso `PNC-0001` e ITV vigentes) y `SAB5678` sin permiso ni ITV.
+  No precarga choferes ni guias: se crean desde el frontoffice. Las otras
   aplicaciones no tienen tablas propias en `main_db`, asi que el script no choca con nada.
 
 ### Backend (WildFly + PostgreSQL)

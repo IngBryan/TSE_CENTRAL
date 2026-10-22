@@ -5,7 +5,6 @@ import jakarta.ejb.EJBException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -16,9 +15,8 @@ import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.NuevoEvento;
 import tse.lab.frontofficeciudadanos.service.apimovil.ViajesChoferService.ResultadoEvento;
 
-// API de la app movil del chofer. No la llama el movil directamente: pasa por el servidor de Next
-// (BFF), que valida el token del movil y manda la cedula en X-Usuario-Ci junto con la X-Api-Key
-// (mismo criterio de confianza que ChoferesResource).
+// API de la app movil del chofer. La app la llama directo con Authorization: Bearer <token de la app>
+// (POST /movil/auth/token); MovilTokenFilter valida el token y deja la cedula del chofer.
 //
 // Respuestas de POST /eventos (politica de conflictos, TSE_MOVIL/docs/adr/0002):
 // - 200 con resultado APLICADO o SIN_EFECTO (el efecto ya estaba aplicado): el movil lo marca SINCRONIZADO.
@@ -37,14 +35,15 @@ public class MovilResource {
 
     @GET
     @Path("/viajes")
-    public Response viajes(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @Context HttpServletRequest req) {
+    public Response viajes(@Context HttpServletRequest req) {
+        String usuario = cedula(req);
         return GuiasResource.ejecutar(() -> viajes.viajes(usuario, GuiasResource.correlationId(req)));
     }
 
     @POST
     @Path("/eventos")
-    public Response evento(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, NuevoEvento body,
-            @Context HttpServletRequest req) {
+    public Response evento(NuevoEvento body, @Context HttpServletRequest req) {
+        String usuario = cedula(req);
         Response r;
         try {
             r = GuiasResource.ejecutar(() -> viajes.registrarEvento(usuario, body, GuiasResource.correlationId(req)));
@@ -61,5 +60,10 @@ public class MovilResource {
             return Response.status(Response.Status.CONFLICT).entity(re).build();
         }
         return r;
+    }
+
+    // Cedula del token de la app (MovilTokenFilter). Nunca sale de un header que mande el cliente.
+    private static String cedula(HttpServletRequest req) {
+        return (String) req.getAttribute(MovilTokenFilter.CEDULA);
     }
 }

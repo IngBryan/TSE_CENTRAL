@@ -30,7 +30,9 @@ spec:
     - type: rabbitmq
       metadata:
         protocol: amqp
-        host: amqp://rabbitmq:5672/
+        # Nombre completo: KEDA consulta la cola desde su namespace (keda), donde "rabbitmq" no resuelve
+        host: amqp://rabbitmq.tse.svc.cluster.local:5672
+        vhostName: "/"
         queueName: tracking.events
         mode: QueueLength
         value: "100"

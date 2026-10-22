@@ -1,12 +1,17 @@
 package tse.lab.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.io.Serializable;
+import java.util.Locale;
 
+// La matricula se da de alta normalizada (normalizarMatricula): es la clave con la que llegan los
+// pesajes de las balanzas y las posiciones del tracking (p. ej. SBC1234).
+// activo: la baja es logica; guias, ITV y permiso lo referencian y la fiscalizacion necesita su historia.
 @Entity
 @Table(name = "vehiculos")
 public class Vehiculo implements Serializable {
@@ -18,6 +23,9 @@ public class Vehiculo implements Serializable {
     private String modelo;
     private long peso;
     private long capacidadCargaKg;
+    // default en la columna: los INSERT de datos de prueba que no lo mencionan quedan activos
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean activo = true;
     @ManyToOne
     @JoinColumn(name = "nro_empresa")
     private Empresa empresa;
@@ -32,6 +40,11 @@ public class Vehiculo implements Serializable {
         this.peso = peso;
         this.capacidadCargaKg = capacidadCargaKg;
         this.empresa = empresa;
+    }
+
+    // Mayusculas, sin espacios ni guiones: "sba 1234" y "SBA-1234" son SBA1234.
+    public static String normalizarMatricula(String matricula) {
+        return matricula == null ? null : matricula.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
     }
 
     public String getMatricula() {
@@ -52,6 +65,14 @@ public class Vehiculo implements Serializable {
 
     public long getCapacidadCargaKg() {
         return capacidadCargaKg;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
     }
 
     public Empresa getEmpresa() {

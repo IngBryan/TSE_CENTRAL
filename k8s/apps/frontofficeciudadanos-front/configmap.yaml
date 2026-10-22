@@ -10,8 +10,8 @@ data:
   # ID Uruguay. https: el proxy de Elastic Cloud termina TLS delante del ingress (activa las cookies Secure).
   APP_BASE_URL: https://env-6537388.web.elasticloud.uy/ciudadanos
   OIDC_CLIENT_ID: "890192"
-  # Service wildfly del namespace tse (puerto 80)
-  BACKEND_URL: http://wildfly/frontofficeciudadanos-web/api
+  # Service wildfly del namespace tse (puerto 8080)
+  BACKEND_URL: http://wildfly:8080/frontofficeciudadanos-web/api
   # Ingreso de testing con cedula, sin gub.uy, mientras ID Uruguay no registre la redirect URI de este
   # ambiente (APP_BASE_URL). Va junto con INGRESO_TESTING de wildfly. Pasar a "false" cuando ande gub.uy.
   LOGIN_TESTING: "true"

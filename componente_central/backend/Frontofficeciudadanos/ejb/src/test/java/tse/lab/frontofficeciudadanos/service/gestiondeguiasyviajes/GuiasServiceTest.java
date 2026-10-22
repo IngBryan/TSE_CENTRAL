@@ -175,6 +175,19 @@ class GuiasServiceTest {
     }
 
     @Test
+    void unVehiculoDadoDeBajaNoSeOfreceNiSeAsigna() throws Exception {
+        GuiaVista g = nuevaGuia();
+        enTx(() -> {
+            em.find(Vehiculo.class, "SBA 1234").setActivo(false);
+            return null;
+        });
+        assertTrue(servicio.opcionesAsignacion(RESPONSABLE, g.id(), "t").vehiculos().isEmpty());
+        assertTrue(assertThrows(DatosInvalidosException.class,
+                () -> servicio.asignar(RESPONSABLE, g.id(), "SBA 1234", choferHabilitado, "t")).getErrores()
+                .containsKey("vehiculo"));
+    }
+
+    @Test
     void guiaInexistenteOSinPermiso() throws Exception {
         assertThrows(RecursoNoEncontradoException.class, () -> servicio.opcionesAsignacion(RESPONSABLE, "GV-NOEXISTE", "t"));
         assertThrows(NoAutorizadoException.class, () -> servicio.listar("56087406", "t"));
