@@ -15,27 +15,36 @@ export function AsociarResponsable({
   disponibles,
   onCerrar,
   onAsociado,
+  onYaTieneResponsable,
 }: {
   nroEmpresa: number;
   nombreEmpresa: string | null;
   disponibles: ResultadoUsuarios;
   onCerrar: () => void;
   onAsociado: (mensaje: string) => void;
+  // Otro funcionario le asocio un responsable mientras tanto: este panel se cierra y el aviso queda afuera
+  onYaTieneResponsable: (aviso: string) => void;
 }) {
   const [elegido, setElegido] = useState<UsuarioDisponible | null>(null);
+  const [rechazados, setRechazados] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
   const confirmar = () => {
     if (!elegido) return;
+    const ci = elegido.ci;
     setError(null);
     iniciar(async () => {
-      const r = await asociarResponsable(nroEmpresa, elegido.ci);
+      const r = await asociarResponsable(nroEmpresa, ci);
       if (r.ok) {
         onAsociado(r.mensaje);
+      } else if (r.yaTieneResponsable) {
+        onYaTieneResponsable(r.error);
       } else {
         setError(r.error);
         setElegido(null);
+        // Ya no esta disponible (validacion, responsable de otra empresa): no se lo vuelve a ofrecer
+        setRechazados((rs) => [...rs, ci]);
       }
     });
   };
@@ -57,6 +66,7 @@ export function AsociarResponsable({
         }}
         deshabilitado={pendiente}
         titulo="Elegir responsable"
+        excluidos={rechazados}
       />
 
       {elegido && (

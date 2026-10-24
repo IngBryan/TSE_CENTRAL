@@ -22,7 +22,7 @@
         <properties>
             <property name="jakarta.persistence.validation.mode" value="NONE"/>
             <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>
-            <property name="jakarta.persistence.jdbc.url" value="jdbc:h2:mem:funcionarios;DB_CLOSE_DELAY=-1"/>
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:h2:mem:funcionarios;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000"/>
             <property name="jakarta.persistence.jdbc.user" value="sa"/>
             <property name="jakarta.persistence.jdbc.password" value=""/>
             <property name="hibernate.hbm2ddl.auto" value="create-drop"/>

@@ -9,6 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -201,6 +206,27 @@ class GestionEmpresasServiceTest {
         assertEquals("EMPRESA_EXISTENTE", e.getCodigo());
         em.clear();
         assertEquals("Transportes del Este", em.find(Empresa.class, 1L).getNombrePublico());
+    }
+
+    @Test
+    void siOtraAltaRegistroElMismoNumeroMientrasTantoEs409YNoQuedaNada() throws Exception {
+        // Emula la carrera: el control de buscarPorId no la ve (la otra alta todavia no habia hecho commit),
+        // pero el insert choca con la PK. Tiene que ser 409, no un error al cerrar la transaccion.
+        EmpresaDAO sinVerLaOtra = new EmpresaDAO() {
+            @Override
+            public Empresa buscarPorId(Long nroEmpresa) {
+                return null;
+            }
+        };
+        set(servicio, "empresas", conEm(sinVerLaOtra));
+
+        ConflictoException e = assertThrows(ConflictoException.class, () -> enTx(() -> servicio.alta(FUNCIONARIO,
+                new AltaEmpresa(1L, "Otra", "Otra", "Otra", true, CIUDADANO), "t")));
+
+        assertEquals("EMPRESA_EXISTENTE", e.getCodigo());
+        em.clear();
+        assertEquals("Transportes del Este", em.find(Empresa.class, 1L).getNombrePublico());
+        assertNull(em.find(Responsable.class, CIUDADANO));
     }
 
     @Test
@@ -400,6 +426,69 @@ class GestionEmpresasServiceTest {
         }
     }
 
+    // Dos funcionarios asocian al mismo ciudadano a empresas distintas a la vez, cada uno en su transaccion:
+    // el lock de su fila hace que el segundo espere al primero y responda 409, no un error de PK al commit.
+    @Test
+    void dosAsociacionesSimultaneasDelMismoCiudadanoDejanUnaYLaOtraEs409() throws Exception {
+        em.getTransaction().begin();
+        em.persist(new Empresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", null));
+        em.getTransaction().commit();
+        em.clear();
+
+        // Primer funcionario: asocia y deja la transaccion abierta (la fila del ciudadano queda bloqueada)
+        em.getTransaction().begin();
+        servicio.asociarUsuario(FUNCIONARIO, 2L, new AsociacionUsuario(CIUDADANO), "t1");
+        em.flush();
+
+        // Segundo funcionario, con su propio EntityManager y servicio, en otro hilo
+        EntityManager em2 = emf.createEntityManager();
+        GestionEmpresasService servicio2 = servicioCon(em2);
+        ExecutorService hilo = Executors.newSingleThreadExecutor();
+        Future<Exception> segundo = hilo.submit(() -> {
+            em2.getTransaction().begin();
+            try {
+                servicio2.asociarUsuario(FUNCIONARIO, 3L, new AsociacionUsuario(CIUDADANO), "t2");
+                em2.getTransaction().commit();
+                return null;
+            } catch (Exception e) {
+                if (em2.getTransaction().isActive()) {
+                    em2.getTransaction().rollback();
+                }
+                return e;
+            }
+        });
+        try {
+            // Mientras el primero no termina, el segundo sigue esperando el lock
+            assertThrows(TimeoutException.class, () -> segundo.get(500, TimeUnit.MILLISECONDS));
+            em.getTransaction().commit();
+
+            Exception e = segundo.get(10, TimeUnit.SECONDS);
+            assertTrue(e instanceof ConflictoException, "se esperaba 409 y fue " + e);
+            assertEquals("RESPONSABLE_DE_OTRA_EMPRESA", ((ConflictoException) e).getCodigo());
+        } finally {
+            hilo.shutdownNow();
+            em2.close();
+        }
+        em.clear();
+        assertEquals(2L, em.find(Responsable.class, CIUDADANO).getEmpresa().getNroEmpresa());
+        assertNull(em.find(Empresa.class, 3L).getResponsable());
+    }
+
+    private GestionEmpresasService servicioCon(EntityManager otro) throws Exception {
+        AutorizacionFuncionario autorizacion = new AutorizacionFuncionario();
+        FuncionarioDAO funcionarios = new FuncionarioDAO();
+        set(funcionarios, "em", otro);
+        set(autorizacion, "funcionarios", funcionarios);
+        GestionEmpresasService s = new GestionEmpresasService();
+        set(s, "autorizacion", autorizacion);
+        for (Object[] dao : new Object[][] { { "empresas", new EmpresaDAO() }, { "ciudadanos", new CiudadanoDAO() },
+                { "responsables", new ResponsableDAO() } }) {
+            set(dao[1], "em", otro);
+            set(s, (String) dao[0], dao[1]);
+        }
+        return s;
+    }
+
     private void assertConflicto(String codigo, Long nroEmpresa, String ci) {
         ConflictoException e = assertThrows(ConflictoException.class,
                 () -> enTx(() -> servicio.asociarUsuario(FUNCIONARIO, nroEmpresa, new AsociacionUsuario(ci), "t")));
@@ -430,8 +519,14 @@ class GestionEmpresasServiceTest {
         return dao;
     }
 
+    // Busca el campo tambien en las superclases (los DAOs con metodos redefinidos en un test son subclases)
     private static void set(Object destino, String campo, Object valor) throws Exception {
-        Field f = destino.getClass().getDeclaredField(campo);
+        Class<?> c = destino.getClass();
+        while (c.getSuperclass() != null && java.util.Arrays.stream(c.getDeclaredFields())
+                .noneMatch(f -> f.getName().equals(campo))) {
+            c = c.getSuperclass();
+        }
+        Field f = c.getDeclaredField(campo);
         f.setAccessible(true);
         f.set(destino, valor);
     }

@@ -156,7 +156,11 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
   }
 }
 
-export type ResultadoAsociacion = { ok: true; mensaje: string } | { ok: false; error: string };
+// yaTieneResponsable: otro funcionario le asocio uno mientras tanto; la pagina se recarga con el actual y el
+// panel de asociacion se cierra, asi que el aviso lo tiene que mostrar quien lo abrio
+export type ResultadoAsociacion =
+  | { ok: true; mensaje: string }
+  | { ok: false; error: string; yaTieneResponsable?: boolean };
 
 // CU Gestionar empresas de transporte, FA4: asociar un usuario registrado y validado como responsable de
 // una empresa que todavia no lo tiene. El backend controla que sea funcionario y las reglas de la asociacion.
@@ -185,7 +189,11 @@ export async function asociarResponsable(nroEmpresa: number, ci: string): Promis
     if (codigo === "EMPRESA_CON_RESPONSABLE") {
       // Otro funcionario le asocio un responsable mientras tanto: la pagina se vuelve a cargar con el actual
       revalidatePath(`/empresas/${nroEmpresa}`);
-      return { ok: false, error: "La empresa ya tiene un responsable asociado." };
+      return {
+        ok: false,
+        error: "Otro funcionario le asoció un responsable a la empresa mientras tanto.",
+        yaTieneResponsable: true,
+      };
     }
     if (codigo === "RESPONSABLE_DE_OTRA_EMPRESA" || codigo === "USUARIO_NO_VALIDADO" || codigo === "USUARIO_NO_ENCONTRADO") {
       return { ok: false, error: `${detalle ?? "El usuario no se puede asociar."} Elegí otro usuario.` };

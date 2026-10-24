@@ -4,6 +4,7 @@ import java.util.List;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.EstadoValidacion;
@@ -17,6 +18,12 @@ public class CiudadanoDAO {
     // Solo lectura: los ciudadanos los crea y valida Frontofficeciudadanos
     public Ciudadano buscarPorCi(String ci) {
         return em.find(Ciudadano.class, ci);
+    }
+
+    // Bloquea la fila hasta el fin de la transaccion, para que dos funcionarios no lo asocien a la vez como
+    // responsable de empresas distintas (el lock de la empresa no alcanza: son filas distintas)
+    public Ciudadano buscarPorCiParaActualizar(String ci) {
+        return em.find(Ciudadano.class, ci, LockModeType.PESSIMISTIC_WRITE);
     }
 
     // Validados, cuya cedula empieza con prefijo y que no son responsables de ninguna empresa

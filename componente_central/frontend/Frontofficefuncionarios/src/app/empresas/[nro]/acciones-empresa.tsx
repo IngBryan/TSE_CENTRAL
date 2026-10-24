@@ -15,19 +15,25 @@ type Panel = "modificar" | "asociar" | null;
 export function AccionesEmpresa({
   empresa,
   disponibles,
+  creada,
 }: {
   empresa: EmpresaDetalle;
   // Solo si la empresa no tiene responsable: la primera tanda de usuarios que se pueden asociar
   disponibles: ResultadoUsuarios | null;
+  // Viene del alta (?creada=1). Es el mensaje inicial: la siguiente accion lo reemplaza, aunque la URL lo
+  // siga teniendo
+  creada: boolean;
 }) {
   const [panel, setPanel] = useState<Panel>(null);
-  const [exito, setExito] = useState<string | null>(null);
+  const [exito, setExito] = useState<string | null>(creada ? "La empresa fue registrada." : null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [ofrecerHabilitar, setOfrecerHabilitar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
   const abrir = (p: Panel) => {
     setExito(null);
+    setAviso(null);
     setError(null);
     setOfrecerHabilitar(false);
     setPanel(p);
@@ -77,6 +83,10 @@ export function AccionesEmpresa({
           setOfrecerHabilitar(!empresa.habilitada);
           setPanel(null);
         }}
+        onYaTieneResponsable={(mensaje) => {
+          setAviso(mensaje);
+          setPanel(null);
+        }}
       />
     );
   }
@@ -86,6 +96,12 @@ export function AccionesEmpresa({
       {exito && (
         <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
           {exito}
+        </p>
+      )}
+
+      {aviso && (
+        <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          {aviso} Arriba se muestra el responsable actual.
         </p>
       )}
 

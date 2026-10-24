@@ -149,16 +149,18 @@ public class GestionEmpresasService {
             throw new DatosInvalidosException(errores);
         }
         if (empresas.buscarPorId(nro) != null) {
-            LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
-                    + " nroEmpresa=" + nro + " motivo=EMPRESA_EXISTENTE");
-            throw new ConflictoException("EMPRESA_EXISTENTE", "Ya existe una empresa con el número " + nro + ".");
+            throw empresaExistente(nro, ci, correlationId);
         }
         Ciudadano ciudadano = ciResponsable.isEmpty() ? null
                 : candidatoResponsable(ciResponsable, nro, ci, correlationId);
 
         Empresa empresa = new Empresa(nro, nombre, razon, direccion, null);
         empresa.setHabilitada(Boolean.TRUE.equals(datos.habilitada()));
-        empresas.guardar(empresa);
+        // Otra alta con el mismo numero pudo entrar despues del control de arriba: la PK la rechaza aca, antes
+        // de registrar al responsable, y se responde 409 en vez de fallar al cerrar la transaccion
+        if (!empresas.guardarNueva(empresa)) {
+            throw empresaExistente(nro, ci, correlationId);
+        }
         if (ciudadano != null) {
             Responsable responsable = new Responsable(ciudadano, empresa);
             responsables.guardar(responsable);
@@ -257,20 +259,21 @@ public class GestionEmpresasService {
 
     // El ciudadano que puede quedar como responsable (alta y asociacion): registrado, validado y sin ser
     // responsable de otra empresa. Si no, 404 USUARIO_NO_ENCONTRADO o 409 RESPONSABLE_DE_OTRA_EMPRESA /
-    // USUARIO_NO_VALIDADO.
+    // USUARIO_NO_VALIDADO. Su fila queda bloqueada hasta el fin de la transaccion: si dos funcionarios lo
+    // asocian a la vez, el segundo espera y despues ve al responsable que registro el primero (409).
     private Ciudadano candidatoResponsable(String ciUsuario, Long nroEmpresa, String ci, String correlationId)
             throws RecursoNoEncontradoException, ConflictoException {
-        Responsable deOtra = responsables.buscarPorCi(ciUsuario);
-        if (deOtra != null) {
-            throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "RESPONSABLE_DE_OTRA_EMPRESA",
-                    "El usuario ya es responsable de la empresa " + deOtra.getEmpresa().getNroEmpresa() + ".");
-        }
-        Ciudadano ciudadano = ciudadanos.buscarPorCi(ciUsuario);
+        Ciudadano ciudadano = ciudadanos.buscarPorCiParaActualizar(ciUsuario);
         if (ciudadano == null) {
             LOG.info(() -> "evento=empresa.asociacion.rechazada correlationId=" + correlationId + " usuario=" + ci
                     + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario + " motivo=USUARIO_NO_ENCONTRADO");
             throw new RecursoNoEncontradoException("USUARIO_NO_ENCONTRADO",
                     "No hay un usuario registrado con esa cédula.");
+        }
+        Responsable deOtra = responsables.buscarPorCi(ciUsuario);
+        if (deOtra != null) {
+            throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "RESPONSABLE_DE_OTRA_EMPRESA",
+                    "El usuario ya es responsable de la empresa " + deOtra.getEmpresa().getNroEmpresa() + ".");
         }
         if (ciudadano.getEstado() != EstadoValidacion.VALIDADO) {
             throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "USUARIO_NO_VALIDADO",
@@ -291,6 +294,12 @@ public class GestionEmpresasService {
         LOG.info(() -> "evento=empresa.no_encontrada correlationId=" + correlationId + " usuario=" + ci
                 + " nroEmpresa=" + nroEmpresa);
         return new RecursoNoEncontradoException("EMPRESA_NO_ENCONTRADA", "La empresa no existe.");
+    }
+
+    private static ConflictoException empresaExistente(Long nro, String ci, String correlationId) {
+        LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
+                + " nroEmpresa=" + nro + " motivo=EMPRESA_EXISTENTE");
+        return new ConflictoException("EMPRESA_EXISTENTE", "Ya existe una empresa con el número " + nro + ".");
     }
 
     private static ConflictoException rechazoAsociacion(String ci, Long nroEmpresa, String ciUsuario,

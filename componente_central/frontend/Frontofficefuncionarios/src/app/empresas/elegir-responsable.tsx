@@ -18,6 +18,7 @@ export function ElegirResponsable({
   deshabilitado,
   error,
   titulo = "Responsable (opcional)",
+  excluidos = [],
 }: {
   inicial: ResultadoUsuarios;
   elegido: UsuarioDisponible | null;
@@ -25,6 +26,9 @@ export function ElegirResponsable({
   deshabilitado: boolean;
   error?: string;
   titulo?: string;
+  // Cedulas que el backend ya rechazo en esta pantalla (dejaron de estar disponibles): no se vuelven a ofrecer
+  // aunque sigan en la primera tanda que trajo la pagina
+  excluidos?: string[];
 }) {
   const [filtro, setFiltro] = useState("");
   const [resultado, setResultado] = useState<ResultadoUsuarios>(inicial);
@@ -34,6 +38,8 @@ export function ElegirResponsable({
   const espera = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(espera.current), []);
+
+  const usuarios = resultado.ok ? resultado.usuarios.filter((u) => !excluidos.includes(u.ci)) : [];
 
   // Busca 300 ms despues de la ultima tecla; sin filtro vuelve a la primera tanda que trajo la pagina
   const buscar = (valor: string) => {
@@ -100,13 +106,13 @@ export function ElegirResponsable({
             <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
               {resultado.error}
             </p>
-          ) : resultado.usuarios.length === 0 ? (
+          ) : usuarios.length === 0 ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {filtro ? "No hay usuarios disponibles con esa cédula." : "No hay usuarios disponibles."}
             </p>
           ) : (
             <ul className="flex max-h-72 flex-col divide-y divide-black/5 overflow-y-auto rounded-lg border border-black/10 dark:divide-white/10 dark:border-white/15">
-              {resultado.usuarios.map((u) => (
+              {usuarios.map((u) => (
                 <li key={u.ci}>
                   <button
                     type="button"

@@ -61,11 +61,6 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const disponibles = r ? null : await buscarUsuariosDisponibles("");
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
-      {creada && (
-        <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-          La empresa fue registrada.
-        </p>
-      )}
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
         <p><span className={dato}>Nombre público:</span> {empresa.nombrePublico ?? "-"}</p>
         <p><span className={dato}>Razón social:</span> {empresa.razonSocial ?? "-"}</p>
@@ -87,7 +82,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
         )}
       </section>
 
-      <AccionesEmpresa empresa={empresa} disponibles={disponibles} />
+      <AccionesEmpresa empresa={empresa} disponibles={disponibles} creada={creada} />
     </Pagina>
   );
 }

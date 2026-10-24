@@ -22,6 +22,7 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
     habilitada: false,
   });
   const [responsable, setResponsable] = useState<UsuarioDisponible | null>(null);
+  const [rechazados, setRechazados] = useState<string[]>([]);
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [campos, setCampos] = useState<Record<string, string>>({});
@@ -56,6 +57,14 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
       setError(r.error);
       setCampos(r.campos ?? {});
       setConfirmar(false);
+      // El responsable elegido dejo de estar disponible: se quita (y con el la habilitacion, que lo necesita)
+      // y no se lo vuelve a ofrecer
+      if (r.campos?.ciResponsable && responsable) {
+        const ci = responsable.ci;
+        setRechazados((rs) => [...rs, ci]);
+        setResponsable(null);
+        cambiar("habilitada", false);
+      }
     });
   };
 
@@ -158,6 +167,7 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
         }}
         deshabilitado={bloqueado}
         error={campos.ciResponsable}
+        excluidos={rechazados}
       />
 
       {!confirmar ? (

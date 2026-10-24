@@ -1,12 +1,15 @@
 package tse.lab.frontofficefuncionarios.data;
 
+import java.sql.SQLException;
 import java.util.List;
 
 import jakarta.ejb.Stateless;
+import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityGraph;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.PersistenceException;
 import tse.lab.model.Empresa;
 
 @Stateless
@@ -40,7 +43,31 @@ public class EmpresaDAO {
                 .getResultList();
     }
 
-    public void guardar(Empresa empresa) {
-        em.persist(empresa);
+    // Inserta la empresa en el momento (flush) en vez de al cerrar la transaccion. Devuelve false si el numero
+    // ya existe: otra transaccion lo registro entre el control de buscarPorId y este insert, y la PK lo rechaza.
+    // La transaccion queda marcada para rollback.
+    public boolean guardarNueva(Empresa empresa) {
+        try {
+            em.persist(empresa);
+            em.flush();
+            return true;
+        } catch (EntityExistsException e) {
+            return false;
+        } catch (PersistenceException e) {
+            if (violaRestriccion(e)) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    // SQLState de la clase 23 (integrity constraint violation): 23505 en PostgreSQL y en H2
+    private static boolean violaRestriccion(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("23")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
