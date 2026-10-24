@@ -36,6 +36,7 @@ public class GestionEmpresasService {
     static final int MAX_NOMBRE = 100;
     static final int MAX_DIRECCION = 200;
     private static final Pattern CEDULA = Pattern.compile("\\d{6,8}");
+    static final int MAX_DISPONIBLES = 50;
 
     @EJB
     private AutorizacionFuncionario autorizacion;
@@ -58,9 +59,16 @@ public class GestionEmpresasService {
             boolean habilitada, ResponsableVista responsable) {
     }
 
-    // habilitada es opcional: en el alta, por defecto la empresa queda no habilitada
+    // habilitada es opcional: en el alta, por defecto la empresa queda no habilitada. ciResponsable es
+    // opcional: la cedula de un usuario registrado y validado (ver usuariosDisponibles) que queda como
+    // responsable de la empresa en la misma transaccion.
     public record AltaEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            Boolean habilitada) {
+            Boolean habilitada, String ciResponsable) {
+    }
+
+    // Un usuario que se puede asociar como responsable: validado y sin ser responsable de otra empresa.
+    // Solo primer nombre y primer apellido (Ley 18.331).
+    public record UsuarioDisponible(String ci, String primerNombre, String primerApellido) {
     }
 
     // El nroEmpresa no se modifica: es la clave con la que la referencian choferes, vehiculos, guias y el
@@ -92,19 +100,43 @@ public class GestionEmpresasService {
         return detalle(empresa);
     }
 
-    // FA1: alta. 409 EMPRESA_EXISTENTE si ya hay una empresa con ese numero.
+    // FA4, paso 2: los usuarios que se pueden elegir como responsable. filtroCi (opcional) es el comienzo
+    // de la cedula; se devuelven hasta MAX_DISPONIBLES, ordenados por cedula.
+    public List<UsuarioDisponible> usuariosDisponibles(String ci, String filtroCi, String correlationId)
+            throws NoAutorizadoException, DatosInvalidosException {
+        autorizacion.funcionario(ci, correlationId);
+        String prefijo = filtroCi == null ? "" : filtroCi.trim();
+        if (!prefijo.matches("\\d{0,8}")) {
+            throw new DatosInvalidosException(
+                    Map.of("ci", "El filtro tiene que ser el comienzo de una cédula (solo dígitos)."));
+        }
+        List<UsuarioDisponible> lista = ciudadanos.disponiblesComoResponsable(prefijo, MAX_DISPONIBLES).stream()
+                .map(c -> new UsuarioDisponible(c.getCi(), c.getPrimerNombre(), c.getPrimerApellido()))
+                .toList();
+        LOG.info(() -> "evento=empresas.usuarios_disponibles correlationId=" + correlationId + " usuario=" + ci
+                + " filtro=" + prefijo + " cantidad=" + lista.size());
+        return lista;
+    }
+
+    // FA1: alta, opcionalmente con su responsable. 409 EMPRESA_EXISTENTE si ya hay una empresa con ese
+    // numero. Si viene ciResponsable se controla igual que en la asociacion (FA4) antes de registrar nada:
+    // si el usuario no se puede asociar, la empresa tampoco se crea.
     public OperacionRealizada alta(String ci, AltaEmpresa datos, String correlationId)
-            throws NoAutorizadoException, DatosInvalidosException, ConflictoException {
+            throws NoAutorizadoException, DatosInvalidosException, ConflictoException, RecursoNoEncontradoException {
         autorizacion.funcionario(ci, correlationId);
         Long nro = datos == null ? null : datos.nroEmpresa();
         String nombre = limpiar(datos == null ? null : datos.nombrePublico());
         String razon = limpiar(datos == null ? null : datos.razonSocial());
         String direccion = limpiar(datos == null ? null : datos.direccion());
+        String ciResponsable = datos == null || datos.ciResponsable() == null ? "" : datos.ciResponsable().trim();
         Map<String, String> errores = new LinkedHashMap<>();
         if (nro == null || nro < 1) {
             errores.put("nroEmpresa", "El número de empresa es obligatorio y tiene que ser un entero positivo.");
         }
         validarTextos(errores, nombre, razon, direccion);
+        if (!ciResponsable.isEmpty() && !CEDULA.matcher(ciResponsable).matches()) {
+            errores.put("ciResponsable", "La cédula tiene que tener de 6 a 8 dígitos.");
+        }
         if (!errores.isEmpty()) {
             LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
                     + " motivo=datos_invalidos campos=" + errores.keySet());
@@ -115,12 +147,20 @@ public class GestionEmpresasService {
                     + " nroEmpresa=" + nro + " motivo=EMPRESA_EXISTENTE");
             throw new ConflictoException("EMPRESA_EXISTENTE", "Ya existe una empresa con el número " + nro + ".");
         }
+        Ciudadano ciudadano = ciResponsable.isEmpty() ? null
+                : candidatoResponsable(ciResponsable, nro, ci, correlationId);
 
         Empresa empresa = new Empresa(nro, nombre, razon, direccion, null);
         empresa.setHabilitada(Boolean.TRUE.equals(datos.habilitada()));
         empresas.guardar(empresa);
+        if (ciudadano != null) {
+            Responsable responsable = new Responsable(ciudadano, empresa);
+            responsables.guardar(responsable);
+            empresa.setResponsable(responsable);
+        }
         LOG.info(() -> "evento=empresa.alta correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa=" + nro
-                + " habilitada=" + empresa.isHabilitada());
+                + " habilitada=" + empresa.isHabilitada() + " ciResponsable="
+                + (ciudadano == null ? "-" : ciudadano.getCi()));
         return new OperacionRealizada("La empresa fue registrada.", detalle(empresa));
     }
 
@@ -195,6 +235,21 @@ public class GestionEmpresasService {
             throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "EMPRESA_CON_RESPONSABLE",
                     "La empresa ya tiene un responsable asociado.");
         }
+        Ciudadano ciudadano = candidatoResponsable(ciUsuario, nroEmpresa, ci, correlationId);
+
+        Responsable responsable = new Responsable(ciudadano, empresa);
+        responsables.guardar(responsable);
+        empresa.setResponsable(responsable);
+        LOG.info(() -> "evento=empresa.usuario_asociado correlationId=" + correlationId + " usuario=" + ci
+                + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario);
+        return new OperacionRealizada("El usuario fue asociado a la empresa.", detalle(empresa));
+    }
+
+    // El ciudadano que puede quedar como responsable (alta y asociacion): registrado, validado y sin ser
+    // responsable de otra empresa. Si no, 404 USUARIO_NO_ENCONTRADO o 409 RESPONSABLE_DE_OTRA_EMPRESA /
+    // USUARIO_NO_VALIDADO.
+    private Ciudadano candidatoResponsable(String ciUsuario, Long nroEmpresa, String ci, String correlationId)
+            throws RecursoNoEncontradoException, ConflictoException {
         Responsable deOtra = responsables.buscarPorCi(ciUsuario);
         if (deOtra != null) {
             throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "RESPONSABLE_DE_OTRA_EMPRESA",
@@ -211,13 +266,7 @@ public class GestionEmpresasService {
             throw rechazoAsociacion(ci, nroEmpresa, ciUsuario, correlationId, "USUARIO_NO_VALIDADO",
                     "El usuario no está validado (" + ciudadano.getEstado() + ").");
         }
-
-        Responsable responsable = new Responsable(ciudadano, empresa);
-        responsables.guardar(responsable);
-        empresa.setResponsable(responsable);
-        LOG.info(() -> "evento=empresa.usuario_asociado correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario);
-        return new OperacionRealizada("El usuario fue asociado a la empresa.", detalle(empresa));
+        return ciudadano;
     }
 
     private Empresa empresa(Long nroEmpresa, String ci, String correlationId) throws RecursoNoEncontradoException {

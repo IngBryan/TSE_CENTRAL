@@ -101,7 +101,7 @@ class GestionEmpresasServiceTest {
 
     @Test
     void quienNoEsFuncionarioNoAccedeANingunaOperacionNiModificaNada() {
-        AltaEmpresa alta = new AltaEmpresa(9L, "X", "X", "X", null);
+        AltaEmpresa alta = new AltaEmpresa(9L, "X", "X", "X", null, null);
         CambiosEmpresa cambios = new CambiosEmpresa("Otro", "Otra", "Otra", false);
         for (String ci : new String[] { NO_FUNCIONARIO, null, " " }) {
             assertThrows(NoAutorizadoException.class, () -> servicio.listar(ci, "t"));
@@ -152,7 +152,7 @@ class GestionEmpresasServiceTest {
     @Test
     void altaRegistraLaEmpresaNoHabilitadaPorDefecto() throws Exception {
         OperacionRealizada r = enTx(() -> servicio.alta(FUNCIONARIO,
-                new AltaEmpresa(3L, "  Carga   Sur ", "Carga Sur S.A.", "Salto", null), "t"));
+                new AltaEmpresa(3L, "  Carga   Sur ", "Carga Sur S.A.", "Salto", null, null), "t"));
 
         assertEquals("La empresa fue registrada.", r.mensaje());
         assertEquals(new EmpresaDetalle(3L, "Carga Sur", "Carga Sur S.A.", "Salto", false, null), r.empresa());
@@ -165,7 +165,7 @@ class GestionEmpresasServiceTest {
 
     @Test
     void altaPuedeDejarLaEmpresaHabilitada() throws Exception {
-        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true), "t"));
+        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, null), "t"));
 
         em.clear();
         assertTrue(em.find(Empresa.class, 3L).isHabilitada());
@@ -174,9 +174,9 @@ class GestionEmpresasServiceTest {
     @Test
     void altaConDatosInvalidosDevuelveTodosLosErroresYNoRegistra() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> enTx(
-                () -> servicio.alta(FUNCIONARIO, new AltaEmpresa(0L, " ", null, "x".repeat(201), null), "t")));
+                () -> servicio.alta(FUNCIONARIO, new AltaEmpresa(0L, " ", null, "x".repeat(201), null, "12a"), "t")));
 
-        assertEquals(List.of("nroEmpresa", "nombrePublico", "razonSocial", "direccion"),
+        assertEquals(List.of("nroEmpresa", "nombrePublico", "razonSocial", "direccion", "ciResponsable"),
                 List.copyOf(e.getErrores().keySet()));
         assertThrows(DatosInvalidosException.class, () -> enTx(() -> servicio.alta(FUNCIONARIO, null, "t")));
         em.clear();
@@ -186,11 +186,57 @@ class GestionEmpresasServiceTest {
     @Test
     void altaConUnNumeroYaRegistradoEs409YNoModificaLaExistente() {
         ConflictoException e = assertThrows(ConflictoException.class,
-                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(1L, "Otra", "Otra", "Otra", null), "t")));
+                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(1L, "Otra", "Otra", "Otra", null, null), "t")));
 
         assertEquals("EMPRESA_EXISTENTE", e.getCodigo());
         em.clear();
         assertEquals("Transportes del Este", em.find(Empresa.class, 1L).getNombrePublico());
+    }
+
+    @Test
+    void altaConResponsableRegistraLaEmpresaYSuResponsableJuntos() throws Exception {
+        OperacionRealizada r = enTx(() -> servicio.alta(FUNCIONARIO,
+                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", true, " " + CIUDADANO + " "), "t"));
+
+        assertEquals(CIUDADANO, r.empresa().responsable().ci());
+        em.clear();
+        assertEquals(CIUDADANO, em.find(Empresa.class, 3L).getResponsable().getCi());
+        assertEquals(3L, em.find(Responsable.class, CIUDADANO).getEmpresa().getNroEmpresa());
+    }
+
+    @Test
+    void siElResponsableNoSePuedeAsociarLaEmpresaTampocoSeCrea() {
+        assertAltaRechazada(ConflictoException.class, "RESPONSABLE_DE_OTRA_EMPRESA", RESPONSABLE);
+        assertAltaRechazada(ConflictoException.class, "USUARIO_NO_VALIDADO", PENDIENTE);
+        assertAltaRechazada(RecursoNoEncontradoException.class, "USUARIO_NO_ENCONTRADO", "5555555");
+    }
+
+    private void assertAltaRechazada(Class<? extends Exception> tipo, String codigo, String ciResponsable) {
+        Exception e = assertThrows(tipo, () -> enTx(() -> servicio.alta(FUNCIONARIO,
+                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", null, ciResponsable), "t")));
+        assertEquals(codigo, e instanceof ConflictoException c ? c.getCodigo()
+                : ((RecursoNoEncontradoException) e).getCodigo());
+        em.clear();
+        assertNull(em.find(Empresa.class, 3L));
+    }
+
+    // ===== FA4, paso 2: usuarios que se pueden elegir como responsable =====
+
+    @Test
+    void soloSonElegiblesLosValidadosQueNoSonResponsables() throws Exception {
+        // RESPONSABLE esta validado pero ya es responsable; PENDIENTE y RECHAZADO no estan validados
+        assertEquals(List.of(new GestionEmpresasService.UsuarioDisponible(CIUDADANO, null, null)),
+                servicio.usuariosDisponibles(FUNCIONARIO, null, "t"));
+        assertEquals(1, servicio.usuariosDisponibles(FUNCIONARIO, "222", "t").size());
+        assertTrue(servicio.usuariosDisponibles(FUNCIONARIO, "9", "t").isEmpty());
+    }
+
+    @Test
+    void elFiltroDeUsuariosDisponiblesSoloAdmiteDigitos() {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
+                () -> servicio.usuariosDisponibles(FUNCIONARIO, "12%", "t"));
+        assertTrue(e.getErrores().containsKey("ci"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.usuariosDisponibles(NO_FUNCIONARIO, null, "t"));
     }
 
     // ===== FA3: modificacion =====

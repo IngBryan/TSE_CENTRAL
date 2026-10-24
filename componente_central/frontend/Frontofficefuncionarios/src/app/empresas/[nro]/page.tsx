@@ -1,0 +1,132 @@
+import { randomUUID } from "node:crypto";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { Encabezado } from "@/components/encabezado";
+import { Habilitada } from "@/components/habilitada";
+import { getSesion } from "@/lib/auth/session";
+import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
+import type { ErrorBackend } from "@/lib/casos";
+import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
+import { ModificarEmpresa } from "./modificar-empresa";
+
+const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
+
+const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
+const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
+const dato = "text-zinc-500";
+
+// CU Gestionar empresas de transporte: consulta de la empresa (FA2) y su modificacion (FA3). Que quien
+// consulta sea funcionario lo controla el backend (403 si no, FA5).
+export default async function DetalleEmpresa({ params, searchParams }: PageProps<"/empresas/[nro]">) {
+  const sesion = await getSesion();
+  if (!sesion) redirect("/");
+  const { nro } = await params;
+  // ?creada=1: viene del alta (FA1, paso 7)
+  const creada = (await searchParams).creada === "1";
+  // Hasta 18 digitos para que entre en el Long del backend
+  if (!/^\d{1,18}$/.test(nro)) notFound();
+
+  const correlationId = randomUUID();
+  let res: RespuestaBackend<EmpresaDetalle & ErrorBackend>;
+  try {
+    res = await llamarBackend<EmpresaDetalle & ErrorBackend>(`/empresas/${nro}`, {
+      correlationId,
+      usuarioCi: sesion.usuario.cedula,
+    });
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return <Pagina sesion={sesion} nro={nro} error={NO_DISPONIBLE} />;
+  }
+  console.info(`[empresas] correlationId=${correlationId} GET /empresas/${nro} status=${res.status}`);
+
+  if (res.status === 401) {
+    // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
+    console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+  }
+  if (res.status !== 200 || !res.data) {
+    const error =
+      res.status === 404
+        ? "La empresa no existe."
+        : res.status === 403
+          ? "No tenés acceso a la gestión de empresas: no estás registrado como funcionario del MTOP."
+          : "No se pudo obtener la empresa.";
+    return <Pagina sesion={sesion} nro={nro} error={error} />;
+  }
+
+  const empresa = res.data;
+  const r = empresa.responsable;
+  return (
+    <Pagina sesion={sesion} nro={nro} empresa={empresa}>
+      {creada && (
+        <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+          La empresa fue registrada.
+        </p>
+      )}
+      <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
+        <p><span className={dato}>Nombre público:</span> {empresa.nombrePublico ?? "-"}</p>
+        <p><span className={dato}>Razón social:</span> {empresa.razonSocial ?? "-"}</p>
+        <p className="sm:col-span-2"><span className={dato}>Dirección:</span> {empresa.direccion ?? "-"}</p>
+      </section>
+
+      <section className={`flex flex-col gap-2 ${tarjeta}`}>
+        <h2 className={titulo}>Responsable</h2>
+        {r ? (
+          <p>
+            {[r.primerNombre, r.primerApellido].filter(Boolean).join(" ") || "Sin nombre registrado"}
+            <span className="text-zinc-500">
+              {" "}· C.I. <span className="font-mono">{r.ci}</span>
+              {r.estado && ` · ${ESTADOS_VALIDACION[r.estado] ?? r.estado}`}
+            </span>
+          </p>
+        ) : (
+          <p className="text-zinc-600 dark:text-zinc-400">La empresa no tiene un responsable asociado.</p>
+        )}
+      </section>
+
+      <ModificarEmpresa empresa={empresa} />
+    </Pagina>
+  );
+}
+
+function Pagina({
+  sesion,
+  nro,
+  empresa,
+  error,
+  children,
+}: {
+  sesion: NonNullable<Awaited<ReturnType<typeof getSesion>>>;
+  nro: string;
+  empresa?: EmpresaDetalle;
+  error?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+      <Encabezado sesion={sesion} />
+
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
+        <div className="flex flex-col gap-1">
+          <Link href="/empresas" className="text-sm text-zinc-500 hover:underline">
+            ← Empresas de transporte
+          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+              {empresa?.nombrePublico ?? `Empresa N° ${nro}`}
+            </h1>
+            {empresa && <Habilitada habilitada={empresa.habilitada} />}
+          </div>
+          {empresa && <p className="text-zinc-600 dark:text-zinc-400">Empresa N° {empresa.nroEmpresa}</p>}
+        </div>
+
+        {error ? (
+          <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+            {error}
+          </p>
+        ) : (
+          children
+        )}
+      </main>
+    </div>
+  );
+}
