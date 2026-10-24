@@ -11,30 +11,30 @@ const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:tex
 
 // FA3: el funcionario ve los datos actuales, los modifica y confirma. Las reglas (obligatorios, largo
 // maximo) las valida el backend; aca solo se limita el largo para no mandar algo que va a rechazar.
-export function ModificarEmpresa({ empresa }: { empresa: EmpresaDetalle }) {
-  const inicial = {
+// Lo abre AccionesEmpresa, que tambien muestra el mensaje cuando sale bien.
+export function ModificarEmpresa({
+  empresa,
+  onCerrar,
+  onModificada,
+}: {
+  empresa: EmpresaDetalle;
+  onCerrar: () => void;
+  onModificada: (mensaje: string) => void;
+}) {
+  const [datos, setDatos] = useState({
     nombrePublico: empresa.nombrePublico ?? "",
     razonSocial: empresa.razonSocial ?? "",
     direccion: empresa.direccion ?? "",
     habilitada: empresa.habilitada,
-  };
-  const [editando, setEditando] = useState(false);
-  const [datos, setDatos] = useState(inicial);
+  });
   const [error, setError] = useState<string | null>(null);
-  const [exito, setExito] = useState<string | null>(null);
   const [campos, setCampos] = useState<Record<string, string>>({});
   const [pendiente, iniciar] = useTransition();
+  // Igual que el backend: sin responsable no se puede pasar a habilitada (si ya lo estaba, se puede deshabilitar)
+  const sePuedeHabilitar = Boolean(empresa.responsable) || empresa.habilitada;
 
   const cambiar = <K extends keyof typeof datos>(campo: K, valor: (typeof datos)[K]) =>
     setDatos((d) => ({ ...d, [campo]: valor }));
-
-  const empezar = () => {
-    setDatos(inicial);
-    setError(null);
-    setExito(null);
-    setCampos({});
-    setEditando(true);
-  };
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,9 +43,7 @@ export function ModificarEmpresa({ empresa }: { empresa: EmpresaDetalle }) {
       // Si sale bien, revalidatePath en la action vuelve a renderizar la pagina con los datos nuevos
       const r = await modificarEmpresa(empresa.nroEmpresa, datos);
       if (r.ok) {
-        setExito(r.mensaje);
-        setCampos({});
-        setEditando(false);
+        onModificada(r.mensaje);
       } else {
         setError(r.error);
         setCampos(r.campos ?? {});
@@ -55,21 +53,6 @@ export function ModificarEmpresa({ empresa }: { empresa: EmpresaDetalle }) {
 
   const errorCampo = (n: string) =>
     campos[n] && <span className="text-xs font-normal text-red-700 dark:text-red-300">{campos[n]}</span>;
-
-  if (!editando) {
-    return (
-      <div className="flex flex-col gap-3">
-        {exito && (
-          <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-            {exito}
-          </p>
-        )}
-        <button type="button" onClick={empezar} className={`${botonPrimario} self-start`}>
-          Modificar datos
-        </button>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
@@ -127,13 +110,18 @@ export function ModificarEmpresa({ empresa }: { empresa: EmpresaDetalle }) {
         <input
           type="checkbox"
           checked={datos.habilitada}
-          disabled={pendiente}
+          disabled={pendiente || !sePuedeHabilitar}
           onChange={(e) => cambiar("habilitada", e.target.checked)}
           className="mt-0.5"
         />
         <span>
           <span className="font-medium">Empresa habilitada</span>
-          <span className="block text-zinc-500">Solo una empresa habilitada puede dar de alta choferes.</span>
+          <span className="block text-zinc-500">
+            {sePuedeHabilitar
+              ? "Solo una empresa habilitada puede dar de alta choferes."
+              : "Para habilitarla, primero asociale un responsable."}
+          </span>
+          {errorCampo("habilitada")}
         </span>
       </label>
 
@@ -141,7 +129,7 @@ export function ModificarEmpresa({ empresa }: { empresa: EmpresaDetalle }) {
         <button type="submit" disabled={pendiente} className={botonPrimario}>
           {pendiente ? "Guardando…" : "Guardar cambios"}
         </button>
-        <button type="button" disabled={pendiente} onClick={() => setEditando(false)} className={botonSecundario}>
+        <button type="button" disabled={pendiente} onClick={onCerrar} className={botonSecundario}>
           Cancelar
         </button>
       </div>

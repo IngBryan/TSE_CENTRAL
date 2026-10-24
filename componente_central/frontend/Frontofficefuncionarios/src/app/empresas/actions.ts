@@ -155,3 +155,50 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     return { ok: false, error: NO_DISPONIBLE };
   }
 }
+
+export type ResultadoAsociacion = { ok: true; mensaje: string } | { ok: false; error: string };
+
+// CU Gestionar empresas de transporte, FA4: asociar un usuario registrado y validado como responsable de
+// una empresa que todavia no lo tiene. El backend controla que sea funcionario y las reglas de la asociacion.
+export async function asociarResponsable(nroEmpresa: number, ci: string): Promise<ResultadoAsociacion> {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false, error: SESION_VENCIDA };
+  if (!Number.isSafeInteger(nroEmpresa) || nroEmpresa <= 0) return { ok: false, error: "La empresa no existe." };
+  if (typeof ci !== "string" || !/^\d{6,8}$/.test(ci)) return { ok: false, error: "Elegí un usuario de la lista." };
+  const correlationId = randomUUID();
+  try {
+    const res = await llamarBackend<OperacionRealizada & ErrorBackend>(`/empresas/${nroEmpresa}/responsable`, {
+      method: "POST",
+      body: { ci },
+      correlationId,
+      usuarioCi: sesion.usuario.cedula,
+    });
+    console.info(`[empresas] correlationId=${correlationId} POST /empresas/${nroEmpresa}/responsable status=${res.status}`);
+    if (res.status === 200) {
+      revalidatePath(`/empresas/${nroEmpresa}`);
+      revalidatePath("/empresas");
+      return { ok: true, mensaje: res.data?.mensaje ?? "El usuario fue asociado a la empresa." };
+    }
+    const codigo = res.data?.error;
+    const detalle = res.data?.detalle;
+    if (codigo === "EMPRESA_NO_ENCONTRADA") return { ok: false, error: "La empresa no existe." };
+    if (codigo === "EMPRESA_CON_RESPONSABLE") {
+      // Otro funcionario le asocio un responsable mientras tanto: la pagina se vuelve a cargar con el actual
+      revalidatePath(`/empresas/${nroEmpresa}`);
+      return { ok: false, error: "La empresa ya tiene un responsable asociado." };
+    }
+    if (codigo === "RESPONSABLE_DE_OTRA_EMPRESA" || codigo === "USUARIO_NO_VALIDADO" || codigo === "USUARIO_NO_ENCONTRADO") {
+      return { ok: false, error: `${detalle ?? "El usuario no se puede asociar."} Elegí otro usuario.` };
+    }
+    if (res.status === 400) return { ok: false, error: "Elegí un usuario de la lista." };
+    if (res.status === 401) {
+      console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    }
+    if (res.status === 403)
+      return { ok: false, error: "No podés asociar responsables: no estás registrado como funcionario del MTOP." };
+    return { ok: false, error: "No se pudo asociar el responsable." };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return { ok: false, error: NO_DISPONIBLE };
+  }
+}

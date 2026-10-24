@@ -164,11 +164,21 @@ class GestionEmpresasServiceTest {
     }
 
     @Test
-    void altaPuedeDejarLaEmpresaHabilitada() throws Exception {
-        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, null), "t"));
+    void altaConResponsablePuedeDejarLaEmpresaHabilitada() throws Exception {
+        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, CIUDADANO), "t"));
 
         em.clear();
         assertTrue(em.find(Empresa.class, 3L).isHabilitada());
+    }
+
+    @Test
+    void altaHabilitadaSinResponsableEs400YNoRegistra() {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
+                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, " "), "t")));
+
+        assertEquals(List.of("habilitada"), List.copyOf(e.getErrores().keySet()));
+        em.clear();
+        assertNull(em.find(Empresa.class, 3L));
     }
 
     @Test
@@ -257,14 +267,39 @@ class GestionEmpresasServiceTest {
     }
 
     @Test
-    void modificarPuedeHabilitarYDeshabilitar() throws Exception {
-        enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("A", "B", "C", true), "t"));
+    void modificarPuedeDeshabilitarYHabilitarUnaEmpresaConResponsable() throws Exception {
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", false), "t"));
         em.clear();
-        assertTrue(em.find(Empresa.class, 2L).isHabilitada());
+        assertFalse(em.find(Empresa.class, 1L).isHabilitada());
 
-        enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("A", "B", "C", false), "t"));
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", true), "t"));
         em.clear();
-        assertFalse(em.find(Empresa.class, 2L).isHabilitada());
+        assertTrue(em.find(Empresa.class, 1L).isHabilitada());
+    }
+
+    @Test
+    void noSeHabilitaUnaEmpresaSinResponsable() {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
+                () -> enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("A", "B", "C", true), "t")));
+
+        assertEquals(List.of("habilitada"), List.copyOf(e.getErrores().keySet()));
+        em.clear();
+        Empresa empresa = em.find(Empresa.class, 2L);
+        assertFalse(empresa.isHabilitada());
+        assertEquals("Fletes del Norte", empresa.getNombrePublico());
+    }
+
+    @Test
+    void unaEmpresaHabilitadaSinResponsableSePuedeSeguirEditando() throws Exception {
+        // Datos anteriores a la regla: habilitada sin responsable
+        em.getTransaction().begin();
+        em.find(Empresa.class, 2L).setHabilitada(true);
+        em.getTransaction().commit();
+        em.clear();
+
+        enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("Otro", "B", "C", true), "t"));
+        em.clear();
+        assertEquals("Otro", em.find(Empresa.class, 2L).getNombrePublico());
     }
 
     @Test

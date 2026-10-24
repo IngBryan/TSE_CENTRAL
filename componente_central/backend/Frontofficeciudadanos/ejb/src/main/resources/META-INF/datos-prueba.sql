@@ -32,7 +32,8 @@ INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BA
 -- viajes a los choferes de la app movil: no debe detectar nada.
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('SBC1234', 'Mercedes-Benz', 'Actros', 8500, 25000, 1);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, nro_empresa) VALUES ('STU5678', 'Volvo', 'FH 460', 9200, 27000, 1);
-INSERT INTO ciudadanos (ci, estado, creado) VALUES ('11111111', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
+-- Validado (aunque es ficticio) para poder elegirlo como responsable en la gestion de empresas de funcionarios
+INSERT INTO ciudadanos (ci, estado, creado, ultimaValidacion) VALUES ('11111111', 'VALIDADO', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('11111111', 1, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-FISC001', 'Agropecuario', 'Soja a granel', 20000, CURRENT_DATE, 'Mercedes', 'Nueva Palmira', 1, 'STU5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'EN_CURSO', CURRENT_TIMESTAMP, 0);
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('TRACKING', 1, 'GPS SBC1234', 'Vehiculo SBC1234', true);

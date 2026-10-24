@@ -7,7 +7,8 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
-import { ModificarEmpresa } from "./modificar-empresa";
+import { buscarUsuariosDisponibles } from "../actions";
+import { AccionesEmpresa } from "./acciones-empresa";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -15,7 +16,8 @@ const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
 const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
 const dato = "text-zinc-500";
 
-// CU Gestionar empresas de transporte: consulta de la empresa (FA2) y su modificacion (FA3). Que quien
+// CU Gestionar empresas de transporte: consulta de la empresa (FA2), su modificacion (FA3) y, si no tiene
+// responsable, la asociacion de uno (FA4). Que quien
 // consulta sea funcionario lo controla el backend (403 si no, FA5).
 export default async function DetalleEmpresa({ params, searchParams }: PageProps<"/empresas/[nro]">) {
   const sesion = await getSesion();
@@ -55,6 +57,8 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
 
   const empresa = res.data;
   const r = empresa.responsable;
+  // FA4: sin responsable, la primera tanda de usuarios que se pueden asociar viene con la pagina
+  const disponibles = r ? null : await buscarUsuariosDisponibles("");
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
       {creada && (
@@ -83,7 +87,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
         )}
       </section>
 
-      <ModificarEmpresa empresa={empresa} />
+      <AccionesEmpresa empresa={empresa} disponibles={disponibles} />
     </Pagina>
   );
 }

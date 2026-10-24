@@ -37,6 +37,9 @@ public class GestionEmpresasService {
     static final int MAX_DIRECCION = 200;
     private static final Pattern CEDULA = Pattern.compile("\\d{6,8}");
     static final int MAX_DISPONIBLES = 50;
+    // Una empresa sin responsable no se puede habilitar (ni en el alta ni al modificarla)
+    static final String SIN_RESPONSABLE_NO_SE_HABILITA =
+            "Para habilitar la empresa tiene que tener un responsable asociado.";
 
     @EJB
     private AutorizacionFuncionario autorizacion;
@@ -137,6 +140,9 @@ public class GestionEmpresasService {
         if (!ciResponsable.isEmpty() && !CEDULA.matcher(ciResponsable).matches()) {
             errores.put("ciResponsable", "La cédula tiene que tener de 6 a 8 dígitos.");
         }
+        if (Boolean.TRUE.equals(datos == null ? null : datos.habilitada()) && ciResponsable.isEmpty()) {
+            errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
+        }
         if (!errores.isEmpty()) {
             LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
                     + " motivo=datos_invalidos campos=" + errores.keySet());
@@ -175,6 +181,10 @@ public class GestionEmpresasService {
         Boolean habilitada = cambios == null ? null : cambios.habilitada();
         Map<String, String> errores = new LinkedHashMap<>();
         validarTextos(errores, nombre, razon, direccion);
+        // Solo se controla al pasar a habilitada: una que ya lo estaba se puede seguir editando
+        if (Boolean.TRUE.equals(habilitada) && !empresa.isHabilitada() && empresa.getResponsable() == null) {
+            errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
+        }
         if (!errores.isEmpty()) {
             LOG.warning(() -> "evento=empresa.modificacion.rechazada correlationId=" + correlationId + " usuario="
                     + ci + " nroEmpresa=" + nroEmpresa + " motivo=datos_invalidos campos=" + errores.keySet());
