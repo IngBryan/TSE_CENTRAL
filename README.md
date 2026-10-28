@@ -49,10 +49,15 @@ DAOs y servicios (sus ABM); lo unico compartido son las entidades.
 - El esquema lo genera **solo** Frontofficeciudadanos (`drop-and-create` + `datos-prueba.sql`). Los otros
   dos usan `schema-generation.database.action=none`: si no, se borrarian las tablas entre si en cada deploy.
 - Hay que instalar Modelo antes de compilar cualquier backend (y despues de cambiar una entidad).
+- `AdaptadorPdi` es el cliente SOAP de la PDI (DNIC) compartido por Frontofficeciudadanos y
+  Frontofficefuncionarios (timeouts, reintentos y circuit breaker). Tambien hay que instalarlo antes de
+  compilarlos. Lo que cada uno hace con el resultado (estados del ciudadano, sesion del funcionario) queda
+  en cada proyecto.
 
 **Levantar un modulo:**
 ```bash
 mvn -f componente_central/backend/Modelo/pom.xml install
+mvn -f componente_central/backend/AdaptadorPdi/pom.xml install
 cd componente_central/backend/Frontofficeciudadanos
 mvn clean install
 mvn wildfly:deploy -pl ear
@@ -145,13 +150,13 @@ docker compose up --build
 
 | Servicio                                     | URL                     |
 |-----------------------------------------------|--------------------------|
-| `wildfly` (las 3 aplicaciones del backend)    | http://localhost:8080    |
+| `wildfly` (las 3 aplicaciones del backend)    | http://localhost:8081    |
 | `postgres`                                    | `localhost:5432` (o `POSTGRES_PORT`) |
 | `mongodb`                                     | `mongodb://localhost:27017` (o `MONGO_PORT`) |
 | `rabbitmq` (panel web)                        | http://localhost:15672   |
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
-| `frontofficefuncionarios-front`               | http://localhost:3003    |
+| `frontofficefuncionarios-front`               | http://localhost:8080/funcionarios |
 | `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
 | `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
@@ -175,8 +180,10 @@ ve una cookie de sesion cifrada.
   `POST /api/ciudadanos/ingreso-testing` da 404). En Kubernetes estan prendidos en los configmaps del
   front y de wildfly; en el compose se prenden con `CIUDADANOS_LOGIN_TESTING=true` en el `.env`. Cada
   ingreso queda en el log (`evento=ingreso.testing`, `[login testing]`). Apagarlo cuando ande gub.uy.
-- **Puerto 80:** las redirect URIs registradas son `http://localhost` y `http://localhost:8080`
-  (logout: `/logout`). El 8080 lo usa WildFly, asi que la app tiene que atender en el 80. El compose
+- **Puerto 80:** las redirect URIs registradas para desarrollo son `http://localhost` (ciudadanos) y
+  `http://localhost:8080` (funcionarios)
+  (logout: `/logout`). Ciudadanos tiene que atender en el 80 y funcionarios en el 8080, por eso WildFly
+  se publica en el 8081. El compose
   publica `80:3000`; en desarrollo usar `npm run dev:gubuy` (`next dev -p 80`).
 - **Credenciales:** en desarrollo van en `componente_central/frontend/frontofficeciudadanos/.env.local`
   (ver `.env.example`); en Docker, en el `.env` de la raiz. Ninguno se commitea.
@@ -335,7 +342,7 @@ docker compose up -d --build wildfly   # levanta tambien postgres
   Maven (varios minutos); despues usa cache. Para reconstruir tras cambiar codigo:
   `docker compose up -d --build wildfly`.
 - **Context roots:** cada app queda en `/<proyecto>-web`, por ejemplo
-  http://localhost:8080/frontofficeciudadanos-web/. Hoy responden `403` porque todavia no hay
+  http://localhost:8081/frontofficeciudadanos-web/. Hoy responden `403` porque todavia no hay
   paginas; un `404` indicaria que la app no esta desplegada.
 - **Datasource:** `wildfly/datasources.cli` registra el driver de PostgreSQL y un unico
   datasource, `java:/MainDS`, que usan los `persistence.xml` de los 3 proyectos (comparten base
@@ -505,11 +512,12 @@ dos es `ruleengine/vehicles/VehicleFactsClient`.
   (`NodosActivos`, `NodosActivosRemote`, `DatosNodo`, `TipoNodo`) y con
   `frontofficefuncionarios-ejb-client.jar` (`CasosAutomaticos`, `CasosAutomaticosRemote`,
   `EventoFiscalizado`, `OrigenEvento`, `CasoAsignado`). Por eso, antes de compilar fiscalizacion hay
-  que instalar Modelo y los tres proyectos en el `.m2` (el `Dockerfile` y el workflow de CI ya lo
+  que instalar Modelo, AdaptadorPdi y los tres proyectos en el `.m2` (el `Dockerfile` y el workflow de CI ya lo
   hacen):
 
   ```bash
   mvn -f componente_central/backend/Modelo/pom.xml install -Dmaven.test.skip=true
+  mvn -f componente_central/backend/AdaptadorPdi/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Frontofficeciudadanos/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Frontofficefuncionarios/pom.xml install -Dmaven.test.skip=true
   mvn -f componente_central/backend/Backofficeautoridadesadministradores/pom.xml install -Dmaven.test.skip=true
@@ -552,7 +560,7 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
   exec /opt/jboss/wildfly/bin/standalone.sh -b 0.0.0.0
   ```
 
-- Variables de fiscalizacion: `WILDFLY_URL` (`remote+http://localhost:8080`; en el compose
+- Variables de fiscalizacion: `WILDFLY_URL` (`remote+http://localhost:8081`; en el compose
   `remote+http://wildfly:8080`), `EJB_USER`, `EJB_PASSWORD`.
 - Errores: si WildFly esta caido, las credenciales son incorrectas o el EAR no esta desplegado, la
   llamada lanza `EJBException`, que el cliente convierte en `IOException`.

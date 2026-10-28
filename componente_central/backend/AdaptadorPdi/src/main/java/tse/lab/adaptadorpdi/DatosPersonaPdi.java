@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
+package tse.lab.adaptadorpdi;
 
 import java.time.LocalDate;
 

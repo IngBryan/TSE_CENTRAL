@@ -22,6 +22,14 @@
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
+        <!-- Cliente de la PDI compartido (componente_central/backend/AdaptadorPdi). Va en el lib/ del EAR.
+            Hay que instalarlo antes: mvn -f ../AdaptadorPdi/pom.xml install -->
+        <dependency>
+            <groupId>tse.lab.adaptadorpdi</groupId>
+            <artifactId>adaptadorpdi</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+
         <!-- Import the CDI API, we use provided scope as the API is included in WildFly / JBoss EAP -->
         <dependency>
             <groupId>jakarta.enterprise</groupId>

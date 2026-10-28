@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
+package tse.lab.adaptadorpdi;
 
 // La PDI no respondio, respondio con un SOAP Fault o con algo que no se pudo interpretar.
 public class PdiNoDisponibleException extends Exception {

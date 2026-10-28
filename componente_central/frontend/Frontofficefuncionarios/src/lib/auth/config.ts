@@ -13,10 +13,28 @@ function requerida(nombre: string): string {
 }
 
 export function getAuthConfig() {
-  const { appBaseUrl, backendUrl, backendTimeoutMs } = loadConfig();
+  const { appBaseUrl, backendUrl, backendTimeoutMs, oidc } = loadConfig();
+  const issuer = oidc.issuer;
 
   return {
     appBaseUrl,
+    // Login con ID Uruguay (gub.uy), mismo cliente OIDC que el front de ciudadanos. La redirect URI y la
+    // de logout (por defecto appBaseUrl y appBaseUrl/logout) tienen que estar registradas en ID Uruguay.
+    issuer,
+    // Algunos tokens de testing traen el issuer sin "/v1": se aceptan los dos.
+    issuersAceptados: [issuer, issuer.replace(/\/v\d+$/, "")],
+    authorizationEndpoint: `${issuer}/authorize`,
+    tokenEndpoint: `${issuer}/token`,
+    userinfoEndpoint: `${issuer}/userinfo`,
+    endSessionEndpoint: `${issuer}/logout`,
+    jwksUri: `${issuer}/jwks`,
+    clientId: oidc.clientId,
+    // Opcional para que el sitio (y el ingreso de testing) ande aunque gub.uy no este configurado
+    clientSecret: process.env.OIDC_CLIENT_SECRET ?? "",
+    redirectUri: oidc.redirectUri,
+    postLogoutRedirectUri: oidc.postLogoutRedirectUri,
+    scopes: oidc.scopes,
+    timeoutMs: oidc.timeoutMs,
     sessionSecret: requerida("SESSION_SECRET"),
     backendUrl,
     backendApiKey: requerida("BACKEND_API_KEY"),
@@ -27,8 +45,9 @@ export function getAuthConfig() {
 
 export type AuthConfig = ReturnType<typeof getAuthConfig>;
 
-// Ingreso con cedula sin proveedor de identidad: solo con LOGIN_TESTING=true. Hoy esta activo en compose
-// y en k8s hasta que se integre gub.uy; sacarlo de k8s cuando haya login real.
+// Ingreso con cedula sin gub.uy: solo con LOGIN_TESTING=true (y FUNCIONARIOS_INGRESO_TESTING=true en
+// WildFly). Pasa por los mismos controles del backend (funcionario registrado y PDI); apagarlo cuando el
+// login con gub.uy ande en el ambiente.
 export function loginTestingHabilitado(): boolean {
   return process.env.LOGIN_TESTING === "true";
 }

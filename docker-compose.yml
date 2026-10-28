@@ -62,15 +62,22 @@ services:
     build:
       context: ./componente_central/frontend/Frontofficefuncionarios
     ports:
-      - "3003:3000"
+      # Login con gub.uy: la redirect URI registrada para funcionarios en local es http://localhost:8080
+      # (logout http://localhost:8080/logout). Por eso WildFly se publica en el 8081. Un solo puerto: los
+      # POST de login y logout solo se aceptan con el origen de appBaseUrl (config/docker.json).
+      - "8080:3000"
     environment:
       - NODE_ENV=production
       # Clave propia: si se filtra la de ciudadanos no sirve para fabricar sesiones de funcionarios
       - SESSION_SECRET=${FUNCIONARIOS_SESSION_SECRET}
       # Key propia del backend de funcionarios: la de ciudadanos no sirve para llamar a /casos
       - BACKEND_API_KEY=${FUNCIONARIOS_API_KEY}
-      # Ingreso con cedula sin proveedor de identidad (hasta que se integre gub.uy)
-      - LOGIN_TESTING=true
+      # Login con gub.uy: mismo cliente que ciudadanos (oidc en config/docker.json). Se entra por
+      # http://localhost:8080/funcionarios.
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      # Ingreso de testing con cedula (sin gub.uy, mismos controles del backend). Prendido por defecto;
+      # FUNCIONARIOS_LOGIN_TESTING=false en el .env lo apaga. Va junto con el de WildFly.
+      - LOGIN_TESTING=${FUNCIONARIOS_LOGIN_TESTING:-true}
     volumes:
       # URLs de la app y del backend (ver src/lib/config.ts)
       - ./componente_central/frontend/Frontofficefuncionarios/config/docker.json:/app/config/app.json:ro
@@ -170,6 +177,8 @@ services:
       - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
       # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy): mismo interruptor que el front
       - INGRESO_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
+      # POST /api/funcionarios/ingreso-testing: mismo interruptor que el front de funcionarios
+      - FUNCIONARIOS_INGRESO_TESTING=${FUNCIONARIOS_LOGIN_TESTING:-true}
       # App movil del chofer (TSE_MOVIL): login con gub.uy en POST /api/movil/auth/token. El canje
       # del code lo hace WildFly con el mismo cliente de ID Uruguay que la web.
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
@@ -183,7 +192,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:
-      - "8080:8080"
+      # 8081 en el host: el 8080 es la redirect URI de gub.uy del front de funcionarios. Los fronts y
+      # fiscalizacion no lo usan: llegan por la red interna (wildfly:8080).
+      - "8081:8080"
     healthcheck:
       # Health check de la interfaz de administracion (solo accesible dentro del contenedor)
       test: ["CMD-SHELL", "curl -sf http://localhost:9990/health/ready >/dev/null"]

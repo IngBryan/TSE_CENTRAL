@@ -26,6 +26,15 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
           </nav>
         )}
       </div>
+      {sesion?.usuario.identidadVerificada === false && (
+        <p
+          role="status"
+          className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
+          Identidad no verificada con DNIC: el servicio no estaba disponible al ingresar. Se vuelve a verificar
+          en el próximo ingreso.
+        </p>
+      )}
     </header>
   );
 }

@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
+package tse.lab.adaptadorpdi;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,7 +16,8 @@ import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-// Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service).
+// Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service). Lo usan
+// Frontofficeciudadanos (ValidacionPdiService) y Frontofficefuncionarios (IngresoFuncionarioService).
 //
 // Resiliencia (CU-03 FA3):
 // - timeout por intento (PDI_TIMEOUT_MS, 5000 por defecto);
