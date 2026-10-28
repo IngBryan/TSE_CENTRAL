@@ -4,7 +4,7 @@
 -- integrante que prueba el login con gub.uy testing.
 --
 -- Empresa habilitada; la alta real la hace un funcionario del MTOP (frontoffice de funcionarios).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, 0);
 -- Ciudadanos que tienen un rol. Quedan pendientes sin cuenta gub.uy: su primer ingreso los vincula y valida
 -- contra la PDI (CU-01 FA2). Los roles (responsables, choferes) los referencian por ci.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('54074380', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);

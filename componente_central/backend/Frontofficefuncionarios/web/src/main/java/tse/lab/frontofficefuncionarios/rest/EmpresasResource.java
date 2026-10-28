@@ -67,8 +67,8 @@ public class EmpresasResource {
         return ejecutar(() -> empresas.detalle(usuario, nro, correlationId(req)));
     }
 
-    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true};
-    // habilitada es opcional
+    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true, "version": 3};
+    // habilitada es opcional. 409 EMPRESA_DESACTUALIZADA si version no es la actual de la empresa.
     @PUT
     @Path("/{nro}")
     public Response modificar(@HeaderParam(USUARIO_CI) String usuario, @PathParam("nro") Long nro,

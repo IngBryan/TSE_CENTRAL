@@ -24,14 +24,18 @@ export type EmpresaDetalle = {
   direccion: string | null;
   habilitada: boolean;
   responsable: ResponsableVista | null;
+  // @Version de la empresa: se manda al modificarla para no pisar lo que otro cambio mientras tanto
+  version: number | null;
 };
 
-// Cuerpo de PUT /empresas/{nro}: el numero de empresa no se modifica
+// Cuerpo de PUT /empresas/{nro}: el numero de empresa no se modifica. version: la que se estaba mirando al
+// editar (409 EMPRESA_DESACTUALIZADA si ya no es la actual).
 export type CambiosEmpresa = {
   nombrePublico: string;
   razonSocial: string;
   direccion: string;
   habilitada: boolean;
+  version: number;
 };
 
 // Cuerpo de POST /empresas. ciResponsable: cedula de un usuario disponible, o null para darla de alta sin
@@ -53,9 +57,10 @@ export const nombreUsuario = (u: { primerNombre: string | null; primerApellido: 
 
 export type OperacionRealizada = { mensaje: string; empresa: EmpresaDetalle };
 
-// GestionEmpresasService.MAX_NOMBRE y MAX_DIRECCION
+// GestionEmpresasService.MAX_NOMBRE, MAX_DIRECCION y MAX_DISPONIBLES
 export const MAX_NOMBRE = 100;
 export const MAX_DIRECCION = 200;
+export const MAX_DISPONIBLES = 50;
 
 export const ESTADOS_VALIDACION: Record<string, string> = {
   PENDIENTE_VALIDACION: "Pendiente de validación",

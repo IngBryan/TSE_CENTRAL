@@ -42,9 +42,12 @@ export function AsociarResponsable({
         onYaTieneResponsable(r.error);
       } else {
         setError(r.error);
-        setElegido(null);
-        // Ya no esta disponible (validacion, responsable de otra empresa): no se lo vuelve a ofrecer
-        setRechazados((rs) => [...rs, ci]);
+        // Ya no esta disponible (validacion, responsable de otra empresa): no se lo vuelve a ofrecer. Ante
+        // otro error (sesion, backend caido) queda elegido para reintentar.
+        if (r.noDisponible) {
+          setElegido(null);
+          setRechazados((rs) => [...rs, ci]);
+        }
       }
     });
   };

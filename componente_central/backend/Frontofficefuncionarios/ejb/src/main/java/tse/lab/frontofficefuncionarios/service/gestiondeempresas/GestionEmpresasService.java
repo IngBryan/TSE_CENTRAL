@@ -58,8 +58,9 @@ public class GestionEmpresasService {
     public record ResponsableVista(String ci, String primerNombre, String primerApellido, String estado) {
     }
 
+    // version: la de la entidad (@Version). El front la manda al modificar para detectar cambios concurrentes.
     public record EmpresaDetalle(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            boolean habilitada, ResponsableVista responsable) {
+            boolean habilitada, ResponsableVista responsable, Long version) {
     }
 
     // habilitada es opcional: en el alta, por defecto la empresa queda no habilitada. ciResponsable es
@@ -75,8 +76,9 @@ public class GestionEmpresasService {
     }
 
     // El nroEmpresa no se modifica: es la clave con la que la referencian choferes, vehiculos, guias y el
-    // responsable. habilitada es opcional: si no viene, se conserva.
-    public record CambiosEmpresa(String nombrePublico, String razonSocial, String direccion, Boolean habilitada) {
+    // responsable. habilitada es opcional: si no viene, se conserva. version: la que se estaba mirando al editar.
+    public record CambiosEmpresa(String nombrePublico, String razonSocial, String direccion, Boolean habilitada,
+            Long version) {
     }
 
     public record AsociacionUsuario(String ci) {
@@ -172,11 +174,25 @@ public class GestionEmpresasService {
         return new OperacionRealizada("La empresa fue registrada.", detalle(empresa));
     }
 
-    // FA3: modificacion de los datos de la empresa (no de su numero)
+    // FA3: modificacion de los datos de la empresa (no de su numero). 409 EMPRESA_DESACTUALIZADA si la version
+    // que manda el front no es la actual: otro funcionario la modifico despues de que se cargo el formulario, y
+    // guardar pisaria esos cambios con los datos viejos. La fila queda bloqueada hasta el fin de la transaccion:
+    // si dos modificaciones llegan a la vez, la segunda espera y despues ve la version nueva.
     public OperacionRealizada modificar(String ci, Long nroEmpresa, CambiosEmpresa cambios, String correlationId)
-            throws NoAutorizadoException, RecursoNoEncontradoException, DatosInvalidosException {
+            throws NoAutorizadoException, RecursoNoEncontradoException, DatosInvalidosException, ConflictoException {
         autorizacion.funcionario(ci, correlationId);
-        Empresa empresa = empresa(nroEmpresa, ci, correlationId);
+        Empresa empresa = nroEmpresa == null ? null : empresas.buscarPorIdParaActualizar(nroEmpresa);
+        if (empresa == null) {
+            throw noEncontrada(nroEmpresa, ci, correlationId);
+        }
+        Long version = cambios == null ? null : cambios.version();
+        if (version == null || !version.equals(empresa.getVersion())) {
+            LOG.warning(() -> "evento=empresa.modificacion.rechazada correlationId=" + correlationId + " usuario="
+                    + ci + " nroEmpresa=" + nroEmpresa + " motivo=EMPRESA_DESACTUALIZADA version=" + version
+                    + " actual=" + empresa.getVersion());
+            throw new ConflictoException("EMPRESA_DESACTUALIZADA",
+                    "La empresa cambió mientras la estabas modificando. Volvé a cargarla.");
+        }
         String nombre = limpiar(cambios == null ? null : cambios.nombrePublico());
         String razon = limpiar(cambios == null ? null : cambios.razonSocial());
         String direccion = limpiar(cambios == null ? null : cambios.direccion());
@@ -213,6 +229,7 @@ public class GestionEmpresasService {
         if (habilitada != null) {
             empresa.setHabilitada(habilitada);
         }
+        empresas.sincronizar(); // flush: la respuesta lleva la version nueva
         LOG.info(() -> "evento=empresa.modificada correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
                 + nroEmpresa + " campos=" + modificados);
         return new OperacionRealizada("La empresa fue modificada.", detalle(empresa));
@@ -325,7 +342,7 @@ public class GestionEmpresasService {
                     c == null || c.getEstado() == null ? null : c.getEstado().name());
         }
         return new EmpresaDetalle(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.getDireccion(),
-                e.isHabilitada(), responsable);
+                e.isHabilitada(), responsable, e.getVersion());
     }
 
     private static void validarTextos(Map<String, String> errores, String nombre, String razon, String direccion) {

@@ -7,7 +7,7 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
-import { buscarUsuariosDisponibles } from "../actions";
+import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "../actions";
 import { AccionesEmpresa } from "./acciones-empresa";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
@@ -27,6 +27,13 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const creada = (await searchParams).creada === "1";
   // Hasta 18 digitos para que entre en el Long del backend
   if (!/^\d{1,18}$/.test(nro)) notFound();
+
+  // FA4: sin responsable, la primera tanda de usuarios que se pueden asociar viene con la pagina. Se pide en
+  // paralelo con el detalle (todavia no se sabe si tiene responsable) y se descarta si lo tiene. El catch
+  // evita un rechazo sin atender si la pagina termina antes de esperarla.
+  const pedidoDisponibles = buscarUsuariosDisponibles("").catch(
+    (): ResultadoUsuarios => ({ ok: false, error: "No se pudieron obtener los usuarios registrados." }),
+  );
 
   const correlationId = randomUUID();
   let res: RespuestaBackend<EmpresaDetalle & ErrorBackend>;
@@ -57,8 +64,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
 
   const empresa = res.data;
   const r = empresa.responsable;
-  // FA4: sin responsable, la primera tanda de usuarios que se pueden asociar viene con la pagina
-  const disponibles = r ? null : await buscarUsuariosDisponibles("");
+  const disponibles = r ? null : await pedidoDisponibles;
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
