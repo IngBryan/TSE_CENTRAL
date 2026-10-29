@@ -1,11 +1,10 @@
 name: Backend - Modelo (entidades compartidas)
 
-# Ejecuta CI en pushes a main/dev y Pull Requests hacia dev.
+# Ejecuta CI en pushes a main y Pull Requests hacia dev.
 on:
   push:
     branches:
       - main
-      - dev
     paths:
       - componente_central/backend/Modelo/**
       - .github/workflows/backend-modelo.yml

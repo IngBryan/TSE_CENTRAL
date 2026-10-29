@@ -10,6 +10,11 @@ on:
         description: Servicio de docker-compose.yml a construir y publicar
         type: string
         required: true
+      build-args:
+        description: Build args de la imagen publicada (uno por linea, NOMBRE=valor); pisan los de docker-compose.yml, que son los de desarrollo local
+        type: string
+        required: false
+        default: ""
 
 jobs:
   docker:
@@ -25,7 +30,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Construir imagen
-        run: docker compose build ${{ inputs.service }}
+        env:
+          SERVICE: ${{ inputs.service }}
+          BUILD_ARGS: ${{ inputs.build-args }}
+        run: |
+          args=()
+          while IFS= read -r arg; do
+            [ -n "$arg" ] && args+=(--build-arg "$arg")
+          done <<< "$BUILD_ARGS"
+          docker compose build "${args[@]}" "$SERVICE"
 
       # Si se corre a mano desde otra rama, la imagen se construye pero no se publica.
       - name: Login en GitHub Container Registry
