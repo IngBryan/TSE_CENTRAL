@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,10 @@ public class Empresa implements Serializable {
     private List<Guia> guias;
     @OneToMany(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<Vehiculo> vehiculos;
+    // Bloqueo optimista: el funcionario manda la version que estaba mirando al modificar la empresa, para no
+    // pisar sin aviso lo que otro cambio mientras tanto
+    @Version
+    private Long version;
 
     public Empresa() {
         this.choferes = new ArrayList<>();
@@ -90,6 +95,10 @@ public class Empresa implements Serializable {
 
     public List<Vehiculo> getVehiculos() {
         return vehiculos;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public void setNroEmpresa(Long nroEmpresa) {

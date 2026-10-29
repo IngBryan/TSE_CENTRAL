@@ -4,9 +4,9 @@
 -- integrante que prueba el login con gub.uy testing.
 --
 -- Empresa habilitada; la alta real la hace un funcionario del MTOP (frontoffice de funcionarios).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, 0);
 -- DEMO / Empresas: contraste con empresa no habilitada (sin identidad gub.uy artificial).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada) VALUES (2, 'Logistica del Litoral', 'Logistica del Litoral S.R.L.', 'Ruta 3 km 390, Paysandu', false);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (2, 'Logistica del Litoral', 'Logistica del Litoral S.R.L.', 'Ruta 3 km 390, Paysandu', false , 0);
 -- Ciudadanos que tienen un rol. Quedan pendientes sin cuenta gub.uy: su primer ingreso los vincula y valida
 -- contra la PDI (CU-01 FA2). Los roles (responsables, choferes) los referencian por ci.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('54074380', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
@@ -80,6 +80,9 @@ INSERT INTO autoridades (ci) VALUES ('88888888');
 -- Frontoffice de funcionarios (CU Gestionar casos de fiscalizacion): el integrante de gub.uy testing tambien es
 -- funcionario, y hay casos de fiscalizacion en distintos estados hasta que la fiscalizacion automatica los genere.
 INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mtop.gub.uy');
+-- Gestion de empresas: ciudadano ficticio ya validado y sin ningun rol, para elegirlo como responsable de una
+-- empresa sin mezclarlo con los datos de los otros casos de prueba
+INSERT INTO ciudadanos (ci, primerNombre, primerApellido, nombres, apellidos, estado, creado, ultimaValidacion) VALUES ('22222222', 'Laura', 'Gomez', 'Laura', 'Gomez', 'VALIDADO', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- Balanza solo para la evidencia de los casos: inactiva, asi el poller no la consulta en la API de balanzas.
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 1, 'Balanza Peaje Pando', 'Peaje Pando', false);
 INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1;

@@ -51,12 +51,15 @@ jobs:
       
       # Igual que el Dockerfile: el build standalone necesita public/ y .next/static
       # al lado de server.js. Asi el artifact queda listo para correr con "node server.js".
+      # Not on pull requests: only builds of main are kept (artifact storage quota).
       - name: Preparar build standalone
+        if: github.event_name != 'pull_request'
         run: |
           cp -r public .next/standalone/
           cp -r .next/static .next/standalone/.next/
 
       - name: Guardar build
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}

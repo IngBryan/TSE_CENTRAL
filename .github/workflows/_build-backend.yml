@@ -63,7 +63,9 @@ jobs:
           clean verify
 
       # El .ear (o el .jar de Fiscalizacion) queda descargable en la pagina de la corrida.
+      # Not on pull requests: only builds of main are kept (artifact storage quota).
       - name: Guardar build
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
