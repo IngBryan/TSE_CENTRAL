@@ -1,5 +1,8 @@
 {
   "appBaseUrl": "http://localhost:3003/funcionarios",
-  "backendUrl": "http://localhost:8080/frontofficefuncionarios-web/api",
-  "backendTimeoutMs": 10000
+  "backendUrl": "http://localhost:8081/frontofficefuncionarios-web/api",
+  "backendTimeoutMs": 20000,
+  "oidc": {
+    "clientId": "890192"
+  }
 }

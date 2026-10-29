@@ -159,6 +159,12 @@ La configuracion que no es secreta esta en ConfigMaps junto a cada aplicacion:
 registradas en ID Uruguay; si no, gub.uy rechaza el login. El ingress no tiene TLS: el HTTPS lo termina
 el proxy de Elastic Cloud que esta delante.
 
+El front de funcionarios usa el mismo cliente OIDC (`oidc.clientId` en
+`apps/frontofficefuncionarios-front/app.json` y `oidc-client-secret` de `tse-runtime-secrets`). Su redirect
+URI es `appBaseUrl` y la de logout `appBaseUrl/logout`: `https://env-6537388.web.elasticloud.uy/funcionarios`
+y `.../funcionarios/logout`, también registradas en ID Uruguay. Después del login, WildFly controla que la
+cédula esté en la tabla `funcionarios` y la valida contra la PDI (que exista en DNIC y sea mayor de edad).
+
 **PDI:** `PDI_URL` tiene que apuntar a donde este desplegada la PDI (`TSE_NODOS`), y
 `PDI_ORGANISMO_CODIGO` / `pdi-organismo-clave` coincidir con los que usa la PDI.
 
@@ -223,7 +229,7 @@ kubectl -n tse create secret generic frontofficefuncionarios-front-secrets \
   --from-literal=BACKEND_API_KEY='<FUNCIONARIOS_API_KEY>'
 ```
 
-El ingreso de testing con cédula (`LOGIN_TESTING=true` en `deployment.yaml`) está habilitado hasta que se integre gub.uy: mientras tanto cualquiera puede ingresar con la cédula de un funcionario registrado.
+El ingreso de testing con cédula (`LOGIN_TESTING=true` en `deployment.yaml` y `FUNCIONARIOS_INGRESO_TESTING=true` en `apps/wildfly/configmap.yaml`) sigue habilitado hasta que ande el login con gub.uy en `/funcionarios`: mientras tanto cualquiera puede ingresar con la cédula de un funcionario registrado (WildFly igual la valida contra la PDI). Apagar los dos cuando gub.uy esté registrado.
 
 Certificado TLS del host del ingress (`env-6537388.web.elasticloud.uy`), a partir del certificado y su clave privada en formato PEM:
 

@@ -1,5 +1,10 @@
 {
-  "appBaseUrl": "http://localhost:3003/funcionarios",
+  "appBaseUrl": "http://localhost:8080/funcionarios",
   "backendUrl": "http://wildfly:8080/frontofficefuncionarios-web/api",
-  "backendTimeoutMs": 10000
+  "backendTimeoutMs": 20000,
+  "oidc": {
+    "clientId": "890192",
+    "redirectUri": "http://localhost:8080",
+    "postLogoutRedirectUri": "http://localhost:8080/logout"
+  }
 }

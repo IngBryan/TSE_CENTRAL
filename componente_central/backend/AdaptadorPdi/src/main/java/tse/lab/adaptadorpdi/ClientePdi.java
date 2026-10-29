@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
+package tse.lab.adaptadorpdi;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,7 +16,8 @@ import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-// Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service).
+// Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service). Lo usan
+// Frontofficeciudadanos (ValidacionPdiService) y Frontofficefuncionarios (IngresoFuncionarioService).
 //
 // Resiliencia (CU-03 FA3):
 // - timeout por intento (PDI_TIMEOUT_MS, 5000 por defecto);
@@ -31,13 +32,13 @@ public class ClientePdi {
 
     private static final Logger LOG = Logger.getLogger(ClientePdi.class.getName());
 
-    private final String url = env("PDI_URL", "http://host.docker.internal:3005/ws/servicioInformacion");
-    private final String organismo = env("PDI_ORGANISMO_CODIGO", "");
-    private final String clave = env("PDI_ORGANISMO_CLAVE", "");
-    private final Duration timeout = Duration.ofMillis(Long.parseLong(env("PDI_TIMEOUT_MS", "5000")));
-    private final int reintentos = Integer.parseInt(env("PDI_REINTENTOS", "2"));
-    private final int umbralCircuito = Integer.parseInt(env("PDI_CB_UMBRAL", "3"));
-    private final Duration esperaCircuito = Duration.ofSeconds(Long.parseLong(env("PDI_CB_ESPERA_S", "30")));
+    private final String url;
+    private final String organismo;
+    private final String clave;
+    private final Duration timeout;
+    private final int reintentos;
+    private final int umbralCircuito;
+    private final Duration esperaCircuito;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -46,6 +47,28 @@ public class ClientePdi {
 
     private final AtomicInteger fallosSeguidos = new AtomicInteger();
     private volatile Instant circuitoAbiertoHasta = Instant.EPOCH;
+
+    public ClientePdi() {
+        this(env("PDI_URL", "http://host.docker.internal:3005/ws/servicioInformacion"),
+                env("PDI_ORGANISMO_CODIGO", ""),
+                env("PDI_ORGANISMO_CLAVE", ""),
+                Duration.ofMillis(Long.parseLong(env("PDI_TIMEOUT_MS", "5000"))),
+                Integer.parseInt(env("PDI_REINTENTOS", "2")),
+                Integer.parseInt(env("PDI_CB_UMBRAL", "3")),
+                Duration.ofSeconds(Long.parseLong(env("PDI_CB_ESPERA_S", "30"))));
+    }
+
+    // For tests: the same client without reading the environment
+    ClientePdi(String url, String organismo, String clave, Duration timeout, int reintentos, int umbralCircuito,
+            Duration esperaCircuito) {
+        this.url = url;
+        this.organismo = organismo;
+        this.clave = clave;
+        this.timeout = timeout;
+        this.reintentos = reintentos;
+        this.umbralCircuito = umbralCircuito;
+        this.esperaCircuito = esperaCircuito;
+    }
 
     // Datos de la persona, o vacio si DNIC no la encuentra (no existe o dada de baja).
     public Optional<DatosPersonaPdi> consultarPersona(String cedula, String correlationId)

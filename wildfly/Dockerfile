@@ -16,10 +16,12 @@ WORKDIR /build
 COPY --from=backend . .
 
 # Cada proyecto es un build Maven independiente. El cache de ~/.m2 evita bajar todo de nuevo.
-# Modelo (entidades compartidas) va primero y con install: los 3 EAR dependen de el.
+# Modelo (entidades compartidas) y AdaptadorPdi (cliente de la PDI) van primero y con install: los EAR
+# dependen de ellos.
 RUN --mount=type=cache,target=/root/.m2 \
     set -e; \
     mvn -B -ntp -q -f Modelo/pom.xml clean install -Dmaven.test.skip=true; \
+    mvn -B -ntp -q -f AdaptadorPdi/pom.xml clean install -Dmaven.test.skip=true; \
     for project in Frontofficeciudadanos Frontofficefuncionarios Backofficeautoridadesadministradores; do \
       mvn -B -ntp -q -f "$project/pom.xml" clean package -Dmaven.test.skip=true; \
     done; \

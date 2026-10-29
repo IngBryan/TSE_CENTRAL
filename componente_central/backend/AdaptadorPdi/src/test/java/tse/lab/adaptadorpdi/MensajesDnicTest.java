@@ -1,4 +1,4 @@
-package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
+package tse.lab.adaptadorpdi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -66,9 +66,26 @@ class MensajesDnicTest {
     }
 
     @Test
+    void anAnswerWithoutPersonOrErrorsIsNotAvailable() {
+        assertThrows(PdiNoDisponibleException.class,
+                () -> MensajesDnic.respuesta(respuesta("<ns2:idSolicitud>7</ns2:idSolicitud>")));
+    }
+
+    @Test
+    void aMissingOrInvalidBirthDateIsNotAvailable() {
+        assertThrows(PdiNoDisponibleException.class, () -> MensajesDnic.respuesta(respuesta("""
+                <ns2:ObjPersona><ns2:Nombre1>Juan</ns2:Nombre1>
+                <ns2:FechaNacimiento>10/05/1980</ns2:FechaNacimiento></ns2:ObjPersona>""")));
+        assertThrows(PdiNoDisponibleException.class, () -> MensajesDnic.respuesta(respuesta("""
+                <ns2:ObjPersona><ns2:Nombre1>Juan</ns2:Nombre1></ns2:ObjPersona>""")));
+    }
+
+    @Test
     void mayoriaDeEdadA18() {
         LocalDate hoy = LocalDate.of(2026, 10, 10);
         assertTrue(MayoriaDeEdad.cumple(LocalDate.of(2008, 10, 10), hoy));
         assertFalse(MayoriaDeEdad.cumple(LocalDate.of(2008, 10, 11), hoy));
+        assertTrue(MayoriaDeEdad.cumple(LocalDate.of(1980, 1, 1)));
+        assertFalse(MayoriaDeEdad.cumple(null));
     }
 }
