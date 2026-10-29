@@ -16,11 +16,16 @@ export function ModificarEmpresa({
   empresa,
   onCerrar,
   onModificada,
+  onDesactualizada,
 }: {
   empresa: EmpresaDetalle;
   onCerrar: () => void;
   onModificada: (mensaje: string) => void;
+  // Otro funcionario la modifico mientras tanto: el formulario se cierra y la pagina muestra los datos actuales
+  onDesactualizada: (aviso: string) => void;
 }) {
+  // La version con la que se abrio el formulario, aunque la pagina se vuelva a renderizar mientras tanto
+  const [version] = useState(empresa.version ?? 0);
   const [datos, setDatos] = useState({
     nombrePublico: empresa.nombrePublico ?? "",
     razonSocial: empresa.razonSocial ?? "",
@@ -41,9 +46,11 @@ export function ModificarEmpresa({
     setError(null);
     iniciar(async () => {
       // Si sale bien, revalidatePath en la action vuelve a renderizar la pagina con los datos nuevos
-      const r = await modificarEmpresa(empresa.nroEmpresa, datos);
+      const r = await modificarEmpresa(empresa.nroEmpresa, { ...datos, version });
       if (r.ok) {
         onModificada(r.mensaje);
+      } else if (r.desactualizada) {
+        onDesactualizada(r.error);
       } else {
         setError(r.error);
         setCampos(r.campos ?? {});

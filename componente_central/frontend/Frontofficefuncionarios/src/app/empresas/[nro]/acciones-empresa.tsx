@@ -42,16 +42,21 @@ export function AccionesEmpresa({
   const habilitar = () => {
     setError(null);
     iniciar(async () => {
-      // Se reenvian los datos actuales: el PUT de la empresa los pide todos
+      // Se reenvian los datos actuales: el PUT de la empresa los pide todos. Con la version, si otro funcionario
+      // los cambio mientras tanto el backend responde 409 en vez de volver a escribir los viejos.
       const r = await modificarEmpresa(empresa.nroEmpresa, {
         nombrePublico: empresa.nombrePublico ?? "",
         razonSocial: empresa.razonSocial ?? "",
         direccion: empresa.direccion ?? "",
         habilitada: true,
+        version: empresa.version ?? 0,
       });
       if (r.ok) {
         setExito("La empresa fue habilitada.");
         setOfrecerHabilitar(false);
+      } else if (r.desactualizada) {
+        // La pagina ya se recargo con los datos actuales: si sigue sin habilitar, se puede volver a intentar
+        setError(`${r.error} Revisalos y volvé a intentar.`);
       } else {
         setError(r.campos?.habilitada ?? r.error);
       }
@@ -65,6 +70,10 @@ export function AccionesEmpresa({
         onCerrar={() => setPanel(null)}
         onModificada={(mensaje) => {
           setExito(mensaje);
+          setPanel(null);
+        }}
+        onDesactualizada={(mensaje) => {
+          setAviso(mensaje);
           setPanel(null);
         }}
       />
@@ -84,7 +93,7 @@ export function AccionesEmpresa({
           setPanel(null);
         }}
         onYaTieneResponsable={(mensaje) => {
-          setAviso(mensaje);
+          setAviso(`${mensaje} Arriba se muestra el responsable actual.`);
           setPanel(null);
         }}
       />
@@ -101,7 +110,7 @@ export function AccionesEmpresa({
 
       {aviso && (
         <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          {aviso} Arriba se muestra el responsable actual.
+          {aviso}
         </p>
       )}
 

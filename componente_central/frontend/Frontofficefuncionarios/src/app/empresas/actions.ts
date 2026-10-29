@@ -11,9 +11,11 @@ import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, UsuarioDisponible
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 const SESION_VENCIDA = "Tu sesión venció. Volvé a ingresar.";
 
+// desactualizada: otro funcionario modifico la empresa despues de que se cargo; la pagina se recarga con los
+// datos actuales
 export type ResultadoModificacion =
   | { ok: true; mensaje: string }
-  | { ok: false; error: string; campos?: Record<string, string> };
+  | { ok: false; error: string; campos?: Record<string, string>; desactualizada?: boolean };
 
 export type ResultadoAlta = { ok: false; error: string; campos?: Record<string, string> };
 
@@ -118,7 +120,8 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     typeof cambios?.nombrePublico !== "string" ||
     typeof cambios.razonSocial !== "string" ||
     typeof cambios.direccion !== "string" ||
-    typeof cambios.habilitada !== "boolean"
+    typeof cambios.habilitada !== "boolean" ||
+    !Number.isSafeInteger(cambios.version)
   ) {
     return { ok: false, error: "No se pudo modificar la empresa." };
   }
@@ -127,6 +130,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     razonSocial: cambios.razonSocial,
     direccion: cambios.direccion,
     habilitada: cambios.habilitada,
+    version: cambios.version,
   };
   const correlationId = randomUUID();
   try {
@@ -144,6 +148,15 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     }
     if (res.status === 400) return { ok: false, error: "Revisá los datos marcados.", campos: res.data?.campos };
     if (res.status === 404) return { ok: false, error: "La empresa no existe." };
+    if (res.data?.error === "EMPRESA_DESACTUALIZADA") {
+      // Otro funcionario la modifico mientras tanto: la pagina se vuelve a cargar con los datos actuales
+      revalidatePath(`/empresas/${nroEmpresa}`);
+      return {
+        ok: false,
+        error: "Otro funcionario modificó la empresa mientras tanto. Arriba se muestran los datos actuales.",
+        desactualizada: true,
+      };
+    }
     if (res.status === 401) {
       console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
     }
@@ -157,10 +170,12 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
 }
 
 // yaTieneResponsable: otro funcionario le asocio uno mientras tanto; la pagina se recarga con el actual y el
-// panel de asociacion se cierra, asi que el aviso lo tiene que mostrar quien lo abrio
+// panel de asociacion se cierra, asi que el aviso lo tiene que mostrar quien lo abrio. noDisponible: el
+// usuario elegido ya no se puede asociar (no esta validado, es responsable de otra empresa o no existe); los
+// demas errores (sesion, backend caido) no dicen nada del usuario y se puede reintentar con el mismo.
 export type ResultadoAsociacion =
   | { ok: true; mensaje: string }
-  | { ok: false; error: string; yaTieneResponsable?: boolean };
+  | { ok: false; error: string; yaTieneResponsable?: boolean; noDisponible?: boolean };
 
 // CU Gestionar empresas de transporte, FA4: asociar un usuario registrado y validado como responsable de
 // una empresa que todavia no lo tiene. El backend controla que sea funcionario y las reglas de la asociacion.
@@ -196,7 +211,11 @@ export async function asociarResponsable(nroEmpresa: number, ci: string): Promis
       };
     }
     if (codigo === "RESPONSABLE_DE_OTRA_EMPRESA" || codigo === "USUARIO_NO_VALIDADO" || codigo === "USUARIO_NO_ENCONTRADO") {
-      return { ok: false, error: `${detalle ?? "El usuario no se puede asociar."} Elegí otro usuario.` };
+      return {
+        ok: false,
+        error: `${detalle ?? "El usuario no se puede asociar."} Elegí otro usuario.`,
+        noDisponible: true,
+      };
     }
     if (res.status === 400) return { ok: false, error: "Elegí un usuario de la lista." };
     if (res.status === 401) {

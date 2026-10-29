@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { botonSecundario } from "@/components/encabezado";
-import { nombreUsuario, type UsuarioDisponible } from "@/lib/empresas";
+import { MAX_DISPONIBLES, nombreUsuario, type UsuarioDisponible } from "@/lib/empresas";
 import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "./actions";
 
 const entrada =
@@ -40,6 +40,8 @@ export function ElegirResponsable({
   useEffect(() => () => clearTimeout(espera.current), []);
 
   const usuarios = resultado.ok ? resultado.usuarios.filter((u) => !excluidos.includes(u.ci)) : [];
+  // El backend devuelve hasta MAX_DISPONIBLES: si llego al tope puede haber mas (se cuenta antes de excluir)
+  const cortada = resultado.ok && resultado.usuarios.length >= MAX_DISPONIBLES;
 
   // Busca 300 ms despues de la ultima tecla; sin filtro vuelve a la primera tanda que trajo la pagina
   const buscar = (valor: string) => {
@@ -111,21 +113,28 @@ export function ElegirResponsable({
               {filtro ? "No hay usuarios disponibles con esa cédula." : "No hay usuarios disponibles."}
             </p>
           ) : (
-            <ul className="flex max-h-72 flex-col divide-y divide-black/5 overflow-y-auto rounded-lg border border-black/10 dark:divide-white/10 dark:border-white/15">
-              {usuarios.map((u) => (
-                <li key={u.ci}>
-                  <button
-                    type="button"
-                    disabled={deshabilitado}
-                    onClick={() => onElegir(u)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:opacity-60 dark:hover:bg-zinc-900"
-                  >
-                    <span className="text-black dark:text-zinc-50">{nombreUsuario(u)}</span>
-                    <span className="font-mono text-zinc-500">C.I. {u.ci}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="flex max-h-72 flex-col divide-y divide-black/5 overflow-y-auto rounded-lg border border-black/10 dark:divide-white/10 dark:border-white/15">
+                {usuarios.map((u) => (
+                  <li key={u.ci}>
+                    <button
+                      type="button"
+                      disabled={deshabilitado}
+                      onClick={() => onElegir(u)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:opacity-60 dark:hover:bg-zinc-900"
+                    >
+                      <span className="text-black dark:text-zinc-50">{nombreUsuario(u)}</span>
+                      <span className="font-mono text-zinc-500">C.I. {u.ci}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {cortada && (
+                <p className="text-xs text-zinc-500">
+                  Se muestran los primeros {MAX_DISPONIBLES}. Si no encontrás al usuario, filtrá por cédula.
+                </p>
+              )}
+            </>
           )}
         </>
       )}

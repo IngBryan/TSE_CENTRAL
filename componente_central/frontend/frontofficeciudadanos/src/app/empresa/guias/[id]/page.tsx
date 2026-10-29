@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
+import { BASE_PATH } from "@/lib/base-path";
 import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
 import { ModificarGuia } from "./modificar-guia";
 
@@ -208,7 +209,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
                       {e.conFoto && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={`/empresa/guias/${encodeURIComponent(id)}/eventos/${encodeURIComponent(e.idEvento)}/foto`}
+                          src={`${BASE_PATH}/empresa/guias/${encodeURIComponent(id)}/eventos/${encodeURIComponent(e.idEvento)}/foto`}
                           alt={`Foto del ${(TIPOS[e.tipo] ?? e.tipo).toLowerCase()}`}
                           className="mt-3 max-h-80 rounded-lg"
                         />
