@@ -66,12 +66,14 @@ jobs:
       # Not on pull requests: only builds of main are kept (artifact storage quota).
       - name: Guardar build
         if: github.event_name != 'pull_request'
+        # The artifact is not used to build the image: a full storage quota must not block it
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ inputs.path }}/${{ inputs.artifact }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       
       # SonarCloud solo en dev y sin bloquear el build.
       - name: Analisis estatico SonarQube

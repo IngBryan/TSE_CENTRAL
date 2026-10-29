@@ -60,6 +60,8 @@ jobs:
 
       - name: Guardar build
         if: github.event_name != 'pull_request'
+        # The artifact is not used to build the image: a full storage quota must not block it
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
@@ -67,7 +69,7 @@ jobs:
           # .next es una carpeta oculta: sin esto upload-artifact la deja afuera
           include-hidden-files: true
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       
       # SonarCloud solo en dev y sin bloquear el build.
       # Los fronts no tienen tests: se excluyen de la cobertura (si no, el codigo nuevo siempre da 0%).
