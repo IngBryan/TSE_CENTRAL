@@ -75,6 +75,20 @@ class IngresoFuncionarioServiceTest {
     }
 
     @Test
+    void blankGubUyEmailKeepsTheStoredEmail() {
+        pdi.persona = new DatosPersonaPdi("Ana", "Perez", "Ana Maria", "Perez Gomez", LocalDate.of(1990, 5, 1));
+
+        em.getTransaction().begin();
+        ResultadoIngreso r = servicio.ingresarConGubUy(FUNCIONARIO, " ", "t");
+        em.getTransaction().commit();
+
+        assertEquals(Resultado.VALIDADO, r.resultado());
+        assertEquals("viejo@mtop.gub.uy", r.email());
+        em.clear();
+        assertEquals("viejo@mtop.gub.uy", em.find(Funcionario.class, FUNCIONARIO).getEmail());
+    }
+
+    @Test
     void quienNoEsFuncionarioNoEntraNiSeConsultaLaPdi() {
         ResultadoIngreso r = servicio.ingresarConGubUy(NO_FUNCIONARIO, "x@prueba.uy", "t");
 
