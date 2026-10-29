@@ -22,6 +22,7 @@ TSE_CENTRAL/
 │
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
+├── load-tests/tracking-generator/ # Generador de carga de eventos de tracking (prueba de performance)
 ├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea las colecciones tracking y balanzas_metadata)
 ├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y los 3 frontends
 └── .gitignore                   # Reglas a nivel workspace (cada modulo tiene el suyo)

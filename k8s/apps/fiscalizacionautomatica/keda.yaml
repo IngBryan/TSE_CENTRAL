@@ -1,6 +1,12 @@
-# Escala el consumidor de tracking (Deployment fiscalizacionautomatica) segun los mensajes pendientes en
-# la cola tracking.events: una replica cada 100 mensajes, entre 1 y 5. Requiere KEDA instalado en el
-# cluster (ver k8s/README.md).
+# Scales the tracking consumer (Deployment fiscalizacionautomatica) between 1 and 5 replicas, taking the
+# higher of two triggers on the tracking.events queue:
+# - publish rate: one replica per 800 msg/s (each one handles ~1000-1300). Sizes for the incoming
+#   traffic, so replicas aren't removed while it lasts even if the queue stays empty.
+# - queue length: one replica per 300 ready messages, to drain a backlog (fewer and it reacts to the
+#   normal jitter of the queue at thousands of msg/s).
+# Scaling only by queue length removed replicas under steady load (empty queue = "not needed") until the
+# consumers fell behind (load test with T = 5 s). Requires KEDA installed in the cluster (see
+# k8s/README.md) and the management API of RabbitMQ (port 15672) reachable from it.
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
@@ -24,17 +30,38 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 5
   pollingInterval: 15
-  # Espera 2 minutos sin carga antes de bajar replicas
-  cooldownPeriod: 120
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        # Scale down only after 10 minutes below target, one replica every 2 minutes: if one too many
+        # is removed, the queue grows and the replica comes back before the backlog builds up
+        scaleDown:
+          stabilizationWindowSeconds: 600
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 120
   triggers:
     - type: rabbitmq
+      name: publish-rate
+      metadata:
+        protocol: http
+        # Full name: KEDA queries from its own namespace (keda), where "rabbitmq" doesn't resolve
+        host: http://rabbitmq.tse.svc.cluster.local:15672
+        vhostName: "/"
+        queueName: tracking.events
+        mode: MessageRate
+        value: "800"
+      authenticationRef:
+        name: fiscalizacionautomatica-rabbitmq
+    - type: rabbitmq
+      name: queue-length
       metadata:
         protocol: amqp
-        # Nombre completo: KEDA consulta la cola desde su namespace (keda), donde "rabbitmq" no resuelve
         host: amqp://rabbitmq.tse.svc.cluster.local:5672
         vhostName: "/"
         queueName: tracking.events
         mode: QueueLength
-        value: "100"
+        value: "300"
       authenticationRef:
         name: fiscalizacionautomatica-rabbitmq
