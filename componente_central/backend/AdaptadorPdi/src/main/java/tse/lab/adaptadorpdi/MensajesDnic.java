@@ -82,9 +82,9 @@ final class MensajesDnic {
             throw new PdiNoDisponibleException("SOAP Fault: " + texto(fault, "faultstring"));
         }
 
-        NodeList codigos = doc.getElementsByTagNameNS("*", "CodMensaje");
-        for (int i = 0; i < codigos.getLength(); i++) {
-            String codigo = codigos.item(i).getTextContent().trim();
+        Element codMensaje = primero(doc, "CodMensaje");
+        if (codMensaje != null) {
+            String codigo = codMensaje.getTextContent().trim();
             if (String.valueOf(PERSONA_NO_ENCONTRADA).equals(codigo)) {
                 return Optional.empty();
             }
