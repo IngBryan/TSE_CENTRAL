@@ -128,6 +128,12 @@ CIUDADANOS_API_KEY=<string largo y aleatorio>  # clave compartida front <-> Wild
 FUNCIONARIOS_API_KEY=<string largo y aleatorio>
 FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
+#Infracciones y descargos - WildFly
+#PLAZO_DESCARGO_DIAS=10                 # opcional: dias corridos desde la notificacion para presentar el descargo
+
+#Portal publico - WildFly
+#PORTAL_UMBRAL_EMPRESAS=3               # opcional: minimo de empresas distintas por numero publicado (nunca menos de 3)
+
 #App movil del chofer (TSE_MOVIL) - WildFly (usa tambien OIDC_CLIENT_ID / OIDC_CLIENT_SECRET)
 MOVIL_TOKEN_SECRET=<string largo y aleatorio, 32+ caracteres>  # firma el token (JWT HS256) de la app
 #OIDC_REDIRECT_URIS_MOVIL=uy.carga.movil:/oauth2redirect,http://localhost:8080  # redirect URIs de la app
@@ -184,12 +190,28 @@ ve una cookie de sesion cifrada.
   `POST /frontofficeciudadanos-web/api/ciudadanos/ingreso-gubuy` (header `X-Api-Key` =
   `CIUDADANOS_API_KEY`, sin ella responde 401) con la cedula, el email y el `sub` de gub.uy. El backend
   busca o crea el perfil (tabla `ciudadanos`, entidad `PerfilCiudadano`); si esta pendiente lo
-  valida contra la PDI por SOAP (`ClientePdi`: timeout, reintentos y circuit breaker, configurables
-  con `PDI_TIMEOUT_MS`, `PDI_REINTENTOS`, `PDI_CB_UMBRAL`, `PDI_CB_ESPERA_S`). Resultados:
+  valida contra la PDI por SOAP (`ClientePdi`, ver *Resiliencia con la PDI*). Resultados:
   `VALIDADO` y `NO_DISPONIBLE` (sesion con la validacion pendiente) inician sesion; `NO_EXISTE` y
   `MENOR_DE_EDAD` no. Cada ingreso lleva un `X-Correlation-Id` que aparece en los logs del front
   (`[login gub.uy] correlationId=...`), de WildFly (`evento=ingreso.gubuy`, `evento=pdi.consulta`)
   y de la PDI. Para probarlo hay que levantar tambien la PDI (`TSE_NODOS`, servicio `pdi`).
+- **Resiliencia con la PDI** (variables del contenedor de WildFly; entre parentesis, el valor por defecto):
+  - *Timeout:* `PDI_TIMEOUT_MS` (5000) por intento. Con la PDI en modo `LENTO` (10 s) cada intento
+    vence; para ver la respuesta lenta llegar, subirlo por encima de la latencia.
+  - *Reintentos con espera exponencial:* `PDI_REINTENTOS` (2, o sea hasta 3 intentos). Antes del
+    reintento n se espera `PDI_REINTENTO_BASE_MS` (500) × 2^(n-1), con tope `PDI_REINTENTO_MAX_MS`
+    (4000), y de eso entre la mitad y el total al azar (jitter).
+  - *Circuit breaker:* tras `PDI_CB_UMBRAL` (3) consultas fallidas seguidas no se llama a la PDI
+    durante `PDI_CB_ESPERA_S` (30) segundos: se responde `NO_DISPONIBLE` al instante. Si la consulta de
+    prueba vuelve a fallar, se abre por el doble (30 s, 60 s, 120 s...) hasta `PDI_CB_ESPERA_MAX_S` (300).
+  - *Comportamiento degradado:* el ingreso sigue andando con el perfil `PENDIENTE_VALIDACION`, y el
+    alta de chofer queda pendiente de validacion.
+  - *Reenvio de pendientes (CU-04, `RevalidacionPdiJob`):* cada `PDI_REVALIDACION_S` (30) segundos se
+    mandan a la PDI los perfiles pendientes. Mientras siga caida, la proxima revision se aleja de forma
+    exponencial (60 s, 120 s, 240 s...) hasta `PDI_REVALIDACION_MAX_S` (600). Cuando responde se
+    validan todos, edad incluida: quedan `VALIDADO` o `NO_HABILITADO`, y los choferes que esperaban
+    quedan habilitados. Despues vuelve a 30 s. En el log: `evento=pdi.revalidacion`.
+    `PDI_REVALIDACION_S=0` lo apaga.
 - **Roles (CU-01 paso 9):** el ingreso devuelve `roles` (`RESPONSABLE` y/o `CHOFER`, con su empresa;
   el de chofer con estado `HABILITADO` o `PENDIENTE_VALIDACION`). El front los guarda en la sesion y
   `/mi-cuenta` muestra la pantalla segun el rol.
@@ -605,8 +627,8 @@ el caso aplicando la jerarquia, y deja el evento asociado a **un unico caso**:
 - Si una llamada falla (WildFly caido), el evento queda pendiente y se vuelve a evaluar.
 - En el log: `Created case 4 (VIAJE_SIN_GUIA) for SBC1234 at ...`, `Notified case 4 (VIAJE_SIN_GUIA)`
   o `Added to case 4 ...`.
-- La notificacion hoy es el cambio de estado y su auditoria; el envio del aviso a la empresa (correo
-  u otro canal) esta pendiente.
+- La notificacion es el cambio de estado y su auditoria. La empresa la ve en la campana del
+  Frontoffice Ciudadanos (ver *Infracciones y descargos*); el envio por correo u otro canal esta pendiente.
 
 El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
 `META-INF/services` con los que RESTEasy registra sus providers.
@@ -692,6 +714,177 @@ manifiesto. Para el EJB remoto, el `Deployment` necesita ademas `WILDFLY_URL`
 Los manifiestos estan en `k8s/apps/fiscalizacionautomatica/` (ver `k8s/README.md`, seccion 7: instalar
 KEDA, ajustar `app.json` y cargar el client secret en el Secret `fiscalizacion-balanzas`, que se crea con la clave
 vacia). Un codigo de salida `1` deja el `Job` del poller como fallido (`kubectl -n tse get jobs`).
+
+### Infracciones y descargos (frontofficeciudadanos)
+
+Continua el ciclo de vida de los casos de fiscalizacion (*detectada → notificada → en descargo →
+confirmada | desestimada*). El responsable de la empresa ve las infracciones de sus vehiculos con la
+evidencia y presenta un descargo; el funcionario lo revisa antes de resolver.
+
+**Pantallas:** en *Mi cuenta* → **Infracciones** (`/empresa/infracciones`). El listado marca **Nueva** a
+las que todavia no se abrieron y muestra hasta cuando se puede presentar el descargo. El detalle
+(`/empresa/infracciones/<id>`) muestra el vehiculo con su peso maximo (peso + capacidad declarada), la
+guia, los pesajes con el exceso y la cantidad de posiciones de tracking; despues el formulario del
+descargo (o el descargo presentado) y, si ya se resolvio, la resolucion del MTOP con su fundamento.
+
+**Notificaciones (campana):** al responsable de la empresa el encabezado le muestra una campana con la
+cantidad de casos notificados que todavia no vio (campo `notificacion_vista` del caso). Al abrirla se
+despliegan los ultimos 10, primero los no vistos, con el plazo del descargo si todavia se puede presentar.
+Al hacer click en uno queda visto y se abre la infraccion; tambien se pueden marcar todas como vistas.
+La campana se vuelve a consultar cada 60 s mientras la pestaña esta visible, asi un caso nuevo aparece sin
+recargar. Abrir el detalle de la infraccion tambien la marca vista.
+
+**API** (`frontofficeciudadanos-web/api`, `X-Api-Key` + `X-Usuario-Ci` como el resto de `/empresa`):
+
+| Metodo | Ruta | Que hace |
+|---|---|---|
+| `GET` | `/empresa/infracciones` | Casos de la empresa, del mas nuevo al mas viejo |
+| `GET` | `/empresa/infracciones/{id}` | Detalle con la evidencia; marca la notificacion como vista |
+| `GET` | `/empresa/infracciones/notificaciones` | `{noVistas, notificaciones: [...]}` para la campana |
+| `POST` | `/empresa/infracciones/{id}/vista` | Marca la notificacion del caso como vista; devuelve las notificaciones |
+| `POST` | `/empresa/infracciones/notificaciones/vistas` | Marca todas como vistas; devuelve las notificaciones |
+| `POST` | `/empresa/infracciones/{id}/descargo` | Body `{"descripcion": "..."}`; devuelve el detalle actualizado |
+
+**Reglas** (en `service/infraccionesydescargos/InfraccionesService`, no en la interfaz):
+
+- La empresa de un caso es la de su vehiculo. Solo se ven los casos desde que se notifican
+  (`NOTIFICADA`, `EN_DESCARGO`, `CONFIRMADA`, `DESESTIMADA`); un caso `DETECTADA` o de otra empresa
+  responde 404, como si no existiera.
+- El descargo se presenta **una sola vez**, con el caso `NOTIFICADA`, dentro del plazo y con hasta 2000
+  caracteres. Si no: `400` (texto vacio o largo), `409 DESCARGO_YA_PRESENTADO`,
+  `409 TRANSICION_NO_PERMITIDA` o `409 PLAZO_VENCIDO`.
+- **Plazo:** `PLAZO_DESCARGO_DIAS` dias corridos (10 por defecto) desde la notificacion, que se toma de la
+  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion).
+- Al presentarlo, el caso pasa a `EN_DESCARGO` (la transicion la valida `CasoFiscalizacion`) y queda en
+  `auditoria_casos` con la cedula del responsable, el `correlationId` y el fundamento
+  "Descargo presentado por la empresa N° ...". El caso se bloquea en la base mientras tanto
+  (`PESSIMISTIC_WRITE`), asi dos descargos simultaneos no lo pisan.
+- `Descargo` guarda el texto, `fechaPresentacion` y `ciPresentante`. El frontoffice de funcionarios los
+  muestra en *Descargo de la empresa* ("Presentado el ... por el responsable C.I. ...").
+- No se exige que la empresa este habilitada: una empresa inhabilitada igual tiene que poder defenderse.
+
+**Probar en local:** entrar a http://localhost como el responsable `54074380` (con gub.uy o el ingreso
+de testing), abrir *Infracciones* y presentar el descargo del caso `DEMO DESVIO` (`SAB5678`, en
+`NOTIFICADA`). Despues, en el frontoffice de funcionarios, el caso aparece *En descargo* con el texto y
+la auditoria (ver el escenario E11 de `Frontofficeciudadanos/.../META-INF/README_ESCENARIOS.md`).
+
+**Pendiente:** un caso `NOTIFICADA` cuyo plazo vence sin descargo queda trabado: la empresa ya no puede
+presentarlo y el funcionario solo resuelve casos `EN_DESCARGO`.
+
+### Portal publico (frontofficeciudadanos, sin login)
+
+Las dos funcionalidades publicas del frontoffice de ciudadanos. Se entra desde la portada (seccion *Sin
+ingresar*); no hace falta sesion. El navegador nunca llama a WildFly: el servidor de Next consulta
+`/publico/*` con la `X-Api-Key`, como el resto de la API (sin ella responde 401).
+
+**Validacion de Permisos de Empresas** (`/validar`): un cliente verifica a la transportista antes de
+contratarla. Busca por numero de empresa (o por nombre, `?nombre=`, si no lo sabe) y ve si esta habilitada
+(no se dan numeros de la empresa, como cuantos vehiculos tiene). Si ademas ingresa una matricula, ve si el vehiculo es de esa
+empresa, si esta en actividad y si el permiso de circulacion y la ITV estan vigentes (con su vencimiento).
+Un vehiculo esta habilitado con la misma regla que en Gestion de Vehiculos (activo, permiso vigente, ITV
+sin vencer) y ademas la empresa habilitada. Son datos de empresas y vehiculos, nunca de personas: no se
+muestra el responsable ni los choferes, y una matricula de otra empresa solo dice que no pertenece (no se
+revela de quien es).
+
+**Listados de Informacion Publica** (`/estadisticas`, del anio en curso): empresas y vehiculos habilitados (hoy),
+viajes y carga transportada en el anio, viajes por mes, carga por rubro del cliente e infracciones por
+tipo. Se cuentan los viajes `FINALIZADA` y solo las infracciones `CONFIRMADA` (las demas pueden terminar
+desestimadas). El rubro es texto libre en la guia: se agrupa sin distinguir mayusculas ni tildes, y los
+rubros reservados se muestran sumados en una fila *Otros rubros* (su nombre podria delatar a la empresa).
+
+Indicadores de fiscalizacion del anio (casos detectados en el anio):
+
+- **Infracciones cada 100 viajes:** confirmadas / viajes finalizados x 100. Es mas comparable que el total,
+  que crece con la actividad. Las dos partes del cociente tienen que alcanzar el umbral. La tabla por tipo
+  muestra tambien la tasa de cada tipo.
+- **Casos resueltos y % desestimados:** cuantos casos se confirmaron o desestimaron y que parte se desestimo
+  (mide si la fiscalizacion automatica detecta bien o genera falsos positivos).
+- **Tiempo de resolucion:** mediana de los dias entre la deteccion y el fundamento de resolucion. Mediana y
+  no promedio, para que un caso trabado meses no la distorsione.
+- En las tablas de viajes, el promedio de carga por viaje; cada fila tiene una barra proporcional.
+- **Descarga en CSV** de cada tabla (`/estadisticas/csv?tabla=meses|rubros|infracciones`, ruta del
+  front): `;` como separador y BOM UTF-8 para Excel en es-UY; lo reservado sale como `Reservado`. El rubro lo
+  escriben las empresas, asi que si empieza como una formula (`=`, `+`, `-`, `@`) se le antepone `'`.
+
+No se publican maximos ni minimos (el viaje mas pesado, la empresa con mas infracciones): siempre
+corresponden a una sola empresa.
+
+| Metodo | Ruta (`frontofficeciudadanos-web/api`) | Que hace |
+|---|---|---|
+| `GET` | `/publico/empresas?nombre=...` | Busca por nombre publico o razon social (3 a 60 caracteres, hasta 10 resultados) |
+| `GET` | `/publico/empresas/{nro}?matricula=...` | Validacion de la empresa y, opcional, de un vehiculo; 404 si no existe |
+| `GET` | `/publico/estadisticas?anio=...` | Estadisticas agregadas del anio (por defecto el actual; 400 fuera de 2020..actual). El front por ahora no ofrece elegir el anio: solo hay datos del actual |
+
+Como se protegen los datos (umbral de agregacion y demas reglas): ver *Proteccion de datos personales*.
+
+Datos de demo: las empresas 3 a 5 (`Fletes del Norte`, `Cargas del Sur`, `Transporte Oriental`), con un
+vehiculo habilitado y viajes finalizados cada una, y dos infracciones confirmadas. Con ellas el portal
+muestra numeros reales y, a la vez, valores reservados: *Construccion* es solo de la empresa 5 (y arrastra a
+*Forestal* por la supresion complementaria), asi que las dos aparecen sumadas en *Otros rubros*, y los meses
+con viajes de 2 empresas figuran como *Reservado*. Ver el escenario E12 de `README_ESCENARIOS.md`.
+
+### Proteccion de datos personales (Ley 18.331)
+
+carga.uy maneja datos de personas (cedula, nombres y fecha de nacimiento de responsables y choferes) y de
+empresas (habilitacion, flota, viajes, infracciones). La Ley 18.331 protege a las personas fisicas y, en lo
+que corresponda, a las juridicas. Las reglas que siguen se aplican en el backend, no en la interfaz:
+ocultar algo en pantalla no protege nada si la API lo devuelve.
+
+**1. Informacion publica (portal y reportes sin login): siempre agregada.**
+
+- **Umbral minimo de agregacion: 3 empresas distintas.** Cada numero publicado (un total, un mes, un
+  rubro, un tipo de infraccion, un indicador) tiene que juntar datos de al menos 3 empresas; si no, se
+  publica como *Reservado*.
+  - *Por que 3:* con 2 empresas, cualquiera de las dos resta sus propios datos del numero publicado y
+    obtiene exactamente los de la otra. Con 3 o mas solo obtiene la suma de las demas, que no identifica a
+    ninguna. Es el minimo que impide ese despeje.
+  - *Vehiculos y choferes:* quedan cubiertos porque siempre pertenecen a una empresa. 3 empresas implican
+    al menos 3 vehiculos y 3 choferes.
+  - Se configura con `PORTAL_UMBRAL_EMPRESAS` en WildFly para hacerlo mas estricto, pero nunca baja de 3.
+- **Supresion complementaria:** si en una tabla queda reservada una sola fila y se publica el total, se
+  deduce restando. Por eso se reservan ademas las filas visibles mas chicas hasta que el conjunto de las
+  reservadas tambien junte 3 empresas (o se reserva todo). Una fila en 0 se publica: no identifica a nadie.
+- **Etiquetas que identifican:** el rubro del cliente lo escribe cada empresa a mano, y su nombre puede
+  delatarla aunque no se vean los numeros. Los rubros reservados no se listan por nombre: van sumados en
+  *Otros rubros*, que se publica si junta 3 empresas (si no, queda *Reservado*). Meses y tipos de infraccion
+  son etiquetas fijas.
+- **Indicadores:** la tasa de infracciones exige el umbral en sus dos partes (viajes e infracciones); el %
+  de desestimados y la mediana de dias de resolucion, en los casos resueltos.
+- **Sin extremos:** no se publican maximos ni minimos (el viaje mas pesado, la empresa con mas
+  infracciones), porque siempre corresponden a una sola empresa.
+- **En el backend:** la regla esta en `service/portalpublico/Agregacion` (sin estado, con tests) y la aplica
+  `PortalPublicoService`. Lo reservado no viaja al navegador y el CSV sale de los mismos datos ya protegidos.
+  Las consultas (`PortalPublicoDAO`) traen los datos por empresa solo para contar cuantas empresas aporta
+  cada numero; eso no se publica.
+- **Validacion de Permisos de Empresas:** es una consulta puntual (verificar a una transportista antes de
+  contratarla), no un reporte estadistico. Responde solo si la empresa esta habilitada y, para una
+  matricula de esa empresa, si puede circular. No da numeros de la empresa (cuantos vehiculos tiene, sus
+  viajes o infracciones) ni datos de personas (responsable, choferes). Una matricula de otra empresa solo
+  dice que no pertenece, sin revelar de quien es. La busqueda por nombre exige 3 letras y devuelve hasta 10.
+
+**2. Informacion de cada empresa: solo para ella.**
+
+- Cada operacion del Frontoffice Ciudadanos verifica en el servicio que quien llama sea responsable
+  validado de la empresa (`AutorizacionResponsable`) y que el recurso sea de esa empresa. Una guia, un
+  vehiculo o una infraccion de otra empresa responde 404, igual que si no existiera.
+- La app movil del chofer ve solo sus viajes asignados: la identidad sale del token, no de lo que manda el
+  cliente (`ViajesChoferService`).
+- Los casos de fiscalizacion los ven los funcionarios del MTOP (`AutorizacionFuncionario`) y la empresa
+  involucrada, esta recien desde que se le notifica.
+
+**3. Datos de personas.**
+
+- **Minimizacion:** al dar de alta un chofer, la empresa ve solo su primer nombre y primer apellido (no la
+  fecha de nacimiento ni los demas datos que devuelve la PDI).
+- **Registro de consultas a la PDI:** cada consulta de una cedula queda en `consultas_persona` (quien
+  consulto, que cedula, fecha y hora).
+- **Sesiones:** la sesion del front va en una cookie cifrada. La API key del backend solo la tiene el
+  servidor de Next y nunca llega al navegador; el backend confia en `X-Usuario-Ci` por eso (si la API se
+  abriera a otros clientes habria que pasar un token firmado).
+- **Logs:** identifican al usuario por cedula y cada operacion por `correlationId`, para poder auditar quien
+  hizo que. No registran nombres, fechas de nacimiento, textos de descargos ni lo que se busca en el portal
+  publico.
+- **Secretos:** credenciales y claves van en `.env` / `.env.local`, que no se commitean.
 
 ### Observabilidad
 

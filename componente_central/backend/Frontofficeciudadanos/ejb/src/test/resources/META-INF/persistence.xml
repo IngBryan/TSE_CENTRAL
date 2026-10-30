@@ -23,6 +23,7 @@
         <class>tse.lab.model.CasoFiscalizacion</class>
         <class>tse.lab.model.Descargo</class>
         <class>tse.lab.model.FundamentoResolucion</class>
+        <class>tse.lab.model.RegistroAuditoriaCaso</class>
         <class>tse.lab.model.UsuarioBackoffice</class>
         <class>tse.lab.model.Funcionario</class>
         <class>tse.lab.model.Autoridad</class>

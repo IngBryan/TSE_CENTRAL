@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { confirmarChofer, consultarChofer, type RespuestaAlta } from "./actions";
 
 type Aviso = { tipo: "ok" | "info" | "error"; texto: string };

@@ -115,7 +115,10 @@ public class GestionCasosService {
             List<EventoTrackingVista> eventosTracking) {
     }
 
-    public record DescargoVista(Long idCaso, Long id, String descripcion, String estado) {
+    // fechaPresentacion y ciPresentante: cuando y quien (responsable de la empresa) lo presento; null en
+    // descargos cargados antes de registrarlos
+    public record DescargoVista(Long idCaso, Long id, String descripcion, String estado, String fechaPresentacion,
+            String ciPresentante) {
     }
 
     // decision: CONFIRMAR o DESESTIMAR
@@ -225,7 +228,8 @@ public class GestionCasosService {
         }
         LOG.info(() -> "evento=caso.descargo correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
                 + " descargo=" + d.getId());
-        return new DescargoVista(caso.getId(), d.getId(), d.getDescripcion(), d.getEstado());
+        return new DescargoVista(caso.getId(), d.getId(), d.getDescripcion(), d.getEstado(),
+                texto(d.getFechaPresentacion()), d.getCiPresentante());
     }
 
     // FA5: resolver el caso (confirmar o desestimar) con fundamento. FA6: si el

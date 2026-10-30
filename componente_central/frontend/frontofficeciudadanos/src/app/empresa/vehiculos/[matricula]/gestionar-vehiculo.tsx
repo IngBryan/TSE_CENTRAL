@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { agregarItv, darDeBaja, editarVehiculo, registrarPermiso, type Resultado, type Vehiculo } from "../actions";
 
 type Modo = "editar" | "permiso" | "itv" | "baja" | null;

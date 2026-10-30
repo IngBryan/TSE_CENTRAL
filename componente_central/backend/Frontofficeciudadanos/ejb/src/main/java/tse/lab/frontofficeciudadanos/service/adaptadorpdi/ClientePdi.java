@@ -20,10 +20,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 //
 // Resiliencia (CU-03 FA3):
 // - timeout por intento (PDI_TIMEOUT_MS, 5000 por defecto);
-// - reintentos con espera creciente (PDI_REINTENTOS, 2 por defecto: hasta 3 intentos);
+// - reintentos con espera exponencial y jitter (PDI_REINTENTOS, 2 por defecto: hasta 3 intentos).
+//   Antes del reintento n se espera PDI_REINTENTO_BASE_MS * 2^(n-1) (500 ms, 1 s, 2 s...), con tope
+//   PDI_REINTENTO_MAX_MS (4000), y de eso entre la mitad y el total al azar;
 // - circuit breaker: tras PDI_CB_UMBRAL consultas fallidas seguidas (3) no se llama a la PDI
 //   durante PDI_CB_ESPERA_S segundos (30) y se responde NO_DISPONIBLE de inmediato. Pasado ese
-//   tiempo se deja pasar una consulta de prueba: si anda se cierra, si falla se vuelve a abrir.
+//   tiempo se deja pasar una consulta de prueba: si anda se cierra; si falla se vuelve a abrir por
+//   el doble (30 s, 60 s, 120 s...) hasta PDI_CB_ESPERA_MAX_S (300).
+//
+// Las validaciones que quedaron pendientes mientras la PDI no respondia las reenvia
+// RevalidacionPdiJob (CU-04).
 //
 // Configuracion por variables de entorno del contenedor de WildFly (docker-compose.yml).
 @ApplicationScoped
@@ -36,8 +42,11 @@ public class ClientePdi {
     private final String clave = env("PDI_ORGANISMO_CLAVE", "");
     private final Duration timeout = Duration.ofMillis(Long.parseLong(env("PDI_TIMEOUT_MS", "5000")));
     private final int reintentos = Integer.parseInt(env("PDI_REINTENTOS", "2"));
+    private final Duration esperaReintento = Duration.ofMillis(Long.parseLong(env("PDI_REINTENTO_BASE_MS", "500")));
+    private final Duration esperaReintentoMax = Duration.ofMillis(Long.parseLong(env("PDI_REINTENTO_MAX_MS", "4000")));
     private final int umbralCircuito = Integer.parseInt(env("PDI_CB_UMBRAL", "3"));
     private final Duration esperaCircuito = Duration.ofSeconds(Long.parseLong(env("PDI_CB_ESPERA_S", "30")));
+    private final Duration esperaCircuitoMax = Duration.ofSeconds(Long.parseLong(env("PDI_CB_ESPERA_MAX_S", "300")));
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -45,6 +54,7 @@ public class ClientePdi {
             .build();
 
     private final AtomicInteger fallosSeguidos = new AtomicInteger();
+    private final AtomicInteger aperturasSeguidas = new AtomicInteger();
     private volatile Instant circuitoAbiertoHasta = Instant.EPOCH;
 
     // Datos de la persona, o vacio si DNIC no la encuentra (no existe o dada de baja).
@@ -64,6 +74,7 @@ public class ClientePdi {
             try {
                 Optional<DatosPersonaPdi> persona = llamar(cedula, correlationId);
                 fallosSeguidos.set(0);
+                aperturasSeguidas.set(0);
                 circuitoAbiertoHasta = Instant.EPOCH;
                 log(Level.INFO, correlationId, cedula, persona.isPresent() ? "encontrada" : "no_encontrada",
                         intento, ms(inicio), null);
@@ -71,16 +82,19 @@ public class ClientePdi {
             } catch (PdiNoDisponibleException e) {
                 ultimo = e;
                 log(Level.WARNING, correlationId, cedula, "fallo", intento, ms(inicio), e.getMessage());
-                if (intento <= reintentos && !esperar(Duration.ofMillis(500L * intento))) {
+                if (intento <= reintentos && !esperar(
+                        Backoff.conJitter(Backoff.exponencial(intento, esperaReintento, esperaReintentoMax)))) {
                     break;
                 }
             }
         }
 
         if (fallosSeguidos.incrementAndGet() >= umbralCircuito) {
-            circuitoAbiertoHasta = Instant.now().plus(esperaCircuito);
+            // Cada vez que la consulta de prueba falla, el circuito queda abierto el doble de tiempo
+            Duration espera = Backoff.exponencial(aperturasSeguidas.incrementAndGet(), esperaCircuito, esperaCircuitoMax);
+            circuitoAbiertoHasta = Instant.now().plus(espera);
             log(Level.WARNING, correlationId, cedula, "circuito_abre", 0, 0,
-                    fallosSeguidos.get() + " consultas fallidas seguidas, se reintenta en " + esperaCircuito.toSeconds() + "s");
+                    fallosSeguidos.get() + " consultas fallidas seguidas, se reintenta en " + espera.toSeconds() + "s");
         }
         throw ultimo;
     }

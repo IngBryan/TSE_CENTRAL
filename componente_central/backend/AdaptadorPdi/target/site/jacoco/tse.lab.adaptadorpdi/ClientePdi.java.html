@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientePdi.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">AdaptadorPdi</a> &gt; <a href="index.source.html" class="el_package">tse.lab.adaptadorpdi</a> &gt; <span class="el_source">ClientePdi.java</span></div><h1>ClientePdi.java</h1><pre class="source lang-java linenums">package tse.lab.adaptadorpdi;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+// Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service). Lo usan
+// Frontofficeciudadanos (ValidacionPdiService) y Frontofficefuncionarios (IngresoFuncionarioService).
+//
+// Resiliencia (CU-03 FA3):
+// - timeout por intento (PDI_TIMEOUT_MS, 5000 por defecto);
+// - reintentos con espera creciente (PDI_REINTENTOS, 2 por defecto: hasta 3 intentos);
+// - circuit breaker: tras PDI_CB_UMBRAL consultas fallidas seguidas (3) no se llama a la PDI
+//   durante PDI_CB_ESPERA_S segundos (30) y se responde NO_DISPONIBLE de inmediato. Pasado ese
+//   tiempo se deja pasar una consulta de prueba: si anda se cierra, si falla se vuelve a abrir.
+//
+// Configuracion por variables de entorno del contenedor de WildFly (docker-compose.yml).
+@ApplicationScoped
+<span class="nc" id="L31">public class ClientePdi {</span>
+
+<span class="nc" id="L33">    private static final Logger LOG = Logger.getLogger(ClientePdi.class.getName());</span>
+
+<span class="nc" id="L35">    private final String url = env(&quot;PDI_URL&quot;, &quot;http://host.docker.internal:3005/ws/servicioInformacion&quot;);</span>
+<span class="nc" id="L36">    private final String organismo = env(&quot;PDI_ORGANISMO_CODIGO&quot;, &quot;&quot;);</span>
+<span class="nc" id="L37">    private final String clave = env(&quot;PDI_ORGANISMO_CLAVE&quot;, &quot;&quot;);</span>
+<span class="nc" id="L38">    private final Duration timeout = Duration.ofMillis(Long.parseLong(env(&quot;PDI_TIMEOUT_MS&quot;, &quot;5000&quot;)));</span>
+<span class="nc" id="L39">    private final int reintentos = Integer.parseInt(env(&quot;PDI_REINTENTOS&quot;, &quot;2&quot;));</span>
+<span class="nc" id="L40">    private final int umbralCircuito = Integer.parseInt(env(&quot;PDI_CB_UMBRAL&quot;, &quot;3&quot;));</span>
+<span class="nc" id="L41">    private final Duration esperaCircuito = Duration.ofSeconds(Long.parseLong(env(&quot;PDI_CB_ESPERA_S&quot;, &quot;30&quot;)));</span>
+
+<span class="nc" id="L43">    private final HttpClient http = HttpClient.newBuilder()</span>
+<span class="nc" id="L44">            .connectTimeout(Duration.ofSeconds(3))</span>
+<span class="nc" id="L45">            .version(HttpClient.Version.HTTP_1_1)</span>
+<span class="nc" id="L46">            .build();</span>
+
+<span class="nc" id="L48">    private final AtomicInteger fallosSeguidos = new AtomicInteger();</span>
+<span class="nc" id="L49">    private volatile Instant circuitoAbiertoHasta = Instant.EPOCH;</span>
+
+    // Datos de la persona, o vacio si DNIC no la encuentra (no existe o dada de baja).
+    public Optional&lt;DatosPersonaPdi&gt; consultarPersona(String cedula, String correlationId)
+            throws PdiNoDisponibleException {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (Instant.now().isBefore(circuitoAbiertoHasta)) {</span>
+<span class="nc" id="L55">            log(Level.WARNING, correlationId, cedula, &quot;circuito_abierto&quot;, 0, 0, &quot;no se consulta a la PDI&quot;);</span>
+<span class="nc" id="L56">            throw new PdiNoDisponibleException(&quot;Circuit breaker abierto hasta &quot; + circuitoAbiertoHasta);</span>
+        }
+<span class="nc bnc" id="L58" title="All 4 branches missed.">        if (organismo.isBlank() || clave.isBlank()) {</span>
+<span class="nc" id="L59">            throw new PdiNoDisponibleException(&quot;Faltan PDI_ORGANISMO_CODIGO / PDI_ORGANISMO_CLAVE&quot;);</span>
+        }
+
+<span class="nc" id="L62">        PdiNoDisponibleException ultimo = null;</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        for (int intento = 1; intento &lt;= reintentos + 1; intento++) {</span>
+<span class="nc" id="L64">            long inicio = System.nanoTime();</span>
+            try {
+<span class="nc" id="L66">                Optional&lt;DatosPersonaPdi&gt; persona = llamar(cedula, correlationId);</span>
+<span class="nc" id="L67">                fallosSeguidos.set(0);</span>
+<span class="nc" id="L68">                circuitoAbiertoHasta = Instant.EPOCH;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                log(Level.INFO, correlationId, cedula, persona.isPresent() ? &quot;encontrada&quot; : &quot;no_encontrada&quot;,</span>
+<span class="nc" id="L70">                        intento, ms(inicio), null);</span>
+<span class="nc" id="L71">                return persona;</span>
+<span class="nc" id="L72">            } catch (PdiNoDisponibleException e) {</span>
+<span class="nc" id="L73">                ultimo = e;</span>
+<span class="nc" id="L74">                log(Level.WARNING, correlationId, cedula, &quot;fallo&quot;, intento, ms(inicio), e.getMessage());</span>
+<span class="nc bnc" id="L75" title="All 4 branches missed.">                if (intento &lt;= reintentos &amp;&amp; !esperar(Duration.ofMillis(500L * intento))) {</span>
+<span class="nc" id="L76">                    break;</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (fallosSeguidos.incrementAndGet() &gt;= umbralCircuito) {</span>
+<span class="nc" id="L82">            circuitoAbiertoHasta = Instant.now().plus(esperaCircuito);</span>
+<span class="nc" id="L83">            log(Level.WARNING, correlationId, cedula, &quot;circuito_abre&quot;, 0, 0,</span>
+<span class="nc" id="L84">                    fallosSeguidos.get() + &quot; consultas fallidas seguidas, se reintenta en &quot; + esperaCircuito.toSeconds() + &quot;s&quot;);</span>
+        }
+<span class="nc" id="L86">        throw ultimo;</span>
+    }
+
+    private Optional&lt;DatosPersonaPdi&gt; llamar(String cedula, String correlationId) throws PdiNoDisponibleException {
+<span class="nc" id="L90">        String cuerpo = MensajesDnic.request(url, &quot;urn:uuid:&quot; + UUID.randomUUID(), organismo, clave, cedula,</span>
+<span class="nc" id="L91">                ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE), Instant.now(), 300);</span>
+<span class="nc" id="L92">        HttpRequest request = HttpRequest.newBuilder(URI.create(url))</span>
+<span class="nc" id="L93">                .timeout(timeout)</span>
+<span class="nc" id="L94">                .header(&quot;Content-Type&quot;, &quot;text/xml; charset=utf-8&quot;)</span>
+<span class="nc" id="L95">                .header(&quot;SOAPAction&quot;, &quot;\&quot;&quot; + MensajesDnic.ACCION + &quot;\&quot;&quot;)</span>
+<span class="nc" id="L96">                .header(&quot;X-Correlation-Id&quot;, correlationId)</span>
+<span class="nc" id="L97">                .POST(HttpRequest.BodyPublishers.ofString(cuerpo, StandardCharsets.UTF_8))</span>
+<span class="nc" id="L98">                .build();</span>
+        HttpResponse&lt;String&gt; respuesta;
+        try {
+<span class="nc" id="L101">            respuesta = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L102">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L103">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L104">            throw new PdiNoDisponibleException(&quot;Consulta a la PDI interrumpida&quot;, e);</span>
+<span class="nc" id="L105">        } catch (Exception e) {</span>
+<span class="nc" id="L106">            throw new PdiNoDisponibleException(&quot;No se pudo contactar la PDI: &quot; + e, e);</span>
+<span class="nc" id="L107">        }</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">        if (respuesta.statusCode() &gt;= 500 &amp;&amp; !respuesta.body().contains(&quot;Fault&quot;)) {</span>
+<span class="nc" id="L109">            throw new PdiNoDisponibleException(&quot;La PDI respondio HTTP &quot; + respuesta.statusCode());</span>
+        }
+<span class="nc" id="L111">        return MensajesDnic.respuesta(respuesta.body());</span>
+    }
+
+    private static boolean esperar(Duration d) {
+        try {
+<span class="nc" id="L116">            Thread.sleep(d);</span>
+<span class="nc" id="L117">            return true;</span>
+<span class="nc" id="L118">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L119">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L120">            return false;</span>
+        }
+    }
+
+    private static long ms(long inicioNanos) {
+<span class="nc" id="L125">        return (System.nanoTime() - inicioNanos) / 1_000_000;</span>
+    }
+
+    private static void log(Level nivel, String correlationId, String cedula, String evento, int intento,
+            long duracionMs, String detalle) {
+<span class="nc" id="L130">        LOG.log(nivel, () -&gt; &quot;evento=pdi.consulta correlationId=&quot; + correlationId + &quot; ci=&quot; + cedula</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                + &quot; resultado=&quot; + evento + (intento &gt; 0 ? &quot; intento=&quot; + intento + &quot; duracionMs=&quot; + duracionMs : &quot;&quot;)</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                + (detalle != null ? &quot; detalle=\&quot;&quot; + detalle.replace('&quot;', '\'') + &quot;\&quot;&quot; : &quot;&quot;));</span>
+<span class="nc" id="L133">    }</span>
+
+    private static String env(String nombre, String porDefecto) {
+<span class="nc" id="L136">        String valor = System.getenv(nombre);</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        return valor == null || valor.isBlank() ? porDefecto : valor;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

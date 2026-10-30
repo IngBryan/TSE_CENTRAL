@@ -165,9 +165,22 @@ services:
       - PDI_URL=${PDI_URL:-http://host.docker.internal:3005/ws/servicioInformacion}
       - PDI_ORGANISMO_CODIGO=${PDI_ORGANISMO_CODIGO}
       - PDI_ORGANISMO_CLAVE=${PDI_ORGANISMO_CLAVE}
+      # Resiliencia (ClientePdi): timeout por intento, reintentos con espera exponencial y circuit breaker
+      - PDI_TIMEOUT_MS=${PDI_TIMEOUT_MS:-5000}
+      - PDI_REINTENTOS=${PDI_REINTENTOS:-2}
+      - PDI_REINTENTO_BASE_MS=${PDI_REINTENTO_BASE_MS:-500}
+      - PDI_CB_UMBRAL=${PDI_CB_UMBRAL:-3}
+      - PDI_CB_ESPERA_S=${PDI_CB_ESPERA_S:-30}
+      # CU-04: cada cuanto se reenvian a la PDI las validaciones pendientes (se duplica mientras siga caida)
+      - PDI_REVALIDACION_S=${PDI_REVALIDACION_S:-30}
+      - PDI_REVALIDACION_MAX_S=${PDI_REVALIDACION_MAX_S:-600}
       # Claves que exigen las API REST (header X-Api-Key): una por frontoffice
       - CIUDADANOS_API_KEY=${CIUDADANOS_API_KEY}
       - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
+      # Dias corridos desde la notificacion para que la empresa presente el descargo de una infraccion
+      - PLAZO_DESCARGO_DIAS=${PLAZO_DESCARGO_DIAS:-10}
+      # Portal publico: minimo de empresas distintas para publicar un numero (nunca menos de 3)
+      - PORTAL_UMBRAL_EMPRESAS=${PORTAL_UMBRAL_EMPRESAS:-3}
       # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy): mismo interruptor que el front
       - INGRESO_TESTING=${CIUDADANOS_LOGIN_TESTING:-false}
       # App movil del chofer (TSE_MOVIL): login con gub.uy en POST /api/movil/auth/token. El canje
