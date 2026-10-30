@@ -288,7 +288,7 @@ public class Main {
     }
 
     private static String wildFlyUrl() {
-        return env("WILDFLY_URL", "remote+http://localhost:8080");
+        return env("WILDFLY_URL", "remote+http://localhost:8081");
     }
 
     private static String env(String name, String defaultValue) {

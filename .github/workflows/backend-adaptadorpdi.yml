@@ -1,0 +1,33 @@
+name: Backend - AdaptadorPdi (cliente de la PDI compartido)
+
+# Ejecuta CI en pushes a main y Pull Requests hacia dev.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - componente_central/backend/AdaptadorPdi/**
+      - .github/workflows/backend-adaptadorpdi.yml
+      - .github/workflows/_build-backend.yml
+
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - componente_central/backend/AdaptadorPdi/**
+      - .github/workflows/backend-adaptadorpdi.yml
+      - .github/workflows/_build-backend.yml
+
+  workflow_dispatch:
+
+jobs:
+  backend:
+    uses: ./.github/workflows/_build-backend.yml
+    with:
+      path: componente_central/backend/AdaptadorPdi
+      artifact-name: backend-adaptadorpdi
+      artifact: target/*.jar
+      sonar-project-key: tse-central-backend-adaptadorpdi
+
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

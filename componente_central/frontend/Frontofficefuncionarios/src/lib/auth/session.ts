@@ -8,16 +8,27 @@ import { getAuthConfig } from "./config";
 // ambos quedan publicados en el mismo host.
 
 export const COOKIE_SESION = "funcionarios_session";
+export const COOKIE_TRANSACCION = "funcionarios_gubuy_tx";
 export const DURACION_SESION_S = 60 * 60 * 8;
+export const DURACION_TRANSACCION_S = 60 * 10; // el code de ID Uruguay vence a los 10 minutos
 const PATH_COOKIES = "/funcionarios";
 
-// Quien inicio sesion. El front no decide si es funcionario: lo controla el backend en cada
-// operacion (403 si la cedula no esta registrada como funcionario del MTOP).
-export type Usuario = { cedula: string; nombre: string };
+// Quien inicio sesion. El backend controlo al ingresar que sea funcionario registrado (y lo valido contra
+// la PDI), y lo vuelve a controlar en cada operacion (403 si la cedula no es de un funcionario del MTOP).
+// identidadVerificada: false si la PDI no respondio al ingresar (se entro igual, en modo degradado). Las
+// sesiones abiertas antes de agregar el campo no lo traen y se toman como verificadas.
+export type Usuario = { cedula: string; nombre: string; email?: string; identidadVerificada?: boolean };
 
 export type Sesion = {
   usuario: Usuario;
+  idToken: string; // id_token_hint del logout en gub.uy; vacio en el ingreso de testing
   exp: number; // epoch en segundos
+};
+
+export type TransaccionLogin = {
+  state: string;
+  nonce: string;
+  creada: number;
 };
 
 function clave(): Buffer {
@@ -48,6 +59,7 @@ export function opcionesCookie(maxAge: number) {
   return {
     httpOnly: true,
     secure: getAuthConfig().cookiesSeguras,
+    // lax: la cookie tiene que viajar en el redirect top-level que vuelve desde gub.uy
     sameSite: "lax" as const,
     path: PATH_COOKIES,
     maxAge,

@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - componente_central/backend/Frontofficefuncionarios/**
+      - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-frontofficefuncionarios.yml
       - .github/workflows/_build-backend.yml
   pull_request:
@@ -15,6 +16,7 @@ on:
     paths:
       - componente_central/backend/Frontofficefuncionarios/**
       - componente_central/backend/Modelo/**
+      - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-frontofficefuncionarios.yml
       - .github/workflows/_build-backend.yml
   workflow_dispatch:
@@ -27,7 +29,7 @@ jobs:
       artifact-name: backend-frontofficefuncionarios
       artifact: ear/target/*.ear
       sonar-project-key: tse-central-backend-frontofficefuncionarios
-      install-first: componente_central/backend/Modelo
+      install-first: componente_central/backend/Modelo componente_central/backend/AdaptadorPdi
 
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

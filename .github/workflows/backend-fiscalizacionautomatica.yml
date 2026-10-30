@@ -15,6 +15,7 @@ on:
       - componente_central/backend/Backofficeautoridadesadministradores/ejb/**
       - componente_central/backend/Frontofficefuncionarios/pom.xml
       - componente_central/backend/Frontofficefuncionarios/ejb/**
+      - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-fiscalizacionautomatica.yml
       - .github/workflows/_build-backend.yml
   pull_request:
@@ -30,6 +31,7 @@ on:
       - componente_central/backend/Backofficeautoridadesadministradores/ejb/**
       - componente_central/backend/Frontofficefuncionarios/pom.xml
       - componente_central/backend/Frontofficefuncionarios/ejb/**
+      - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-fiscalizacionautomatica.yml
       - .github/workflows/_build-backend.yml
   workflow_dispatch:
@@ -42,7 +44,7 @@ jobs:
       artifact-name: backend-fiscalizacionautomatica
       artifact: target/*.jar
       sonar-project-key: tse-central-backend-fiscalizacionautomatica
-      install-first: componente_central/backend/Modelo componente_central/backend/Frontofficeciudadanos componente_central/backend/Frontofficefuncionarios componente_central/backend/Backofficeautoridadesadministradores
+      install-first: componente_central/backend/Modelo componente_central/backend/AdaptadorPdi componente_central/backend/Frontofficeciudadanos componente_central/backend/Frontofficefuncionarios componente_central/backend/Backofficeautoridadesadministradores
 
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -27,9 +27,17 @@ spec:
           env:
             - name: NODE_ENV
               value: production
-            # Ingreso con cedula sin proveedor de identidad, hasta que se integre gub.uy
+            # Ingreso de testing con cedula (sin gub.uy), junto con FUNCIONARIOS_INGRESO_TESTING de wildfly.
+            # Pasar a "false" cuando ande el login con gub.uy (redirect URIs registradas en ID Uruguay).
             - name: LOGIN_TESTING
               value: "true"
+            # Login con gub.uy: mismo cliente OIDC que ciudadanos (oidc.clientId en app.json)
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: oidc-client-secret
+                  optional: true
           # SESSION_SECRET y BACKEND_API_KEY: el Secret se crea a mano y no va al repo (ver k8s/README.md)
           envFrom:
             - secretRef:

@@ -13,3 +13,6 @@ data:
   # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy). Va junto con LOGIN_TESTING del
   # front de ciudadanos. Pasar a "false" cuando ID Uruguay registre la redirect URI de este ambiente.
   INGRESO_TESTING: "true"
+  # POST /api/funcionarios/ingreso-testing. Va junto con LOGIN_TESTING del front de funcionarios
+  # (deployment.yaml). Pasar los dos a "false" cuando ande el login con gub.uy en /funcionarios.
+  FUNCIONARIOS_INGRESO_TESTING: "true"

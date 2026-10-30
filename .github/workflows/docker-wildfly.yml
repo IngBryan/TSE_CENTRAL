@@ -12,6 +12,7 @@ on:
       - componente_central/backend/Backofficeautoridadesadministradores/**
       - wildfly/**
       - docker-compose.yml
+      - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/docker-wildfly.yml
       - .github/workflows/_docker-image.yml
   workflow_dispatch:

@@ -18,6 +18,7 @@ import jakarta.ejb.TimerConfig;
 import jakarta.ejb.TimerService;
 import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
+import tse.lab.adaptadorpdi.Backoff;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.EstadoValidacion;

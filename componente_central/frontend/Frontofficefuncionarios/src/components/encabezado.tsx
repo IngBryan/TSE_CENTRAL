@@ -17,6 +17,12 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
         </Link>
         {sesion && (
           <nav className="flex items-center gap-3">
+            <Link href="/casos" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
+              Casos
+            </Link>
+            <Link href="/empresas" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
+              Empresas
+            </Link>
             <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">{sesion.usuario.nombre}</span>
             <form method="post" action={`${BASE_PATH}/auth/logout`}>
               <button type="submit" className={botonSecundario}>
@@ -26,6 +32,15 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
           </nav>
         )}
       </div>
+      {sesion?.usuario.identidadVerificada === false && (
+        <p
+          role="status"
+          className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
+          Identidad no verificada con DNIC: el servicio no estaba disponible al ingresar. Se vuelve a verificar
+          en el próximo ingreso.
+        </p>
+      )}
     </header>
   );
 }

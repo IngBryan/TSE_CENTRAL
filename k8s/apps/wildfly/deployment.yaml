@@ -131,6 +131,11 @@ spec:
                   name: tse-runtime-secrets
                   key: pdi-organismo-clave
 
+            # Replaces the "-Xms64m -Xmx512m" default of standalone.conf. Leaves ~800Mi of the limit for
+            # metaspace, threads and buffers.
+            - name: JBOSS_JAVA_SIZING
+              value: "-Xms256m -Xmx1200m"
+
           envFrom:
             - configMapRef:
                 name: wildfly-config
@@ -162,9 +167,9 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 512Mi
-            limits:
               memory: 1Gi
+            limits:
+              memory: 2Gi
 
           securityContext:
             runAsNonRoot: true
