@@ -82,10 +82,14 @@ public class Main {
         System.out.printf("Simulated by %d vehicles reporting every %d ms, profile %s, for %s%n",
                 Fleet.SIZE, settings.spacingMicros() / 1000, settings.profile(), settings.duration());
 
+        // One connection per publisher: the client writes and the broker applies flow control per connection,
+        // so a shared one caps the rate however many publishers there are
         ConnectionFactory factory = connectionFactory();
-        Connection connection;
+        List<Connection> connections = new ArrayList<>();
         try {
-            connection = factory.newConnection("tracking-generator");
+            for (int i = 0; i < publishers; i++) {
+                connections.add(factory.newConnection("tracking-generator-" + i));
+            }
         } catch (IOException | TimeoutException e) {
             System.err.printf("Could not connect to RabbitMQ at %s:%d: %s%n", factory.getHost(), factory.getPort(),
                     e.getMessage());
@@ -105,12 +109,12 @@ public class Main {
                 Thread.currentThread().interrupt();
             }
         }));
-        try (connection) {
+        try {
             long startNanos = System.nanoTime();
             List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < publishers; i++) {
-                Thread thread = new Thread(new Publisher(connection, settings, i, publishers, stats, stop, startNanos,
-                        clocksStart), "publisher-" + i);
+                Thread thread = new Thread(new Publisher(connections.get(i), settings, i, publishers, stats, stop,
+                        startNanos, clocksStart), "publisher-" + i);
                 thread.start();
                 threads.add(thread);
             }
@@ -119,6 +123,14 @@ public class Main {
                 thread.join();
             }
         } finally {
+            for (Connection connection : connections) {
+                try {
+                    connection.close();
+                } catch (IOException | RuntimeException e) {
+                    // An already closed connection must not skip the summary
+                    System.err.println("Could not close a RabbitMQ connection: " + e.getMessage());
+                }
+            }
             printSummary(stats);
             finished.countDown();
         }
@@ -127,6 +139,7 @@ public class Main {
     private static void report(List<Thread> threads, LoadProfile profile, double baseRate, Stats stats,
             long startNanos) throws InterruptedException {
         long lastUnique = 0;
+        double lastElapsed = 0;
         while (threads.stream().anyMatch(Thread::isAlive)) {
             long deadline = System.currentTimeMillis() + REPORT_EVERY.toMillis();
             for (Thread thread : threads) {
@@ -134,12 +147,14 @@ public class Main {
             }
             double elapsed = (System.nanoTime() - startNanos) / 1e9;
             long unique = stats.uniquePublished.get();
+            // Divided by the real time since the last line: under load the lines come later than every 5 s
             System.out.printf("%6.0fs  target %8.1f/s  sent %8.1f/s  unique %d  duplicates %d  confirmed %d"
                     + "  pending %d  rejected %d%n",
-                    elapsed, baseRate * profile.factor(elapsed), (unique - lastUnique) / (REPORT_EVERY.toMillis() / 1000.0),
+                    elapsed, baseRate * profile.factor(elapsed), (unique - lastUnique) / (elapsed - lastElapsed),
                     unique, stats.duplicatesPublished.get(), stats.uniqueConfirmed.get(), stats.outstanding.get(),
                     stats.rejected.get() + stats.unroutable.get());
             lastUnique = unique;
+            lastElapsed = elapsed;
         }
     }
 

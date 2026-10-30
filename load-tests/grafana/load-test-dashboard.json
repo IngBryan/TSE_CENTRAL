@@ -69,7 +69,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(rabbitmq_global_messages_received_total{cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(rabbitmq_global_messages_received_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "",
           "refId": "A",
           "range": true
@@ -123,7 +123,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "",
           "refId": "A",
           "range": true
@@ -177,7 +177,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rabbitmq_queue_messages_ready{cluster=\"$cluster\", queue=\"tracking.events\"})",
+          "expr": "sum(rabbitmq_queue_messages_ready{cluster=~\"$cluster|\", queue=\"tracking.events\"} or rabbitmq_detailed_queue_messages_ready{cluster=~\"$cluster|\", queue=\"tracking.events\"})",
           "legendFormat": "",
           "refId": "A",
           "range": true
@@ -286,7 +286,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Sustained below 100% = messages accumulate (breaking point). Shows 100% when there is no traffic.",
+      "description": "Sustained below 100% = messages accumulate (breaking point). Above 100% = a backlog is being drained. No data when there is no traffic.",
       "gridPos": {
         "h": 4,
         "w": 5,
@@ -299,7 +299,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=\"$cluster\"}[$__rate_interval])) / sum(rate(rabbitmq_global_messages_received_total{cluster=\"$cluster\"}[$__rate_interval]))) or vector(1)",
+          "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=~\"$cluster|\"}[$__rate_interval])) / sum(rate(rabbitmq_global_messages_received_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "",
           "refId": "A",
           "range": true
@@ -374,7 +374,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(rabbitmq_global_messages_received_total{cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(rabbitmq_global_messages_received_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "published",
           "refId": "A",
           "range": true
@@ -384,7 +384,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "acknowledged",
           "refId": "B",
           "range": true
@@ -394,7 +394,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(rabbitmq_global_messages_redelivered_total{cluster=\"$cluster\"}[$__rate_interval]))",
+          "expr": "sum(rate(rabbitmq_global_messages_redelivered_total{cluster=~\"$cluster|\"}[$__rate_interval]))",
           "legendFormat": "redelivered",
           "refId": "C",
           "range": true
@@ -490,7 +490,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rabbitmq_queue_messages_ready{cluster=\"$cluster\", queue=\"tracking.events\"})",
+          "expr": "sum(rabbitmq_queue_messages_ready{cluster=~\"$cluster|\", queue=\"tracking.events\"} or rabbitmq_detailed_queue_messages_ready{cluster=~\"$cluster|\", queue=\"tracking.events\"})",
           "legendFormat": "ready",
           "refId": "A",
           "range": true
@@ -500,7 +500,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rabbitmq_queue_messages_unacked{cluster=\"$cluster\", queue=\"tracking.events\"})",
+          "expr": "sum(rabbitmq_queue_messages_unacked{cluster=~\"$cluster|\", queue=\"tracking.events\"} or rabbitmq_detailed_queue_messages_unacked{cluster=~\"$cluster|\", queue=\"tracking.events\"})",
           "legendFormat": "unacked",
           "refId": "B",
           "range": true
@@ -724,7 +724,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rabbitmq_queue_consumers{cluster=\"$cluster\", queue=\"tracking.events\"})",
+          "expr": "sum(rabbitmq_queue_consumers{cluster=~\"$cluster|\", queue=\"tracking.events\"} or rabbitmq_detailed_queue_consumers{cluster=~\"$cluster|\", queue=\"tracking.events\"})",
           "legendFormat": "consumers",
           "refId": "A",
           "range": true
