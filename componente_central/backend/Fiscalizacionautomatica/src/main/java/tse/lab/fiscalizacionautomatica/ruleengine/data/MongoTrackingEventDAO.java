@@ -1,17 +1,21 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.data;
 
 import com.mongodb.ErrorCategory;
+import com.mongodb.MongoBulkWriteException;
 import com.mongodb.MongoWriteException;
+import com.mongodb.bulk.BulkWriteError;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import org.bson.Document;
@@ -55,6 +59,31 @@ public class MongoTrackingEventDAO implements TrackingEventDAO {
             }
             throw e;
         }
+    }
+
+    @Override
+    public List<Boolean> saveAll(List<TrackingEvent> events) {
+        List<Boolean> saved = new ArrayList<>(Collections.nCopies(events.size(), true));
+        if (events.isEmpty()) {
+            return saved;
+        }
+        Instant receivedAt = clock.instant();
+        try {
+            // Unordered: a duplicate doesn't stop the rest of the batch from being inserted
+            collection.insertMany(events.stream().map(event -> toDocument(event, receivedAt)).toList(),
+                    new InsertManyOptions().ordered(false));
+        } catch (MongoBulkWriteException e) {
+            if (e.getWriteConcernError() != null) {
+                throw e;
+            }
+            for (BulkWriteError error : e.getWriteErrors()) {
+                if (ErrorCategory.fromErrorCode(error.getCode()) != ErrorCategory.DUPLICATE_KEY) {
+                    throw e;
+                }
+                saved.set(error.getIndex(), false);
+            }
+        }
+        return saved;
     }
 
     @Override

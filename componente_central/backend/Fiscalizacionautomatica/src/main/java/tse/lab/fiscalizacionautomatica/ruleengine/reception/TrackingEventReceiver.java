@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.LongPredicate;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.TrackingEventDAO;
@@ -54,21 +56,49 @@ public class TrackingEventReceiver {
      * @param messageId RabbitMQ message_id (required)
      * @param body      JSON published by tracking
      */
+    public record Message(String messageId, byte[] body) {
+    }
+
+    /** Receives one message: parses it, validates it, saves it and hands it to the detection. */
     public Result receive(String messageId, byte[] body) {
-        TrackingEvent event;
-        try {
-            event = parse(messageId, body);
-        } catch (IOException | IllegalArgumentException | DateTimeParseException e) {
-            return Result.INVALID;
+        return receiveAll(List.of(new Message(messageId, body))).getFirst();
+    }
+
+    /**
+     * Receives a batch of messages, saving the valid ones in a single operation.
+     *
+     * @return the result of each message, in order
+     */
+    public List<Result> receiveAll(List<Message> messages) {
+        Result[] results = new Result[messages.size()];
+        List<TrackingEvent> events = new ArrayList<>();
+        List<Integer> positions = new ArrayList<>();
+        for (int i = 0; i < messages.size(); i++) {
+            Message message = messages.get(i);
+            TrackingEvent event;
+            try {
+                event = parse(message.messageId(), message.body());
+            } catch (IOException | IllegalArgumentException | DateTimeParseException e) {
+                results[i] = Result.INVALID;
+                continue;
+            }
+            if (!activeGps.test(event.gpsId())) {
+                results[i] = Result.UNKNOWN_GPS;
+                continue;
+            }
+            events.add(event);
+            positions.add(i);
         }
-        if (!activeGps.test(event.gpsId())) {
-            return Result.UNKNOWN_GPS;
+        if (!events.isEmpty()) {
+            List<Boolean> saved = dao.saveAll(events);
+            for (int j = 0; j < events.size(); j++) {
+                results[positions.get(j)] = saved.get(j) ? Result.SAVED : Result.DUPLICATE;
+                if (saved.get(j)) {
+                    detection.accept(events.get(j));
+                }
+            }
         }
-        if (!dao.save(event)) {
-            return Result.DUPLICATE;
-        }
-        detection.accept(event);
-        return Result.SAVED;
+        return List.of(results);
     }
 
     private static TrackingEvent parse(String messageId, byte[] body) throws IOException {

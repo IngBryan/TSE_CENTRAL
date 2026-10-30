@@ -53,6 +53,11 @@ public class Main {
     private static final Duration ACTIVE_GPS_REFRESH = Duration.ofSeconds(60);
     /** How often the last communication of each GPS is sent to the backoffice. */
     private static final Duration GPS_COMMUNICATIONS_FLUSH = Duration.ofSeconds(60);
+    /**
+     * Consumers of the tracking queue per instance, each on its own channel: RabbitMQ delivers the messages of a
+     * channel one at a time, so a single one serializes the whole instance.
+     */
+    private static final int CONSUMER_CHANNELS = 4;
     /** Detection threads of the tracking consumer: the events of a vehicle always go to the same one. */
     private static final int DETECTION_LANES = 4;
     private static final int DETECTION_QUEUE_PER_LANE = 1_000;
@@ -127,10 +132,12 @@ public class Main {
                     gpsCommunications.record(event.gpsId());
                     detection.submit(event);
                 });
-                new TrackingConsumer(connection.createChannel(), receiver).start();
-                System.out.printf("Consuming %s from %s:%d, saving to %s.%s (%d active GPS)%n",
-                        TrackingConsumer.QUEUE, factory.getHost(), factory.getPort(), database.getName(),
-                        MongoTrackingEventDAO.COLLECTION, activeGps.size());
+                for (int i = 0; i < CONSUMER_CHANNELS; i++) {
+                    new TrackingConsumer(connection.createChannel(), receiver).start();
+                }
+                System.out.printf("Consuming %s from %s:%d with %d channels, saving to %s.%s (%d active GPS)%n",
+                        TrackingConsumer.QUEUE, factory.getHost(), factory.getPort(), CONSUMER_CHANNELS,
+                        database.getName(), MongoTrackingEventDAO.COLLECTION, activeGps.size());
 
                 stopRequested.await();
                 System.out.println("Stopping: closing RabbitMQ, then the queued detections");

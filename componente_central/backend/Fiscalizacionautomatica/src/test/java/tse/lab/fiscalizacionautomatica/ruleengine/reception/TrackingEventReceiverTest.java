@@ -82,6 +82,23 @@ class TrackingEventReceiverTest {
         assertEquals(Result.SAVED, onlyGps1.receive("msg-2", bytes(MESSAGE)));
     }
 
+    @Test
+    void receivesABatchKeepingTheResultOfEachMessageInOrder() {
+        TrackingEventReceiver onlyGps1 = new TrackingEventReceiver(dao, gpsId -> gpsId == 1, toDetect::add);
+        String later = MESSAGE.replace("15:30:00.000Z", "15:31:00.000Z");
+
+        List<Result> results = onlyGps1.receiveAll(List.of(
+                new TrackingEventReceiver.Message("msg-1", bytes(MESSAGE)),
+                new TrackingEventReceiver.Message("msg-2", bytes("not json")),
+                new TrackingEventReceiver.Message("msg-3", bytes(MESSAGE.replace("\"gpsId\": 1", "\"gpsId\": 3"))),
+                new TrackingEventReceiver.Message("msg-4", bytes(MESSAGE)),
+                new TrackingEventReceiver.Message("msg-5", bytes(later))));
+
+        assertEquals(List.of(Result.SAVED, Result.INVALID, Result.UNKNOWN_GPS, Result.DUPLICATE, Result.SAVED), results);
+        assertEquals(2, dao.events().size());
+        assertEquals(2, toDetect.size());
+    }
+
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = " ")

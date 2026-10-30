@@ -15,6 +15,15 @@ public interface TrackingEventDAO {
      */
     boolean save(TrackingEvent event);
 
+    /**
+     * Saves the events as {@link #save} does with each one, in a single operation where possible.
+     *
+     * @return for each event, in order, whether it was saved ({@code false}: it already existed)
+     */
+    default List<Boolean> saveAll(List<TrackingEvent> events) {
+        return events.stream().map(this::save).toList();
+    }
+
     /** Marks the event as evaluated by the detection. */
     void markDetected(TrackingEvent event);
 
