@@ -63,4 +63,25 @@ class RutasCompartidasTest {
         assertEquals(Long.valueOf(10L), localidad.getId());
         assertEquals("Soriano", localidad.getDepartamento());
     }
+
+    @Test
+    void cambioDeLocalidadesInvalidaAsociacionesSinEliminarGeometriaCompartida() {
+        RutaReferencia referencia = new RutaReferencia(GEO_A, 40000);
+        Guia guia = guia("G5");
+        guia.reemplazarRutasAutorizadas(List.of(referencia));
+        guia.setDestino("Dolores");
+        assertTrue(guia.getRutasAutorizadas().isEmpty());
+        assertEquals(GEO_A, referencia.getGeometriaGeoJson());
+    }
+
+    @Test
+    void noPermiteCambiarOrigenConRutasFijadasTrasInicio() {
+        Guia guia = guia("G6");
+        guia.reemplazarRutasAutorizadas(List.of(new RutaReferencia(GEO_A, 40000)));
+        guia.cambiarEstado(EstadoGuia.EN_CURSO);
+        assertThrows(IllegalStateException.class, () -> guia.setOrigen("Dolores"));
+        assertEquals("Mercedes", guia.getOrigen());
+        assertEquals(1, guia.getRutasAutorizadas().size());
+    }
+
 }

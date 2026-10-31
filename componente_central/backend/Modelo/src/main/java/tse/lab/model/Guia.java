@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -138,11 +139,27 @@ public class Guia implements Serializable {
     }
 
     public void setOrigen(String origen) {
+        if (!Objects.equals(this.origen, origen)) {
+            invalidarRutasSiCambioLocalidad();
+        }
         this.origen = origen;
     }
 
     public void setDestino(String destino) {
+        if (!Objects.equals(this.destino, destino)) {
+            invalidarRutasSiCambioLocalidad();
+        }
         this.destino = destino;
+    }
+
+    private void invalidarRutasSiCambioLocalidad() {
+        if (!rutasAutorizadas.isEmpty()) {
+            if (estado != EstadoGuia.SIN_ASIGNAR && estado != EstadoGuia.ASIGNADA) {
+                throw new IllegalStateException("No puede cambiarse el recorrido de un viaje iniciado o cerrado");
+            }
+            // Las asociaciones desaparecen; las geometrías compartidas NO se borran.
+            rutasAutorizadas.clear();
+        }
     }
 
     public void setVehiculo(Vehiculo vehiculo) {

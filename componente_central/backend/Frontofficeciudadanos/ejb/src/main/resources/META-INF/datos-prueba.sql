@@ -3,6 +3,17 @@
 -- Una sentencia por linea. Datos ficticios salvo la cedula del responsable, que es la del
 -- integrante que prueba el login con gub.uy testing.
 --
+-- Catalogo de localidades del entorno academico; coordenadas centrales WGS84 aproximadas.
+-- Son puntos de referencia viales a verificar con OSRM; no representan domicilios ni depositos.
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (1, 'Montevideo', 'Montevideo', -34.9033, -56.1882);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (2, 'Paysandu', 'Paysandu', -32.3171, -58.0807);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (3, 'Rivera', 'Rivera', -30.9053, -55.5508);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (4, 'Maldonado', 'Maldonado', -34.8979, -54.9502);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (5, 'Tacuarembo', 'Tacuarembo', -31.7188, -55.9793);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (6, 'Durazno', 'Durazno', -33.3589, -56.4992);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (7, 'Mercedes', 'Soriano', -33.2524, -58.0305);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (8, 'Nueva Palmira', 'Colonia', -33.87031, -58.41176);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (13, 'Dolores', 'Soriano', -33.53009, -58.21701);
 -- Empresa habilitada; la alta real la hace un funcionario del MTOP (frontoffice de funcionarios).
 INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, 0);
 -- DEMO / Empresas: contraste con empresa no habilitada (sin identidad gub.uy artificial).

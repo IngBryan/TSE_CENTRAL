@@ -22,6 +22,14 @@ public class RutaReferenciaDAO {
                 .getResultStream().findFirst().orElse(null);
     }
 
+    public RutaReferencia buscarPorId(Long id) {
+        return id == null ? null : em.find(RutaReferencia.class, id);
+    }
+
+    public void sincronizar() {
+        em.flush();
+    }
+
     public RutaReferencia guardar(RutaReferencia ruta) {
         em.persist(ruta);
         return ruta;
