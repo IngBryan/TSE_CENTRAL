@@ -56,13 +56,7 @@ class InfraccionesServiceTest {
     void setUp() throws Exception {
         emf = Persistence.createEntityManagerFactory("frontofficeciudadanosTestPersistenceUnit");
         em = emf.createEntityManager();
-        AutorizacionResponsable autorizacion = new AutorizacionResponsable();
-        set(autorizacion, "responsables", conEm(new ResponsableDAO()));
-        set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));
-        servicio = new InfraccionesService();
-        set(servicio, "autorizacion", autorizacion);
-        set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
-        servicio.plazoDias = 10;
+        servicio = conPlazo(10);
 
         Empresa este = new Empresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", null);
         Empresa otra = new Empresa(2L, "Logistica del Litoral", "Logistica del Litoral S.A.", "Paysandu", null);
@@ -173,8 +167,8 @@ class InfraccionesServiceTest {
     }
 
     @Test
-    void conElPlazoVencidoSeRechazaYElCasoNoCambia() {
-        servicio.plazoDias = 0;
+    void conElPlazoVencidoSeRechazaYElCasoNoCambia() throws Exception {
+        servicio = conPlazo(0);
 
         em.getTransaction().begin();
         ConflictoException e = assertThrows(ConflictoException.class,
@@ -231,6 +225,16 @@ class InfraccionesServiceTest {
                     AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.DETECTADA, EstadoCaso.NOTIFICADA, null, "t"));
         }
         return caso.getId();
+    }
+
+    private InfraccionesService conPlazo(int dias) throws Exception {
+        AutorizacionResponsable autorizacion = new AutorizacionResponsable();
+        set(autorizacion, "responsables", conEm(new ResponsableDAO()));
+        set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));
+        InfraccionesService s = new InfraccionesService(dias);
+        set(s, "autorizacion", autorizacion);
+        set(s, "casos", conEm(new CasoFiscalizacionDAO()));
+        return s;
     }
 
     private <T> T conEm(T dao) throws Exception {

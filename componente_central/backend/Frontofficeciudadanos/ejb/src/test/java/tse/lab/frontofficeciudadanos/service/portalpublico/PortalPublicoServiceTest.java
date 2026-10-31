@@ -54,13 +54,12 @@ class PortalPublicoServiceTest {
     void setUp() throws Exception {
         emf = Persistence.createEntityManagerFactory("frontofficeciudadanosTestPersistenceUnit");
         em = emf.createEntityManager();
-        servicio = new PortalPublicoService();
+        servicio = new PortalPublicoService(3);
         set(servicio, "portal", conEm(new PortalPublicoDAO()));
         set(servicio, "empresas", conEm(new EmpresaDAO()));
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "permisos", conEm(new PermisoCirculacionDAO()));
         set(servicio, "itvs", conEm(new ITVDAO()));
-        servicio.umbral = 3;
 
         em.getTransaction().begin();
         // Empresas 1 a 3 habilitadas, cada una con un vehiculo habilitado; la 4 no habilitada

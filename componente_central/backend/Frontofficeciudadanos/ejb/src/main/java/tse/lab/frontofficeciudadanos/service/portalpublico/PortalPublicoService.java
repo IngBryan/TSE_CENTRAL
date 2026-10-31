@@ -64,8 +64,16 @@ public class PortalPublicoService {
     @EJB
     private ITVDAO itvs;
 
-    // Se puede fijar en los tests
-    int umbral = umbralConfigurado();
+    private final int umbral;
+
+    public PortalPublicoService() {
+        this(umbralConfigurado());
+    }
+
+    // Para los tests: sin leer el entorno
+    PortalPublicoService(int umbral) {
+        this.umbral = umbral;
+    }
 
     public record EmpresaEncontrada(Long nroEmpresa, String nombrePublico, String razonSocial, boolean habilitada) {
     }

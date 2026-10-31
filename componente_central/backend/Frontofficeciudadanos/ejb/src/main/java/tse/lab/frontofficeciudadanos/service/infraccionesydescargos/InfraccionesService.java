@@ -50,8 +50,16 @@ public class InfraccionesService {
     @EJB
     private CasoFiscalizacionDAO casos;
 
-    // Se puede fijar en los tests
-    int plazoDias = plazoConfigurado();
+    private final int plazoDias;
+
+    public InfraccionesService() {
+        this(plazoConfigurado());
+    }
+
+    // Para los tests: sin leer el entorno
+    InfraccionesService(int plazoDias) {
+        this.plazoDias = plazoDias;
+    }
 
     public record InfraccionResumen(Long id, String tipoCaso, String descripcion, String estado,
             String fechaDeteccion, String matricula, boolean nueva, String venceDescargo, boolean admiteDescargo) {
