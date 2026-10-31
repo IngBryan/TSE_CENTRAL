@@ -1184,16 +1184,16 @@
     },
     {
       "type": "timeseries",
-      "title": "WildFly CPU (cores)",
-      "id": 21,
+      "title": "WildFly replicas",
+      "id": 27,
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "",
+      "description": "HPA by CPU (k8s/apps/wildfly/hpa.yaml). Desired above available = replicas starting or Pending (no room in the nodes).",
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 42
       },
@@ -1203,9 +1203,29 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{cluster=\"$cluster\", namespace=\"tse\", container=\"wildfly\"}[$__rate_interval]))",
-          "legendFormat": "wildfly",
+          "expr": "max(kube_horizontalpodautoscaler_status_desired_replicas{cluster=\"$cluster\", namespace=\"tse\", horizontalpodautoscaler=\"wildfly\"})",
+          "legendFormat": "desired",
           "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(kube_deployment_status_replicas_available{cluster=\"$cluster\", namespace=\"tse\", deployment=\"wildfly\"})",
+          "legendFormat": "available",
+          "refId": "B",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(kube_horizontalpodautoscaler_spec_max_replicas{cluster=\"$cluster\", namespace=\"tse\", horizontalpodautoscaler=\"wildfly\"})",
+          "legendFormat": "max",
+          "refId": "C",
           "range": true
         }
       ],
@@ -1219,7 +1239,157 @@
             "showPoints": "never"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "desired"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "available"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "WildFly CPU (cores)",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Per replica. The HPA adds one when the average goes above 70% of the request.",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 42
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{cluster=\"$cluster\", namespace=\"tse\", container=\"wildfly\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(kube_pod_container_resource_requests{cluster=\"$cluster\", namespace=\"tse\", container=\"wildfly\", resource=\"cpu\"})",
+          "legendFormat": "request",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "request"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1240,11 +1410,11 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Near the limit the JVM spends its time in GC and stops answering.",
+      "description": "Per replica, against the limit of each pod. Near the limit the JVM spends its time in GC and stops answering.",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 42
       },
       "targets": [
@@ -1253,8 +1423,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"tse\", container=\"wildfly\"})",
-          "legendFormat": "working set",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{cluster=\"$cluster\", namespace=\"tse\", container=\"wildfly\"})",
+          "legendFormat": "{{pod}}",
           "refId": "A",
           "range": true
         },
@@ -1333,8 +1503,8 @@
       "description": "",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 18,
         "y": 42
       },
       "targets": [
@@ -1406,7 +1576,7 @@
       "description": "Above ~85% there is no room for more replicas.",
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 51
       },
@@ -1456,8 +1626,8 @@
       "description": "",
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 51
       },
       "targets": [
@@ -1469,6 +1639,66 @@
           "expr": "100 * (1 - node_memory_MemAvailable_bytes{cluster=\"$cluster\"} / node_memory_MemTotal_bytes{cluster=\"$cluster\"})",
           "legendFormat": "{{instance}}",
           "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requested per node",
+      "id": 28,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Requests of the running pods over what each node offers to pods. Near 100% new pods stay Pending, however free the node really is.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 51
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 * sum by (node) (kube_pod_container_resource_requests{cluster=\"$cluster\", resource=\"memory\"} and on (namespace, pod) (kube_pod_status_phase{cluster=\"$cluster\", phase=\"Running\"} == 1)) / sum by (node) (kube_node_status_allocatable{cluster=\"$cluster\", resource=\"memory\"})",
+          "legendFormat": "{{node}} memory",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 * sum by (node) (kube_pod_container_resource_requests{cluster=\"$cluster\", resource=\"cpu\"} and on (namespace, pod) (kube_pod_status_phase{cluster=\"$cluster\", phase=\"Running\"} == 1)) / sum by (node) (kube_node_status_allocatable{cluster=\"$cluster\", resource=\"cpu\"})",
+          "legendFormat": "{{node}} cpu",
+          "refId": "B",
           "range": true
         }
       ],
