@@ -1,5 +1,9 @@
 package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
@@ -18,6 +22,7 @@ import jakarta.ejb.TimerConfig;
 import jakarta.ejb.TimerService;
 import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
+import javax.sql.DataSource;
 import tse.lab.adaptadorpdi.Backoff;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.model.Ciudadano;
@@ -33,9 +38,17 @@ import tse.lab.model.EstadoValidacion;
 public class RevalidacionPdiJob {
 
     private static final Logger LOG = Logger.getLogger(RevalidacionPdiJob.class.getName());
+    /**
+     * With several WildFly replicas each one has this timer: only the one holding this PostgreSQL advisory lock
+     * revises, so the same profiles are never sent to the PDI twice at the same time.
+     */
+    private static final long LOCK = "RevalidacionPdiJob".hashCode();
 
     @Resource
     private TimerService timers;
+
+    @Resource(lookup = "java:/MainDS")
+    private DataSource database;
 
     @EJB
     private CiudadanoDAO perfiles;
@@ -62,12 +75,33 @@ public class RevalidacionPdiJob {
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     void revisar() {
         Duration proxima = intervalo;
-        try {
-            proxima = revalidarPendientes();
-        } catch (RuntimeException e) {
+        try (Connection connection = database.getConnection()) {
+            if (advisoryLock(connection, "pg_try_advisory_lock")) {
+                try {
+                    proxima = revalidarPendientes();
+                } finally {
+                    advisoryLock(connection, "pg_advisory_unlock");
+                }
+            } else {
+                LOG.fine("evento=pdi.revalidacion resultado=otra_replica");
+            }
+        } catch (SQLException | RuntimeException e) {
             LOG.log(Level.WARNING, "evento=pdi.revalidacion resultado=error", e);
         } finally {
             programar(proxima);
+        }
+    }
+
+    /**
+     * Takes or releases the lock in the session of the connection (it isn't tied to a transaction: each profile
+     * is validated in its own one). If the connection dies before releasing it, PostgreSQL releases it.
+     */
+    private static boolean advisoryLock(Connection connection, String function) throws SQLException {
+        try (PreparedStatement query = connection.prepareStatement("SELECT " + function + "(?)")) {
+            query.setLong(1, LOCK);
+            try (ResultSet result = query.executeQuery()) {
+                return result.next() && result.getBoolean(1);
+            }
         }
     }
 
