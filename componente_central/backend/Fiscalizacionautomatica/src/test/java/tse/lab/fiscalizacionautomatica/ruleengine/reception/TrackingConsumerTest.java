@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver.Message;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver.Result;
 
@@ -58,9 +61,9 @@ class TrackingConsumerTest {
         ArgumentCaptor<List<Message>> batch = ArgumentCaptor.forClass(List.class);
         verify(receiver).receiveAll(batch.capture());
         assertEquals(3, batch.getValue().size());
-        verify(channel).basicAck(1, false);
-        verify(channel).basicAck(2, false);
-        verify(channel).basicAck(3, false);
+        // A single ack for the whole batch
+        verify(channel).basicAck(3, true);
+        verify(channel, times(1)).basicAck(anyLong(), anyBoolean());
     }
 
     @Test
@@ -71,7 +74,7 @@ class TrackingConsumerTest {
         deliver(consumer, 1, PROPERTIES);
         consumer.flush();
 
-        verify(channel).basicAck(1, false);
+        verify(channel).basicAck(1, true);
     }
 
     @Test
@@ -82,21 +85,36 @@ class TrackingConsumerTest {
     }
 
     @Test
-    void eachMessageIsAcknowledgedByItsResult() throws IOException {
+    void discardsTheMessagesThatCantBeSavedBeforeAcknowledgingTheRestUpToTheLastValidOne() throws IOException {
         TrackingConsumer consumer = new TrackingConsumer(channel, receiver, 4);
         when(receiver.receiveAll(any()))
-                .thenReturn(List.of(Result.SAVED, Result.DUPLICATE, Result.INVALID, Result.UNKNOWN_GPS));
+                .thenReturn(List.of(Result.INVALID, Result.SAVED, Result.DUPLICATE, Result.UNKNOWN_GPS));
 
-        deliver(consumer, 1, PROPERTIES);
+        deliver(consumer, 1, null);
         deliver(consumer, 2, PROPERTIES);
-        deliver(consumer, 3, null);
+        deliver(consumer, 3, PROPERTIES);
         deliver(consumer, 4, PROPERTIES);
 
-        verify(channel).basicAck(1, false);
-        verify(channel).basicAck(2, false);
-        // Retrying would give the same result: discarded without requeue
-        verify(channel).basicReject(3, false);
-        verify(channel).basicReject(4, false);
+        // Retrying would give the same result: discarded without requeue, before the ack that would cover them
+        InOrder order = inOrder(channel);
+        order.verify(channel).basicReject(1, false);
+        order.verify(channel).basicReject(4, false);
+        // Up to the last valid one: acking a rejected tag closes the channel
+        order.verify(channel).basicAck(3, true);
+        verify(channel, times(1)).basicAck(anyLong(), anyBoolean());
+    }
+
+    @Test
+    void aBatchWithoutValidMessagesIsNotAcknowledged() throws IOException {
+        TrackingConsumer consumer = new TrackingConsumer(channel, receiver, 2);
+        when(receiver.receiveAll(any())).thenReturn(List.of(Result.INVALID, Result.UNKNOWN_GPS));
+
+        deliver(consumer, 1, null);
+        deliver(consumer, 2, PROPERTIES);
+
+        verify(channel).basicReject(1, false);
+        verify(channel).basicReject(2, false);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
     @Test
@@ -107,8 +125,8 @@ class TrackingConsumerTest {
         deliver(consumer, 1, PROPERTIES);
         deliver(consumer, 2, PROPERTIES);
 
-        verify(channel).basicNack(1, false, true);
-        verify(channel).basicNack(2, false, true);
+        verify(channel).basicNack(2, true, true);
+        verify(channel, times(1)).basicNack(anyLong(), anyBoolean(), anyBoolean());
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
