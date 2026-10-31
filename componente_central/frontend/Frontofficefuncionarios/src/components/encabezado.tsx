@@ -20,6 +20,9 @@ export function Encabezado({ sesion }: { sesion: Sesion | null }) {
             <Link href="/casos" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
               Casos
             </Link>
+            <Link href="/viajes" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
+              Viajes
+            </Link>
             <Link href="/empresas" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
               Empresas
             </Link>
