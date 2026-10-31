@@ -43,3 +43,25 @@ export async function llamarBackend<T>(
   }
   return { status: res.status, data: (await res.json().catch(() => null)) as T };
 }
+
+// GET de un recurso binario (la foto de un evento de viaje): devuelve la respuesta tal cual, para pasar
+// el cuerpo al navegador sin leerlo entero en memoria. Igual que en Frontofficeciudadanos.
+export async function descargarBackend(
+  ruta: string,
+  opciones: { correlationId: string; usuarioCi: string },
+): Promise<Response> {
+  const cfg = getAuthConfig();
+  try {
+    return await fetch(`${cfg.backendUrl}${ruta}`, {
+      headers: {
+        "X-Api-Key": cfg.backendApiKey,
+        "X-Correlation-Id": opciones.correlationId,
+        "X-Usuario-Ci": opciones.usuarioCi,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(cfg.backendTimeoutMs),
+    });
+  } catch (e) {
+    throw new BackendNoDisponible(`No se pudo contactar el backend: ${(e as Error).message}`);
+  }
+}

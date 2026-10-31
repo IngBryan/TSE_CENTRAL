@@ -123,20 +123,21 @@ final class Publisher implements Runnable {
 
     private void publishAtRate(Channel channel) throws IOException, InterruptedException {
         double baseRate = settings.rate() * vehicles.size() / Fleet.SIZE;
-        double durationSeconds = settings.duration().toMillis() / 1000.0;
+        long endNanos = startNanos + settings.duration().toNanos();
         double due = 0;
         long emitted = 0;
         int cursor = 0;
         long lastNanos = startNanos;
         while (!stop.get()) {
             long now = System.nanoTime();
-            double elapsed = (now - startNanos) / 1e9;
-            if (elapsed >= durationSeconds) {
+            if (now >= endNanos) {
                 return;
             }
+            double elapsed = (now - startNanos) / 1e9;
             due += baseRate * settings.profile().factor(elapsed) * (now - lastNanos) / 1e9;
             lastNanos = now;
-            while (emitted < (long) due && !stop.get()) {
+            // Above what the broker accepts the publisher falls behind: it catches up for as long as the run lasts
+            while (emitted < (long) due && !stop.get() && System.nanoTime() < endNanos) {
                 emit(channel, vehicles.get(cursor));
                 cursor = (cursor + 1) % vehicles.size();
                 emitted++;

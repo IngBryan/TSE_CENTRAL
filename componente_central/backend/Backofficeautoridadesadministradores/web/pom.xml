@@ -106,6 +106,12 @@
             <artifactId>jakarta.jms-api</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- JSON-P (included in WildFly): the backoffice token -->
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -140,6 +146,14 @@
             <groupId>jakarta.authentication</groupId>
             <artifactId>jakarta.authentication-api</artifactId>
             <version>3.1.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JSON-P implementation for the tests (in WildFly the server provides it) -->
+        <dependency>
+            <groupId>org.eclipse.parsson</groupId>
+            <artifactId>parsson</artifactId>
+            <version>1.1.9</version>
             <scope>test</scope>
         </dependency>
 

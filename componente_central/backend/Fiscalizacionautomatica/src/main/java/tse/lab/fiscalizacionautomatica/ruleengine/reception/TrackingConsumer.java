@@ -17,8 +17,8 @@ import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceive
 
 /**
  * Consumes the tracking queue in batches: the messages are saved together in one MongoDB operation and
- * acknowledged one by one by their result. Saving one message at a time bounded each consumer by the
- * round trip to MongoDB.
+ * acknowledged together. Saving one message at a time bounded each consumer by the round trip to MongoDB,
+ * and acknowledging one at a time gave the queue process of RabbitMQ one ack per event to handle.
  */
 public class TrackingConsumer extends DefaultConsumer {
 
@@ -69,7 +69,7 @@ public class TrackingConsumer extends DefaultConsumer {
         }
     }
 
-    /** Saves the pending messages and acknowledges each one by its result. */
+    /** Saves the pending messages, discards the ones that can't be saved and acknowledges the rest at once. */
     synchronized void flush() throws IOException {
         if (batch.isEmpty()) {
             return;
@@ -80,19 +80,23 @@ public class TrackingConsumer extends DefaultConsumer {
         try {
             results = receiver.receiveAll(deliveries.stream().map(Delivery::message).toList());
         } catch (RuntimeException e) {
-            // Saving failed: back to the queue to retry them
-            for (Delivery delivery : deliveries) {
-                getChannel().basicNack(delivery.tag(), false, true);
-            }
+            // Saving failed: the whole batch back to the queue to retry it
+            getChannel().basicNack(deliveries.getLast().tag(), true, true);
             return;
         }
+        long lastAcknowledged = 0;
         for (int i = 0; i < deliveries.size(); i++) {
             long tag = deliveries.get(i).tag();
             switch (results.get(i)) {
-                case SAVED, DUPLICATE -> getChannel().basicAck(tag, false);
+                case SAVED, DUPLICATE -> lastAcknowledged = tag;
                 // Retrying would give the same result: discard it (there is no dead letter queue)
                 case INVALID, UNKNOWN_GPS -> getChannel().basicReject(tag, false);
             }
+        }
+        // One ack for the rest of the batch: the earlier deliveries of the channel are already settled and the
+        // rejected ones went first. Its tag can't be a rejected one, or the broker closes the channel.
+        if (lastAcknowledged > 0) {
+            getChannel().basicAck(lastAcknowledged, true);
         }
     }
 

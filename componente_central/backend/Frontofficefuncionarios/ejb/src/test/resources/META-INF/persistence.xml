@@ -8,6 +8,8 @@
         <class>tse.lab.model.Localidad</class>
         <class>tse.lab.model.RutaReferencia</class>
         <class>tse.lab.model.GuiaRutaAutorizada</class>
+        <class>tse.lab.model.EventoViaje</class>
+        <class>tse.lab.model.ModificacionGuia</class>
         <class>tse.lab.model.Vehiculo</class>
         <class>tse.lab.model.Chofer</class>
         <class>tse.lab.model.Responsable</class>

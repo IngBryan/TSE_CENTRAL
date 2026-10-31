@@ -199,6 +199,8 @@ services:
       - OIDC_REDIRECT_URIS_MOVIL=${OIDC_REDIRECT_URIS_MOVIL:-uy.carga.movil:/oauth2redirect,http://localhost:8080}
       # Firma el token (JWT HS256, 8 h) que la app manda en /api/movil/*: 32+ caracteres aleatorios
       - MOVIL_TOKEN_SECRET=${MOVIL_TOKEN_SECRET}
+      # Firma el token (JWT HS256, 8 h) del backoffice, que reemplaza a la sesion: 32+ caracteres aleatorios
+      - BACKOFFICE_JWT_SECRET=${BACKOFFICE_JWT_SECRET}
       # Usuario de aplicacion para EJB remoto (lo crea wildfly/start.sh al arrancar)
       - EJB_USER=${EJB_USER}
       - EJB_PASSWORD=${EJB_PASSWORD}

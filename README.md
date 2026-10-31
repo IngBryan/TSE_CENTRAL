@@ -23,6 +23,7 @@ TSE_CENTRAL/
 ├── wildfly/                     # Imagen del backend: un WildFly con los 3 EAR (Dockerfile + scripts CLI)
 ├── rabbitmq/                    # Topologia de RabbitMQ (definitions.json)
 ├── load-tests/tracking-generator/ # Generador de carga de eventos de tracking (prueba de performance)
+├── load-tests/frontoffice-k6/   # Prueba de carga de las consultas del frontoffice con k6 (p95 < 500 ms)
 ├── mongodb/init/                # Scripts del primer arranque de MongoDB (crea las colecciones tracking y balanzas_metadata)
 ├── docker-compose.yml           # Levanta todo: RabbitMQ, PostgreSQL, MongoDB, WildFly, la fiscalizacion automatica y los 3 frontends
 └── .gitignore                   # Reglas a nivel workspace (cada modulo tiene el suyo)
@@ -142,6 +143,7 @@ FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
 #App movil del chofer (TSE_MOVIL) - WildFly (usa tambien OIDC_CLIENT_ID / OIDC_CLIENT_SECRET)
 MOVIL_TOKEN_SECRET=<string largo y aleatorio, 32+ caracteres>  # firma el token (JWT HS256) de la app
+BACKOFFICE_JWT_SECRET=<otro string aleatorio, 32+ caracteres>  # firma el token del backoffice (sin el, su login responde 503)
 #OIDC_REDIRECT_URIS_MOVIL=uy.carga.movil:/oauth2redirect,http://localhost:8080  # redirect URIs de la app
 ```
 

@@ -21,6 +21,8 @@ Cada frontend dispone de su propio Deployment, Service e Ingress.
 - `frontofficefuncionarios.ear`
 - `backofficeautoridadesadministradores.ear`
 
+Escala horizontalmente con un HPA por CPU (`k8s/apps/wildfly/hpa.yaml`: 2 a 3 réplicas, objetivo 70 % del request de 1 CPU; requiere metrics-server). Puede porque no guarda estado propio: el backoffice se autentica con un token firmado (`BACKOFFICE_JWT_SECRET`) en lugar de sesión, y el timer de revalidación de la PDI toma un lock en PostgreSQL para que lo corra una sola réplica a la vez.
+
 **Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ, los persiste en MongoDB y detecta los casos de fiscalización. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP; KEDA ajusta sus réplicas (1 a 5) según los mensajes pendientes en la cola. La misma imagen corre como CronJob (`fiscalizacionautomatica-poller`) cada 30 minutos para consultar las balanzas.
 
 ### Infraestructura externa
@@ -93,6 +95,7 @@ ejb-password
 oidc-client-secret
 session-secret
 movil-token-secret
+backoffice-jwt-secret
 pdi-organismo-clave
 ```
 
@@ -102,6 +105,7 @@ pdi-organismo-clave
 | `oidc-client-secret` | `OIDC_CLIENT_SECRET` | frontofficeciudadanos-front |
 | `session-secret` | `SESSION_SECRET` | frontofficeciudadanos-front |
 | `movil-token-secret` | `MOVIL_TOKEN_SECRET` | frontofficeciudadanos-front |
+| `backoffice-jwt-secret` | `BACKOFFICE_JWT_SECRET` | wildfly: firma el token del backoffice, que reemplaza a la sesion para poder tener varias replicas (sin la clave, el login del backoffice responde 503) |
 | `pdi-organismo-clave` | `PDI_ORGANISMO_CLAVE` | wildfly (igual al de la PDI) |
 
 `ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
@@ -127,6 +131,7 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=oidc-client-secret='<OIDC_CLIENT_SECRET>' \
   --from-literal=session-secret='<SESSION_SECRET>' \
   --from-literal=movil-token-secret='<MOVIL_TOKEN_SECRET>' \
+  --from-literal=backoffice-jwt-secret='<BACKOFFICE_JWT_SECRET>' \
   --from-literal=pdi-organismo-clave='<PDI_ORGANISMO_CLAVE>'
 ```
 
@@ -143,6 +148,13 @@ Lo mismo para las del front de ciudadanos y la PDI:
 ```bash
 kubectl -n tse patch secret tse-runtime-secrets --type merge \
   -p '{"stringData":{"oidc-client-secret":"<OIDC_CLIENT_SECRET>","session-secret":"<SESSION_SECRET>","movil-token-secret":"<MOVIL_TOKEN_SECRET>","pdi-organismo-clave":"<PDI_ORGANISMO_CLAVE>"}}'
+```
+
+Y la del token del backoffice (despues, `kubectl -n tse rollout restart deployment/wildfly`):
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"backoffice-jwt-secret":"<BACKOFFICE_JWT_SECRET>"}}'
 ```
 
 Los secretos de produccion deben ser distintos a los de desarrollo local. Despues de cambiar el

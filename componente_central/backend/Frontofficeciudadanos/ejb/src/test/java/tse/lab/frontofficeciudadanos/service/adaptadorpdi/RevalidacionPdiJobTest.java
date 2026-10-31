@@ -1,12 +1,27 @@
 package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.sql.DataSource;
+
+import jakarta.ejb.TimerConfig;
+import jakarta.ejb.TimerService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
@@ -26,6 +41,9 @@ class RevalidacionPdiJobTest {
     private EntityManager em;
     private PdiFalsa pdi;
     private RevalidacionPdiJob job;
+    private final TimerService timers = mock(TimerService.class);
+    private final DataSource database = mock(DataSource.class);
+    private final Connection connection = mock(Connection.class);
 
     @BeforeEach
     void setUp() throws Exception {
@@ -37,6 +55,9 @@ class RevalidacionPdiJobTest {
         job = new RevalidacionPdiJob();
         set(job, "perfiles", perfiles);
         set(job, "validacion", pdi);
+        set(job, "timers", timers);
+        set(job, "database", database);
+        when(database.getConnection()).thenReturn(connection);
 
         em.getTransaction().begin();
         for (String ci : List.of("11111111", "22222222")) {
@@ -86,6 +107,56 @@ class RevalidacionPdiJobTest {
         pdi.consultadas.clear();
         assertEquals(Duration.ofSeconds(30), job.revalidarPendientes());
         assertEquals(0, pdi.consultadas.size());
+    }
+
+    @Test
+    void theReplicaThatTakesTheLockRevisesAndThenReleasesIt() throws Exception {
+        lockTaken(true);
+
+        job.revisar();
+
+        assertEquals(List.of("11111111", "22222222"), pdi.consultadas.stream().sorted().toList());
+        verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
+        verify(connection).close();
+        verify(timers).createSingleActionTimer(eq(30_000L), any(TimerConfig.class));
+    }
+
+    @Test
+    void whileAnotherReplicaHoldsTheLockTheRoundIsSkipped() throws Exception {
+        lockTaken(false);
+
+        job.revisar();
+
+        assertTrue(pdi.consultadas.isEmpty());
+        verify(connection, never()).prepareStatement("SELECT pg_advisory_unlock(?)");
+        verify(timers).createSingleActionTimer(eq(30_000L), any(TimerConfig.class));
+    }
+
+    @Test
+    void withoutTheDatabaseTheRoundIsRetriedLater() throws Exception {
+        when(database.getConnection()).thenThrow(new SQLException("PostgreSQL down"));
+
+        job.revisar();
+
+        assertTrue(pdi.consultadas.isEmpty());
+        verify(timers).createSingleActionTimer(eq(30_000L), any(TimerConfig.class));
+    }
+
+    /** pg_try_advisory_lock answers {@code taken}; pg_advisory_unlock always works. */
+    private void lockTaken(boolean taken) throws SQLException {
+        PreparedStatement tryLock = query(taken);
+        PreparedStatement unlock = query(true);
+        when(connection.prepareStatement("SELECT pg_try_advisory_lock(?)")).thenReturn(tryLock);
+        when(connection.prepareStatement("SELECT pg_advisory_unlock(?)")).thenReturn(unlock);
+    }
+
+    private static PreparedStatement query(boolean result) throws SQLException {
+        PreparedStatement statement = mock(PreparedStatement.class);
+        ResultSet rows = mock(ResultSet.class);
+        when(statement.executeQuery()).thenReturn(rows);
+        when(rows.next()).thenReturn(true);
+        when(rows.getBoolean(1)).thenReturn(result);
+        return statement;
     }
 
     private class PdiFalsa extends ValidacionPdiService {
