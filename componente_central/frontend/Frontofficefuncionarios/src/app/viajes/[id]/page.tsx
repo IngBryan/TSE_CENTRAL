@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Encabezado } from "@/components/encabezado";
+import { SeguimientoViaje } from "./seguimiento-viaje";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
@@ -106,6 +107,8 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
           <p className="text-zinc-600 dark:text-zinc-400">La guía no tiene vehículo asignado.</p>
         )}
       </section>
+
+      <SeguimientoViaje id={id} estado={v.estado} asignacion={v.fechaAsignacion} inicio={v.inicio} fin={v.fin} />
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
