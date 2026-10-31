@@ -247,6 +247,12 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           <div className={`flex flex-col gap-1 ${tarjeta}`}>
             {desc.estado && <p className="text-xs uppercase tracking-wide text-zinc-500">{desc.estado.replace(/_/g, " ")}</p>}
             <p className="whitespace-pre-line">{desc.descripcion ?? "-"}</p>
+            {desc.fechaPresentacion && (
+              <p className={`text-xs ${dato}`}>
+                Presentado el {fechaHora(desc.fechaPresentacion)}
+                {desc.ciPresentante ? ` por el responsable C.I. ${desc.ciPresentante}` : ""}
+              </p>
+            )}
           </div>
         ) : sinDescargo ? (
           <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Encabezado, botonGubUy, botonSecundario } from "@/components/encabezado";
 import { loginTestingHabilitado } from "@/lib/auth/config";
@@ -28,6 +29,20 @@ const SERVICIOS = [
   {
     titulo: "Guías de viaje",
     texto: "Emití y consultá las guías de viaje de tus cargas en todo el país.",
+  },
+];
+
+// Portal publico (sin login): validacion de empresas y estadisticas agregadas
+const PUBLICOS = [
+  {
+    href: "/validar",
+    titulo: "Validar una empresa",
+    texto: "Verificá que una transportista esté habilitada y que su vehículo tenga el permiso y la ITV vigentes.",
+  },
+  {
+    href: "/estadisticas",
+    titulo: "Estadísticas del transporte de carga",
+    texto: "Empresas y vehículos habilitados, viajes, carga por rubro e infracciones confirmadas.",
   },
 ];
 
@@ -104,6 +119,22 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               <p className="text-zinc-600 dark:text-zinc-400">{s.texto}</p>
             </article>
           ))}
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Sin ingresar</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {PUBLICOS.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="group flex flex-col gap-2 rounded-2xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:bg-zinc-950"
+              >
+                <h3 className="text-lg font-semibold text-[#0068b3] group-hover:underline dark:text-sky-400">{s.titulo} →</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">{s.texto}</p>
+              </Link>
+            ))}
+          </div>
         </section>
       </main>
 

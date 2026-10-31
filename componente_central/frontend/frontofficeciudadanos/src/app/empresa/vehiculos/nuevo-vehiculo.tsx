@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { crearVehiculo, type EstadoNuevoVehiculo } from "./actions";
 
 const CAMPOS = [

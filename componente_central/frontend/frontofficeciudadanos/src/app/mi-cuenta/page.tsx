@@ -72,6 +72,9 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
                 <Link href="/empresa/guias" className={botonGubUy}>
                   Guías de viaje
                 </Link>
+                <Link href="/empresa/infracciones" className={botonGubUy}>
+                  Infracciones
+                </Link>
               </div>
             </div>
           ))}

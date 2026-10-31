@@ -66,6 +66,21 @@ class CasoYAuditoriaTest {
     }
 
     @Test
+    void presentarUnDescargoGuardaCuandoYQuienLoPresento() {
+        CasoFiscalizacion caso = new CasoFiscalizacion("d", "EXCESO_CARGA", vehiculo, null);
+        Instant antes = Instant.now();
+
+        Descargo descargo = Descargo.presentar("La ruta estaba cortada", caso, "54074380");
+
+        assertEquals("La ruta estaba cortada", descargo.getDescripcion());
+        assertEquals("EXCESO_CARGA", descargo.getTipoCaso());
+        assertEquals(Descargo.PRESENTADO, descargo.getEstado());
+        assertSame(caso, descargo.getCasoFiscalizacion());
+        assertEquals("54074380", descargo.getCiPresentante());
+        assertFalse(descargo.getFechaPresentacion().isBefore(antes));
+    }
+
+    @Test
     void elDescargoMantieneSusDatos() {
         CasoFiscalizacion caso = new CasoFiscalizacion("d", "EXCESO_CARGA", null);
         Descargo descargo = new Descargo("La balanza estaba descalibrada", "EXCESO_CARGA", "PRESENTADO", caso);
