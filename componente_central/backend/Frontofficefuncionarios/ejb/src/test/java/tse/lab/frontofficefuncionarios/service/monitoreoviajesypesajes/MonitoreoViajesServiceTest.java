@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.CiudadanoDAO;
 import tse.lab.frontofficefuncionarios.data.EventoPesajesDAO;
 import tse.lab.frontofficefuncionarios.data.EventoViajeDAO;
@@ -31,12 +32,14 @@ import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.CasoVista;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.ChoferVista;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.EventoVista;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.PaginaViajes;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.PesajeVista;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.ViajeDetalle;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService.ViajeResumen;
+import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.Chofer;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
@@ -53,8 +56,8 @@ import tse.lab.model.TipoModificacionGuia;
 import tse.lab.model.Vehiculo;
 
 // CU Monitorear viajes y pesajes contra H2 con los DAOs reales.
-// GV-1: FINALIZADA (INICIO 10:00, FIN 14:00), GV-2: EN_CURSO sin INICIO registrado, GV-3: ASIGNADA (no
-// es un viaje todavia: no se muestra).
+// GV-1: FINALIZADA (INICIO 10:00, FIN 14:00), GV-2: EN_CURSO sin INICIO registrado, GV-3: ASIGNADA (por
+// empezar), GV-4: SIN_ASIGNAR (no es un viaje: no se muestra).
 class MonitoreoViajesServiceTest {
 
     private static final String FUNCIONARIO = "45678901";
@@ -80,6 +83,7 @@ class MonitoreoViajesServiceTest {
         set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
         set(servicio, "pesajes", conEm(new EventoPesajesDAO()));
         set(servicio, "ciudadanos", conEm(new CiudadanoDAO()));
+        set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
 
         Empresa este = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Empresa norte = new Empresa(2L, "Fletes del Norte", "FDN S.R.L.", "Rivera", null);
@@ -101,6 +105,7 @@ class MonitoreoViajesServiceTest {
         gv2.cambiarEstado(EstadoGuia.EN_CURSO);
         Guia gv3 = new Guia("GV-3", "Agropecuario", 10000, LocalDate.of(2026, 10, 11), "Pando", "Minas", este);
         gv3.asignar(sba, chofer);
+        Guia gv4 = new Guia("GV-4", "Agropecuario", 5000, LocalDate.of(2026, 10, 13), "Pando", "Rocha", este);
 
         NodoBalanza balanza = new NodoBalanza("Peaje Pando", "Ruta 8 km 32", 1L);
 
@@ -116,12 +121,15 @@ class MonitoreoViajesServiceTest {
         em.persist(gv1);
         em.persist(gv2);
         em.persist(gv3);
+        em.persist(gv4);
         em.persist(balanza);
-        // Pesajes de SBA1234: antes, durante (uno con exceso) y despues de GV-1
+        // Pesajes de SBA1234: antes, durante (uno con exceso) y despues de GV-1, y uno posterior a la
+        // asignacion de GV-3 (que no es de GV-3: todavia no empezo)
         em.persist(new EventoPesajes(1L, "SBA1234", t("09:00"), 30000, balanza));
         em.persist(new EventoPesajes(2L, "SBA1234", t("12:00"), 38500, balanza));
         em.persist(new EventoPesajes(3L, "SBA1234", t("13:00"), 30000, balanza));
         em.persist(new EventoPesajes(4L, "SBA1234", t("15:00"), 30000, balanza));
+        em.persist(new EventoPesajes(7L, "SBA1234", Instant.now().plus(1, ChronoUnit.HOURS), 30000, balanza));
         // SAB5678: uno anterior a la asignacion de GV-2 y uno posterior
         em.persist(new EventoPesajes(5L, "SAB5678", Instant.parse("2026-01-01T12:00:00Z"), 20000, balanza));
         em.persist(new EventoPesajes(6L, "SAB5678", Instant.now().plus(1, ChronoUnit.HOURS), 25000, balanza));
@@ -134,6 +142,9 @@ class MonitoreoViajesServiceTest {
                 ResultadoEventoViaje.CONFLICTO));
         em.persist(new ModificacionGuia(gv1, TipoModificacionGuia.EDICION, RESPONSABLE, "destino: Salto -> Paysandú",
                 null, 0L, 1L));
+        // Un caso generado en GV-1 y un Viaje sin guia del mismo vehiculo, que no es de ningun viaje
+        em.persist(new CasoFiscalizacion("Exceso de carga en Peaje Pando", "EXCESO_CARGA", gv1));
+        em.persist(new CasoFiscalizacion("Viaje sin guia", "VIAJE_SIN_GUIA", sba, null));
         em.getTransaction().commit();
         em.clear();
     }
@@ -156,26 +167,30 @@ class MonitoreoViajesServiceTest {
     // ===== Listado =====
 
     @Test
-    void listaSoloLosViajesEnCursoOFinalizadosDelMasNuevoAlMasViejo() throws Exception {
+    void listaLosViajesAsignadosEnCursoOFinalizadosDelMasNuevoAlMasViejo() throws Exception {
         PaginaViajes p = servicio.listar(FUNCIONARIO, null, null, null, null, null, "t");
 
-        // GV-3 (ASIGNADA, sin empezar) no aparece
+        // GV-4 (SIN_ASIGNAR) no aparece
         ChoferVista juan = new ChoferVista(CHOFER, "Juan", "Gómez");
         assertEquals(List.of(
                 new ViajeResumen("GV-2", "2026-10-12", "Rivera", "Montevideo", "EN_CURSO", 2L, "Fletes del Norte",
                         "SAB5678", juan),
+                new ViajeResumen("GV-3", "2026-10-11", "Pando", "Minas", "ASIGNADA", 1L, "Transportes del Este",
+                        "SBA1234", juan),
                 new ViajeResumen("GV-1", "2026-10-10", "Montevideo", "Paysandú", "FINALIZADA", 1L,
                         "Transportes del Este", "SBA1234", juan)),
                 p.viajes());
-        assertEquals(2, p.total());
+        assertEquals(3, p.total());
         assertEquals(1, p.totalPaginas());
     }
 
     @Test
     void filtraPorEstadoMatriculaYEmpresa() throws Exception {
         assertEquals(List.of("GV-2"), ids(servicio.listar(FUNCIONARIO, "en_curso", null, null, null, null, "t")));
-        // La matricula se normaliza como al darla de alta; GV-3 tambien es de SBA1234 pero no empezo
-        assertEquals(List.of("GV-1"), ids(servicio.listar(FUNCIONARIO, null, "sba-1234", null, null, null, "t")));
+        assertEquals(List.of("GV-3"), ids(servicio.listar(FUNCIONARIO, "ASIGNADA", null, null, null, null, "t")));
+        // La matricula se normaliza como al darla de alta
+        assertEquals(List.of("GV-3", "GV-1"),
+                ids(servicio.listar(FUNCIONARIO, null, "sba-1234", null, null, null, "t")));
         assertEquals(List.of("GV-2"), ids(servicio.listar(FUNCIONARIO, null, null, "2", null, null, "t")));
         assertEquals(List.of("GV-1"),
                 ids(servicio.listar(FUNCIONARIO, "FINALIZADA", "SBA1234", "1", null, null, "t")));
@@ -185,13 +200,13 @@ class MonitoreoViajesServiceTest {
     @Test
     void paginaElListado() throws Exception {
         PaginaViajes segunda = servicio.listar(FUNCIONARIO, null, null, null, "2", "1", "t");
-        assertEquals(List.of("GV-1"), ids(segunda));
-        assertEquals(2, segunda.total());
-        assertEquals(2, segunda.totalPaginas());
+        assertEquals(List.of("GV-3"), ids(segunda));
+        assertEquals(3, segunda.total());
+        assertEquals(3, segunda.totalPaginas());
 
         PaginaViajes fuera = servicio.listar(FUNCIONARIO, null, null, null, "5", "1", "t");
         assertTrue(fuera.viajes().isEmpty());
-        assertEquals(2, fuera.total());
+        assertEquals(3, fuera.total());
     }
 
     @Test
@@ -203,7 +218,7 @@ class MonitoreoViajesServiceTest {
 
     @Test
     void filtrarPorUnEstadoDeGuiaQueNoEsViajeEsInvalido() {
-        for (String estado : new String[] { "SIN_ASIGNAR", "ASIGNADA", "CANCELADA" }) {
+        for (String estado : new String[] { "SIN_ASIGNAR", "CANCELADA" }) {
             DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
                     () -> servicio.listar(FUNCIONARIO, estado, null, null, null, null, "t"));
             assertEquals(List.of("estado"), List.copyOf(e.getErrores().keySet()));
@@ -242,6 +257,18 @@ class MonitoreoViajesServiceTest {
     }
 
     @Test
+    void detalleIncluyeSoloLosCasosConLaGuiaDelViaje() throws Exception {
+        List<CasoVista> casos = servicio.detalle(FUNCIONARIO, "GV-1", "t").casos();
+
+        // El Viaje sin guia de SBA1234 no tiene guia: no es de GV-1
+        assertEquals(1, casos.size());
+        assertEquals("EXCESO_CARGA", casos.get(0).tipo());
+        assertEquals("Exceso de carga en Peaje Pando", casos.get(0).descripcion());
+        assertEquals("DETECTADA", casos.get(0).estado());
+        assertTrue(servicio.detalle(FUNCIONARIO, "GV-2", "t").casos().isEmpty());
+    }
+
+    @Test
     void unViajeEnCursoSinInicioRegistradoTomaLosPesajesDesdeLaAsignacion() throws Exception {
         ViajeDetalle d = servicio.detalle(FUNCIONARIO, "GV-2", "t");
 
@@ -252,11 +279,22 @@ class MonitoreoViajesServiceTest {
     }
 
     @Test
-    void unaGuiaQueNoEmpezoNoSePuedeConsultarComoViaje() {
+    void unViajeAsignadoTodaviaNoTieneInicioNiPesajes() throws Exception {
+        ViajeDetalle d = servicio.detalle(FUNCIONARIO, "GV-3", "t");
+
+        assertEquals("ASIGNADA", d.estado());
+        assertNull(d.inicio());
+        assertTrue(d.eventos().isEmpty());
+        // El pesaje de SBA1234 posterior a la asignacion no es de este viaje: todavia no empezo
+        assertTrue(d.pesajes().isEmpty());
+    }
+
+    @Test
+    void unaGuiaSinAsignarNoSePuedeConsultarComoViaje() {
         assertEquals("VIAJE_NO_ENCONTRADO", assertThrows(RecursoNoEncontradoException.class,
-                () -> servicio.detalle(FUNCIONARIO, "GV-3", "t")).getCodigo());
+                () -> servicio.detalle(FUNCIONARIO, "GV-4", "t")).getCodigo());
         assertEquals("VIAJE_NO_ENCONTRADO", assertThrows(RecursoNoEncontradoException.class,
-                () -> servicio.fotoEvento(FUNCIONARIO, "GV-3", "e-incidente", "t")).getCodigo());
+                () -> servicio.fotoEvento(FUNCIONARIO, "GV-4", "e-incidente", "t")).getCodigo());
     }
 
     @Test

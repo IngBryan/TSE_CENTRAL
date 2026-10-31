@@ -1,8 +1,10 @@
 // Tipos de la API /viajes del backend Frontofficefuncionarios (records de MonitoreoViajesService) y
 // textos para mostrarlos. Fechas y kg se formatean con las funciones de casos.ts.
 
-// Solo se muestran los viajes que el chofer ya inicio (MonitoreoViajesService.VISIBLES)
-export type EstadoViaje = "EN_CURSO" | "FINALIZADA";
+import type { EstadoCaso } from "./casos";
+
+// Solo se muestran las guias con vehiculo y chofer asignados (MonitoreoViajesService.VISIBLES)
+export type EstadoViaje = "ASIGNADA" | "EN_CURSO" | "FINALIZADA";
 
 // Solo primer nombre y primer apellido del chofer (Ley 18.331)
 export type ChoferVista = { ci: string | null; primerNombre: string | null; primerApellido: string | null };
@@ -62,6 +64,15 @@ export type ModificacionVista = {
 // excesoKg: lo que el pesaje supera al peso del vehiculo mas su capacidad declarada (0 si no supera)
 export type PesajeVista = { fechaHora: string | null; balanza: string | null; pesoKg: number; excesoKg: number };
 
+// Caso de fiscalizacion generado durante el viaje (los de Viaje sin guia no tienen guia: nunca aparecen)
+export type CasoVista = {
+  id: number;
+  tipo: string;
+  descripcion: string | null;
+  estado: EstadoCaso;
+  fechaDeteccion: string | null;
+};
+
 // inicio y fin: hora del INICIO y del FIN aplicados (null si todavia no ocurrieron). pesajes: los del
 // vehiculo entre inicio y fin, o hasta ahora si el viaje sigue en curso.
 export type ViajeDetalle = {
@@ -83,14 +94,18 @@ export type ViajeDetalle = {
   eventos: EventoVista[];
   modificaciones: ModificacionVista[];
   pesajes: PesajeVista[];
+  casos: CasoVista[];
 };
 
+// El orden es el de los filtros del listado
 export const ESTADOS_VIAJE: Record<EstadoViaje, string> = {
+  ASIGNADA: "Asignado",
   EN_CURSO: "En curso",
   FINALIZADA: "Finalizado",
 };
 
 export const COLOR_ESTADO_VIAJE: Record<EstadoViaje, string> = {
+  ASIGNADA: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
   EN_CURSO: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
   FINALIZADA: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200",
 };

@@ -5,7 +5,7 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
-import { fecha, fechaHora, kg, type ErrorBackend } from "@/lib/casos";
+import { COLOR_ESTADO, estado, fecha, fechaHora, kg, tipoCaso, type ErrorBackend } from "@/lib/casos";
 import {
   COLOR_ESTADO_VIAJE,
   estadoViaje,
@@ -28,9 +28,9 @@ const dato = "text-zinc-500";
 // Linea de tiempo: eventos del chofer (por la hora del dispositivo) y modificaciones de la empresa
 type Entrada = { cuando: string | null; evento?: EventoVista; modificacion?: ModificacionVista };
 
-// CU Monitorear viajes y pesajes: detalle de un viaje en curso o finalizado con los pesajes del vehiculo
-// durante el viaje y la linea de tiempo. Que quien consulta sea funcionario lo controla el backend (403
-// si no); una guia que todavia no empezo da 404 como si no existiera.
+// CU Monitorear viajes y pesajes: detalle de un viaje asignado, en curso o finalizado con los pesajes del
+// vehiculo durante el viaje y la linea de tiempo. Que quien consulta sea funcionario lo controla el backend
+// (403 si no); una guia sin asignar o cancelada da 404 como si no existiera.
 export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">) {
   const sesion = await getSesion();
   if (!sesion) redirect("/");
@@ -55,7 +55,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
   if (res.status !== 200 || !res.data) {
     const error =
       res.status === 404
-        ? "El viaje no existe o todavía no empezó."
+        ? "El viaje no existe o la guía todavía no tiene vehículo y chofer asignados."
         : res.status === 403
           ? "No tenés acceso a los viajes: no estás registrado como funcionario del MTOP."
           : "No se pudo obtener el viaje.";
@@ -79,7 +79,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
         <p><span className={dato}>Fecha de la guía:</span> {fecha(v.fecha)}</p>
         <p><span className={dato}>Chofer:</span> {nombreChofer(v.chofer)}{v.chofer?.ci && <span className="text-zinc-500"> (C.I. {v.chofer.ci})</span>}</p>
         <p><span className={dato}>Asignada:</span> {fechaHora(v.fechaAsignacion)}</p>
-        <p><span className={dato}>Inicio:</span> {fechaHora(v.inicio)}</p>
+        <p><span className={dato}>Inicio:</span> {v.inicio ? fechaHora(v.inicio) : v.estado === "ASIGNADA" ? "todavía no empezó" : "-"}</p>
         <p><span className={dato}>Fin:</span> {v.fin ? fechaHora(v.fin) : v.estado === "EN_CURSO" ? "en curso" : "-"}</p>
         <p>
           <span className={dato}>Carga declarada:</span> {kg(v.pesoCargaKg)}
@@ -119,9 +119,11 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
         <div className={tarjeta}>
           {v.pesajes.length === 0 ? (
             <p className="text-zinc-600 dark:text-zinc-400">
-              {v.estado === "EN_CURSO"
-                ? "El vehículo todavía no pasó por ninguna balanza en este viaje."
-                : "El vehículo no pasó por ninguna balanza durante el viaje."}
+              {v.estado === "ASIGNADA"
+                ? "El viaje todavía no empezó."
+                : v.estado === "EN_CURSO"
+                  ? "El vehículo todavía no pasó por ninguna balanza en este viaje."
+                  : "El vehículo no pasó por ninguna balanza durante el viaje."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -152,6 +154,36 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className={titulo}>Casos generados</h2>
+        <div className={tarjeta}>
+          {v.casos.length === 0 ? (
+            <p className="text-zinc-600 dark:text-zinc-400">
+              {v.estado === "FINALIZADA"
+                ? "La fiscalización automática no detectó casos en este viaje."
+                : "La fiscalización automática no detectó casos en este viaje hasta ahora."}
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-black/5 dark:divide-white/10">
+              {v.casos.map((c) => (
+                <li key={c.id} className="py-2 first:pt-0 last:pb-0">
+                  <Link href={`/casos/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 hover:underline">
+                    <span>
+                      <span className="font-medium text-black dark:text-zinc-50">{tipoCaso(c.tipo)}</span>
+                      <span className="text-zinc-500"> · caso N° {c.id} · {fechaHora(c.fechaDeteccion)}</span>
+                    </span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${COLOR_ESTADO[c.estado] ?? ""}`}>
+                      {estado(c.estado)}
+                    </span>
+                  </Link>
+                  {c.descripcion && <p className="mt-1 text-zinc-600 dark:text-zinc-400">{c.descripcion}</p>}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </section>

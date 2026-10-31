@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
+import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.CiudadanoDAO;
 import tse.lab.frontofficefuncionarios.data.EventoPesajesDAO;
 import tse.lab.frontofficefuncionarios.data.EventoViajeDAO;
@@ -31,18 +32,18 @@ import tse.lab.model.Vehiculo;
 
 // CU Monitorear viajes y pesajes (funcionario): listado de los viajes de todas las empresas y detalle de
 // uno con su linea de tiempo (eventos que registro el chofer desde la app movil y modificaciones del
-// responsable) y los pesajes del vehiculo durante el viaje. Solo consultas: cada operacion verifica
+// responsable), los pesajes del vehiculo durante el viaje y los casos de fiscalizacion que genero. Solo
+// consultas: cada operacion verifica
 // primero que quien llama sea funcionario y no modifica nada.
 @Stateless
 public class MonitoreoViajesService {
 
     private static final Logger LOG = Logger.getLogger(MonitoreoViajesService.class.getName());
 
-    // Un viaje es una guia que el chofer ya inicio: las SIN_ASIGNAR, ASIGNADA (sin
-    // empezar) y CANCELADA
-    // (solo se cancela antes del INICIO) no se muestran, ni en el listado ni en el
-    // detalle
-    static final List<EstadoGuia> VISIBLES = List.of(EstadoGuia.EN_CURSO, EstadoGuia.FINALIZADA);
+    // Un viaje es una guia con vehiculo y chofer asignados: ASIGNADA (por empezar), EN_CURSO o FINALIZADA.
+    // Las SIN_ASIGNAR y CANCELADA no se muestran, ni en el listado ni en el detalle
+    static final List<EstadoGuia> VISIBLES = List.of(EstadoGuia.ASIGNADA, EstadoGuia.EN_CURSO,
+            EstadoGuia.FINALIZADA);
 
     static final int TAMANIO_POR_DEFECTO = 20;
     static final int TAMANIO_MAXIMO = 100;
@@ -59,6 +60,8 @@ public class MonitoreoViajesService {
     private EventoPesajesDAO pesajes;
     @EJB
     private CiudadanoDAO ciudadanos;
+    @EJB
+    private CasoFiscalizacionDAO casos;
 
     // Solo primer nombre y primer apellido del chofer (Ley 18.331)
     public record ChoferVista(String ci, String primerNombre, String primerApellido) {
@@ -88,10 +91,15 @@ public class MonitoreoViajesService {
     public record PesajeVista(String fechaHora, String balanza, long pesoKg, long excesoKg) {
     }
 
+    // Caso de fiscalizacion generado durante el viaje (el detalle completo esta en /casos/{id})
+    public record CasoVista(Long id, String tipo, String descripcion, String estado, String fechaDeteccion) {
+    }
+
     public record ViajeDetalle(String id, String fecha, String origen, String destino, String rubroCliente,
             String tipoCarga, long pesoCargaKg, String estado, String fechaAsignacion, Long nroEmpresa,
             String empresa, VehiculoVista vehiculo, ChoferVista chofer, String inicio, String fin,
-            List<EventoVista> eventos, List<ModificacionVista> modificaciones, List<PesajeVista> pesajes) {
+            List<EventoVista> eventos, List<ModificacionVista> modificaciones, List<PesajeVista> pesajes,
+            List<CasoVista> casos) {
     }
 
     public PaginaViajes listar(String ci, String estado, String matricula, String nroEmpresa, String pagina,
@@ -167,14 +175,19 @@ public class MonitoreoViajesService {
         Vehiculo v = g.getVehiculo();
         long pesoMaximo = v == null ? 0 : v.getPeso() + v.getCapacidadCargaKg();
         // Las guias en viaje sin un INICIO registrado (cargadas directamente en la
-        // base) usan la asignacion
+        // base) usan la asignacion. Una ASIGNADA todavia no empezo: no tiene pesajes
         Instant desde = inicio != null ? inicio : g.getFechaAsignacion();
-        List<PesajeVista> pesajesDelViaje = v == null || desde == null ? List.of()
+        List<PesajeVista> pesajesDelViaje = v == null || desde == null || estado(g) == EstadoGuia.ASIGNADA
+                ? List.of()
                 : pesajes.buscarPorMatriculaEntre(v.getMatricula(), desde, fin).stream()
                         .map(p -> new PesajeVista(texto(p.getFechaHora()),
                                 p.getNodoBalanza() == null ? null : p.getNodoBalanza().getNombre(), p.getPeso(),
                                 Math.max(0, p.getPeso() - pesoMaximo)))
                         .toList();
+        List<CasoVista> casosDelViaje = casos.buscarPorGuia(g).stream()
+                .map(c -> new CasoVista(c.getId(), c.getTipoCaso(), c.getDescripcion(), texto(c.getEstado()),
+                        texto(c.getFechaDeteccion())))
+                .toList();
 
         Empresa e = g.getEmpresa();
         ViajeDetalle detalle = new ViajeDetalle(g.getId(), texto(g.getFecha()), g.getOrigen(), g.getDestino(),
@@ -184,10 +197,11 @@ public class MonitoreoViajesService {
                 v == null ? null
                         : new VehiculoVista(v.getMatricula(), v.getMarca(), v.getModelo(), v.getPeso(),
                                 v.getCapacidadCargaKg(), pesoMaximo),
-                chofer(g.getChofer()), texto(inicio), texto(fin), lineaDeTiempo, mods, pesajesDelViaje);
+                chofer(g.getChofer()), texto(inicio), texto(fin), lineaDeTiempo, mods, pesajesDelViaje,
+                casosDelViaje);
         LOG.info(() -> "evento=viaje.consulta correlationId=" + correlationId + " usuario=" + ci + " guia=" + idGuia
                 + " estado=" + detalle.estado() + " eventos=" + lineaDeTiempo.size() + " modificaciones="
-                + mods.size() + " pesajes=" + pesajesDelViaje.size());
+                + mods.size() + " pesajes=" + pesajesDelViaje.size() + " casos=" + casosDelViaje.size());
         return detalle;
     }
 

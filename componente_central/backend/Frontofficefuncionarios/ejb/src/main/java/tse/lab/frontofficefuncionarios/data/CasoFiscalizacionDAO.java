@@ -85,6 +85,15 @@ public class CasoFiscalizacionDAO {
         return em.find(Guia.class, id);
     }
 
+    // Casos generados durante un viaje (los que tienen esa guia), del mas viejo al mas nuevo. Los de Viaje
+    // sin guia no tienen guia: nunca aparecen.
+    public List<CasoFiscalizacion> buscarPorGuia(Guia guia) {
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.guia = :guia"
+                + " ORDER BY c.fechaDeteccion, c.id", CasoFiscalizacion.class)
+                .setParameter("guia", guia)
+                .getResultList();
+    }
+
     // Casos abiertos (EstadoCaso.ABIERTOS) del vehiculo
     public List<CasoFiscalizacion> abiertosDelVehiculo(String matricula) {
         return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.vehiculo.matricula = :matricula"

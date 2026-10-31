@@ -35,7 +35,7 @@ const urlListado = (f: Filtros, pagina = 1) => {
 
 const texto = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim() : "");
 
-// CU Monitorear viajes y pesajes: listado paginado de los viajes en curso o finalizados de todas las
+// CU Monitorear viajes y pesajes: listado paginado de los viajes asignados, en curso o finalizados de todas las
 // empresas. ?estado=EN_CURSO, ?matricula=SBA1234 y ?nroEmpresa=1 filtran, ?pagina=2 elige la pagina (los
 // aplica el backend). Que quien consulta sea funcionario lo controla el backend (403 si no).
 export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
@@ -101,7 +101,7 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
     <Pagina sesion={sesion} filtros={filtros}>
       {viajes.length === 0 ? (
         <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          {conFiltros ? "No hay viajes que coincidan con los filtros." : "Todavía no hay viajes en curso ni finalizados."}
+          {conFiltros ? "No hay viajes que coincidan con los filtros." : "Todavía no hay viajes."}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
