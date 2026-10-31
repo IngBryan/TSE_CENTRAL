@@ -1,7 +1,8 @@
 # Scales the tracking consumer (Deployment fiscalizacionautomatica) between 1 and 5 replicas, taking the
 # higher of two triggers on the tracking.events queue:
-# - publish rate: one replica per 800 msg/s (each one handles ~1000-1300). Sizes for the incoming
-#   traffic, so replicas aren't removed while it lasts even if the queue stays empty.
+# - publish rate: one replica per 1500 msg/s (each one handled 1800 with the queue empty in the load test
+#   with batched consumption). Sizes for the incoming traffic, so replicas aren't removed while it lasts
+#   even if the queue stays empty.
 # - queue length: one replica per 300 ready messages, to drain a backlog (fewer and it reacts to the
 #   normal jitter of the queue at thousands of msg/s).
 # Scaling only by queue length removed replicas under steady load (empty queue = "not needed") until the
@@ -36,7 +37,7 @@ spec:
         # Scale down only after 10 minutes below target, one replica every 2 minutes: if one too many
         # is removed, the queue grows and the replica comes back before the backlog builds up
         scaleDown:
-          stabilizationWindowSeconds: 600
+          stabilizationWindowSeconds: 300
           policies:
             - type: Pods
               value: 1
@@ -51,7 +52,7 @@ spec:
         vhostName: "/"
         queueName: tracking.events
         mode: MessageRate
-        value: "800"
+        value: "1500"
       authenticationRef:
         name: fiscalizacionautomatica-rabbitmq
     - type: rabbitmq
