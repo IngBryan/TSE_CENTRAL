@@ -5,11 +5,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
-  cookieWildFly,
   idSesion,
   NOMBRE_COOKIE_SESION,
   RUTA_COOKIE_SESION,
   urlBackend,
+  wildFlyAuthorization,
 } from "@/lib/backoffice-sesion";
 
 export type EstadoLogin = {
@@ -38,6 +38,7 @@ export async function iniciarSesionAction(
   }
 
   let sesion: string;
+  let duracionSesion: number;
 
   try {
     const respuesta = await fetch(urlBackend("auth/login"), {
@@ -67,28 +68,33 @@ export async function iniciarSesionAction(
       };
     }
 
-    const cookieBackend =
-      respuesta.headers.get("set-cookie") ?? "";
+    // The login answers the token (JWT) and its lifetime in seconds
+    const login: unknown = await respuesta.json();
 
-    const encontrada = cookieBackend.match(
-      /\bJSESSIONID=([A-Za-z0-9_.~-]+)/
-    );
-
-    if (!encontrada) {
+    if (
+      !login ||
+      typeof login !== "object" ||
+      !("token" in login) ||
+      typeof login.token !== "string" ||
+      !/^[A-Za-z0-9_.~-]+$/.test(login.token) ||
+      !("expiraEn" in login) ||
+      typeof login.expiraEn !== "number"
+    ) {
       return {
         estado: "error",
         mensaje: "WildFly no devolvió una sesión válida.",
       };
     }
 
-    sesion = encontrada[1];
+    sesion = login.token;
+    duracionSesion = login.expiraEn;
 
     // Comprobar la identidad y el rol en WildFly.
     const comprobacion = await fetch(urlBackend("auth/me"), {
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Cookie: cookieWildFly(sesion),
+        Authorization: wildFlyAuthorization(sesion),
       },
     });
 
@@ -110,7 +116,7 @@ export async function iniciarSesionAction(
       await fetch(urlBackend("auth/logout"), {
         method: "POST",
         headers: {
-          Cookie: cookieWildFly(sesion),
+          Authorization: wildFlyAuthorization(sesion),
         },
         cache: "no-store",
       }).catch(() => undefined);
@@ -127,12 +133,13 @@ export async function iniciarSesionAction(
     };
   }
 
-  // Sin maxAge: el vencimiento lo decide la sesión de WildFly, que se renueva con cada uso.
+  // The cookie lasts as long as the token: after that WildFly rejects it and the user logs in again
   (await cookies()).set(NOMBRE_COOKIE_SESION, sesion, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: RUTA_COOKIE_SESION,
+    maxAge: duracionSesion,
   });
 
   redirect("/nodos-perifericos");
@@ -147,7 +154,7 @@ export async function cerrarSesionAction(): Promise<void> {
         method: "POST",
         cache: "no-store",
         headers: {
-          Cookie: cookieWildFly(sesion),
+          Authorization: wildFlyAuthorization(sesion),
         },
       });
     } catch {

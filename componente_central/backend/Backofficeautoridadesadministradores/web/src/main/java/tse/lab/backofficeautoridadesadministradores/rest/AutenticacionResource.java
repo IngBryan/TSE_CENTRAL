@@ -1,6 +1,7 @@
 
 package tse.lab.backofficeautoridadesadministradores.rest;
 
+import java.time.Instant;
 import java.util.Map;
 
 import jakarta.inject.Inject;
@@ -10,7 +11,6 @@ import jakarta.security.enterprise.credential.UsernamePasswordCredential;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -19,6 +19,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
+import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
+import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
 
 @Path("/auth")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -47,6 +50,8 @@ public class AutenticacionResource {
     @Context
     private jakarta.ws.rs.core.SecurityContext seguridadRest;
 
+    private byte[] tokenSecret = BackofficeToken.configuredSecret();
+
     public record Credenciales(
             String ci,
             String contrasena) {
@@ -67,6 +72,13 @@ public class AutenticacionResource {
                     .build();
         }
 
+        // Without BACKOFFICE_JWT_SECRET there is no way to issue the token
+        if (tokenSecret.length == 0) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(Map.of("error", "login_no_disponible"))
+                    .build();
+        }
+
         AuthenticationStatus estado = seguridad.authenticate(
                 solicitud,
                 respuesta,
@@ -81,13 +93,24 @@ public class AutenticacionResource {
                     .build();
         }
 
-        HttpSession sesion = solicitud.getSession(false);
+        String rol = seguridad.isCallerInRole("ADMINISTRADOR") ? "ADMINISTRADOR"
+                : seguridad.isCallerInRole("AUTORIDAD") ? "AUTORIDAD" : null;
 
-        if (sesion != null) {
-            solicitud.changeSessionId();
+        if (rol == null) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", "no_autorizado"))
+                    .build();
         }
 
-        return Response.ok(Map.of("autenticado", true)).build();
+        // No session: the client sends this token in "Authorization: Bearer" on every request
+        String token = BackofficeToken.issue(
+                new IdentidadBackoffice(seguridad.getCallerPrincipal().getName(), rol),
+                tokenSecret,
+                Instant.now());
+
+        return Response.ok(Map.of(
+                "token", token,
+                "expiraEn", BackofficeToken.LIFETIME_S)).build();
     }
 
     @GET
@@ -117,17 +140,12 @@ public class AutenticacionResource {
                 "rol", rol)).build();
     }
 
+    /** There is no session to close in the server: the client discards its token. */
     @POST
     @Path("/logout")
     public Response logout() throws ServletException {
 
         solicitud.logout();
-
-        HttpSession sesion = solicitud.getSession(false);
-
-        if (sesion != null) {
-            sesion.invalidate();
-        }
 
         return Response.noContent().build();
     }

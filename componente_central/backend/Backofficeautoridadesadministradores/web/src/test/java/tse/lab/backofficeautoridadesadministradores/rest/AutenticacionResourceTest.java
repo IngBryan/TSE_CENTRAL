@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,10 +20,15 @@ import jakarta.security.enterprise.authentication.mechanism.http.AuthenticationP
 import jakarta.security.enterprise.credential.UsernamePasswordCredential;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.core.Response;
 
+import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
+import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
+
 class AutenticacionResourceTest {
+
+    private static final byte[] SECRET =
+            "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 
     private AutenticacionResource recurso;
 
@@ -50,6 +57,17 @@ class AutenticacionResourceTest {
         inyectar("seguridadRest", seguridadRest);
         inyectar("solicitud", solicitud);
         inyectar("respuesta", respuestaHttp);
+        inyectar("tokenSecret", SECRET);
+    }
+
+    private void loggedInAs(String ci, String rol) {
+        when(seguridadJakarta.authenticate(
+                eq(solicitud),
+                eq(respuestaHttp),
+                any(AuthenticationParameters.class)
+        )).thenReturn(AuthenticationStatus.SUCCESS);
+        when(seguridadJakarta.getCallerPrincipal()).thenReturn(() -> ci);
+        when(seguridadJakarta.isCallerInRole(rol)).thenReturn(true);
     }
 
     private void inyectar(String nombre, Object valor)
@@ -62,19 +80,8 @@ class AutenticacionResourceTest {
     }
 
     @Test
-    void loginValidoDevuelve200YRenuevaSesion()
-            throws Exception {
-
-        HttpSession sesion = mock(HttpSession.class);
-
-        when(seguridadJakarta.authenticate(
-                eq(solicitud),
-                eq(respuestaHttp),
-                any(AuthenticationParameters.class)
-        )).thenReturn(AuthenticationStatus.SUCCESS);
-
-        when(solicitud.getSession(false))
-                .thenReturn(sesion);
+    void validLoginReturnsATokenWithTheIdentityAndRole() {
+        loggedInAs("99999999", "ADMINISTRADOR");
 
         Response respuesta = recurso.login(
                 new AutenticacionResource.Credenciales(
@@ -87,9 +94,12 @@ class AutenticacionResourceTest {
         Map<?, ?> cuerpo =
                 (Map<?, ?>) respuesta.getEntity();
 
-        assertEquals(true, cuerpo.get("autenticado"));
-
-        verify(solicitud).changeSessionId();
+        assertEquals(
+                new IdentidadBackoffice("99999999", "ADMINISTRADOR"),
+                BackofficeToken.verify((String) cuerpo.get("token"), SECRET, Instant.now()).orElseThrow());
+        assertEquals(BackofficeToken.LIFETIME_S, cuerpo.get("expiraEn"));
+        // No session: nothing is stored in WildFly
+        verify(solicitud, never()).getSession(anyBoolean());
 
         ArgumentCaptor<AuthenticationParameters> captor =
                 ArgumentCaptor.forClass(
@@ -115,23 +125,30 @@ class AutenticacionResourceTest {
     }
 
     @Test
-    void loginValidoSinSesionPreexistenteDevuelve200() {
-        when(seguridadJakarta.authenticate(
-                eq(solicitud),
-                eq(respuestaHttp),
-                any(AuthenticationParameters.class)
-        )).thenReturn(AuthenticationStatus.SUCCESS);
+    void theTokenOfAnAuthorityCarriesItsRole() {
+        loggedInAs("87654321", "AUTORIDAD");
 
-        when(solicitud.getSession(false))
-                .thenReturn(null);
+        Response respuesta = recurso.login(
+                new AutenticacionResource.Credenciales(
+                        "87654321", "ClaveValida"));
+
+        Map<?, ?> cuerpo = (Map<?, ?>) respuesta.getEntity();
+        assertEquals(
+                "AUTORIDAD",
+                BackofficeToken.verify((String) cuerpo.get("token"), SECRET, Instant.now()).orElseThrow().rol());
+    }
+
+    @Test
+    void withoutTheTokenSecretTheLoginIsNotAvailable() throws Exception {
+        inyectar("tokenSecret", new byte[0]);
 
         Response respuesta = recurso.login(
                 new AutenticacionResource.Credenciales(
                         "99999999", "ClaveValida"));
 
-        assertEquals(200, respuesta.getStatus());
-
-        verify(solicitud, never()).changeSessionId();
+        assertEquals(503, respuesta.getStatus());
+        assertEquals("login_no_disponible", ((Map<?, ?>) respuesta.getEntity()).get("error"));
+        verifyNoInteractions(seguridadJakarta);
     }
 
     @Test
@@ -182,8 +199,6 @@ class AutenticacionResourceTest {
 
         assertEquals("credenciales_invalidas",
                 error.get("error"));
-
-        verify(solicitud, never()).changeSessionId();
     }
 
     @Test
@@ -272,30 +287,12 @@ class AutenticacionResourceTest {
     }
 
     @Test
-    void logoutInvalidaSesion() throws Exception {
-        HttpSession sesion = mock(HttpSession.class);
-
-        when(solicitud.getSession(false))
-                .thenReturn(sesion);
-
+    void logoutReturns204WithoutTouchingASession() throws Exception {
         Response respuesta = recurso.logout();
 
         assertEquals(204, respuesta.getStatus());
 
         verify(solicitud).logout();
-        verify(sesion).invalidate();
-    }
-
-    @Test
-    void logoutSinSesionDevuelve204() throws Exception {
-        when(solicitud.getSession(false))
-                .thenReturn(null);
-
-        Response respuesta = recurso.logout();
-
-        assertEquals(204, respuesta.getStatus());
-
-        verify(solicitud).logout();
-        verify(solicitud).getSession(false);
+        verify(solicitud, never()).getSession(anyBoolean());
     }
 }

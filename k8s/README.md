@@ -93,6 +93,7 @@ ejb-password
 oidc-client-secret
 session-secret
 movil-token-secret
+backoffice-jwt-secret
 pdi-organismo-clave
 ```
 
@@ -102,6 +103,7 @@ pdi-organismo-clave
 | `oidc-client-secret` | `OIDC_CLIENT_SECRET` | frontofficeciudadanos-front |
 | `session-secret` | `SESSION_SECRET` | frontofficeciudadanos-front |
 | `movil-token-secret` | `MOVIL_TOKEN_SECRET` | frontofficeciudadanos-front |
+| `backoffice-jwt-secret` | `BACKOFFICE_JWT_SECRET` | wildfly: firma el token del backoffice, que reemplaza a la sesion para poder tener varias replicas (sin la clave, el login del backoffice responde 503) |
 | `pdi-organismo-clave` | `PDI_ORGANISMO_CLAVE` | wildfly (igual al de la PDI) |
 
 `ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
@@ -127,6 +129,7 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=oidc-client-secret='<OIDC_CLIENT_SECRET>' \
   --from-literal=session-secret='<SESSION_SECRET>' \
   --from-literal=movil-token-secret='<MOVIL_TOKEN_SECRET>' \
+  --from-literal=backoffice-jwt-secret='<BACKOFFICE_JWT_SECRET>' \
   --from-literal=pdi-organismo-clave='<PDI_ORGANISMO_CLAVE>'
 ```
 
@@ -143,6 +146,13 @@ Lo mismo para las del front de ciudadanos y la PDI:
 ```bash
 kubectl -n tse patch secret tse-runtime-secrets --type merge \
   -p '{"stringData":{"oidc-client-secret":"<OIDC_CLIENT_SECRET>","session-secret":"<SESSION_SECRET>","movil-token-secret":"<MOVIL_TOKEN_SECRET>","pdi-organismo-clave":"<PDI_ORGANISMO_CLAVE>"}}'
+```
+
+Y la del token del backoffice (despues, `kubectl -n tse rollout restart deployment/wildfly`):
+
+```bash
+kubectl -n tse patch secret tse-runtime-secrets --type merge \
+  -p '{"stringData":{"backoffice-jwt-secret":"<BACKOFFICE_JWT_SECRET>"}}'
 ```
 
 Los secretos de produccion deben ser distintos a los de desarrollo local. Despues de cambiar el

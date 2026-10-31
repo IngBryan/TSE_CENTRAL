@@ -91,6 +91,12 @@ spec:
                   name: tse-runtime-secrets
                   key: movil-token-secret
                   optional: true
+            - name: BACKOFFICE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: backoffice-jwt-secret
+                  optional: true
 
             # X-Api-Key de frontofficeciudadanos-web (la misma que BACKEND_API_KEY del front de ciudadanos)
             - name: CIUDADANOS_API_KEY

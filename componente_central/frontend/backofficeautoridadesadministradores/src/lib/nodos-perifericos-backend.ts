@@ -1,9 +1,9 @@
 
 import type { AltaNodo, DatosNodo } from "./nodos-perifericos";
 import {
-  cookieWildFly,
   idSesion,
   urlBackend,
+  wildFlyAuthorization,
 } from "./backoffice-sesion";
 
 type ResultadoListado =
@@ -31,7 +31,7 @@ export async function listarNodos(): Promise<ResultadoListado> {
         method: "GET",
         headers: {
           Accept: "application/json",
-          Cookie: cookieWildFly(sesion),
+          Authorization: wildFlyAuthorization(sesion),
         },
         cache: "no-store",
       }
@@ -108,7 +108,7 @@ export async function registrarNodo(
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Cookie: cookieWildFly(sesion),
+          Authorization: wildFlyAuthorization(sesion),
         },
         body: JSON.stringify(datos),
         cache: "no-store",

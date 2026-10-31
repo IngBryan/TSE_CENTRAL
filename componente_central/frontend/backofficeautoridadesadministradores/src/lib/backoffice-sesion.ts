@@ -27,8 +27,9 @@ export async function idSesion(): Promise<string | null> {
     : null;
 }
 
-export function cookieWildFly(id: string): string {
-  return `JSESSIONID=${id}`;
+// WildFly keeps no session: every request carries the token (JWT) of the login, so any replica can validate it
+export function wildFlyAuthorization(token: string): string {
+  return `Bearer ${token}`;
 }
 
 export async function consultarIdentidad():
@@ -42,7 +43,7 @@ export async function consultarIdentidad():
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Cookie: cookieWildFly(sesion),
+        Authorization: wildFlyAuthorization(sesion),
       },
     });
 
