@@ -92,7 +92,15 @@ export type EvidenciaVista = {
 // Un evento de tracking se identifica por el vehiculo y el momento
 export type EventoTrackingVista = { matricula: string; fechaHora: string };
 
-export type DescargoVista = { idCaso: number; id: number; descripcion: string | null; estado: string | null };
+// fechaPresentacion y ciPresentante: cuando y quien lo presento desde el frontoffice de ciudadanos
+export type DescargoVista = {
+  idCaso: number;
+  id: number;
+  descripcion: string | null;
+  estado: string | null;
+  fechaPresentacion?: string | null;
+  ciPresentante?: string | null;
+};
 
 export type ResolucionRegistrada = { mensaje: string; caso: CasoDetalle };
 

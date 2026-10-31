@@ -6,10 +6,10 @@
 
 ## E01 — Empresas y acceso a datos
 
-**Datos:** Empresa 1, `Transportes del Este` (habilitada); Empresa 2, `Logistica del Litoral` (no habilitada).
+**Datos:** Empresa 1, `Transportes del Este` (habilitada); Empresa 2, `Logistica del Litoral` (no habilitada). Las empresas 3 a 5 existen solo para las estadísticas del portal público (E12).
 
 1. Entrar al Frontoffice de Funcionarios y consultar el listado de empresas.
-2. Identificar las dos empresas y comparar su estado de habilitación.
+2. Identificar las empresas 1 y 2 y comparar su estado de habilitación.
 3. Examinar los vehículos de Empresa 1 y localizar `SBA1234`, `SAB5678` y `SDE3000`.
 4. Desde un perfil responsable de Empresa 1, intentar acceder a `SCL2001`, perteneciente a Empresa 2.
 5. **Verificar:** ambas empresas son consultables por el funcionario; la operación sobre el vehículo ajeno no se autoriza en el servicio.
@@ -98,7 +98,7 @@
 5. Confirmar la resolución desde la aplicación.
 6. Volver al caso y consultar estado, fundamento y auditoría.
 7. Intentar resolver nuevamente el caso terminado.
-8. **Verificar:** resolución y auditoría reales; segundo intento rechazado. **No se demuestra** aquí la presentación de descargo desde Ciudadanos; ese flujo corresponde a la segunda demo.
+8. **Verificar:** resolución y auditoría reales; segundo intento rechazado. La presentación del descargo desde Ciudadanos se muestra en E11.
 
 ## E07 — PDI: validación y comportamiento ante fallas
 
@@ -108,8 +108,10 @@
 2. Invocar una validación de un ciudadano menor; comprobar que no queda habilitado como chofer.
 3. Desde la administración SOAP de la PDI, configurar la simulación en modo `LENTO` o `CAIDO`.
 4. Iniciar **otra** validación de identidad, para evitar reutilizar una validación previamente exitosa.
-5. **Verificar:** la falta de respuesta o demora no vuelve indisponible el Central y se aplica el comportamiento degradado definido.
-6. Restaurar la simulación a `NORMAL`.
+5. **Verificar:** la falta de respuesta o demora no vuelve indisponible el Central y se aplica el comportamiento degradado definido: el ciudadano ingresa con la validación pendiente. En el log de `wildfly-server`, `evento=pdi.consulta resultado=fallo` con esperas crecientes entre intentos y, tras 3 consultas fallidas, `resultado=circuito_abre`.
+6. Esperar una o dos revisiones del reenvío de pendientes: `evento=pdi.revalidacion resultado=pdi_no_disponible`, con `proximoIntentoS` que se duplica (60, 120...).
+7. Restaurar la simulación a `NORMAL`.
+8. **Verificar:** en la siguiente revisión (como mucho `proximoIntentoS` segundos) aparece `evento=pdi.revalidacion resultado=ok`, y el perfil queda `VALIDADO` (o `NO_HABILITADO` si es menor) sin que el ciudadano vuelva a ingresar.
 
 ## E08 — Resiliencia: Balanzas no disponible
 
@@ -133,6 +135,35 @@
 6. **Verificar:** rechazo por duplicación del par tipo/identificador externo.
 7. Intentar la misma operación con un usuario de rol `AUTORIDAD`.
 8. **Verificar:** la autorización del servicio no permite gestionar nodos a ese rol. Conviene presentar E09 al final porque incorporar la balanza 2 cambia qué nodos consulta el poller.
+
+## E11 — Descargo de la empresa desde Ciudadanos
+
+**Datos:** el caso `DEMO DESVIO` de `SAB5678` (Empresa 1) está en `NOTIFICADA` y nunca se abrió; el responsable de Empresa 1 es `54074380`. El plazo de descargo es de 10 días desde la notificación (`PLAZO_DESCARGO_DIAS`).
+
+1. Entrar al Frontoffice Ciudadanos como `54074380`. **Verificar:** la campana del encabezado muestra `1` notificación sin ver; al abrirla figura la infracción por desvío de ruta de `SAB5678` con la fecha límite del descargo. Cerrarla y abrir **Mi cuenta → Infracciones**.
+2. Comprobar que el caso de desvío aparece marcado **Nueva**, con la fecha límite del descargo, y que los casos `DETECTADA` (`SBC1234`, `SCL2001`) no aparecen.
+3. Abrir el caso: comprobar la evidencia (vehículo con su peso máximo, guía `GV-MOVIL002`) y volver al listado; ya no figura como nuevo y la campana no tiene notificaciones sin ver (lo mismo pasa haciendo click en la notificación desde la campana).
+4. Presentar un descargo con un texto explicativo.
+5. **Verificar:** el caso pasa a `EN_DESCARGO`, la página muestra el descargo con fecha y cédula, y el formulario ya no se ofrece.
+6. Intentar presentar otro descargo para el mismo caso (por ejemplo con `POST /empresa/infracciones/{id}/descargo`).
+7. **Verificar:** se rechaza con `409 DESCARGO_YA_PRESENTADO`.
+8. Entrar al Frontoffice Funcionarios y abrir el mismo caso.
+9. **Verificar:** *Descargo de la empresa* muestra el texto, la fecha y el responsable; el historial agrega `Notificada → En descargo` con el usuario `54074380`, y el caso ya se puede resolver (continuar como en E06).
+
+## E12 — Portal público: validación de empresas y estadísticas
+
+**Datos:** empresas 1 y 3 a 5 habilitadas, 2 no habilitada. `SBA1234` (empresa 1) habilitado; `SBC1234` (empresa 1) con permiso e ITV vencidos; `SCL2001` es de la empresa 2. Viajes finalizados de las empresas 1, 3, 4 y 5; *Construccion* solo de la 5.
+
+1. Sin ingresar, abrir la portada del Frontoffice Ciudadanos y entrar a **Validar una empresa**.
+2. Buscar por nombre `del` y elegir *Transportes del Este*: figura habilitada, sin ningún número de la empresa (por ejemplo, cuántos vehículos tiene).
+3. Validar la empresa 1 con la matrícula `sba-1234` (se normaliza): vehículo habilitado, con el vencimiento del permiso y la ITV.
+4. Validar la empresa 1 con `SBC1234`: vehículo no habilitado, permiso e ITV vencidos.
+5. Validar la empresa 1 con `SCL2001`: «no pertenece a la empresa», sin revelar de quién es. Validar la empresa 2: no habilitada.
+6. Abrir **Estadísticas del transporte de carga**.
+7. **Verificar:** se ven empresas y vehículos habilitados, viajes y toneladas del año; *Construccion* (una sola empresa) y *Forestal* (supresión complementaria) no aparecen por nombre: están sumadas en *Otros rubros*; los meses con viajes de solo 2 empresas figuran «Reservado»; *Exceso de carga* muestra 3 infracciones confirmadas (3 empresas).
+8. **Verificar** la sección *Fiscalización*: 37,5 infracciones cada 100 viajes (3 confirmadas en 8 viajes), 4 casos resueltos (empresas 1, 3 y 4), 25 % desestimados y 1,0 día de tiempo de resolución (mediana). En *Infracciones por tipo*, *Exceso de carga* muestra también su tasa cada 100 viajes.
+9. Descargar el CSV de *Carga por rubro* y abrirlo en Excel: las filas reservadas dicen «Reservado».
+10. Explicar el umbral: cada número junta al menos 3 empresas, porque con 2 una podría deducir los datos de la otra restando los propios. Por eso no se publican máximos ni mínimos.
 
 ---
 

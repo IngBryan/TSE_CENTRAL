@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { botonGubUy } from "@/components/encabezado";
+import { botonGubUy } from "@/components/estilos";
 import { actualizarEmpresa, type DatosEmpresa, type EstadoFormulario } from "./actions";
 
 const CAMPOS = [

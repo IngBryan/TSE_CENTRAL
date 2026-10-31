@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { asignarGuia, type ChoferResumen, type Guia, type VehiculoResumen } from "../../actions";
 
 const nombre = (c: ChoferResumen) => [c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || c.cedula;

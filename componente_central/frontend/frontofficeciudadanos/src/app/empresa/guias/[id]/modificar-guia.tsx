@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { botonGubUy, botonSecundario } from "@/components/encabezado";
+import { botonGubUy, botonSecundario } from "@/components/estilos";
 import {
   cancelarGuia,
   editarGuia,
