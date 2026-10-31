@@ -5,6 +5,9 @@
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
         <class>tse.lab.model.Empresa</class>
         <class>tse.lab.model.Guia</class>
+        <class>tse.lab.model.Localidad</class>
+        <class>tse.lab.model.RutaReferencia</class>
+        <class>tse.lab.model.GuiaRutaAutorizada</class>
         <class>tse.lab.model.Vehiculo</class>
         <class>tse.lab.model.Chofer</class>
         <class>tse.lab.model.Responsable</class>
