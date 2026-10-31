@@ -5,7 +5,7 @@ metadata:
   labels:
     app: wildfly
 spec:
-  replicas: 1
+  # No replicas: the HPA (hpa.yaml) manages them, and with a fixed number Argo CD would undo its changes
 
   selector:
     matchLabels:
@@ -172,7 +172,8 @@ spec:
 
           resources:
             requests:
-              cpu: 200m
+              # The HPA measures the CPU as a percentage of this request: with 200m any load went past 100%
+              cpu: 1000m
               memory: 1Gi
             limits:
               memory: 2Gi

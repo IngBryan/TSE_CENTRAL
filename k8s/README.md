@@ -21,6 +21,8 @@ Cada frontend dispone de su propio Deployment, Service e Ingress.
 - `frontofficefuncionarios.ear`
 - `backofficeautoridadesadministradores.ear`
 
+Escala horizontalmente con un HPA por CPU (`k8s/apps/wildfly/hpa.yaml`: 2 a 3 réplicas, objetivo 70 % del request de 1 CPU; requiere metrics-server). Puede porque no guarda estado propio: el backoffice se autentica con un token firmado (`BACKOFFICE_JWT_SECRET`) en lugar de sesión, y el timer de revalidación de la PDI toma un lock en PostgreSQL para que lo corra una sola réplica a la vez.
+
 **Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ, los persiste en MongoDB y detecta los casos de fiscalización. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP; KEDA ajusta sus réplicas (1 a 5) según los mensajes pendientes en la cola. La misma imagen corre como CronJob (`fiscalizacionautomatica-poller`) cada 30 minutos para consultar las balanzas.
 
 ### Infraestructura externa
