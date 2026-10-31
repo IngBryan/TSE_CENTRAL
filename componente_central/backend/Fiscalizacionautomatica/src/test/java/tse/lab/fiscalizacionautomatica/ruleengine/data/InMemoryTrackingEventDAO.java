@@ -37,6 +37,15 @@ public class InMemoryTrackingEventDAO implements TrackingEventDAO {
     }
 
     @Override
+    public List<TrackingEvent> findByLicensePlateBetween(String matricula, Instant desde, Instant hasta, int limit) {
+        return events.values().stream().map(Stored::event)
+                .filter(e -> e.licensePlate().equals(matricula) && !e.timestamp().isBefore(desde)
+                        && e.timestamp().isBefore(hasta))
+                .sorted(Comparator.comparing(TrackingEvent::timestamp))
+                .limit(limit).toList();
+    }
+
+    @Override
     public void markDetected(TrackingEvent event) {
         events.computeIfPresent(Key.of(event), (key, stored) -> new Stored(stored.event(), stored.receivedAt(), true));
     }

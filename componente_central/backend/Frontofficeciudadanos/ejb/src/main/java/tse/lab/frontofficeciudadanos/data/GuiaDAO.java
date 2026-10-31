@@ -98,6 +98,23 @@ public class GuiaDAO {
                 .getResultList();
     }
 
+    /**
+     * Candidatas para asociar un GPS histórico. Se incluyen las FINALIZADA: una consulta
+     * del historial no puede depender solamente de los viajes que siguen activos hoy.
+     * La fecha de asignación es hora del servidor, no la fecha prevista de la Guía.
+     */
+    public List<Guia> buscarCandidatasGps(String matricula, java.time.Instant hasta) {
+        return em.createQuery(
+                "SELECT g FROM Guia g WHERE g.vehiculo.matricula = :matricula "
+                        + "AND g.estado IN :estados AND g.fechaAsignacion IS NOT NULL "
+                        + "AND g.fechaAsignacion <= :hasta ORDER BY g.fechaAsignacion, g.id",
+                Guia.class)
+                .setParameter("matricula", matricula)
+                .setParameter("estados", List.of(EstadoGuia.ASIGNADA, EstadoGuia.EN_CURSO, EstadoGuia.FINALIZADA))
+                .setParameter("hasta", hasta)
+                .getResultList();
+    }
+
     public List<Guia> buscarSinVehiculoAsignado() {
         return em.createQuery(
                 "SELECT g FROM Guia g WHERE g.vehiculo IS NULL", Guia.class)

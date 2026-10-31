@@ -7,6 +7,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import tse.lab.model.EventoViaje;
 import tse.lab.model.Guia;
+import tse.lab.model.ResultadoEventoViaje;
+import tse.lab.model.TipoEventoViaje;
 
 @Stateless
 public class EventoViajeDAO {
@@ -22,6 +24,26 @@ public class EventoViajeDAO {
     public void guardar(EventoViaje evento) {
         em.persist(evento);
         em.flush();
+    }
+
+    /**
+     * Proyección mínima de los límites temporales reales: [idGuia, tipo, fechaDispositivo].
+     * No carga fotografías ni incidentes en memoria y excluye eventos rechazados
+     * (CONFLICTO) y repetidos (SIN_EFECTO).
+     */
+    public List<Object[]> buscarLimitesAplicados(List<Guia> guias) {
+        if (guias.isEmpty()) {
+            return List.of();
+        }
+        return em.createQuery(
+                "SELECT e.guia.id, e.tipo, e.fechaHoraDispositivo FROM EventoViaje e "
+                        + "WHERE e.guia IN :guias AND e.resultado = :aplicado AND e.tipo IN :tipos "
+                        + "ORDER BY e.fechaHoraDispositivo, e.idEvento",
+                Object[].class)
+                .setParameter("guias", guias)
+                .setParameter("aplicado", ResultadoEventoViaje.APLICADO)
+                .setParameter("tipos", List.of(TipoEventoViaje.INICIO, TipoEventoViaje.FIN))
+                .getResultList();
     }
 
     public List<EventoViaje> buscarPorGuia(Guia guia) {
