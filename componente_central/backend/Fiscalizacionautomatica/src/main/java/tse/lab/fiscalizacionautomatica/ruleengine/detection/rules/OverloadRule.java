@@ -20,10 +20,15 @@ public class OverloadRule implements SituationRule {
 
     @Override
     public boolean appliesTo(VehicleEvent event, VehicleFacts facts) {
-        if (!(event instanceof Weighing weighing) || !facts.hasActiveTrip()) {
+        return facts.hasActiveTrip() && excedePeso(event, facts);
+    }
+
+    /** Condición de peso; el detector con contexto temporal valida la Guía histórica por separado. */
+    public boolean excedePeso(VehicleEvent event, VehicleFacts facts) {
+        if (!(event instanceof Weighing weighing)) {
             return false;
         }
-        long maximum = facts.vehicle().getPesoKg() + facts.vehicle().getCapacidadCargaKg();
+        long maximum = (long) facts.vehicle().getPesoKg() + facts.vehicle().getCapacidadCargaKg();
         return maximum < weighing.weightKg();
     }
 }

@@ -1,42 +1,61 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.detection;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 
-/**
- * Finds the situations that apply to a vehicle event. It doesn't create cases: CaseAssigner does, applying
- * the hierarchy against the open cases of the vehicle.
- */
+/** Detecta todas las situaciones aplicables y adjunta la asociación temporal a la Guía. */
 public class SituationDetector {
-
     private final VehicleFactsSource factsSource;
     private final List<SituationRule> rules;
+    private final ContextoEventoSource contextoSource;
 
-    /** The rules are evaluated in priority order, whatever their order in the list. */
+    /** Se conserva para tests y detección manual, sin asignación de casos. */
     public SituationDetector(VehicleFactsSource factsSource, List<SituationRule> rules) {
-        this.factsSource = factsSource;
-        this.rules = rules.stream().sorted(Comparator.comparing(SituationRule::situation)).toList();
+        this(factsSource, rules, null);
     }
 
-    /**
-     * @return the situations that apply, in priority order; none if the vehicle is not registered in the
-     *         central (there is no company to notify)
-     * @throws IOException if the vehicle facts can't be fetched: the event must be evaluated again later
-     */
+    public SituationDetector(VehicleFactsSource factsSource, List<SituationRule> rules,
+            ContextoEventoSource contextoSource) {
+        this.factsSource = factsSource;
+        this.rules = rules.stream().sorted(Comparator.comparing(SituationRule::situation)).toList();
+        this.contextoSource = contextoSource;
+    }
+
     public Detection detect(VehicleEvent event) throws IOException {
         Optional<VehicleFacts> facts = factsSource.find(event.licensePlate());
         if (facts.isEmpty()) {
             return new Detection(event, null, List.of());
         }
-        List<Situation> situations = new java.util.ArrayList<>();
+        ResultadoAsociacionGpsGuia contexto = contextoSource == null ? null : contextoSource.resolver(event);
+        if (contexto != null && (contexto.estado() == ResultadoAsociacionGpsGuia.Estado.AMBIGUO
+                || contexto.estado() == ResultadoAsociacionGpsGuia.Estado.NO_DETERMINABLE)) {
+            // No etiquetar un evento incierto como infracción ni marcarlo como evaluado.
+            throw new IOException("Asociación temporal indeterminada para " + event.licensePlate()
+                    + " en " + event.timestamp() + ": " + contexto.estado());
+        }
+        List<Situation> situations = new ArrayList<>();
         for (SituationRule rule : rules) {
-            if (rule.appliesTo(event, facts.get())) {
+            boolean applies;
+            if (contexto != null && rule instanceof TripWithoutGuideRule) {
+                applies = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.SIN_GUIA;
+            } else if (contexto != null && rule instanceof OverloadRule overload) {
+                applies = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO
+                        && overload.excedePeso(event, facts.get());
+            } else {
+                applies = rule.appliesTo(event, facts.get());
+            }
+            if (applies) {
                 situations.add(rule.situation());
             }
         }
-        return new Detection(event, facts.get(), List.copyOf(situations));
+        return new Detection(event, facts.get(), List.copyOf(situations), contexto);
     }
 }

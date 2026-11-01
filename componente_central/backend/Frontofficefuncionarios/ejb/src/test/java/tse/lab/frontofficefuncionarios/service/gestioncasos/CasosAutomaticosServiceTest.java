@@ -1,6 +1,7 @@
 package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -86,7 +87,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void creaElCasoDetectadoConElVehiculoYElEventoComoEvidencia() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
 
         assertEquals("DETECTADA", creado.getEstado());
         CasoFiscalizacion c = caso(creado.getId());
@@ -102,7 +103,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void unCasoConGuiaQuedaAsociadoAEllaYAlPesaje() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
 
         CasoFiscalizacion c = caso(creado.getId());
         assertEquals("GV-1", c.getGuia().getId());
@@ -111,7 +112,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void notificarPasaElCasoANotificadaYQuedaEnLaAuditoriaComoSistema() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
 
         DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId()));
 
@@ -125,7 +126,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
         enTx(() -> servicio.notificarCaso(creado.getId()));
 
         DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId()));
@@ -136,8 +137,8 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void losCasosAbiertosSonLosDetectadosYNotificados() {
-        DatosCaso detectado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
-        DatosCaso enDescargo = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T2));
+        DatosCaso detectado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso enDescargo = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T2));
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, enDescargo.getId());
             c.cambiarEstado(EstadoCaso.NOTIFICADA);
@@ -149,21 +150,96 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void sabeEnQueCasoEstaUnEvento() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+    void variasInfraccionesCompartenGpsSinDuplicarloEnCadaCaso() {
+        DatosCaso sinGuia = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso habilitacion = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T1));
+        DatosCaso repetido = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+
+        assertEquals(sinGuia.getId(), repetido.getId());
+        assertEquals(1, caso(sinGuia.getId()).getClavesEventosTracking().size());
+        assertEquals(1, caso(habilitacion.getId()).getClavesEventosTracking().size());
+
+        ClaveEvento evidenciaEsperada = new ClaveEvento("SBC1234", T1);
+        assertEquals(
+            evidenciaEsperada,
+            caso(sinGuia.getId()).getClavesEventosTracking().get(0)
+        );
+
+        assertEquals(
+            evidenciaEsperada,
+            caso(habilitacion.getId()).getClavesEventosTracking().get(0)
+        );
+    }
+
+    @Test
+    void reprocesarUnEventoDeCasoEnDescargoNoAbreUnSegundoCaso() {
+        DatosCaso primero = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
         enTx(() -> {
-            servicio.agregarEvidencia(creado.getId(), PESAJE_T1);
+            CasoFiscalizacion c = em.find(CasoFiscalizacion.class, primero.getId());
+            c.cambiarEstado(EstadoCaso.NOTIFICADA);
+            c.cambiarEstado(EstadoCaso.EN_DESCARGO);
             return null;
         });
+        DatosCaso repetido = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        assertEquals(primero.getId(), repetido.getId());
+        DatosCaso segundo = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T2));
+        assertNotEquals(primero.getId(), segundo.getId());
+        assertEquals(1, caso(primero.getId()).getClavesEventosTracking().size());
+        assertEquals(1, caso(segundo.getId()).getClavesEventosTracking().size());
+    }
 
-        assertEquals(creado.getId(), enTx(() -> servicio.casoDelEvento(TRACKING_T1)).getId());
-        assertEquals(creado.getId(), enTx(() -> servicio.casoDelEvento(PESAJE_T1)).getId());
-        assertNull(enTx(() -> servicio.casoDelEvento(TRACKING_T2)));
+    @Test
+    void unPesajePuedeSerEvidenciaDeDosCasosYNoSeRepite() {
+        DatosCaso exceso = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
+        DatosCaso habilitacion = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, "GV-1", PESAJE_T1));
+        enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
+
+        assertEquals(1, caso(exceso.getId()).getEventosPesajes().size());
+        assertEquals(1, caso(habilitacion.getId()).getEventosPesajes().size());
+    }
+
+    @Test
+    void guiasDistintasDelMismoVehiculoCreanCasosIndependientes() {
+        Guia segunda = new Guia("GV-2", "Agropecuario", 20_000, LocalDate.of(2026, 10, 18),
+                "Mercedes", "Nueva Palmira", em.find(Empresa.class, 1L));
+        segunda.setVehiculo(em.find(Vehiculo.class, "SBC1234"));
+        enTx(() -> { em.persist(segunda); return null; });
+
+        DatosCaso primero = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.DESVIO_RUTA, "GV-1", TRACKING_T1));
+        DatosCaso otro = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.DESVIO_RUTA, "GV-2", TRACKING_T2));
+        DatosCaso reuso = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.DESVIO_RUTA, "GV-1", TRACKING_T2));
+
+        assertEquals(primero.getId(), reuso.getId());
+        assertNotEquals(primero.getId(), otro.getId());
+        assertEquals(2, caso(primero.getId()).getClavesEventosTracking().size());
+        assertEquals(1, caso(otro.getId()).getClavesEventosTracking().size());
+    }
+
+    @Test
+    void casoSinGuiaNoSeVinculaAUnaGuiaInventada() {
+        DatosCaso a = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso b = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T2));
+        assertEquals(a.getId(), b.getId());
+        assertNull(caso(a.getId()).getGuia());
+        assertEquals(2, caso(a.getId()).getClavesEventosTracking().size());
     }
 
     @Test
     void elCasoLlevaLaDescripcionDeSuTipo() {
-        DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
 
         assertEquals(TipoCasoAutomatico.EXCESO_CARGA.getDescripcion(), caso(creado.getId()).getDescripcion());
     }
@@ -171,8 +247,8 @@ class CasosAutomaticosServiceTest {
     @Test
     void noCreaUnCasoConUnaGuiaInexistenteNiSinTipo() {
         assertThrows(IllegalArgumentException.class,
-                () -> enTx(() -> servicio.crearCaso(TipoCasoAutomatico.EXCESO_CARGA, "GV-NO-EXISTE", PESAJE_T1)));
-        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.crearCaso(null, null, TRACKING_T1)));
+                () -> enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-NO-EXISTE", PESAJE_T1)));
+        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.registrarEvidencia(null, null, TRACKING_T1)));
 
         assertEquals(List.of(), enTx(() -> servicio.casosAbiertos("SBC1234")));
     }

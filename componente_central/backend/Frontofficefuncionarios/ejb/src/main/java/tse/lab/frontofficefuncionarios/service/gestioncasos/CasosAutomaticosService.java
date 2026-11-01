@@ -35,51 +35,52 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
     }
 
     @Override
-    public DatosCaso casoDelEvento(EventoFiscalizado evento) {
-        ClaveEvento clave = clave(evento);
-        CasoFiscalizacion caso = evento.getOrigen() == OrigenEvento.TRACKING
-                ? casos.casoConEventoTracking(clave)
-                : casos.casoConPesaje(clave);
-        return caso == null ? null : datos(caso);
-    }
-
-    @Override
-    public DatosCaso crearCaso(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento) {
-        if (tipoCaso == null) {
-            throw new IllegalArgumentException("Falta el tipo de caso");
+    public DatosCaso registrarEvidencia(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento) {
+        if (tipoCaso == null || evento == null || evento.getOrigen() == null
+                || evento.getMatricula() == null || evento.getFechaHora() == null) {
+            throw new IllegalArgumentException("Faltan datos del tipo o del evento");
+        }
+        if (tipoCaso == TipoCasoAutomatico.DESVIO_RUTA && idGuia == null) {
+            throw new IllegalArgumentException("Un desvío necesita Guía");
+        }
+        if (tipoCaso == TipoCasoAutomatico.VIAJE_SIN_GUIA && idGuia != null) {
+            throw new IllegalArgumentException("Viaje sin Guía no debe asociarse a una Guía");
         }
         Vehiculo vehiculo = casos.buscarVehiculo(evento.getMatricula());
         if (vehiculo == null) {
-            throw new IllegalArgumentException("El vehiculo no existe: " + evento.getMatricula());
+            throw new IllegalArgumentException("El vehículo no existe: " + evento.getMatricula());
         }
-        Guia guia = null;
-        if (idGuia != null) {
-            guia = casos.buscarGuia(idGuia);
-            if (guia == null) {
-                throw new IllegalArgumentException("La guia no existe: " + idGuia);
-            }
+        Guia guia = idGuia == null ? null : casos.buscarGuia(idGuia);
+        if (idGuia != null && guia == null) {
+            throw new IllegalArgumentException("La Guía no existe: " + idGuia);
         }
-        CasoFiscalizacion caso = new CasoFiscalizacion(tipoCaso.getDescripcion(), tipoCaso.name(), vehiculo, guia);
-        asociar(caso, evento);
-        casos.guardar(caso);
-        auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
-                AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA, "Detectado por la fiscalizacion"
-                        + " automatica en un evento de " + evento.getOrigen() + " del " + evento.getFechaHora(),
-                null));
-        LOG.info(() -> "evento=caso.creado caso=" + caso.getId() + " tipo=" + tipoCaso + " matricula="
-                + evento.getMatricula() + " fechaHora=" + evento.getFechaHora());
-        return datos(caso);
-    }
-
-    @Override
-    public void agregarEvidencia(long idCaso, EventoFiscalizado evento) {
-        CasoFiscalizacion caso = casos.buscarPorId(idCaso);
+        if (guia != null && (guia.getVehiculo() == null
+                || !evento.getMatricula().equals(guia.getVehiculo().getMatricula()))) {
+            throw new IllegalArgumentException("La Guía no corresponde al vehículo: " + idGuia);
+        }
+        // Si el mismo evento ya respaldó este tipo/contexto, el reintento nunca debe
+        // reabrir otro caso, aunque el original ahora esté EN_DESCARGO o resuelto.
+        CasoFiscalizacion asociado = casos.buscarConEvidencia(evento.getMatricula(), idGuia,
+                tipoCaso.name(), clave(evento), evento.getOrigen() == OrigenEvento.TRACKING);
+        if (asociado != null) {
+            return datos(asociado);
+        }
+        CasoFiscalizacion caso = casos.buscarAbierto(evento.getMatricula(), idGuia, tipoCaso.name());
         if (caso == null) {
-            throw new IllegalArgumentException("El caso no existe: " + idCaso);
+            caso = new CasoFiscalizacion(tipoCaso.getDescripcion(), tipoCaso.name(), vehiculo, guia);
+            asociarSiFalta(caso, evento);
+            casos.guardar(caso);
+            auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
+                    AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA,
+                    "Detectado por fiscalización automática en evento " + evento.getOrigen() + " del "
+                            + evento.getFechaHora(), null));
+            Long id = caso.getId();
+            LOG.info(() -> "evento=caso.creado caso=" + id + " tipo=" + tipoCaso);
+        } else {
+            caso = casos.buscarPorIdParaActualizar(caso.getId());
+            asociarSiFalta(caso, evento);
         }
-        asociar(caso, evento);
-        LOG.info(() -> "evento=caso.evidencia_agregada caso=" + idCaso + " matricula=" + evento.getMatricula()
-                + " fechaHora=" + evento.getFechaHora());
+        return datos(caso);
     }
 
     @Override
@@ -100,18 +101,24 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         return datos(caso);
     }
 
-    private void asociar(CasoFiscalizacion caso, EventoFiscalizado evento) {
+    /** El bloqueo de caso y la unicidad (id_caso, clave) garantizan idempotencia. */
+    private void asociarSiFalta(CasoFiscalizacion caso, EventoFiscalizado evento) {
         ClaveEvento clave = clave(evento);
         if (evento.getOrigen() == OrigenEvento.TRACKING) {
-            caso.getClavesEventosTracking().add(clave);
+            if (!caso.getClavesEventosTracking().contains(clave)) {
+                caso.getClavesEventosTracking().add(clave);
+            }
             return;
         }
         EventoPesajes pesaje = casos.buscarPesaje(clave);
         if (pesaje == null) {
-            throw new IllegalArgumentException("El pesaje no esta guardado: " + clave.getMatricula() + " "
-                    + clave.getFechaHora());
+            throw new IllegalArgumentException("El pesaje no está guardado: " + clave.getMatricula()
+                    + " " + clave.getFechaHora());
         }
-        caso.getEventosPesajes().add(pesaje);
+        if (!caso.getEventosPesajes().stream().anyMatch(p -> p.getMatricula().equals(clave.getMatricula())
+                && p.getFechaHora().equals(clave.getFechaHora()))) {
+            caso.getEventosPesajes().add(pesaje);
+        }
     }
 
     private static ClaveEvento clave(EventoFiscalizado evento) {

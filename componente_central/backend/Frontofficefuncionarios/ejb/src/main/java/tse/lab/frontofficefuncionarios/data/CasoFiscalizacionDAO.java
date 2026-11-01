@@ -103,26 +103,34 @@ public class CasoFiscalizacionDAO {
                 .getResultList();
     }
 
-    // El caso que ya tiene ese evento de tracking como evidencia; null si ninguno
-    public CasoFiscalizacion casoConEventoTracking(ClaveEvento clave) {
-        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.clavesEventosTracking t"
-                + " WHERE t.matricula = :matricula AND t.fechaHora = :fechaHora", CasoFiscalizacion.class)
-                .setParameter("matricula", clave.getMatricula())
-                .setParameter("fechaHora", clave.getFechaHora())
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
+    /** Solo un caso abierto por (Guía, tipo), o por (vehículo, tipo) si no hay Guía. */
+    public CasoFiscalizacion buscarAbierto(String matricula, String idGuia, String tipo) {
+        String filtro = idGuia == null
+                ? "c.guia IS NULL AND c.vehiculo.matricula = :identidad"
+                : "c.guia.id = :identidad";
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE " + filtro
+                + " AND c.tipoCaso = :tipo AND c.estado IN :abiertos", CasoFiscalizacion.class)
+                .setParameter("identidad", idGuia == null ? matricula : idGuia)
+                .setParameter("tipo", tipo)
+                .setParameter("abiertos", EstadoCaso.ABIERTOS)
+                .getResultStream().findFirst().orElse(null);
     }
 
-    // El caso que ya tiene ese pesaje como evidencia; null si ninguno
-    public CasoFiscalizacion casoConPesaje(ClaveEvento clave) {
-        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.eventosPesajes p"
-                + " WHERE p.matricula = :matricula AND p.fechaHora = :fechaHora", CasoFiscalizacion.class)
+    /** Idempotencia ante redelivery posterior al cierre: el evento ya probado no crea otro caso. */
+    public CasoFiscalizacion buscarConEvidencia(String matricula, String idGuia, String tipo,
+            ClaveEvento clave, boolean tracking) {
+        String relacion = tracking ? "clavesEventosTracking" : "eventosPesajes";
+        String filtro = idGuia == null
+                ? "c.guia IS NULL AND c.vehiculo.matricula = :identidad"
+                : "c.guia.id = :identidad";
+        return em.createQuery("SELECT DISTINCT c FROM CasoFiscalizacion c JOIN c." + relacion
+                + " e WHERE " + filtro + " AND c.tipoCaso = :tipo"
+                + " AND e.matricula = :matricula AND e.fechaHora = :fechaHora", CasoFiscalizacion.class)
+                .setParameter("identidad", idGuia == null ? matricula : idGuia)
+                .setParameter("tipo", tipo)
                 .setParameter("matricula", clave.getMatricula())
                 .setParameter("fechaHora", clave.getFechaHora())
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
+                .getResultStream().findFirst().orElse(null);
     }
 
     public EventoPesajes buscarPesaje(ClaveEvento clave) {

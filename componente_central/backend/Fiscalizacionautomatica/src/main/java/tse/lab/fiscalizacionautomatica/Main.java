@@ -38,6 +38,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.routes.RemoteRutasAutorizadasSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.RemoteIntervalosGuiasGpsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
@@ -114,8 +115,8 @@ public class Main {
                         Clock.systemUTC());
                 VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
                 RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
-                RemoteIntervalosGuiasGpsSource intervalos = desvioHabilitado
-                        ? new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password) : null;
+                RemoteIntervalosGuiasGpsSource intervalos =
+                        new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password);
                 RemoteRutasAutorizadasSource rutas = desvioHabilitado
                         ? new RemoteRutasAutorizadasSource(wildFlyUrl(), user, password) : null) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
@@ -135,7 +136,7 @@ public class Main {
             if (desvioHabilitado) {
                 reglas.add(new RouteDeviationRule(intervalos, rutas, dao));
             }
-            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(new SituationDetector(facts, reglas), dao,
+            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(new SituationDetector(facts, reglas, new ContextoEventoSource(intervalos)), dao,
                     new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
                     Connection connection = connectToRabbit(factory, stopRequested)) {
                 if (connection == null) {
@@ -236,7 +237,9 @@ public class Main {
         try (MongoClient mongo = createMongoClient();
         RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
         VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
-        RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
+        RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
+        RemoteIntervalosGuiasGpsSource intervalos =
+                new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             ScalesApiClient api = new ScalesApiClient(url, balanzas.clientId(),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
@@ -252,7 +255,7 @@ public class Main {
             reportScaleCommunications(nodes, result);
 
             // Also the ones left pending by previous runs
-            int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO,
+            int notEvaluated = new PendingWeighingsDetection(createDetector(facts, new ContextoEventoSource(intervalos)), weighingDAO,
                     new CaseAssigner(cases)).detectPending();
             if (notEvaluated > 0) {
                 System.err.println(notEvaluated + " weighings could not be evaluated: they stay pending");
@@ -289,6 +292,10 @@ public class Main {
     /** The situations that are detected; adding a situation means adding its rule here. */
     private static SituationDetector createDetector(VehicleFactsSource facts) {
         return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()));
+    }
+
+    private static SituationDetector createDetector(VehicleFactsSource facts, ContextoEventoSource contexto) {
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()), contexto);
     }
 
     /**

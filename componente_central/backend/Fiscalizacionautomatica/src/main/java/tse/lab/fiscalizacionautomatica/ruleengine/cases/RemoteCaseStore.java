@@ -1,7 +1,6 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
 import java.io.IOException;
-import java.util.List;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
@@ -42,26 +41,8 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
-    public List<DatosCaso> openCases(String licensePlate) throws IOException {
-        return call(() -> cases.casosAbiertos(licensePlate));
-    }
-
-    @Override
-    public DatosCaso caseOf(VehicleEvent event) throws IOException {
-        return call(() -> cases.casoDelEvento(toEventoFiscalizado(event)));
-    }
-
-    @Override
-    public DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException {
-        return call(() -> cases.crearCaso(caseType, guideId, toEventoFiscalizado(event)));
-    }
-
-    @Override
-    public void addEvidence(long caseId, VehicleEvent event) throws IOException {
-        call(() -> {
-            cases.agregarEvidencia(caseId, toEventoFiscalizado(event));
-            return null;
-        });
+    public DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException {
+        return call(() -> cases.registrarEvidencia(tipo, idGuia, toEventoFiscalizado(evento)));
     }
 
     @Override

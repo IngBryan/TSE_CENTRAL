@@ -2,28 +2,15 @@ package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.List;
 import java.util.function.Consumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
-import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 
-/**
- * Assigns each detected event to a single fiscalization case, following the hierarchy of situations:
- * <ul>
- * <li>a case is created for the first situation (in priority order) the vehicle has no open case of
- * (DETECTADA or NOTIFICADA), and then notified to the company;</li>
- * <li>if every situation already has an open case, the event is added as evidence to the one of the
- * highest priority;</li>
- * <li>an event that is already evidence of a case is not assigned again (reprocessing).</li>
- * </ul>
- * If a call fails it throws, so the event stays pending and is evaluated again.
- */
+/** Asigna la evidencia a CADA infracción; las operaciones remotas son idempotentes por caso y evento. */
 public class CaseAssigner implements Consumer<Detection> {
-
     private static final String DETECTADA = "DETECTADA";
-
     private final CaseStore cases;
 
     public CaseAssigner(CaseStore cases) {
@@ -38,51 +25,30 @@ public class CaseAssigner implements Consumer<Detection> {
         try {
             assign(detection);
         } catch (IOException e) {
+            // El worker deja el evento pendiente y reintenta. Lo ya registrado es idempotente.
             throw new UncheckedIOException(e);
         }
     }
 
     private void assign(Detection detection) throws IOException {
-        VehicleEvent event = detection.event();
-        DatosCaso existing = cases.caseOf(event);
-        if (existing != null) {
-            notifyIfDetected(existing);
-            return;
+        ResultadoAsociacionGpsGuia contexto = detection.contexto();
+        if (contexto == null || contexto.estado() == ResultadoAsociacionGpsGuia.Estado.AMBIGUO
+                || contexto.estado() == ResultadoAsociacionGpsGuia.Estado.NO_DETERMINABLE) {
+            throw new IOException("No se puede asignar un caso sin contexto temporal inequívoco");
         }
-        List<DatosCaso> open = cases.openCases(event.licensePlate());
-        for (Situation situation : detection.situations()) {
-            if (open.stream().noneMatch(c -> situation.isTypeOf(c.getTipoCaso()))) {
-                DatosCaso created = cases.create(situation.caseType(), guideId(detection), event);
-                log("Created", created, event);
-                notifyIfDetected(created);
-                return;
+        String guia = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO
+                ? contexto.idGuia() : null;
+        for (Situation situacion : detection.situations()) {
+            if (situacion == Situation.ROUTE_DEVIATION && guia == null) {
+                throw new IOException("El desvío necesita una Guía asociada");
+            }
+            if (situacion == Situation.TRIP_WITHOUT_GUIDE && guia != null) {
+                throw new IOException("Viaje sin Guía contradictorio con la asociación temporal");
+            }
+            DatosCaso caso = cases.registrar(situacion.caseType(), guia, detection.event());
+            if (DETECTADA.equals(caso.getEstado())) {
+                cases.notify(caso.getId());
             }
         }
-        Situation highest = detection.situations().get(0);
-        DatosCaso target = open.stream().filter(c -> highest.isTypeOf(c.getTipoCaso())).findFirst().orElseThrow();
-        cases.addEvidence(target.getId(), event);
-        log("Added to", target, event);
-        notifyIfDetected(target);
-    }
-
-    /** Also covers a case whose notification failed before: it is notified with its next event. */
-    private void notifyIfDetected(DatosCaso caseData) throws IOException {
-        if (DETECTADA.equals(caseData.getEstado())) {
-            cases.notify(caseData.getId());
-            System.out.printf("Notified case %d (%s)%n", caseData.getId(), caseData.getTipoCaso());
-        }
-    }
-
-    /** The active trip of the vehicle, if any: the guide of the case. */
-    private static String guideId(Detection detection) {
-        if (detection.facts() == null || !detection.facts().hasActiveTrip()) {
-            return null;
-        }
-        return detection.facts().activeTrips().get(0).getIdGuia();
-    }
-
-    private static void log(String action, DatosCaso caseData, VehicleEvent event) {
-        System.out.printf("%s case %d (%s) for %s at %s%n", action, caseData.getId(), caseData.getTipoCaso(),
-                event.licensePlate(), event.timestamp());
     }
 }

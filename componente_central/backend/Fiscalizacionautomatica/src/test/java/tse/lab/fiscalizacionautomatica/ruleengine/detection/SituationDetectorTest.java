@@ -114,4 +114,30 @@ class SituationDetectorTest {
 
         assertThrows(IOException.class, () -> wildFlyDown.detect(tracking("SBC1234")));
     }
+
+    @Test
+    void gpsAtrasadoConGuiaYaFinalizadaNoGeneraViajeSinGuia() throws Exception {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+        var intervalo = new tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.IntervaloGuiaGps(
+                "G-ANT", "SBC1234", "FINALIZADA", NOW.minusSeconds(3600), NOW.minusSeconds(3000),
+                NOW.plusSeconds(60));
+        var ctx = new tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource(
+                (matricula, desde, hasta) -> List.of(intervalo));
+        var detectorHistorico = new SituationDetector(facts, List.of(new TripWithoutGuideRule()), ctx);
+        Detection detected = detectorHistorico.detect(tracking("SBC1234"));
+        assertEquals(List.of(), detected.situations());
+        assertEquals("G-ANT", detected.contexto().idGuia());
+    }
+
+    @Test
+    void guiaInciertaNoMarcaEventoComoEvaluado() {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+        var sinFin = new tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.IntervaloGuiaGps(
+                "G-ANT", "SBC1234", "FINALIZADA", NOW.minusSeconds(3600), NOW.minusSeconds(3000), null);
+        var contexto = new tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource(
+                (matricula, desde, hasta) -> List.of(sinFin));
+        var detectorHistorico = new SituationDetector(facts, List.of(new TripWithoutGuideRule()), contexto);
+        assertThrows(IOException.class, () -> detectorHistorico.detect(tracking("SBC1234")));
+    }
+
 }
