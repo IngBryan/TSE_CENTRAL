@@ -77,6 +77,8 @@ public class CasoFiscalizacionDAO {
         em.persist(caso);
     }
 
+    public void flush() { em.flush(); }
+
     public Vehiculo buscarVehiculo(String matricula) {
         return em.find(Vehiculo.class, matricula);
     }

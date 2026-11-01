@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.TrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
@@ -26,7 +27,7 @@ import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
  * Confirma un desvío solo cuando dos muestras temporalmente consecutivas de la MISMA Guía
  * superan la distancia máxima a TODAS las rutas permitidas y están separadas como máximo
  * por la ventana de confirmación. Se usa la fecha de medición del GPS, nunca receivedAt.
- * El caso y sus evidencias probatorias se integrarán en la tarea 4B/4C.
+ * La evaluación devuelve además una instantánea probatoria para el expediente (4C).
  */
 public final class RouteDeviationRule implements SituationRule {
     public static final double UMBRAL_METROS = 2_000;
@@ -62,10 +63,19 @@ public final class RouteDeviationRule implements SituationRule {
         return Situation.ROUTE_DEVIATION;
     }
 
+    /** Evidencia reproducible del par utilizado y de las rutas consultadas. */
+    public record PruebaDesvio(TrackingEvent confirmante, TrackingEvent pareja,
+            double distanciaConfirmanteMetros, double distanciaParejaMetros,
+            double umbralMetros, long ventanaMaximaSegundos, List<String> hashesRutas) { }
+
     @Override
     public boolean appliesTo(VehicleEvent event, VehicleFacts facts) throws IOException {
+        return evaluar(event, facts).isPresent();
+    }
+
+    public Optional<PruebaDesvio> evaluar(VehicleEvent event, VehicleFacts facts) throws IOException {
         if (!(event instanceof TrackingEvent gps)) {
-            return false; // Los pesajes nunca son evidencia espacial de desvío.
+            return Optional.empty(); // Los pesajes nunca son evidencia espacial de desvío.
         }
         Instant desde = gps.timestamp().minus(ventana);
         // [desde,hasta) incluye la muestra exactamente en timestamp+ventana.
@@ -73,22 +83,23 @@ public final class RouteDeviationRule implements SituationRule {
         List<IntervaloGuiaGps> ventanas = intervalos.buscar(gps.licensePlate(), desde, hasta);
         var asociacion = AsociadorGpsGuia.resolver(gps, ventanas);
         if (asociacion.estado() != ResultadoAsociacionGpsGuia.Estado.ASOCIADO) {
-            return false; // Sin Guía, ambiguo o incertidumbre: no hay ruta fiscalizable.
+            return Optional.empty(); // Sin Guía, ambiguo o incertidumbre: no hay ruta fiscalizable.
         }
         String idGuia = asociacion.idGuia();
         List<DatosRutaAutorizada> autorizadas = rutas.obtenerPorGuia(idGuia);
         if (autorizadas == null || autorizadas.isEmpty()) {
-            return false; // No se inventa un corredor de referencia.
+            return Optional.empty(); // No se inventa un corredor de referencia.
         }
         CorredorRutas corredor = new CorredorRutas(autorizadas);
-        if (corredor.distanciaMinimaMetros(gps.latitude(), gps.longitude()) <= umbralMetros) {
-            return false;
+        double distanciaPrincipal = corredor.distanciaMinimaMetros(gps.latitude(), gps.longitude());
+        if (distanciaPrincipal <= umbralMetros) {
+            return Optional.empty();
         }
 
         List<TrackingEvent> candidatos = posiciones.findByLicensePlateBetween(gps.licensePlate(), desde, hasta,
                 MAX_CANDIDATOS);
         if (candidatos.size() >= MAX_CANDIDATOS) {
-            return false; // No confirmar con datos incompletos por límite de consulta.
+            return Optional.empty(); // No confirmar con datos incompletos por límite de consulta.
         }
         List<TrackingEvent> ordenadas = new ArrayList<>(candidatos);
         // Un evento recién recibido puede no aparecer aún en una implementación del DAO.
@@ -106,13 +117,25 @@ public final class RouteDeviationRule implements SituationRule {
             }
         }
         if (indice < 0) {
-            return false;
+            return Optional.empty();
         }
         // Solo vecinos inmediatos: un GPS dentro del corredor entre dos muestras externas
         // impide contar esas dos muestras como consecutivas.
-        return (indice > 0 && confirmarPar(gps, ordenadas.get(indice - 1), idGuia, ventanas, corredor))
-                || (indice + 1 < ordenadas.size()
-                && confirmarPar(gps, ordenadas.get(indice + 1), idGuia, ventanas, corredor));
+        TrackingEvent pareja = null;
+        if (indice > 0 && confirmarPar(gps, ordenadas.get(indice - 1), idGuia, ventanas, corredor)) {
+            pareja = ordenadas.get(indice - 1);
+        } else if (indice + 1 < ordenadas.size()
+                && confirmarPar(gps, ordenadas.get(indice + 1), idGuia, ventanas, corredor)) {
+            pareja = ordenadas.get(indice + 1);
+        }
+        if (pareja == null) return Optional.empty();
+        List<String> hashes = autorizadas.stream().map(DatosRutaAutorizada::getSha256).toList();
+        if (hashes.stream().anyMatch(h -> h == null || h.isBlank())) {
+            throw new IOException("La ruta autorizada no tiene hash de referencia");
+        }
+        return Optional.of(new PruebaDesvio(gps, pareja, distanciaPrincipal,
+                corredor.distanciaMinimaMetros(pareja.latitude(), pareja.longitude()),
+                umbralMetros, ventana.toSeconds(), List.copyOf(hashes)));
     }
 
     private boolean confirmarPar(TrackingEvent actual, TrackingEvent otra, String idGuia,

@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 
@@ -19,9 +20,10 @@ public class CaseAssigner implements Consumer<Detection> {
 
     @Override
     public void accept(Detection detection) {
-        if (detection.situations().isEmpty()) {
-            return;
-        }
+        // Sin infracciones ni cambio de contexto de Guía, no hay ninguna operación remota.
+        if (detection.situations().isEmpty() && !(detection.event() instanceof TrackingEvent
+                && detection.contexto() != null
+                && detection.contexto().estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO)) return;
         try {
             assign(detection);
         } catch (IOException e) {
@@ -38,6 +40,9 @@ public class CaseAssigner implements Consumer<Detection> {
         }
         String guia = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO
                 ? contexto.idGuia() : null;
+        if (guia != null && detection.event() instanceof TrackingEvent gps) {
+            cases.cerrarCirculacionPorGuia(gps.licensePlate(), gps.timestamp());
+        }
         for (Situation situacion : detection.situations()) {
             if (situacion == Situation.ROUTE_DEVIATION && guia == null) {
                 throw new IOException("El desvío necesita una Guía asociada");
@@ -45,8 +50,19 @@ public class CaseAssigner implements Consumer<Detection> {
             if (situacion == Situation.TRIP_WITHOUT_GUIDE && guia != null) {
                 throw new IOException("Viaje sin Guía contradictorio con la asociación temporal");
             }
-            DatosCaso caso = cases.registrar(situacion.caseType(), guia, detection.event());
-            if (DETECTADA.equals(caso.getEstado())) {
+            DatosCaso caso;
+            if (situacion == Situation.TRIP_WITHOUT_GUIDE) {
+                if (!(detection.event() instanceof TrackingEvent gps)) continue;
+                caso = cases.registrarCirculacionSinGuia(gps);
+            } else if (situacion == Situation.ROUTE_DEVIATION) {
+                if (!(detection.event() instanceof TrackingEvent gps) || detection.pruebaDesvio() == null) {
+                    throw new IOException("La situación de desvío carece de prueba geométrica");
+                }
+                caso = cases.registrarDesvio(guia, gps, detection.pruebaDesvio());
+            } else {
+                caso = cases.registrar(situacion.caseType(), guia, detection.event());
+            }
+            if (caso != null && DETECTADA.equals(caso.getEstado())) {
                 cases.notify(caso.getId());
             }
         }

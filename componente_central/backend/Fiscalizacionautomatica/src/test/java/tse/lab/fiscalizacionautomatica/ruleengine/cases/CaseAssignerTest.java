@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
@@ -39,6 +40,17 @@ class CaseAssignerTest {
             return data(caso);
         }
         @Override
+        public DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) throws IOException {
+            // Fake conserva el contrato antiguo para probar el routing; el ciclo de vida
+            // y la confirmación de movimiento se prueban en CasosAutomaticosServiceTest.
+            return registrar(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, evento);
+        }
+        @Override
+        public DatosCaso registrarDesvio(String guia, TrackingEvent evento, PruebaDesvio prueba) throws IOException {
+            if (prueba == null) throw new IOException("Prueba faltante");
+            return registrar(TipoCasoAutomatico.DESVIO_RUTA, guia, evento);
+        }
+        @Override
         public DatosCaso notify(long id) {
             Caso c = casos.get((int)id - 1);
             c.estado()[0] = "NOTIFICADA";
@@ -54,6 +66,12 @@ class CaseAssignerTest {
                 Instant.parse("2026-10-17T13:00:00Z").plusSeconds(segundos));
     }
     private static Detection conGuia(VehicleEvent e, String guia, Situation... tipos) {
+        if (List.of(tipos).contains(Situation.ROUTE_DEVIATION)) {
+            TrackingEvent gps = (TrackingEvent) e;
+            PruebaDesvio prueba = new PruebaDesvio(gps, gps((int) (gps.timestamp().getEpochSecond()
+                    - gps(0).timestamp().getEpochSecond()) - 10), 2300, 2500, 2000, 30, List.of("sha-a"));
+            return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.asociado(guia), prueba);
+        }
         return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.asociado(guia));
     }
     private static Detection sinGuia(VehicleEvent e, Situation... tipos) {
@@ -90,7 +108,7 @@ class CaseAssignerTest {
     }
 
     @Test
-    void sinGuiaDeDiasDistintosConservaMismoCasoAbierto() {
+    void fakeDeAsignacionConservaCasoAbiertoSinSepararCirculaciones() {
         asignador.accept(sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE));
         asignador.accept(sinGuia(gps(86400), Situation.TRIP_WITHOUT_GUIDE));
         assertEquals(1, store.casos.size());

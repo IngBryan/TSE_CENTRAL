@@ -21,6 +21,10 @@ import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
+import tse.lab.model.CirculacionSinGuia;
+import tse.lab.model.EstadoCirculacionSinGuia;
+import tse.lab.model.MotivoFinCirculacionSinGuia;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.ClaveEvento;
@@ -37,6 +41,11 @@ class CasosAutomaticosServiceTest {
 
     private static final Instant T1 = Instant.parse("2026-10-17T10:00:00Z");
     private static final Instant T2 = Instant.parse("2026-10-17T10:00:10Z");
+    private static PruebaDesvioRemota prueba(Instant ts) {
+        return new PruebaDesvioRemota(ts.plusSeconds(10), -34.9, -56.1, -34.9, -56.12,
+                2400.0, 2600.0, 2000.0, 30L, List.of("sha-ruta-a", "sha-ruta-b"));
+    }
+
     private static final EventoFiscalizado TRACKING_T1 = new EventoFiscalizado("SBC1234", T1, OrigenEvento.TRACKING);
     private static final EventoFiscalizado TRACKING_T2 = new EventoFiscalizado("SBC1234", T2, OrigenEvento.TRACKING);
     private static final EventoFiscalizado PESAJE_T1 = new EventoFiscalizado("SBC1234", T1, OrigenEvento.PESAJE);
@@ -52,6 +61,7 @@ class CasosAutomaticosServiceTest {
         servicio = new CasosAutomaticosService();
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
         set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "circulaciones", conEm(new CirculacionSinGuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBC1234", "Mercedes-Benz", "Actros", 8500, 25000, empresa);
@@ -85,16 +95,30 @@ class CasosAutomaticosServiceTest {
                 RegistroAuditoriaCaso.class).setParameter("id", idCaso).getResultList();
     }
 
+    private static PosicionSinGuiaRemota gps(Instant fecha, double lat, double lon) {
+        return new PosicionSinGuiaRemota("SBC1234", fecha, lat, lon);
+    }
+    private DatosCaso iniciarCirculacion() {
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1))));
+        return enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.9, -56.098)));
+    }
+    private CirculacionSinGuia circulacion(long idCaso) {
+        em.clear();
+        return em.createQuery("SELECT c FROM CirculacionSinGuia c WHERE c.caso.id = :id", CirculacionSinGuia.class)
+                .setParameter("id", idCaso).getSingleResult();
+    }
+
     @Test
     void creaElCasoDetectadoConElVehiculoYElEventoComoEvidencia() {
-        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = iniciarCirculacion();
 
         assertEquals("DETECTADA", creado.getEstado());
         CasoFiscalizacion c = caso(creado.getId());
         assertEquals("VIAJE_SIN_GUIA", c.getTipoCaso());
         assertEquals("SBC1234", c.getVehiculo().getMatricula());
         assertNull(c.getGuia());
-        assertEquals(List.of(new ClaveEvento("SBC1234", T1)), c.getClavesEventosTracking());
+        assertEquals(2, c.getClavesEventosTracking().size());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(creado.getId()).getEstado());
         RegistroAuditoriaCaso creacion = auditoria(creado.getId()).get(0);
         assertEquals(RegistroAuditoriaCaso.SISTEMA, creacion.getUsuario());
         assertEquals(AccionAuditoriaCaso.CREACION, creacion.getAccion());
@@ -112,7 +136,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void notificarPasaElCasoANotificadaYQuedaEnLaAuditoriaComoSistema() {
-        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = iniciarCirculacion();
 
         DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId()));
 
@@ -126,7 +150,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
-        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso creado = iniciarCirculacion();
         enTx(() -> servicio.notificarCaso(creado.getId()));
 
         DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId()));
@@ -137,7 +161,7 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void losCasosAbiertosSonLosDetectadosYNotificados() {
-        DatosCaso detectado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso detectado = iniciarCirculacion();
         DatosCaso enDescargo = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T2));
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, enDescargo.getId());
@@ -151,15 +175,12 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void variasInfraccionesCompartenGpsSinDuplicarloEnCadaCaso() {
-        DatosCaso sinGuia = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso sinGuia = iniciarCirculacion();
         DatosCaso habilitacion = enTx(() -> servicio.registrarEvidencia(
                 TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T1));
-        DatosCaso repetido = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
-
+        DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.9, -56.098)));
         assertEquals(sinGuia.getId(), repetido.getId());
-        assertEquals(1, caso(sinGuia.getId()).getClavesEventosTracking().size());
+        assertEquals(2, caso(sinGuia.getId()).getClavesEventosTracking().size());
         assertEquals(1, caso(habilitacion.getId()).getClavesEventosTracking().size());
 
         ClaveEvento evidenciaEsperada = new ClaveEvento("SBC1234", T1);
@@ -175,23 +196,44 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void reprocesarUnEventoDeCasoEnDescargoNoAbreUnSegundoCaso() {
-        DatosCaso primero = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+    void cierreYReinicioCreanExpedientesIndependientesAunqueElPrimeroSigaNotificado() {
+        DatosCaso primero = iniciarCirculacion();
+        enTx(() -> servicio.notificarCaso(primero.getId()));
+        Instant tarde = T1.plusSeconds(3600);
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.8, -56.0))));
+        DatosCaso segundo = enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(tarde.plusSeconds(10), -34.8, -55.998)));
+        assertNotEquals(primero.getId(), segundo.getId());
+        assertEquals(EstadoCirculacionSinGuia.FINALIZADA, circulacion(primero.getId()).getEstado());
+        assertEquals(MotivoFinCirculacionSinGuia.BRECHA_TEMPORAL,
+                circulacion(primero.getId()).getMotivoFin());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(segundo.getId()).getEstado());
+        assertEquals(2, caso(primero.getId()).getClavesEventosTracking().size());
+        assertEquals(2, caso(segundo.getId()).getClavesEventosTracking().size());
+        assertEquals(primero.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(T2, -34.9, -56.098))).getId());
+    }
+
+    @Test
+    void gpsInmovilNoAbreExpediente() {
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1))));
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.90001, -56.1))));
+        assertEquals(List.of(), enTx(() -> servicio.casosAbiertos("SBC1234")));
+        assertThrows(IllegalArgumentException.class, () -> enTx(() ->
+                servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1)));
+    }
+
+    @Test
+    void reprocesarEventoDeCasoResueltoNoAbreOtroCaso() {
+        DatosCaso primero = iniciarCirculacion();
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, primero.getId());
             c.cambiarEstado(EstadoCaso.NOTIFICADA);
             c.cambiarEstado(EstadoCaso.EN_DESCARGO);
             return null;
         });
-        DatosCaso repetido = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
+        DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1)));
         assertEquals(primero.getId(), repetido.getId());
-        DatosCaso segundo = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T2));
-        assertNotEquals(primero.getId(), segundo.getId());
-        assertEquals(1, caso(primero.getId()).getClavesEventosTracking().size());
-        assertEquals(1, caso(segundo.getId()).getClavesEventosTracking().size());
     }
 
     @Test
@@ -213,28 +255,70 @@ class CasosAutomaticosServiceTest {
         segunda.setVehiculo(em.find(Vehiculo.class, "SBC1234"));
         enTx(() -> { em.persist(segunda); return null; });
 
-        DatosCaso primero = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.DESVIO_RUTA, "GV-1", TRACKING_T1));
-        DatosCaso otro = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.DESVIO_RUTA, "GV-2", TRACKING_T2));
-        DatosCaso reuso = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.DESVIO_RUTA, "GV-1", TRACKING_T2));
+        DatosCaso primero = enTx(() -> servicio.registrarDesvio("GV-1", TRACKING_T1, prueba(T1)));
+        DatosCaso otro = enTx(() -> servicio.registrarDesvio("GV-2", TRACKING_T2, prueba(T2)));
+        DatosCaso reuso = enTx(() -> servicio.registrarDesvio("GV-1", TRACKING_T2, prueba(T2)));
 
         assertEquals(primero.getId(), reuso.getId());
         assertNotEquals(primero.getId(), otro.getId());
         assertEquals(2, caso(primero.getId()).getClavesEventosTracking().size());
         assertEquals(1, caso(otro.getId()).getClavesEventosTracking().size());
+        assertEquals(2, caso(primero.getId()).getEvidenciasDesvio().size());
+        assertEquals(1, caso(otro.getId()).getEvidenciasDesvio().size());
+    }
+
+    @Test
+    void desvioReentregadoConservaUnaSolaPruebaYGps() {
+        DatosCaso a = enTx(() -> servicio.registrarDesvio("GV-1", TRACKING_T1, prueba(T1)));
+        DatosCaso b = enTx(() -> servicio.registrarDesvio("GV-1", TRACKING_T1, prueba(T1)));
+        assertEquals(a.getId(), b.getId());
+        var c = caso(a.getId());
+        assertEquals(1, c.getClavesEventosTracking().size());
+        assertEquals(1, c.getEvidenciasDesvio().size());
+        var guardada = c.getEvidenciasDesvio().get(0);
+        assertEquals(T1.plusSeconds(10), guardada.getFechaPareja());
+        assertEquals(2600.0, guardada.getDistanciaPareja());
+        assertEquals("sha-ruta-a,sha-ruta-b", guardada.getRutasSha());
+    }
+
+    @Test
+    void desvioInvalidoNoDejaCasoParcial() {
+        PruebaDesvioRemota invalida = new PruebaDesvioRemota(T1.plusSeconds(31), -34.9, -56.1,
+                -34.9, -56.12, 2400, 2600, 2000, 30, List.of("sha-a"));
+        assertThrows(IllegalArgumentException.class,
+                () -> enTx(() -> servicio.registrarDesvio("GV-1", TRACKING_T1, invalida)));
+        assertEquals(List.of(), enTx(() -> servicio.casosAbiertos("SBC1234")));
+        assertThrows(IllegalArgumentException.class,
+                () -> enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.DESVIO_RUTA, "GV-1", TRACKING_T1)));
     }
 
     @Test
     void casoSinGuiaNoSeVinculaAUnaGuiaInventada() {
-        DatosCaso a = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
-        DatosCaso b = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T2));
-        assertEquals(a.getId(), b.getId());
+        DatosCaso a = iniciarCirculacion();
         assertNull(caso(a.getId()).getGuia());
         assertEquals(2, caso(a.getId()).getClavesEventosTracking().size());
+    }
+
+    @Test
+    void detencionProlongadaFinalizaCirculacionPeroNoCaso() {
+        DatosCaso creado = iniciarCirculacion();
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(T2.plusSeconds(30 * 60), -34.9, -56.098))));
+        assertEquals(EstadoCirculacionSinGuia.FINALIZADA, circulacion(creado.getId()).getEstado());
+        assertEquals(MotivoFinCirculacionSinGuia.DETENCION_PROLONGADA,
+                circulacion(creado.getId()).getMotivoFin());
+        assertEquals(T2, circulacion(creado.getId()).getFechaFin());
+        assertEquals(EstadoCaso.DETECTADA, caso(creado.getId()).getEstado());
+    }
+
+    @Test
+    void cierrePorGuiaNoConfundeEstadoAdministrativo() {
+        DatosCaso creado = iniciarCirculacion();
+        enTx(() -> { servicio.cerrarCirculacionPorGuia("SBC1234", T2.plusSeconds(5)); return null; });
+        assertEquals(EstadoCirculacionSinGuia.FINALIZADA, circulacion(creado.getId()).getEstado());
+        assertEquals(MotivoFinCirculacionSinGuia.GUIA_INICIADA,
+                circulacion(creado.getId()).getMotivoFin());
+        assertEquals(EstadoCaso.DETECTADA, caso(creado.getId()).getEstado());
     }
 
     @Test

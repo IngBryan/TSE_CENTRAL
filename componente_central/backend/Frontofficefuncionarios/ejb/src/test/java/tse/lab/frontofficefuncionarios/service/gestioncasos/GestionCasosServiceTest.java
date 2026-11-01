@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
+import tse.lab.model.CirculacionSinGuia;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
@@ -38,6 +40,7 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.ResolucionRegistrada;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
+import tse.lab.model.ClaveEvento;
 import tse.lab.model.Descargo;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoCaso;
@@ -75,6 +78,7 @@ class GestionCasosServiceTest {
         set(servicio, "autorizacion", autorizacion);
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
         set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "circulaciones", conEm(new CirculacionSinGuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, empresa);
@@ -124,6 +128,14 @@ class GestionCasosServiceTest {
     void tearDown() {
         em.close();
         emf.close();
+    }
+
+    @Test
+    void vistaCirculacionRequiereCasoSinGuiaYFuncionario() {
+        assertThrows(DatosInvalidosException.class,
+                () -> servicio.circulacion(FUNCIONARIO, detectado, "t"));
+        assertThrows(NoAutorizadoException.class,
+                () -> servicio.circulacion(NO_FUNCIONARIO, detectado, "t"));
     }
 
     // ===== FA1: usuario no autorizado =====

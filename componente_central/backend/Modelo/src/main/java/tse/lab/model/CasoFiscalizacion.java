@@ -84,6 +84,14 @@ public class CasoFiscalizacion implements Serializable {
                     "id_caso", "matricula", "fecha_hora" }))
     private List<ClaveEvento> clavesEventosTracking = new ArrayList<>();
 
+    // Snapshot geométrico adicional solo para casos DESVIO_RUTA.
+    // La unicidad utiliza el evento confirmante dentro del caso; no duplica eventos Mongo.
+    @ElementCollection
+    @CollectionTable(name = "casos_evidencias_desvio", joinColumns = @JoinColumn(name = "id_caso"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_prueba_desvio", columnNames = {
+                    "id_caso", "matricula", "fecha_hora" }))
+    private List<EvidenciaGeometricaDesvio> evidenciasDesvio = new ArrayList<>();
+
     public CasoFiscalizacion() {
     }
 
@@ -175,6 +183,10 @@ public class CasoFiscalizacion implements Serializable {
 
     public List<EventoPesajes> getEventosPesajes() {
         return eventosPesajes;
+    }
+
+    public List<EvidenciaGeometricaDesvio> getEvidenciasDesvio() {
+        return evidenciasDesvio;
     }
 
     public List<ClaveEvento> getClavesEventosTracking() {

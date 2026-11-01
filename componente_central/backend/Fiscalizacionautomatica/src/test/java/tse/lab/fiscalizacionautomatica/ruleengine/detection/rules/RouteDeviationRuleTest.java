@@ -66,6 +66,18 @@ class RouteDeviationRuleTest {
     }
 
     @Test
+    void pruebaContieneAmbosPuntosDistanciasYTodasLasReferencias() throws IOException {
+        TrackingEvent primero = gps(0, -55.95);
+        TrackingEvent segundo = gps(10, -55.951);
+        var prueba = regla.evaluar(segundo, HECHOS).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(segundo, prueba.confirmante());
+        org.junit.jupiter.api.Assertions.assertEquals(primero, prueba.pareja());
+        org.junit.jupiter.api.Assertions.assertEquals(List.of("sha1"), prueba.hashesRutas());
+        assertTrue(prueba.distanciaConfirmanteMetros() > 2000);
+        assertTrue(prueba.distanciaParejaMetros() > 2000);
+    }
+
+    @Test
     void unaSolaPosicionFueraNoConfirma() throws IOException {
         assertFalse(regla.appliesTo(gps(0, -55.95), HECHOS));
     }

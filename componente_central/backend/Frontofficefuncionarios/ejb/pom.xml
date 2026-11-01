@@ -135,6 +135,8 @@
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/EventoFiscalizado.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/OrigenEvento.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/DatosCaso.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/PruebaDesvioRemota.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/PosicionSinGuiaRemota.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/TipoCasoAutomatico.class</clientInclude>
                         </clientIncludes>
                     </configuration>

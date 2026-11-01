@@ -6,6 +6,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource;
@@ -42,13 +44,19 @@ public class SituationDetector {
                     + " en " + event.timestamp() + ": " + contexto.estado());
         }
         List<Situation> situations = new ArrayList<>();
+        PruebaDesvio pruebaDesvio = null;
         for (SituationRule rule : rules) {
             boolean applies;
             if (contexto != null && rule instanceof TripWithoutGuideRule) {
-                applies = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.SIN_GUIA;
+                applies = event instanceof tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent
+                        && contexto.estado() == ResultadoAsociacionGpsGuia.Estado.SIN_GUIA;
             } else if (contexto != null && rule instanceof OverloadRule overload) {
                 applies = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO
                         && overload.excedePeso(event, facts.get());
+            } else if (rule instanceof RouteDeviationRule desvio) {
+                var resultado = desvio.evaluar(event, facts.get());
+                applies = resultado.isPresent();
+                if (applies) pruebaDesvio = resultado.orElseThrow();
             } else {
                 applies = rule.appliesTo(event, facts.get());
             }
@@ -56,6 +64,6 @@ public class SituationDetector {
                 situations.add(rule.situation());
             }
         }
-        return new Detection(event, facts.get(), List.copyOf(situations), contexto);
+        return new Detection(event, facts.get(), List.copyOf(situations), contexto, pruebaDesvio);
     }
 }
