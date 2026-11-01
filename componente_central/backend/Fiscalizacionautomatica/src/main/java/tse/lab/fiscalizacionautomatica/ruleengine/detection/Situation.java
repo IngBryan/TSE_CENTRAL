@@ -4,7 +4,7 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 
 /**
  * Possible non-compliance situations, in priority order (the declaration order is the priority).
- * Without an active trip only TRIP_WITHOUT_GUIDE and VEHICLE_WITHOUT_VALID_PERMIT can apply.
+ * Route deviation is evaluated against the guide at GPS measurement time, not only current trips.
  */
 public enum Situation {
     TRIP_WITHOUT_GUIDE(TipoCasoAutomatico.VIAJE_SIN_GUIA),

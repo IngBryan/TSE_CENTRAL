@@ -31,10 +31,12 @@ public class SituationDetector {
         if (facts.isEmpty()) {
             return new Detection(event, null, List.of());
         }
-        List<Situation> situations = rules.stream()
-                .filter(rule -> rule.appliesTo(event, facts.get()))
-                .map(SituationRule::situation)
-                .toList();
-        return new Detection(event, facts.get(), situations);
+        List<Situation> situations = new java.util.ArrayList<>();
+        for (SituationRule rule : rules) {
+            if (rule.appliesTo(event, facts.get())) {
+                situations.add(rule.situation());
+            }
+        }
+        return new Detection(event, facts.get(), List.copyOf(situations));
     }
 }

@@ -94,6 +94,19 @@ class SituationDetectorTest {
     }
 
     @Test
+    void failureToEvaluateAnExternalRouteRuleIsReportedForRetry() {
+        central.put("SBC1234", withTrip("SBC1234", "EN_CURSO"));
+        SituationRule rule = new SituationRule() {
+            @Override public Situation situation() { return Situation.ROUTE_DEVIATION; }
+            @Override public boolean appliesTo(VehicleEvent event, VehicleFacts facts) throws IOException {
+                throw new IOException("Consulta de rutas caida");
+            }
+        };
+        SituationDetector detectorConFallo = new SituationDetector(facts, List.of(rule));
+        assertThrows(IOException.class, () -> detectorConFallo.detect(tracking("SBC1234")));
+    }
+
+    @Test
     void failureToGetTheVehicleFactsIsReported() {
         SituationDetector wildFlyDown = new SituationDetector(licensePlate -> {
             throw new IOException("WildFly down");
