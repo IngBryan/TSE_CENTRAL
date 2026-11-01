@@ -7,6 +7,7 @@ import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { VehiculoDetalle } from "../actions";
 import { EstadoItv, EstadoPermiso, formatoFecha, Habilitacion } from "../estado";
 import { GestionarVehiculo } from "./gestionar-vehiculo";
+import { PermisosExtra } from "./permisos-extra";
 
 // Detalle de un vehiculo de la empresa: datos, permiso de circulacion, historial de ITV y, si sigue
 // activo, las acciones para modificarlo o darlo de baja.
@@ -68,6 +69,8 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresa/ve
               </div>
               <p><span className="text-zinc-500">ITV:</span> <EstadoItv vehiculo={v} /></p>
             </section>
+
+            {v.permisosExtra.length > 0 && <PermisosExtra matricula={v.matricula} permisos={v.permisosExtra} editable={v.activo} />}
 
             {v.activo ? (
               <GestionarVehiculo vehiculo={v} />

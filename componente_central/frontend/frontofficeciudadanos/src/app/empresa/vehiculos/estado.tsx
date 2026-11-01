@@ -8,7 +8,7 @@ const ok = `${etiqueta} bg-green-50 text-green-800 dark:bg-green-950 dark:text-g
 const mal = `${etiqueta} bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200`;
 const neutro = `${etiqueta} bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300`;
 
-// Habilitado = permiso vigente e ITV sin vencer (lo calcula el backend a la fecha de hoy)
+// Habilitado = permiso vigente, ITV sin vencer y permisos adicionales al dia (lo calcula el backend a la fecha de hoy)
 export function Habilitacion({ vehiculo }: { vehiculo: Vehiculo }) {
   if (!vehiculo.activo) return <span className={neutro}>Dado de baja</span>;
   return vehiculo.habilitado ? <span className={ok}>Habilitado</span> : <span className={mal}>No habilitado</span>;

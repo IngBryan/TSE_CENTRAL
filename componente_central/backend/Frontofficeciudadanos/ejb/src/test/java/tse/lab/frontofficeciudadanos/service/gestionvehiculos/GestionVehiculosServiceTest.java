@@ -23,6 +23,7 @@ import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
+import tse.lab.frontofficeciudadanos.data.PermisoVehiculoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
@@ -41,6 +42,7 @@ import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Guia;
 import tse.lab.model.Responsable;
+import tse.lab.model.TipoPermiso;
 import tse.lab.model.Vehiculo;
 
 // ABM de Vehiculos contra H2 con los DAOs reales.
@@ -66,6 +68,7 @@ class GestionVehiculosServiceTest {
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "permisos", conEm(new PermisoCirculacionDAO()));
         set(servicio, "itvs", conEm(new ITVDAO()));
+        set(servicio, "permisosExtra", conEm(new PermisoVehiculoDAO()));
         set(servicio, "guias", conEm(new GuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
@@ -83,6 +86,70 @@ class GestionVehiculosServiceTest {
         em.persist(new Responsable(otroResponsable, otra));
         em.persist(new Vehiculo("OTR0001", "Ford", "Cargo", 5000, 8000, otra));
         em.getTransaction().commit();
+    }
+
+    // Vehiculo con PNC e ITV vigentes y un permiso a demanda asignado a su empresa
+    private Long vehiculoConPermisoExigido(String nombre, boolean pideNumero, boolean pideVencimiento) throws Exception {
+        TipoPermiso tipo = new TipoPermiso(nombre, pideNumero, pideVencimiento);
+        em.getTransaction().begin();
+        em.persist(tipo);
+        em.find(Empresa.class, 1L).getPermisosRequeridos().add(tipo);
+        em.getTransaction().commit();
+        enTx(() -> servicio.crear(RESPONSABLE, new NuevoVehiculo("EXT1234", "Scania", "R", 9000L, 20000L), "t"));
+        enTx(() -> servicio.registrarPermiso(RESPONSABLE, "EXT1234",
+                new GestionVehiculosService.DatosPermiso("PNC-EXT", HOY.minusDays(1).toString(), HOY.plusDays(30).toString()), "t"));
+        enTx(() -> servicio.agregarItv(RESPONSABLE, "EXT1234",
+                new GestionVehiculosService.DatosItv(HOY.plusDays(30).toString()), "t"));
+        return tipo.getId();
+    }
+
+    @Test
+    void unPermisoAsignadoSinCargarDejaElVehiculoNoHabilitado() throws Exception {
+        Long tipo = vehiculoConPermisoExigido("Mercaderia peligrosa", true, true);
+        VehiculoVista v = servicio.detalle(RESPONSABLE, "EXT1234", "t").vehiculo();
+        assertFalse(v.habilitado());
+        assertEquals(1, v.permisosExtra().size());
+        assertFalse(v.permisosExtra().get(0).cargado());
+
+        VehiculoDetalle d = enTx(() -> servicio.registrarPermisoExtra(RESPONSABLE, "EXT1234", tipo,
+                new GestionVehiculosService.DatosPermisoExtra(" mp-1 ", HOY.plusDays(10).toString()), "t"));
+        assertTrue(d.vehiculo().habilitado());
+        assertEquals("MP-1", d.vehiculo().permisosExtra().get(0).numero());
+    }
+
+    @Test
+    void unPermisoVencidoDejaElVehiculoNoHabilitadoYActualizarloNoDuplica() throws Exception {
+        Long tipo = vehiculoConPermisoExigido("Refrigerado", false, true);
+        enTx(() -> servicio.registrarPermisoExtra(RESPONSABLE, "EXT1234", tipo,
+                new GestionVehiculosService.DatosPermisoExtra(null, HOY.minusDays(1).toString()), "t"));
+        assertFalse(servicio.detalle(RESPONSABLE, "EXT1234", "t").vehiculo().habilitado());
+
+        VehiculoDetalle d = enTx(() -> servicio.registrarPermisoExtra(RESPONSABLE, "EXT1234", tipo,
+                new GestionVehiculosService.DatosPermisoExtra(null, HOY.toString()), "t"));
+        assertTrue(d.vehiculo().habilitado());
+        assertEquals(1, d.vehiculo().permisosExtra().size());
+    }
+
+    @Test
+    void losDatosSePidenSegunElTipoYUnTipoNoAsignadoNoSeAcepta() throws Exception {
+        Long tipo = vehiculoConPermisoExigido("Mercaderia peligrosa", true, true);
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.registrarPermisoExtra(
+                RESPONSABLE, "EXT1234", tipo, new GestionVehiculosService.DatosPermisoExtra("", null), "t"));
+        assertTrue(e.getErrores().containsKey("numero"));
+        assertTrue(e.getErrores().containsKey("fechaVencimiento"));
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.registrarPermisoExtra(RESPONSABLE, "EXT1234",
+                tipo + 1, new GestionVehiculosService.DatosPermisoExtra("X", HOY.toString()), "t"));
+    }
+
+    @Test
+    void unTipoDesactivadoDejaDeExigirse() throws Exception {
+        Long tipo = vehiculoConPermisoExigido("Mercaderia peligrosa", true, true);
+        em.getTransaction().begin();
+        em.find(TipoPermiso.class, tipo).setActivo(false);
+        em.getTransaction().commit();
+        VehiculoVista v = servicio.detalle(RESPONSABLE, "EXT1234", "t").vehiculo();
+        assertTrue(v.habilitado());
+        assertTrue(v.permisosExtra().isEmpty());
     }
 
     @AfterEach

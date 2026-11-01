@@ -7,8 +7,9 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
-import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "../actions";
+import { buscarUsuariosDisponibles, obtenerPermisos, obtenerRubros, type ResultadoUsuarios } from "../actions";
 import { AccionesEmpresa } from "./acciones-empresa";
+import { PermisosEmpresa } from "./permisos-empresa";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -65,12 +66,15 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const empresa = res.data;
   const r = empresa.responsable;
   const disponibles = r ? null : await pedidoDisponibles;
+  const rubros = await obtenerRubros();
+  const permisos = await obtenerPermisos(empresa.nroEmpresa);
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
         <p><span className={dato}>Nombre público:</span> {empresa.nombrePublico ?? "-"}</p>
         <p><span className={dato}>Razón social:</span> {empresa.razonSocial ?? "-"}</p>
-        <p className="sm:col-span-2"><span className={dato}>Dirección:</span> {empresa.direccion ?? "-"}</p>
+        <p><span className={dato}>Dirección:</span> {empresa.direccion ?? "-"}</p>
+        <p><span className={dato}>Rubro:</span> {empresa.rubro ?? "-"}</p>
       </section>
 
       <section className={`flex flex-col gap-2 ${tarjeta}`}>
@@ -88,7 +92,9 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
         )}
       </section>
 
-      <AccionesEmpresa empresa={empresa} disponibles={disponibles} creada={creada} />
+      <PermisosEmpresa nroEmpresa={empresa.nroEmpresa} permisos={permisos} />
+
+      <AccionesEmpresa empresa={empresa} rubros={rubros} disponibles={disponibles} creada={creada} />
     </Pagina>
   );
 }

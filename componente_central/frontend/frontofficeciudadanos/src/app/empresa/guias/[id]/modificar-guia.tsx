@@ -7,6 +7,7 @@ import {
   cancelarGuia,
   editarGuia,
   reasignarGuia,
+  type Catalogos,
   type ChoferResumen,
   type Guia,
   type ResultadoModificacion,
@@ -28,11 +29,13 @@ export function ModificarGuia({
   vehiculos,
   choferes,
   hoy,
+  catalogos,
 }: {
   guia: Guia;
   vehiculos: VehiculoResumen[];
   choferes: ChoferResumen[];
   hoy: string;
+  catalogos: Catalogos;
 }) {
   const router = useRouter();
   const [modo, setModo] = useState<Modo>(null);
@@ -119,8 +122,28 @@ export function ModificarGuia({
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
-              ["rubroCliente", "Rubro del cliente", "text"],
-              ["tipoCarga", "Tipo de carga", "text"],
+              ["rubroCliente", "Rubro del cliente", catalogos.rubros],
+              ["tipoCarga", "Tipo de carga", catalogos.tiposCarga],
+            ] as const
+          ).map(([n, texto, opciones]) => (
+            <label key={n} className={etiqueta}>
+              {texto}
+              <select value={datos[n]} onChange={(e) => setDatos({ ...datos, [n]: e.target.value })} className={campo}>
+                <option value="" disabled>
+                  Elegí una opción
+                </option>
+                {/* El valor actual siempre es una opcion, aunque el catalogo no se haya podido cargar */}
+                {[...new Set([...(datos[n] ? [datos[n]] : []), ...opciones])].map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+              {errorCampo(n)}
+            </label>
+          ))}
+          {(
+            [
               ["pesoCargaKg", "Carga (kg)", "number"],
               ["fecha", "Fecha del viaje", "date"],
               ["origen", "Origen", "text"],

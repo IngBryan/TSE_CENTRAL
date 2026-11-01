@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import tse.lab.frontofficeciudadanos.data.CatalogoDAO;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
@@ -42,6 +43,8 @@ import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Guia;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Vehiculo;
 
 // Gestion de Viajes de Carga y CU-07 contra H2 con los DAOs reales.
@@ -73,6 +76,7 @@ class GuiasServiceTest {
         set(servicio, "perfiles", perfiles);
         set(servicio, "eventos", conEm(new EventoViajeDAO()));
         set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
+        set(servicio, "catalogos", conEm(new CatalogoDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         empresa.setHabilitada(true);
@@ -86,6 +90,10 @@ class GuiasServiceTest {
         Chofer pendiente = new Chofer(personaPendiente, empresa, EstadoChofer.PENDIENTE_VALIDACION);
         Chofer deOtra = new Chofer(personaDeOtra, otra, EstadoChofer.HABILITADO);
         em.getTransaction().begin();
+        em.persist(new Rubro("Agropecuario"));
+        em.persist(new Rubro("Forestal"));
+        em.persist(new TipoCarga("Granos a granel"));
+        em.persist(new TipoCarga("Rollizos"));
         em.persist(empresa);
         em.persist(otra);
         em.persist(responsable);
@@ -108,6 +116,21 @@ class GuiasServiceTest {
     void tearDown() {
         em.close();
         emf.close();
+    }
+
+    @Test
+    void losCatalogosTraenLasOpcionesOrdenadas() throws Exception {
+        GuiasService.Catalogos c = servicio.catalogos(RESPONSABLE, "t");
+        assertEquals(List.of("Agropecuario", "Forestal"), c.rubros());
+        assertEquals(List.of("Granos a granel", "Rollizos"), c.tiposCarga());
+    }
+
+    @Test
+    void rubroYTipoDeCargaTienenQueSerDelCatalogo() {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Inventado", "Otra cosa", 1000L, MANANA, "Rivera", "Salto"), "t"));
+        assertEquals("Elegí un rubro de la lista.", e.getErrores().get("rubroCliente"));
+        assertEquals("Elegí un tipo de carga de la lista.", e.getErrores().get("tipoCarga"));
     }
 
     @Test

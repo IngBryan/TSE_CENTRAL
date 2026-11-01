@@ -39,7 +39,7 @@
 
 ## E03 — Móvil: consulta, offline e idempotencia
 
-**Datos:** guías `GV-MOVIL001` y `GV-MOVIL002`, asignadas a choferes de Empresa 1.
+**Datos:** guías `GV-MOVIL001` y `GV-MOVIL002`, asignadas al chofer `48060995` de Empresa 1.
 
 1. Ingresar en la aplicación móvil con un chofer cuya identidad pueda autenticarse en el entorno de pruebas.
 2. Descargar su guía asignada y comprobar que los detalles quedan disponibles localmente.

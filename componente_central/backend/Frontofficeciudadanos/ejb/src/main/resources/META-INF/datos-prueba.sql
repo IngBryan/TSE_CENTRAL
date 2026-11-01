@@ -7,6 +7,10 @@
 INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, 0);
 -- DEMO / Empresas: contraste con empresa no habilitada (sin identidad gub.uy artificial).
 INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (2, 'Logistica del Litoral', 'Logistica del Litoral S.R.L.', 'Ruta 3 km 390, Paysandu', false , 0);
+-- Rubro de las empresas: lo elige el funcionario entre los del catalogo (esquema-adicional.sql).
+UPDATE empresas SET rubro = 'Agropecuario' WHERE nroEmpresa IN (1, 2);
+-- Permisos a demanda: sin asignar a ninguna empresa, para hacerlo desde el frontoffice de funcionarios.
+INSERT INTO tipos_permiso (nombre, pideNumero, pideVencimiento, activo) VALUES ('Mercaderia peligrosa', true, true, true), ('Transporte refrigerado', false, true, true), ('Carga sobredimensionada', true, true, true);
 -- Ciudadanos que tienen un rol. Quedan pendientes sin cuenta gub.uy: su primer ingreso los vincula y valida
 -- contra la PDI (CU-01 FA2). Los roles (responsables, choferes) los referencian por ci.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('54074380', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
@@ -26,19 +30,19 @@ INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE
 -- DEMO / ITV y permisos: SDE3000 habilitado y disponible para asignacion. SAB5678 sigue sin habilitacion.
 INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SDE-01', CURRENT_DATE - 50, CURRENT_DATE + 250, 'SDE3000');
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 50, CURRENT_DATE + 250, 'SDE3000');
--- App movil del chofer: Bryan (56087406, existe en la PDI) y el propio responsable (54074380, para probar con
--- su usuario de gub.uy testing) como choferes habilitados de la empresa 1, cada uno con una guia ASIGNADA.
-INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('56087406', 1, 'HABILITADO', CURRENT_TIMESTAMP);
-INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('54074380', 1, 'HABILITADO', CURRENT_TIMESTAMP);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA1234', (SELECT id FROM choferes WHERE ci = '56087406' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos de eucalipto', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+-- App movil del chofer: 48060995 (existe en la PDI, para probar con
+-- su usuario de gub.uy testing) como chofer habilitado de la empresa 1, con dos guias ASIGNADA.
+INSERT INTO ciudadanos (ci, estado, creado) VALUES ('48060995', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
+INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('48060995', 1, 'HABILITADO', CURRENT_TIMESTAMP);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL001', 'Agropecuario', 'Granos a granel', 18000, CURRENT_DATE, 'Montevideo', 'Paysandu', 1, 'SBA1234', (SELECT id FROM choferes WHERE ci = '48060995' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-MOVIL002', 'Forestal', 'Rollizos', 24000, CURRENT_DATE, 'Rivera', 'Montevideo', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '48060995' AND nro_empresa = 1), 'ASIGNADA', CURRENT_TIMESTAMP, 0);
 -- DEMO / Chofer aun no validado: debe quedar fuera de las opciones de asignacion.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('22222222', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('22222222', 1, 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 -- DEMO / Guia nueva, vehiculo libre SDE3000; nunca se asigna inicialmente.
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, estado, version) VALUES ('GV-DEMO-ASIGNAR', 'Construccion', 'Materiales de obra', 12000, CURRENT_DATE + 1, 'Montevideo', 'Maldonado', 1, 'SIN_ASIGNAR', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, estado, version) VALUES ('GV-DEMO-ASIGNAR', 'Construccion', 'Materiales de construccion', 12000, CURRENT_DATE + 1, 'Montevideo', 'Maldonado', 1, 'SIN_ASIGNAR', 0);
 -- DEMO / Guia cancelada e historial de modificaciones, sin interferir con las guias de la app.
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-DEMO-CANCELADA', 'Forestal', 'Madera aserrada', 12000, CURRENT_DATE - 2, 'Tacuarembo', 'Durazno', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '54074380' AND nro_empresa = 1), 'CANCELADA', CURRENT_TIMESTAMP - INTERVAL '3 days', 1);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-DEMO-CANCELADA', 'Forestal', 'Madera aserrada', 12000, CURRENT_DATE - 2, 'Tacuarembo', 'Durazno', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '48060995' AND nro_empresa = 1), 'CANCELADA', CURRENT_TIMESTAMP - INTERVAL '3 days', 1);
 INSERT INTO modificaciones_guia (id_guia, tipo, ciResponsable, fecha, cambios, motivo, versionAnterior, versionNueva) VALUES ('GV-DEMO-CANCELADA', 'CANCELACION', '54074380', CURRENT_TIMESTAMP - INTERVAL '2 days', 'estado: ASIGNADA -> CANCELADA', 'El cliente suspendio el traslado.', 0, 1);
 -- Nodo de balanza activo para el poller de fiscalizacion automatica: id_externo es el id de la balanza en la
 -- API de balanzas (TSE_NODOS, balanza 4 "Ruta 8 - Km 150"); el id lo genera la base.
@@ -59,9 +63,9 @@ INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 100, CURRENT_DATE + 250, 'STU5678');
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('11111111', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('11111111', 1, 'HABILITADO', CURRENT_TIMESTAMP);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-FISC001', 'Agropecuario', 'Soja a granel', 20000, CURRENT_DATE, 'Mercedes', 'Nueva Palmira', 1, 'STU5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'EN_CURSO', CURRENT_TIMESTAMP, 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-FISC001', 'Agropecuario', 'Granos a granel', 20000, CURRENT_DATE, 'Mercedes', 'Nueva Palmira', 1, 'STU5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'EN_CURSO', CURRENT_TIMESTAMP, 0);
 -- DEMO / Guia finalizada: sirve para mostrar historia sin hacer activo el viaje de SBC1234.
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-DEMO-HIST-SBC', 'Agropecuario', 'Maiz a granel', 16000, CURRENT_DATE - 12, 'San Jose', 'Colonia', 1, 'SBC1234', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '13 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-DEMO-HIST-SBC', 'Agropecuario', 'Granos a granel', 16000, CURRENT_DATE - 12, 'San Jose', 'Colonia', 1, 'SBC1234', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '13 days', 0);
 -- Guia historica de SAB5678 para dos casos ya resueltos: no interfiere con detecciones en vivo.
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) VALUES ('GV-DEMO-HIST-SAB', 'Forestal', 'Rollizos', 24000, CURRENT_DATE - 5, 'Rivera', 'Tacuarembo', 1, 'SAB5678', (SELECT id FROM choferes WHERE ci = '11111111' AND nro_empresa = 1), 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '6 days', 0);
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('TRACKING', 1, 'GPS SBC1234', 'Vehiculo SBC1234', true);
@@ -80,9 +84,6 @@ INSERT INTO autoridades (ci) VALUES ('88888888');
 -- Frontoffice de funcionarios (CU Gestionar casos de fiscalizacion): el integrante de gub.uy testing tambien es
 -- funcionario, y hay casos de fiscalizacion en distintos estados hasta que la fiscalizacion automatica los genere.
 INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mtop.gub.uy');
--- Gestion de empresas: ciudadano ficticio ya validado y sin ningun rol, para elegirlo como responsable de una
--- empresa sin mezclarlo con los datos de los otros casos de prueba
-INSERT INTO ciudadanos (ci, primerNombre, primerApellido, nombres, apellidos, estado, creado, ultimaValidacion) VALUES ('22222222', 'Laura', 'Gomez', 'Laura', 'Gomez', 'VALIDADO', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- Balanza solo para la evidencia de los casos: inactiva, asi el poller no la consulta en la API de balanzas.
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 1, 'Balanza Peaje Pando', 'Peaje Pando', false);
 INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1;
@@ -131,12 +132,12 @@ INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM3001');
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM4001');
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM5001');
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-301', 'Agropecuario', 'Soja a granel', 22000, CURRENT_DATE - 20, 'Young', 'Nueva Palmira', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-302', 'Forestal', 'Rollizos de pino', 25000, CURRENT_DATE - 45, 'Rivera', 'Fray Bentos', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '46 days', 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-401', 'Agropecuario', 'Arroz', 19000, CURRENT_DATE - 20, 'Treinta y Tres', 'Montevideo', 4, 'SEM4001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-301', 'Agropecuario', 'Granos a granel', 22000, CURRENT_DATE - 20, 'Young', 'Nueva Palmira', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-302', 'Forestal', 'Rollizos', 25000, CURRENT_DATE - 45, 'Rivera', 'Fray Bentos', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '46 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-401', 'Agropecuario', 'Granos a granel', 19000, CURRENT_DATE - 20, 'Treinta y Tres', 'Montevideo', 4, 'SEM4001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-402', 'Forestal', 'Madera aserrada', 26000, CURRENT_DATE - 75, 'Tacuarembo', 'Montevideo', 4, 'SEM4001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '76 days', 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-501', 'Agropecuario', 'Trigo', 21000, CURRENT_DATE - 45, 'Mercedes', 'Montevideo', 5, 'SEM5001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '46 days', 0);
-INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-502', 'Construccion', 'Arena', 15000, CURRENT_DATE - 75, 'San Jose', 'Montevideo', 5, 'SEM5001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '76 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-501', 'Agropecuario', 'Granos a granel', 21000, CURRENT_DATE - 45, 'Mercedes', 'Montevideo', 5, 'SEM5001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '46 days', 0);
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-502', 'Construccion', 'Materiales de construccion', 15000, CURRENT_DATE - 75, 'San Jose', 'Montevideo', 5, 'SEM5001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '76 days', 0);
 -- Infracciones confirmadas de las empresas 3 y 4: con la confirmada de la empresa 1, EXCESO_CARGA junta 3 empresas.
 INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('DEMO PUBLICO: exceso de 1500 kg', 'EXCESO_CARGA', 'CONFIRMADA', CURRENT_TIMESTAMP - INTERVAL '20 days', 'GV-PUB-301', 'SEM3001', true);
 INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_guia, id_vehiculo, notificacion_vista) VALUES ('DEMO PUBLICO: exceso de 900 kg', 'EXCESO_CARGA', 'CONFIRMADA', CURRENT_TIMESTAMP - INTERVAL '20 days', 'GV-PUB-401', 'SEM4001', true);

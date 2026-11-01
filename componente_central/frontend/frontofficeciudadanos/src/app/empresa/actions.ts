@@ -15,6 +15,7 @@ export type DatosEmpresa = {
   razonSocial: string;
   direccion: string;
   habilitada: boolean;
+  rubro?: string | null;
 };
 
 export type EstadoFormulario = {

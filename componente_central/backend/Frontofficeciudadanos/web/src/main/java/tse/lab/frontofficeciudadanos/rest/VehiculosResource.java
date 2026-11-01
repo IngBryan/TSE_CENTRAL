@@ -19,6 +19,7 @@ import jakarta.ws.rs.core.Response;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService.DatosItv;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService.DatosPermiso;
+import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService.DatosPermisoExtra;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService.EdicionVehiculo;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.GestionVehiculosService.NuevoVehiculo;
 
@@ -64,6 +65,15 @@ public class VehiculosResource {
     public Response permiso(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario,
             @PathParam("matricula") String matricula, DatosPermiso datos, @Context HttpServletRequest req) {
         return ejecutar(() -> vehiculos.registrarPermiso(usuario, matricula, datos, correlationId(req)));
+    }
+
+    // Permiso a demanda del vehiculo: 404 si el tipo no esta asignado a la empresa
+    @PUT
+    @Path("/{matricula}/permisos-extra/{idTipo}")
+    public Response permisoExtra(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario,
+            @PathParam("matricula") String matricula, @PathParam("idTipo") Long idTipo, DatosPermisoExtra datos,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> vehiculos.registrarPermisoExtra(usuario, matricula, idTipo, datos, correlationId(req)));
     }
 
     @POST

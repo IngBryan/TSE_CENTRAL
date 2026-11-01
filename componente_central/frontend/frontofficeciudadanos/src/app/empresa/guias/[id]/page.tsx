@@ -5,7 +5,7 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
-import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
+import { obtenerCatalogos, type ChoferResumen, type Guia, type VehiculoResumen } from "../actions";
 import { ModificarGuia } from "./modificar-guia";
 
 type EventoViaje = {
@@ -137,7 +137,13 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             </section>
 
             {datos.guia.estado === "ASIGNADA" && (
-              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} />
+              <ModificarGuia
+                guia={datos.guia}
+                vehiculos={datos.vehiculos}
+                choferes={datos.choferes}
+                hoy={hoy}
+                catalogos={await obtenerCatalogos()}
+              />
             )}
 
             <section className="flex flex-col gap-3">

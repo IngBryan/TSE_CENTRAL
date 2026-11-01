@@ -33,6 +33,12 @@ export function FormularioEmpresa({ empresa }: { empresa: DatosEmpresa }) {
         <span className="text-xs text-zinc-500">Lo asigna el MTOP y no se puede modificar.</span>
       </div>
 
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Rubro</span>
+        <span className="text-black dark:text-zinc-50">{empresa.rubro ?? "Sin rubro"}</span>
+        <span className="text-xs text-zinc-500">Lo asigna el MTOP y no se puede modificar.</span>
+      </div>
+
       {CAMPOS.map((c) => {
         const error = estado.campos?.[c.nombre];
         return (

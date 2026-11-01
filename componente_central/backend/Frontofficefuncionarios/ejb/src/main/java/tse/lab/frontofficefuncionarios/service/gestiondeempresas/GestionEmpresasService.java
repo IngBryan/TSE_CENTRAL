@@ -13,6 +13,8 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.CiudadanoDAO;
 import tse.lab.frontofficefuncionarios.data.EmpresaDAO;
 import tse.lab.frontofficefuncionarios.data.ResponsableDAO;
+import tse.lab.frontofficefuncionarios.data.RubroDAO;
+import tse.lab.frontofficefuncionarios.data.TipoPermisoDAO;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
@@ -22,6 +24,7 @@ import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Responsable;
+import tse.lab.model.TipoPermiso;
 
 // CU Gestionar empresas de transporte (funcionario): listado, alta, consulta, modificacion y asociacion
 // de un usuario (ciudadano) como responsable de la empresa. Cada operacion verifica primero que quien
@@ -49,6 +52,10 @@ public class GestionEmpresasService {
     private CiudadanoDAO ciudadanos;
     @EJB
     private ResponsableDAO responsables;
+    @EJB
+    private RubroDAO rubros;
+    @EJB
+    private TipoPermisoDAO tiposPermiso;
 
     public record EmpresaResumen(Long nroEmpresa, String nombrePublico, String razonSocial, boolean habilitada,
             String ciResponsable) {
@@ -60,14 +67,14 @@ public class GestionEmpresasService {
 
     // version: la de la entidad (@Version). El front la manda al modificar para detectar cambios concurrentes.
     public record EmpresaDetalle(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            boolean habilitada, ResponsableVista responsable, Long version) {
+            boolean habilitada, ResponsableVista responsable, Long version, String rubro) {
     }
 
     // habilitada es opcional: en el alta, por defecto la empresa queda no habilitada. ciResponsable es
     // opcional: la cedula de un usuario registrado y validado (ver usuariosDisponibles) que queda como
-    // responsable de la empresa en la misma transaccion.
+    // responsable de la empresa en la misma transaccion. rubro es opcional e informativo (catalogo de rubros).
     public record AltaEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            Boolean habilitada, String ciResponsable) {
+            Boolean habilitada, String ciResponsable, String rubro) {
     }
 
     // Un usuario que se puede asociar como responsable: validado y sin ser responsable de otra empresa.
@@ -77,11 +84,19 @@ public class GestionEmpresasService {
 
     // El nroEmpresa no se modifica: es la clave con la que la referencian choferes, vehiculos, guias y el
     // responsable. habilitada es opcional: si no viene, se conserva. version: la que se estaba mirando al editar.
+    // rubro: como el resto de los datos se manda siempre; vacio o null deja la empresa sin rubro.
     public record CambiosEmpresa(String nombrePublico, String razonSocial, String direccion, Boolean habilitada,
-            Long version) {
+            Long version, String rubro) {
     }
 
     public record AsociacionUsuario(String ci) {
+    }
+
+    // Un tipo de permiso a demanda activo y si esta asignado a la empresa
+    public record PermisoEmpresa(Long id, String nombre, boolean asignado) {
+    }
+
+    public record AsignacionPermisos(List<Long> tipos) {
     }
 
     public record OperacionRealizada(String mensaje, EmpresaDetalle empresa) {
@@ -103,6 +118,12 @@ public class GestionEmpresasService {
         LOG.info(() -> "evento=empresa.consulta correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
                 + nroEmpresa);
         return detalle(empresa);
+    }
+
+    // Opciones del desplegable de rubro en el alta y la modificacion
+    public List<String> rubros(String ci, String correlationId) throws NoAutorizadoException {
+        autorizacion.funcionario(ci, correlationId);
+        return rubros.listar();
     }
 
     // FA4, paso 2: los usuarios que se pueden elegir como responsable. filtroCi (opcional) es el comienzo
@@ -135,6 +156,7 @@ public class GestionEmpresasService {
         String direccion = limpiar(datos == null ? null : datos.direccion());
         String ciResponsable = datos == null || datos.ciResponsable() == null ? "" : datos.ciResponsable().trim();
         Map<String, String> errores = new LinkedHashMap<>();
+        String rubro = rubroValido(errores, datos == null ? null : datos.rubro());
         if (nro == null || nro < 1) {
             errores.put("nroEmpresa", "El número de empresa es obligatorio y tiene que ser un entero positivo.");
         }
@@ -157,6 +179,7 @@ public class GestionEmpresasService {
                 : candidatoResponsable(ciResponsable, nro, ci, correlationId);
 
         Empresa empresa = new Empresa(nro, nombre, razon, direccion, null);
+        empresa.setRubro(rubro);
         empresa.setHabilitada(Boolean.TRUE.equals(datos.habilitada()));
         // Otra alta con el mismo numero pudo entrar despues del control de arriba: la PK la rechaza aca, antes
         // de registrar al responsable, y se responde 409 en vez de fallar al cerrar la transaccion
@@ -199,6 +222,7 @@ public class GestionEmpresasService {
         Boolean habilitada = cambios == null ? null : cambios.habilitada();
         Map<String, String> errores = new LinkedHashMap<>();
         validarTextos(errores, nombre, razon, direccion);
+        String rubro = rubroValido(errores, cambios == null ? null : cambios.rubro());
         // Solo se controla al pasar a habilitada: una que ya lo estaba se puede seguir editando
         if (Boolean.TRUE.equals(habilitada) && !empresa.isHabilitada() && empresa.getResponsable() == null) {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
@@ -219,6 +243,9 @@ public class GestionEmpresasService {
         if (!Objects.equals(direccion, empresa.getDireccion())) {
             modificados.add("direccion");
         }
+        if (!Objects.equals(rubro, empresa.getRubro())) {
+            modificados.add("rubro");
+        }
         if (habilitada != null && habilitada != empresa.isHabilitada()) {
             modificados.add("habilitada");
         }
@@ -226,6 +253,7 @@ public class GestionEmpresasService {
         empresa.setNombrePublico(nombre);
         empresa.setRazonSocial(razon);
         empresa.setDireccion(direccion);
+        empresa.setRubro(rubro);
         if (habilitada != null) {
             empresa.setHabilitada(habilitada);
         }
@@ -233,6 +261,41 @@ public class GestionEmpresasService {
         LOG.info(() -> "evento=empresa.modificada correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
                 + nroEmpresa + " campos=" + modificados);
         return new OperacionRealizada("La empresa fue modificada.", detalle(empresa));
+    }
+
+    // Los permisos a demanda que se le pueden exigir a la empresa, marcando los que ya tiene asignados
+    public List<PermisoEmpresa> permisos(String ci, Long nroEmpresa, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException {
+        autorizacion.funcionario(ci, correlationId);
+        return vistaPermisos(empresa(nroEmpresa, ci, correlationId));
+    }
+
+    // Reemplaza los permisos a demanda asignados: todos los vehiculos de la empresa los van a tener que cargar.
+    // Los asignados que el administrador desactivo no se ofrecen y se conservan por si se reactivan.
+    public List<PermisoEmpresa> asignarPermisos(String ci, Long nroEmpresa, AsignacionPermisos datos,
+            String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException, DatosInvalidosException {
+        autorizacion.funcionario(ci, correlationId);
+        Empresa empresa = nroEmpresa == null ? null : empresas.buscarPorIdParaActualizar(nroEmpresa);
+        if (empresa == null) {
+            throw noEncontrada(nroEmpresa, ci, correlationId);
+        }
+        List<Long> pedidos = datos == null || datos.tipos() == null ? List.of() : datos.tipos();
+        List<TipoPermiso> activos = tiposPermiso.listarActivos();
+        List<TipoPermiso> elegidos = activos.stream().filter(t -> pedidos.contains(t.getId())).toList();
+        if (elegidos.size() != pedidos.stream().distinct().count()) {
+            throw new DatosInvalidosException(Map.of("tipos", "Elegí permisos de la lista."));
+        }
+        empresa.getPermisosRequeridos().removeIf(TipoPermiso::isActivo);
+        empresa.getPermisosRequeridos().addAll(elegidos);
+        LOG.info(() -> "evento=empresa.permisos correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
+                + nroEmpresa + " tipos=" + pedidos);
+        return vistaPermisos(empresa);
+    }
+
+    private List<PermisoEmpresa> vistaPermisos(Empresa empresa) {
+        return tiposPermiso.listarActivos().stream().map(t -> new PermisoEmpresa(t.getId(), t.getNombre(),
+                empresa.getPermisosRequeridos().stream().anyMatch(a -> a.getId().equals(t.getId())))).toList();
     }
 
     // FA4: asocia un usuario ya registrado (ciudadano, por cedula) a la empresa como su responsable. Este
@@ -342,7 +405,19 @@ public class GestionEmpresasService {
                     c == null || c.getEstado() == null ? null : c.getEstado().name());
         }
         return new EmpresaDetalle(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.getDireccion(),
-                e.isHabilitada(), responsable, e.getVersion());
+                e.isHabilitada(), responsable, e.getVersion(), e.getRubro());
+    }
+
+    // Vacio queda sin rubro; si viene, tiene que ser del catalogo
+    private String rubroValido(Map<String, String> errores, String valor) {
+        String rubro = limpiar(valor);
+        if (rubro == null || rubro.isEmpty()) {
+            return null;
+        }
+        if (!rubros.existe(rubro)) {
+            errores.put("rubro", "Elegí un rubro de la lista.");
+        }
+        return rubro;
     }
 
     private static void validarTextos(Map<String, String> errores, String nombre, String razon, String direccion) {

@@ -61,7 +61,7 @@ class PerfilEmpresaServiceTest {
 
     @Test
     void elResponsableConsultaLosDatosDeSuEmpresa() throws Exception {
-        assertEquals(new DatosEmpresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", false),
+        assertEquals(new DatosEmpresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", false, null),
                 servicio.obtener(RESPONSABLE, "t"));
     }
 
@@ -73,7 +73,7 @@ class PerfilEmpresaServiceTest {
         em.getTransaction().commit();
         em.clear();
 
-        assertEquals(new DatosEmpresa(1L, "TDE Cargas", "TDE Cargas S.R.L.", "Av. Italia 1234, Montevideo", false), r);
+        assertEquals(new DatosEmpresa(1L, "TDE Cargas", "TDE Cargas S.R.L.", "Av. Italia 1234, Montevideo", false, null), r);
         Empresa guardada = em.find(Empresa.class, 1L);
         assertEquals("TDE Cargas", guardada.getNombrePublico());
         assertEquals("Av. Italia 1234, Montevideo", guardada.getDireccion());

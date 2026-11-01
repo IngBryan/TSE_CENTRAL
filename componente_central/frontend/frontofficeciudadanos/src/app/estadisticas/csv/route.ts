@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   });
 }
 
-// Comillas solo si hace falta (separador, comillas o salto de linea). El rubro lo escriben las empresas: si
+// Comillas solo si hace falta (separador, comillas o salto de linea). Los rubros son de un catalogo, pero: si
 // empieza como una formula (=, +, -, @) se le antepone un apostrofo para que Excel no la ejecute.
 function celda(texto: string) {
   const seguro = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;

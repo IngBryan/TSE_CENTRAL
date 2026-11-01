@@ -43,6 +43,13 @@ public class GuiasResource {
         return ejecutar(() -> guias.listar(usuario, correlationId(req)));
     }
 
+    // Opciones de los desplegables de rubro y tipo de carga. Ruta fija: JAX-RS la prefiere a /{id}.
+    @GET
+    @Path("/catalogos")
+    public Response catalogos(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @Context HttpServletRequest req) {
+        return ejecutar(() -> guias.catalogos(usuario, correlationId(req)));
+    }
+
     @POST
     public Response crear(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, NuevaGuia datos,
             @Context HttpServletRequest req) {

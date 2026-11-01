@@ -36,7 +36,7 @@ public final class Agregacion {
                 .toList();
     }
 
-    // Para filas cuya etiqueta puede identificar a una empresa (el rubro lo escribe cada empresa): las
+    // Para filas cuya etiqueta puede identificar a una empresa (un rubro con pocas empresas): las
     // reservadas no se muestran una por una, sino sumadas en una sola fila al final (clave, etiqueta). Esa
     // fila se publica si junta `umbral` empresas (lo que pasa siempre que alcanzo la supresion complementaria:
     // de todos modos se deduce como total menos lo visible); si no, queda reservada.

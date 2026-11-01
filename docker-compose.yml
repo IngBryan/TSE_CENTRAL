@@ -93,6 +93,10 @@ services:
       - "3004:3000"
     environment:
       - NODE_ENV=production
+      # Login y API del backoffice (WildFly, por la red interna)
+      - BACKOFFICE_API_URL=http://wildfly:8080/backofficeautoridadesadministradores-web/api
+    depends_on:
+      - wildfly
     restart: unless-stopped
 
   # --- Backend (componente central) ---

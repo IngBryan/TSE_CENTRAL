@@ -14,11 +14,13 @@ const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:tex
 // Lo abre AccionesEmpresa, que tambien muestra el mensaje cuando sale bien.
 export function ModificarEmpresa({
   empresa,
+  rubros,
   onCerrar,
   onModificada,
   onDesactualizada,
 }: {
   empresa: EmpresaDetalle;
+  rubros: string[];
   onCerrar: () => void;
   onModificada: (mensaje: string) => void;
   // Otro funcionario la modifico mientras tanto: el formulario se cierra y la pagina muestra los datos actuales
@@ -30,6 +32,7 @@ export function ModificarEmpresa({
     nombrePublico: empresa.nombrePublico ?? "",
     razonSocial: empresa.razonSocial ?? "",
     direccion: empresa.direccion ?? "",
+    rubro: empresa.rubro ?? "",
     habilitada: empresa.habilitada,
   });
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,7 @@ export function ModificarEmpresa({
     setError(null);
     iniciar(async () => {
       // Si sale bien, revalidatePath en la action vuelve a renderizar la pagina con los datos nuevos
-      const r = await modificarEmpresa(empresa.nroEmpresa, { ...datos, version });
+      const r = await modificarEmpresa(empresa.nroEmpresa, { ...datos, rubro: datos.rubro || null, version });
       if (r.ok) {
         onModificada(r.mensaje);
       } else if (r.desactualizada) {
@@ -111,6 +114,24 @@ export function ModificarEmpresa({
           className={entrada}
         />
         {errorCampo("direccion")}
+      </label>
+
+      <label className={etiqueta}>
+        Rubro (opcional)
+        <select
+          value={datos.rubro}
+          disabled={pendiente}
+          onChange={(e) => cambiar("rubro", e.target.value)}
+          className={entrada}
+        >
+          <option value="">Sin rubro</option>
+          {[...new Set([...(datos.rubro ? [datos.rubro] : []), ...rubros])].map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        {errorCampo("rubro")}
       </label>
 
       <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">

@@ -1,4 +1,5 @@
 
+import Link from "next/link";
 import { listarNodos } from "@/lib/nodos-perifericos-backend";
 import PanelAltaNodo from "./PanelAltaNodo";
 import { redirect } from "next/navigation";
@@ -45,6 +46,10 @@ export default async function GestionNodosPerifericosPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Sesión: {identidad.ci} · Administrador
           </p>
+
+          <Link href="/tipos-permiso" className="mt-2 inline-block text-sm underline">
+            Tipos de permiso
+          </Link>
         </div>
 
         <form action={cerrarSesionAction}>

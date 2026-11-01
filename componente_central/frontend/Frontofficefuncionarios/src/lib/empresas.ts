@@ -23,6 +23,7 @@ export type EmpresaDetalle = {
   razonSocial: string | null;
   direccion: string | null;
   habilitada: boolean;
+  rubro: string | null;
   responsable: ResponsableVista | null;
   // @Version de la empresa: se manda al modificarla para no pisar lo que otro cambio mientras tanto
   version: number | null;
@@ -34,6 +35,7 @@ export type CambiosEmpresa = {
   nombrePublico: string;
   razonSocial: string;
   direccion: string;
+  rubro: string | null;
   habilitada: boolean;
   version: number;
 };
@@ -45,12 +47,16 @@ export type AltaEmpresa = {
   nombrePublico: string;
   razonSocial: string;
   direccion: string;
+  rubro: string | null;
   habilitada: boolean;
   ciResponsable: string | null;
 };
 
 // GET /empresas/usuarios-disponibles: validados que no son responsables de ninguna empresa
 export type UsuarioDisponible = { ci: string; primerNombre: string | null; primerApellido: string | null };
+
+// GET /empresas/{nro}/permisos: un tipo de permiso a demanda activo y si esta asignado a la empresa
+export type PermisoEmpresa = { id: number; nombre: string; asignado: boolean };
 
 export const nombreUsuario = (u: { primerNombre: string | null; primerApellido: string | null }) =>
   [u.primerNombre, u.primerApellido].filter(Boolean).join(" ") || "Sin nombre registrado";

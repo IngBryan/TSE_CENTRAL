@@ -18,6 +18,7 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
+import tse.lab.frontofficeciudadanos.data.PermisoVehiculoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
@@ -28,6 +29,8 @@ import tse.lab.model.Empresa;
 import tse.lab.model.EstadoGuia;
 import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
+import tse.lab.model.PermisoVehiculo;
+import tse.lab.model.TipoPermiso;
 import tse.lab.model.Vehiculo;
 
 // ABM de Vehiculos: el responsable de una empresa habilitada da de alta, modifica, consulta y da de
@@ -36,7 +39,8 @@ import tse.lab.model.Vehiculo;
 // - La matricula se guarda normalizada (Vehiculo.normalizarMatricula) para cruzarla con balanzas y
 //   tracking, y no se modifica (es la clave).
 // - La baja es logica: el vehiculo deja de ofrecerse para guias nuevas pero se conserva su historia.
-// - Un vehiculo esta habilitado si sigue activo, tiene permiso vigente a la fecha y una ITV que no vencio.
+// - Un vehiculo esta habilitado si sigue activo, tiene permiso vigente a la fecha, una ITV que no vencio y
+//   vigentes los permisos a demanda que un funcionario le asigno a la empresa.
 @Stateless
 public class GestionVehiculosService {
 
@@ -59,6 +63,8 @@ public class GestionVehiculosService {
     @EJB
     private ITVDAO itvs;
     @EJB
+    private PermisoVehiculoDAO permisosExtra;
+    @EJB
     private GuiaDAO guias;
 
     public record NuevoVehiculo(String matricula, String marca, String modelo, Long peso, Long capacidadCargaKg) {
@@ -74,6 +80,15 @@ public class GestionVehiculosService {
     public record DatosItv(String fechaVencimiento) {
     }
 
+    // numero y fechaVencimiento: solo los que pida el tipo. Fecha en formato ISO (yyyy-MM-dd).
+    public record DatosPermisoExtra(String numero, String fechaVencimiento) {
+    }
+
+    // Un permiso a demanda exigido a la empresa, cargado o no en este vehiculo
+    public record PermisoExtraVista(Long idTipo, String nombre, boolean pideNumero, boolean pideVencimiento,
+            boolean cargado, String numero, String fechaVencimiento, boolean vigente) {
+    }
+
     public record PermisoVista(String nro, String fechaEmision, String fechaVencimiento, boolean vigente) {
     }
 
@@ -82,7 +97,8 @@ public class GestionVehiculosService {
 
     // permiso / itv: null si no se registraron; itv es la de vencimiento mas lejano.
     public record VehiculoVista(String matricula, String marca, String modelo, long peso, long capacidadCargaKg,
-            boolean activo, PermisoVista permiso, ItvVista itv, boolean habilitado) {
+            boolean activo, PermisoVista permiso, ItvVista itv, boolean habilitado,
+            List<PermisoExtraVista> permisosExtra) {
     }
 
     public record VehiculoDetalle(VehiculoVista vehiculo, List<ItvVista> itvs) {
@@ -198,6 +214,47 @@ public class GestionVehiculosService {
         return detalle(vehiculo);
     }
 
+    // Registra o actualiza un permiso a demanda del vehiculo (uno por tipo). Solo se aceptan los tipos activos
+    // asignados a la empresa: otro id responde 404.
+    public VehiculoDetalle registrarPermisoExtra(String ciResponsable, String matricula, Long idTipo,
+            DatosPermisoExtra datos, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
+        Empresa empresa = empresaDelResponsable(ciResponsable, correlationId);
+        Vehiculo vehiculo = vehiculoActivo(empresa, matricula);
+        TipoPermiso tipo = permisosExtra.tiposRequeridos(empresa).stream()
+                .filter(t -> t.getId().equals(idTipo)).findFirst()
+                .orElseThrow(() -> new RecursoNoEncontradoException("La empresa no tiene asignado ese permiso"));
+        DatosPermisoExtra d = datos == null ? new DatosPermisoExtra(null, null) : datos;
+
+        Map<String, String> errores = new LinkedHashMap<>();
+        String numero = null;
+        if (tipo.isPideNumero()) {
+            numero = d.numero() == null ? "" : d.numero().trim().toUpperCase(Locale.ROOT);
+            if (numero.isEmpty()) {
+                errores.put("numero", "El número de permiso es obligatorio.");
+            } else if (numero.length() > MAX_NRO_PERMISO) {
+                errores.put("numero", "El número de permiso no puede tener más de " + MAX_NRO_PERMISO + " caracteres.");
+            }
+        }
+        LocalDate vencimiento = tipo.isPideVencimiento() ? fecha(errores, "fechaVencimiento", d.fechaVencimiento()) : null;
+        if (!errores.isEmpty()) {
+            throw new DatosInvalidosException(errores);
+        }
+
+        PermisoVehiculo actual = permisosExtra.buscarPorVehiculo(vehiculo).stream()
+                .filter(p -> p.getTipo().getId().equals(tipo.getId())).findFirst().orElse(null);
+        if (actual == null) {
+            permisosExtra.guardar(new PermisoVehiculo(vehiculo, tipo, numero, vencimiento));
+        } else {
+            actual.setNumero(numero);
+            actual.setFechaVencimiento(vencimiento);
+        }
+        LOG.info(() -> "evento=vehiculo.permiso_extra correlationId=" + correlationId + " usuario=" + ciResponsable
+                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula() + " tipo="
+                + tipo.getId() + " vencimiento=" + vencimiento);
+        return detalle(vehiculo);
+    }
+
     // Agrega una Inspeccion Tecnica Vehicular; se conserva el historial.
     public VehiculoDetalle agregarItv(String ciResponsable, String matricula, DatosItv datos, String correlationId)
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
@@ -278,9 +335,27 @@ public class GestionVehiculosService {
                 : new PermisoVista(p.getNro(), texto(p.getFechaEmision()), texto(p.getFechaVencimiento()),
                         !hoy.isBefore(p.getFechaEmision()) && !hoy.isAfter(p.getFechaVencimiento()));
         ItvVista itv = historial.isEmpty() ? null : itvVista(historial.get(0), hoy);
+        List<PermisoExtraVista> extras = extras(v, hoy);
         return new VehiculoVista(v.getMatricula(), v.getMarca(), v.getModelo(), v.getPeso(), v.getCapacidadCargaKg(),
                 v.isActivo(), permiso, itv,
-                v.isActivo() && permiso != null && permiso.vigente() && itv != null && itv.vigente());
+                v.isActivo() && permiso != null && permiso.vigente() && itv != null && itv.vigente()
+                        && extras.stream().allMatch(PermisoExtraVista::vigente),
+                extras);
+    }
+
+    private List<PermisoExtraVista> extras(Vehiculo v, LocalDate hoy) {
+        List<TipoPermiso> tipos = permisosExtra.tiposRequeridos(v.getEmpresa());
+        if (tipos.isEmpty()) {
+            return List.of();
+        }
+        List<PermisoVehiculo> cargados = permisosExtra.buscarPorVehiculo(v);
+        return tipos.stream().map(t -> {
+            PermisoVehiculo p = cargados.stream().filter(c -> c.getTipo().getId().equals(t.getId())).findFirst()
+                    .orElse(null);
+            return new PermisoExtraVista(t.getId(), t.getNombre(), t.isPideNumero(), t.isPideVencimiento(), p != null,
+                    p == null ? null : p.getNumero(), p == null ? null : texto(p.getFechaVencimiento()),
+                    p != null && p.vigenteAl(hoy));
+        }).toList();
     }
 
     private static ItvVista itvVista(ITV i, LocalDate hoy) {

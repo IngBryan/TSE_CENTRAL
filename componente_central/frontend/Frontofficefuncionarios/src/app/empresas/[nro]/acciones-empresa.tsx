@@ -14,10 +14,12 @@ type Panel = "modificar" | "asociar" | null;
 // se ofrece habilitarla, que antes no se podia (sin responsable no se habilita).
 export function AccionesEmpresa({
   empresa,
+  rubros,
   disponibles,
   creada,
 }: {
   empresa: EmpresaDetalle;
+  rubros: string[];
   // Solo si la empresa no tiene responsable: la primera tanda de usuarios que se pueden asociar
   disponibles: ResultadoUsuarios | null;
   // Viene del alta (?creada=1). Es el mensaje inicial: la siguiente accion lo reemplaza, aunque la URL lo
@@ -48,6 +50,7 @@ export function AccionesEmpresa({
         nombrePublico: empresa.nombrePublico ?? "",
         razonSocial: empresa.razonSocial ?? "",
         direccion: empresa.direccion ?? "",
+        rubro: empresa.rubro,
         habilitada: true,
         version: empresa.version ?? 0,
       });
@@ -67,6 +70,7 @@ export function AccionesEmpresa({
     return (
       <ModificarEmpresa
         empresa={empresa}
+        rubros={rubros}
         onCerrar={() => setPanel(null)}
         onModificada={(mensaje) => {
           setExito(mensaje);

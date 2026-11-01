@@ -21,8 +21,10 @@ public class Guia implements Serializable {
 
     @Id
     private String id;
+    // Nombre del catalogo Rubro
+    @Column(length = 100)
     private String rubroCliente;
-    // Que se transporta (granos a granel, rollizos, contenedor...); lo ve el chofer en la app movil
+    // Nombre del catalogo TipoCarga; lo ve el chofer en la app movil
     @Column(length = 100)
     private String tipoCarga;
     private long pesoCargaKg; /* lo dejo como peso en vez de volumen */

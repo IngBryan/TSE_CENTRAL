@@ -24,6 +24,9 @@ export type Guia = {
   version?: number | null;
 };
 
+// Opciones de los desplegables de rubro y tipo de carga (catalogos precargados del sistema)
+export type Catalogos = { rubros: string[]; tiposCarga: string[] };
+
 export type ValoresGuia = { rubroCliente: string; tipoCarga: string; pesoCargaKg: string; fecha: string; origen: string; destino: string };
 export type EstadoNuevaGuia = { ok?: string; error?: string; campos?: Record<string, string>; valores?: ValoresGuia };
 export type ResultadoAsignacion = { ok: true } | { ok: false; error: string; campos?: Record<string, string> };
@@ -37,6 +40,17 @@ async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: un
   const res = await llamarBackend<T & ErrorBackend>(ruta, { method, body, correlationId, usuarioCi: sesion.perfil.cedula });
   console.info(`[guias] correlationId=${correlationId} ${method} ${ruta} status=${res.status}`);
   return res;
+}
+
+// Sin catalogos los desplegables quedan vacios y el formulario no se puede guardar
+export async function obtenerCatalogos(): Promise<Catalogos> {
+  try {
+    const res = await llamar<Catalogos>("/empresa/guias/catalogos", "GET");
+    if (res?.status === 200 && res.data) return { rubros: res.data.rubros, tiposCarga: res.data.tiposCarga };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+  }
+  return { rubros: [], tiposCarga: [] };
 }
 
 export async function crearGuia(_previo: EstadoNuevaGuia, formulario: FormData): Promise<EstadoNuevaGuia> {

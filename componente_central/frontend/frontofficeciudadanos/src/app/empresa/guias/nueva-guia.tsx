@@ -2,18 +2,20 @@
 
 import { useActionState, useState } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
-import { crearGuia, type EstadoNuevaGuia } from "./actions";
+import { crearGuia, type Catalogos, type EstadoNuevaGuia } from "./actions";
 
 const CAMPOS = [
-  { nombre: "rubroCliente", etiqueta: "Rubro del cliente", tipo: "text", ayuda: "Por ejemplo: agropecuario, forestal, construcción." },
-  { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "text", ayuda: "Por ejemplo: granos a granel, rollizos, contenedor." },
+  { nombre: "rubroCliente", etiqueta: "Rubro del cliente", tipo: "select" },
+  { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "select" },
   { nombre: "pesoCargaKg", etiqueta: "Carga (kg)", tipo: "number" },
   { nombre: "fecha", etiqueta: "Fecha del viaje", tipo: "date" },
   { nombre: "origen", etiqueta: "Origen", tipo: "text" },
   { nombre: "destino", etiqueta: "Destino", tipo: "text" },
 ] as const;
 
-export function NuevaGuia({ hoy }: { hoy: string }) {
+const clase = "h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50";
+
+export function NuevaGuia({ hoy, catalogos }: { hoy: string; catalogos: Catalogos }) {
   const [abierto, setAbierto] = useState(false);
   const [estado, accion, guardando] = useActionState<EstadoNuevaGuia, FormData>(async (previo, datos) => {
     const r = await crearGuia(previo, datos);
@@ -47,29 +49,43 @@ export function NuevaGuia({ hoy }: { hoy: string }) {
       <div className="grid gap-4 sm:grid-cols-2">
         {CAMPOS.map((c) => {
           const error = estado.campos?.[c.nombre];
+          const borde = error ? "border-red-500" : "border-black/15 dark:border-white/20";
           return (
             <label
               key={c.nombre}
               className={`flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300 ${c.nombre === "rubroCliente" ? "sm:col-span-2" : ""}`}
             >
               {c.etiqueta}
-              <input
-                name={c.nombre}
-                type={c.tipo}
-                defaultValue={estado.valores?.[c.nombre] ?? ""}
-                required
-                min={c.tipo === "number" ? 1 : c.tipo === "date" ? hoy : undefined}
-                step={c.tipo === "number" ? 1 : undefined}
-                aria-invalid={error ? true : undefined}
-                className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
-                  error ? "border-red-500" : "border-black/15 dark:border-white/20"
-                }`}
-              />
-              {error ? (
-                <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>
+              {c.tipo === "select" ? (
+                <select
+                  name={c.nombre}
+                  defaultValue={estado.valores?.[c.nombre] ?? ""}
+                  required
+                  aria-invalid={error ? true : undefined}
+                  className={`${clase} ${borde}`}
+                >
+                  <option value="" disabled>
+                    Elegí una opción
+                  </option>
+                  {(c.nombre === "rubroCliente" ? catalogos.rubros : catalogos.tiposCarga).map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
               ) : (
-                "ayuda" in c && <span className="text-xs font-normal text-zinc-500">{c.ayuda}</span>
+                <input
+                  name={c.nombre}
+                  type={c.tipo}
+                  defaultValue={estado.valores?.[c.nombre] ?? ""}
+                  required
+                  min={c.tipo === "number" ? 1 : c.tipo === "date" ? hoy : undefined}
+                  step={c.tipo === "number" ? 1 : undefined}
+                  aria-invalid={error ? true : undefined}
+                  className={`${clase} ${borde}`}
+                />
               )}
+              {error && <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>}
             </label>
           );
         })}

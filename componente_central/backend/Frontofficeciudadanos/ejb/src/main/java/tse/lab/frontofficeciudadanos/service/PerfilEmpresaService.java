@@ -26,10 +26,10 @@ public class PerfilEmpresaService {
     private AutorizacionResponsable autorizacion;
 
     public record DatosEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            boolean habilitada) {
+            boolean habilitada, String rubro) {
         static DatosEmpresa de(Empresa e) {
             return new DatosEmpresa(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.getDireccion(),
-                    e.isHabilitada());
+                    e.isHabilitada(), e.getRubro());
         }
     }
 

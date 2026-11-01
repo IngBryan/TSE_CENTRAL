@@ -166,7 +166,7 @@ docker compose up --build
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
 | `frontofficefuncionarios-front`               | http://localhost:8080/funcionarios |
-| `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
+| `backofficeautoridadesadministradores-front`  | http://localhost:3004/backoffice |
 | `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
@@ -343,6 +343,19 @@ ve una cookie de sesion cifrada.
     (`{ nro, fechaEmision, fechaVencimiento }`, fechas `yyyy-MM-dd`), `POST .../{matricula}/itv`
     (`{ fechaVencimiento }`) y `POST .../{matricula}/baja`. Logs `evento=vehiculo.alta|modificado|permiso|itv|baja`.
   - Tests: `GestionVehiculosServiceTest` (un caso por regla, contra H2).
+- **Rubros y tipos de carga:** son catalogos precargados, sin ABM, como pide la letra. `esquema-adicional.sql`
+  carga las tablas `rubros` y `tipos_carga`; para cambiarlos se edita ese script. `Guia.rubroCliente`,
+  `Guia.tipoCarga` y `Empresa.rubro` guardan el nombre, con clave foranea al catalogo, y los servicios responden
+  400 si el valor no existe. Opciones: `GET /api/empresa/guias/catalogos` (ciudadanos) y `GET /api/empresas/rubros`
+  (funcionarios). El rubro de la guia es el del **cliente**. El de la empresa lo elige el funcionario en el alta o
+  la modificacion: es opcional e informativo, no limita lo que la empresa puede transportar.
+- **Permisos a demanda:** el Permiso Nacional y la ITV son fijos y para todos; los demas se agregan sin
+  programar. El administrador crea el tipo en el backoffice (`/backoffice/tipos-permiso`, `TipoPermiso`: si pide
+  numero y vencimiento, y si esta activo), el funcionario lo asigna a la empresa (`GET|PUT /api/empresas/{nro}/permisos`)
+  y el responsable lo carga en cada vehiculo (`PUT /api/empresa/vehiculos/{matricula}/permisos-extra/{idTipo}`,
+  `PermisoVehiculo`). Un permiso asignado que falta o esta vencido deja al vehiculo como no habilitado en el
+  frontoffice y en el portal publico. No bloquea la asignacion de guias ni genera casos de fiscalizacion, y un
+  tipo desactivado deja de exigirse.
 - **Modelo:** `Chofer` es la asociacion persona-empresa (id propio, `(ci, nro_empresa)` unico), asi
   una persona puede ser chofer de varias empresas; las guias referencian esa asociacion.
 - **Datos de prueba (solo desarrollo):** `ejb/src/main/resources/META-INF/datos-prueba.sql` carga en

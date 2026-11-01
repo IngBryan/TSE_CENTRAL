@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
-import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, UsuarioDisponible } from "@/lib/empresas";
+import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, PermisoEmpresa, UsuarioDisponible } from "@/lib/empresas";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 const SESION_VENCIDA = "Tu sesión venció. Volvé a ingresar.";
@@ -20,6 +20,71 @@ export type ResultadoModificacion =
 export type ResultadoAlta = { ok: false; error: string; campos?: Record<string, string> };
 
 export type ResultadoUsuarios = { ok: true; usuarios: UsuarioDisponible[] } | { ok: false; error: string };
+
+// Opciones del desplegable de rubro (catalogo precargado). El rubro es opcional: si falla, queda solo "Sin rubro".
+export async function obtenerRubros(): Promise<string[]> {
+  const sesion = await getSesion();
+  if (!sesion) return [];
+  try {
+    const res = await llamarBackend<string[]>("/empresas/rubros", { correlationId: randomUUID(), usuarioCi: sesion.usuario.cedula });
+    return res.status === 200 && Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return [];
+  }
+}
+
+// Permisos a demanda que se le pueden exigir a la empresa. null si no se pudieron obtener.
+export async function obtenerPermisos(nroEmpresa: number): Promise<PermisoEmpresa[] | null> {
+  const sesion = await getSesion();
+  if (!sesion) return null;
+  try {
+    const res = await llamarBackend<PermisoEmpresa[]>(`/empresas/${nroEmpresa}/permisos`, {
+      correlationId: randomUUID(),
+      usuarioCi: sesion.usuario.cedula,
+    });
+    return res.status === 200 && Array.isArray(res.data) ? res.data : null;
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return null;
+  }
+}
+
+// Reemplaza los permisos a demanda asignados: los vehiculos de la empresa los van a tener que cargar
+export async function asignarPermisos(nroEmpresa: number, tipos: number[]): Promise<ResultadoModificacion> {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false, error: SESION_VENCIDA };
+  if (!Number.isSafeInteger(nroEmpresa) || nroEmpresa <= 0) return { ok: false, error: "La empresa no existe." };
+  if (!Array.isArray(tipos) || !tipos.every(Number.isSafeInteger)) {
+    return { ok: false, error: "No se pudieron guardar los permisos." };
+  }
+  const correlationId = randomUUID();
+  try {
+    const res = await llamarBackend<PermisoEmpresa[] & ErrorBackend>(`/empresas/${nroEmpresa}/permisos`, {
+      method: "PUT",
+      body: { tipos },
+      correlationId,
+      usuarioCi: sesion.usuario.cedula,
+    });
+    console.info(`[empresas] correlationId=${correlationId} PUT /empresas/${nroEmpresa}/permisos status=${res.status}`);
+    if (res.status === 200) {
+      revalidatePath(`/empresas/${nroEmpresa}`);
+      return { ok: true, mensaje: "Guardamos los permisos de la empresa." };
+    }
+    if (res.status === 400) {
+      // Un tipo elegido se desactivo mientras tanto: la pagina se recarga con los disponibles
+      revalidatePath(`/empresas/${nroEmpresa}`);
+      return { ok: false, error: "Alguno de los permisos ya no está disponible. Revisá la lista." };
+    }
+    if (res.status === 404) return { ok: false, error: "La empresa no existe." };
+    if (res.status === 403)
+      return { ok: false, error: "No podés asignar permisos: no estás registrado como funcionario del MTOP." };
+    return { ok: false, error: "No se pudieron guardar los permisos." };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return { ok: false, error: NO_DISPONIBLE };
+  }
+}
 
 // FA4, paso 2: usuarios registrados y validados que se pueden elegir como responsable. filtro es el
 // comienzo de la cedula (vacio: los primeros).
@@ -57,6 +122,7 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     typeof datos.razonSocial !== "string" ||
     typeof datos.direccion !== "string" ||
     typeof datos.habilitada !== "boolean" ||
+    (datos.rubro !== null && typeof datos.rubro !== "string") ||
     (datos.ciResponsable !== null && typeof datos.ciResponsable !== "string")
   ) {
     return { ok: false, error: "No se pudo registrar la empresa." };
@@ -66,6 +132,7 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     nombrePublico: datos.nombrePublico,
     razonSocial: datos.razonSocial,
     direccion: datos.direccion,
+    rubro: datos.rubro,
     habilitada: datos.habilitada,
     ciResponsable: datos.ciResponsable,
   };
@@ -121,6 +188,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     typeof cambios.razonSocial !== "string" ||
     typeof cambios.direccion !== "string" ||
     typeof cambios.habilitada !== "boolean" ||
+    (cambios.rubro !== null && typeof cambios.rubro !== "string") ||
     !Number.isSafeInteger(cambios.version)
   ) {
     return { ok: false, error: "No se pudo modificar la empresa." };
@@ -129,6 +197,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     nombrePublico: cambios.nombrePublico,
     razonSocial: cambios.razonSocial,
     direccion: cambios.direccion,
+    rubro: cambios.rubro,
     habilitada: cambios.habilitada,
     version: cambios.version,
   };

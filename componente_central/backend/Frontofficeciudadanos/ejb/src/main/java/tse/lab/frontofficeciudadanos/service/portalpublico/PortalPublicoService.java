@@ -21,6 +21,7 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
+import tse.lab.frontofficeciudadanos.data.PermisoVehiculoDAO;
 import tse.lab.frontofficeciudadanos.data.PortalPublicoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
@@ -63,6 +64,8 @@ public class PortalPublicoService {
     private PermisoCirculacionDAO permisos;
     @EJB
     private ITVDAO itvs;
+    @EJB
+    private PermisoVehiculoDAO permisosExtra;
 
     private final int umbral;
 
@@ -150,7 +153,8 @@ public class PortalPublicoService {
         return new ValidacionVehiculo(v.getMatricula(), true, v.isActivo(),
                 p == null ? null : p.getFechaVencimiento().toString(), permisoVigente,
                 itv == null ? null : itv.getFechaVencimiento().toString(), itvVigente,
-                empresa.isHabilitada() && v.isActivo() && permisoVigente && itvVigente);
+                empresa.isHabilitada() && v.isActivo() && permisoVigente && itvVigente
+                        && permisosExtra.tieneRequeridosVigentes(v, hoy));
     }
 
     public Estadisticas estadisticas(Integer anioPedido, String correlationId) throws DatosInvalidosException {
@@ -191,7 +195,7 @@ public class PortalPublicoService {
             kg += numero(r[3]);
         }
 
-        // Carga por rubro del cliente (texto libre: se agrupa sin distinguir mayusculas ni tildes)
+        // Carga por rubro del cliente (catalogo Rubro: se agrupa sin distinguir mayusculas ni tildes)
         Map<String, Fila> porRubro = new LinkedHashMap<>();
         for (Object[] r : portal.viajesPorEmpresaYRubro(desde, hasta)) {
             String etiqueta = r[1] == null || ((String) r[1]).isBlank() ? "Sin rubro" : ((String) r[1]).strip();
@@ -247,7 +251,7 @@ public class PortalPublicoService {
                 viajesPublicables ? new Valor(viajes, false) : new Valor(null, true),
                 viajesPublicables ? new Valor(kg, false) : new Valor(null, true),
                 Agregacion.proteger(new ArrayList<>(porMes.values()), umbral),
-                // El rubro lo escribe cada empresa y su nombre puede identificarla: los reservados van juntos
+                // Un rubro con pocas empresas puede identificarlas: los reservados van juntos
                 Agregacion.protegerAgrupando(rubros, umbral, OTROS_RUBROS, "Otros rubros"),
                 Agregacion.proteger(new ArrayList<>(porTipo.values()), umbral),
                 tasa,

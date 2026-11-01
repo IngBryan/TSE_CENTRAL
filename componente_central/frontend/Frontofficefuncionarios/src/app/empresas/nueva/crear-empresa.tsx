@@ -13,12 +13,13 @@ const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:tex
 // FA1: el funcionario ingresa los datos de la empresa, elige (opcionalmente) su responsable entre los
 // usuarios disponibles y confirma. Las reglas las valida el backend; si sale bien, la action redirige
 // al detalle de la empresa nueva.
-export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }) {
+export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUsuarios; rubros: string[] }) {
   const [datos, setDatos] = useState({
     nroEmpresa: "",
     nombrePublico: "",
     razonSocial: "",
     direccion: "",
+    rubro: "",
     habilitada: false,
   });
   const [responsable, setResponsable] = useState<UsuarioDisponible | null>(null);
@@ -51,6 +52,7 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
       const r = await crearEmpresa({
         ...datos,
         nroEmpresa: Number(datos.nroEmpresa),
+        rubro: datos.rubro || null,
         habilitada: datos.habilitada && responsable !== null,
         ciResponsable: responsable?.ci ?? null,
       });
@@ -135,6 +137,24 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
             className={entrada}
           />
           {errorCampo("direccion")}
+        </label>
+
+        <label className={etiqueta}>
+          Rubro (opcional)
+          <select
+            value={datos.rubro}
+            disabled={bloqueado}
+            onChange={(e) => cambiar("rubro", e.target.value)}
+            className={entrada}
+          >
+            <option value="">Sin rubro</option>
+            {rubros.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+          {errorCampo("rubro")}
         </label>
 
         <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">

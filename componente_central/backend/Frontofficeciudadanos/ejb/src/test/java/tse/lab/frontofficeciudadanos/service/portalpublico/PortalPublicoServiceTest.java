@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
+import tse.lab.frontofficeciudadanos.data.PermisoVehiculoDAO;
 import tse.lab.frontofficeciudadanos.data.PortalPublicoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
@@ -60,6 +61,7 @@ class PortalPublicoServiceTest {
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "permisos", conEm(new PermisoCirculacionDAO()));
         set(servicio, "itvs", conEm(new ITVDAO()));
+        set(servicio, "permisosExtra", conEm(new PermisoVehiculoDAO()));
 
         em.getTransaction().begin();
         // Empresas 1 a 3 habilitadas, cada una con un vehiculo habilitado; la 4 no habilitada

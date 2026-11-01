@@ -3,15 +3,21 @@ package tse.lab.model;
 import java.io.Serializable;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "empresas")
@@ -23,6 +29,9 @@ public class Empresa implements Serializable {
     private String nombrePublico;
     private String razonSocial;
     private String direccion;
+    // Opcional e informativo (catalogo Rubro): no limita lo que la empresa puede transportar
+    @Column(length = 100)
+    private String rubro;
     // La habilita un funcionario del MTOP; solo una empresa habilitada puede dar de alta choferes (CU-02)
     private boolean habilitada;
     @OneToOne(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE }) // lo defini como one to one,
@@ -34,6 +43,11 @@ public class Empresa implements Serializable {
     private List<Guia> guias;
     @OneToMany(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<Vehiculo> vehiculos;
+    // Permisos a demanda que un funcionario le asigno: los tienen que tener todos sus vehiculos
+    @ManyToMany
+    @JoinTable(name = "empresas_tipos_permiso", joinColumns = @JoinColumn(name = "nro_empresa"),
+            inverseJoinColumns = @JoinColumn(name = "id_tipo"))
+    private Set<TipoPermiso> permisosRequeridos = new HashSet<>();
     // Bloqueo optimista: el funcionario manda la version que estaba mirando al modificar la empresa, para no
     // pisar sin aviso lo que otro cambio mientras tanto
     @Version
@@ -73,6 +87,14 @@ public class Empresa implements Serializable {
         return direccion;
     }
 
+    public String getRubro() {
+        return rubro;
+    }
+
+    public void setRubro(String rubro) {
+        this.rubro = rubro;
+    }
+
     public boolean isHabilitada() {
         return habilitada;
     }
@@ -95,6 +117,10 @@ public class Empresa implements Serializable {
 
     public List<Vehiculo> getVehiculos() {
         return vehiculos;
+    }
+
+    public Set<TipoPermiso> getPermisosRequeridos() {
+        return permisosRequeridos;
     }
 
     public Long getVersion() {

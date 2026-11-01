@@ -45,8 +45,8 @@ class EmpresasResourceTest {
 
     @Test
     void cadaEndpointDelegaEnElServicioConElCorrelationId() throws Exception {
-        AltaEmpresa alta = new AltaEmpresa(3L, "A", "B", "C", null, "12345678");
-        CambiosEmpresa cambios = new CambiosEmpresa("A", "B", "C", true, 0L);
+        AltaEmpresa alta = new AltaEmpresa(3L, "A", "B", "C", null, "12345678", null);
+        CambiosEmpresa cambios = new CambiosEmpresa("A", "B", "C", true, 0L, null);
         AsociacionUsuario asociacion = new AsociacionUsuario("12345678");
 
         assertEquals(200, recurso.listar(CI, req).getStatus());

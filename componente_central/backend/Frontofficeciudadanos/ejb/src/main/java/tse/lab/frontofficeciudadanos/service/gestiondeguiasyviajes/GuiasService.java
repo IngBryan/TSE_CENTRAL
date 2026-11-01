@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
+import tse.lab.frontofficeciudadanos.data.CatalogoDAO;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
@@ -63,6 +64,12 @@ public class GuiasService {
     private EventoViajeDAO eventos;
     @EJB
     private ModificacionGuiaDAO modificaciones;
+    @EJB
+    private CatalogoDAO catalogos;
+
+    // Opciones de los desplegables de la guia
+    public record Catalogos(List<String> rubros, List<String> tiposCarga) {
+    }
 
     public record NuevaGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha, String origen, String destino) {
     }
@@ -111,6 +118,11 @@ public class GuiasService {
     public List<GuiaVista> listar(String ciResponsable, String correlationId) throws NoAutorizadoException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
         return guias.buscarPorEmpresaOrdenadas(empresa).stream().map(this::vista).toList();
+    }
+
+    public Catalogos catalogos(String ciResponsable, String correlationId) throws NoAutorizadoException {
+        autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
+        return new Catalogos(catalogos.rubros(), catalogos.tiposCarga());
     }
 
     public GuiaVista crear(String ciResponsable, NuevaGuia datos, String correlationId)
@@ -398,13 +410,19 @@ public class GuiasService {
             String destino) {
     }
 
-    // Reglas de los datos de una guia (alta y edicion): rubro y tipo de carga obligatorios, carga entre 1 y
+    // Reglas de los datos de una guia (alta y edicion): rubro y tipo de carga obligatorios y del catalogo, carga entre 1 y
     // MAX_CARGA_KG, fecha >= hoy, origen y destino obligatorios y distintos.
-    private static DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
+    private DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
             String origenTexto, String destinoTexto) throws DatosInvalidosException {
         Map<String, String> errores = new LinkedHashMap<>();
         String rubro = texto(errores, "rubroCliente", "El rubro del cliente", rubroCliente, MAX_TEXTO);
         String tipoCarga = texto(errores, "tipoCarga", "El tipo de carga", tipoCargaTexto, MAX_TEXTO);
+        if (rubro != null && !catalogos.existeRubro(rubro)) {
+            errores.put("rubroCliente", "Elegí un rubro de la lista.");
+        }
+        if (tipoCarga != null && !catalogos.existeTipoCarga(tipoCarga)) {
+            errores.put("tipoCarga", "Elegí un tipo de carga de la lista.");
+        }
         String origen = texto(errores, "origen", "El origen", origenTexto, MAX_LUGAR);
         String destino = texto(errores, "destino", "El destino", destinoTexto, MAX_LUGAR);
         if (pesoCargaKg == null || pesoCargaKg <= 0) {

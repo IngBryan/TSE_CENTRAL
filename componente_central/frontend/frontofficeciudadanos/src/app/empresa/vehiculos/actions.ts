@@ -10,6 +10,17 @@ import { getSesion } from "@/lib/auth/session";
 
 export type PermisoVista = { nro: string; fechaEmision: string; fechaVencimiento: string; vigente: boolean };
 export type ItvVista = { id: number; fechaVencimiento: string; vigente: boolean };
+// Permiso a demanda que un funcionario le exige a la empresa, cargado o no en este vehiculo
+export type PermisoExtraVista = {
+  idTipo: number;
+  nombre: string;
+  pideNumero: boolean;
+  pideVencimiento: boolean;
+  cargado: boolean;
+  numero: string | null;
+  fechaVencimiento: string | null;
+  vigente: boolean;
+};
 export type Vehiculo = {
   matricula: string;
   marca: string;
@@ -20,6 +31,7 @@ export type Vehiculo = {
   permiso?: PermisoVista | null;
   itv?: ItvVista | null;
   habilitado: boolean;
+  permisosExtra: PermisoExtraVista[];
 };
 export type VehiculoDetalle = { vehiculo: Vehiculo; itvs: ItvVista[] };
 
@@ -105,6 +117,14 @@ export async function registrarPermiso(
   datos: { nro: string; fechaEmision: string; fechaVencimiento: string },
 ): Promise<Resultado> {
   return modificar(matricula, "/permiso", "PUT", datos);
+}
+
+export async function registrarPermisoExtra(
+  matricula: string,
+  idTipo: number,
+  datos: { numero: string; fechaVencimiento: string },
+): Promise<Resultado> {
+  return modificar(matricula, `/permisos-extra/${idTipo}`, "PUT", datos);
 }
 
 export async function agregarItv(matricula: string, fechaVencimiento: string): Promise<Resultado> {

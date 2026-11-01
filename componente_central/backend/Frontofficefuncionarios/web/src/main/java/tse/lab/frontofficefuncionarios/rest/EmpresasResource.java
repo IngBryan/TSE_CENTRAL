@@ -22,6 +22,7 @@ import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.AltaEmpresa;
+import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.AsignacionPermisos;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.AsociacionUsuario;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.CambiosEmpresa;
 
@@ -51,8 +52,16 @@ public class EmpresasResource {
         return ejecutar(() -> empresas.usuariosDisponibles(usuario, filtro, correlationId(req)));
     }
 
+    // Opciones del desplegable de rubro. Ruta fija: JAX-RS la prefiere a /{nro}.
+    @GET
+    @Path("/rubros")
+    public Response rubros(@HeaderParam(USUARIO_CI) String usuario, @Context HttpServletRequest req) {
+        return ejecutar(() -> empresas.rubros(usuario, correlationId(req)));
+    }
+
     // Body {"nroEmpresa": 2, "nombrePublico": "...", "razonSocial": "...", "direccion": "...",
-    // "habilitada": false, "ciResponsable": "12345678"}; habilitada y ciResponsable son opcionales.
+    // "habilitada": false, "ciResponsable": "12345678", "rubro": "Forestal"}; habilitada, ciResponsable y
+    // rubro son opcionales.
     // 409 EMPRESA_EXISTENTE si el numero ya esta registrado; con ciResponsable, los mismos errores que la
     // asociacion (404 USUARIO_NO_ENCONTRADO, 409 USUARIO_NO_VALIDADO o RESPONSABLE_DE_OTRA_EMPRESA).
     @POST
@@ -67,13 +76,30 @@ public class EmpresasResource {
         return ejecutar(() -> empresas.detalle(usuario, nro, correlationId(req)));
     }
 
-    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true, "version": 3};
+    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true, "version": 3,
+    // "rubro": "Forestal"}; rubro vacio deja la empresa sin rubro.
     // habilitada es opcional. 409 EMPRESA_DESACTUALIZADA si version no es la actual de la empresa.
     @PUT
     @Path("/{nro}")
     public Response modificar(@HeaderParam(USUARIO_CI) String usuario, @PathParam("nro") Long nro,
             CambiosEmpresa body, @Context HttpServletRequest req) {
         return ejecutar(() -> empresas.modificar(usuario, nro, body, correlationId(req)));
+    }
+
+    // Permisos a demanda: los que se pueden exigir, marcando los asignados a la empresa
+    @GET
+    @Path("/{nro}/permisos")
+    public Response permisos(@HeaderParam(USUARIO_CI) String usuario, @PathParam("nro") Long nro,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> empresas.permisos(usuario, nro, correlationId(req)));
+    }
+
+    // Body {"tipos": [1, 2]}: reemplaza los permisos a demanda asignados a la empresa
+    @PUT
+    @Path("/{nro}/permisos")
+    public Response asignarPermisos(@HeaderParam(USUARIO_CI) String usuario, @PathParam("nro") Long nro,
+            AsignacionPermisos body, @Context HttpServletRequest req) {
+        return ejecutar(() -> empresas.asignarPermisos(usuario, nro, body, correlationId(req)));
     }
 
     // Body {"ci": "12345678"}: asocia al usuario (registrado y validado) como responsable de la empresa.
