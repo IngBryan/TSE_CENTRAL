@@ -72,7 +72,7 @@ export default function MapaSeguimiento({
       style: ESTILO,
       center: [-56.2, -33.5],
       zoom: 6,
-      attributionControl: true,
+      attributionControl: {},
     });
     mapa.current = instancia;
     instancia.addControl(new NavigationControl(), "top-right");

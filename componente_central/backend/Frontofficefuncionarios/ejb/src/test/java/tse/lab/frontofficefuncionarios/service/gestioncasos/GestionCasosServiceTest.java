@@ -417,6 +417,51 @@ class GestionCasosServiceTest {
         assertEquals(1, auditoria(enDescargo).size());
     }
 
+    @Test
+    void gpsCasoSoloMuestraEvidenciasVinculadasYPaginaSinDuplicar() throws Exception {
+        Instant a = Instant.parse("2026-10-31T10:00:00Z");
+        Instant b = a.plusSeconds(15);
+        Instant c = a.plusSeconds(30);
+        Long id = enTx(() -> {
+            CasoFiscalizacion caso = new CasoFiscalizacion("Circulación sin Guía", "VIAJE_SIN_GUIA",
+                    em.find(Vehiculo.class, "SBA 1234"), null);
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", a));
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", b));
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", c));
+            em.persist(caso);
+            return caso.getId();
+        });
+        // El lector devuelve duplicados y otra matrícula: la consulta debe filtrar ambas cosas.
+        set(servicio, "tracking", new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MongoSeguimientoDAO() {
+            @Override
+            public List<tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento> buscarClaves(
+                    String matricula, List<Instant> instantes) {
+                return instantes.stream().filter(i -> !i.equals(b))
+                        .flatMap(i -> java.util.stream.Stream.of(
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "e1", 1, matricula, -34.9, -56.2, i),
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "e1-repetido", 1, matricula, -34.9, -56.2, i),
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "ajeno", 1, "OTRO", -34.9, -56.2, i)))
+                        .toList();
+            }
+        });
+        var primera = servicio.gpsCaso(FUNCIONARIO, id, "0", "2", "t");
+        assertEquals(3, primera.totalClaves());
+        assertEquals(2, primera.siguienteIndice());
+        assertEquals(1, primera.posiciones().size());
+        assertEquals(a, primera.posiciones().get(0).fechaHora());
+        assertEquals(1, primera.sinRecuperar());
+        var segunda = servicio.gpsCaso(FUNCIONARIO, id, "2", "2", "t");
+        assertNull(segunda.siguienteIndice());
+        assertEquals(1, segunda.posiciones().size());
+        assertEquals(c, segunda.posiciones().get(0).fechaHora());
+        assertThrows(NoAutorizadoException.class, () -> servicio.gpsCaso(NO_FUNCIONARIO, id, "0", "2", "t"));
+        assertThrows(DatosInvalidosException.class, () -> servicio.gpsCaso(FUNCIONARIO, id, "0", "501", "t"));
+        assertThrows(DatosInvalidosException.class, () -> servicio.gpsCaso(FUNCIONARIO, detectado, "0", "2", "t"));
+    }
+
     // ===== helpers =====
 
     // Lo consultado o rechazado no cambio el estado del caso, ni genero resolucion ni auditoria

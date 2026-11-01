@@ -68,6 +68,15 @@ public class CasosResource {
         return ejecutar(() -> casos.circulacion(usuario, id, correlationId(req)));
     }
 
+    /** Coordenadas de la evidencia GPS de una circulación sin Guía. Hasta 500 claves por página. */
+    @GET
+    @Path("/{id}/gps")
+    public Response gps(@HeaderParam(USUARIO_CI) String usuario, @PathParam("id") Long id,
+            @QueryParam("indice") String indice, @QueryParam("limite") String limite,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> casos.gpsCaso(usuario, id, indice, limite, correlationId(req)));
+    }
+
     // 404 SIN_DESCARGO si la empresa no presento descargo
     @GET
     @Path("/{id}/descargo")

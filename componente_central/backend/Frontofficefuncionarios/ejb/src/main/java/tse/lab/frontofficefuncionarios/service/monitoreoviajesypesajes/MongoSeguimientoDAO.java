@@ -69,6 +69,24 @@ public class MongoSeguimientoDAO implements TrackingSeguimientoSource {
         return consulta(matricula, desde, hasta, limite, true);
     }
 
+    /** Recupera exclusivamente marcas GPS ya vinculadas por PostgreSQL a un expediente.
+     * No admite una búsqueda por rango libre que pueda mostrar puntos de otra circulación.
+     * MongoDB almacena timestamps en milisegundos; las claves se normalizan a esa precisión.
+     */
+    public List<PuntoGpsSeguimiento> buscarClaves(String matricula, List<Instant> instantes) {
+        if (instantes == null || instantes.isEmpty()) return List.of();
+        if (instantes.size() > 500) throw new IllegalArgumentException("Máximo 500 claves por consulta");
+        List<Date> fechas = instantes.stream().map(Date::from).distinct().toList();
+        try {
+            return coleccion().find(Filters.and(Filters.eq("licensePlate", matricula),
+                            Filters.in("timestamp", fechas)))
+                    .sort(Sorts.ascending("timestamp"))
+                    .map(MongoSeguimientoDAO::punto).into(new ArrayList<>());
+        } catch (MongoException e) {
+            throw new SeguimientoNoDisponibleException("No se pudo consultar las evidencias GPS del caso", e);
+        }
+    }
+
     private List<PuntoGpsSeguimiento> consulta(String matricula, Instant desde, Instant hasta, int limite,
             boolean descendente) {
         try {

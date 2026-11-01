@@ -1,8 +1,10 @@
 package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,6 +18,8 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MongoSeguimientoDAO;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento;
 import tse.lab.model.CirculacionSinGuia;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
@@ -60,6 +64,8 @@ public class GestionCasosService {
     private AuditoriaCasoDAO auditoria;
     @EJB
     private CirculacionSinGuiaDAO circulaciones;
+    @EJB
+    private MongoSeguimientoDAO tracking;
 
     public enum Decision {
         CONFIRMAR(EstadoCaso.CONFIRMADA),
@@ -131,6 +137,12 @@ public class GestionCasosService {
     public record CirculacionVista(Long id, Long idCaso, String matricula, String estado,
             String inicio, String fin, String ultimaMedicion, String motivoFin,
             int cantidadClavesGps, boolean finalInferido) { }
+
+    /** El orden de las claves viene de PostgreSQL. La respuesta puede ser parcial si
+     * faltan documentos MongoDB, o si la circulación tiene más páginas.
+     */
+    public record PaginaGpsCaso(Long idCaso, int totalClaves, int indiceDesde,
+            Integer siguienteIndice, int sinRecuperar, List<PuntoGpsSeguimiento> posiciones) { }
 
     // fechaPresentacion y ciPresentante: cuando y quien (responsable de la empresa) lo presento; null en
     // descargos cargados antes de registrarlos
@@ -251,6 +263,48 @@ public class GestionCasosService {
                 c.getEstado().name(), texto(c.getFechaInicio()), texto(c.getFechaFin()),
                 texto(c.getUltimaMedicion()), c.getMotivoFin() == null ? null : c.getMotivoFin().name(),
                 caso.getClavesEventosTracking().size(), c.getFechaFin() != null);
+    }
+
+    /** Geometría del caso sin Guía, consultada por las claves de evidencia, no por matrícula/rango abiertos. */
+    public PaginaGpsCaso gpsCaso(String ci, Long idCaso, String indiceTexto, String limiteTexto,
+            String correlationId) throws NoAutorizadoException, RecursoNoEncontradoException,
+            DatosInvalidosException {
+        autorizacion.funcionario(ci, correlationId);
+        CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
+        if (!"VIAJE_SIN_GUIA".equals(caso.getTipoCaso())) {
+            throw new DatosInvalidosException(Map.of("caso", "La consulta GPS exige un caso VIAJE_SIN_GUIA"));
+        }
+        Map<String, String> errores = new LinkedHashMap<>();
+        Integer indice = entero(indiceTexto, 0);
+        Integer limite = entero(limiteTexto, 250);
+        if (indice == null || indice < 0) errores.put("indice", "Debe ser entero no negativo.");
+        if (limite == null || limite < 1 || limite > 500) errores.put("limite", "Debe estar entre 1 y 500.");
+        if (!errores.isEmpty()) throw new DatosInvalidosException(errores);
+
+        List<tse.lab.model.ClaveEvento> claves = caso.getClavesEventosTracking().stream()
+                .sorted(Comparator.comparing(tse.lab.model.ClaveEvento::getFechaHora)
+                        .thenComparing(tse.lab.model.ClaveEvento::getMatricula))
+                .toList();
+        int total = claves.size();
+        int inicio = Math.min(indice, total);
+        int fin = Math.min(total, inicio + limite);
+        List<tse.lab.model.ClaveEvento> seleccion = claves.subList(inicio, fin);
+        List<PuntoGpsSeguimiento> puntos = new ArrayList<>();
+        // La matrícula forma parte de la clave de evidencia; nunca recuperamos GPS ajenos al caso.
+        for (String matricula : seleccion.stream().map(tse.lab.model.ClaveEvento::getMatricula).distinct().toList()) {
+            List<Instant> marcas = seleccion.stream().filter(k -> matricula.equals(k.getMatricula()))
+                    .map(tse.lab.model.ClaveEvento::getFechaHora).toList();
+            Set<Instant> esperados = new HashSet<>(marcas.stream()
+                    .map(t -> java.util.Date.from(t).toInstant()).toList());
+            Set<Instant> hallados = new HashSet<>();
+            for (PuntoGpsSeguimiento p : tracking.buscarClaves(matricula, marcas)) {
+                if (matricula.equals(p.matricula()) && esperados.contains(p.fechaHora())
+                        && hallados.add(p.fechaHora())) puntos.add(p);
+            }
+        }
+        puntos.sort(Comparator.comparing(PuntoGpsSeguimiento::fechaHora));
+        return new PaginaGpsCaso(idCaso, total, inicio, fin < total ? fin : null,
+                seleccion.size() - puntos.size(), puntos);
     }
 
     // Flujo Alt3: el descargo presentado por la empresa. Flujo Alt 4: si no hay,
