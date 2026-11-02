@@ -59,6 +59,11 @@ public class PermisoCirculacion implements Serializable {
         this.fechaVencimiento = fechaVencimiento;
     }
 
+    public boolean vigenteEn(LocalDate fecha) {
+        return fechaEmision != null && fechaVencimiento != null
+                && !fecha.isBefore(fechaEmision) && !fecha.isAfter(fechaVencimiento);
+    }
+
     public Vehiculo getVehiculo() {
         return vehiculo;
     }
@@ -67,4 +72,3 @@ public class PermisoCirculacion implements Serializable {
         this.vehiculo = vehiculo;
     }
 }
-

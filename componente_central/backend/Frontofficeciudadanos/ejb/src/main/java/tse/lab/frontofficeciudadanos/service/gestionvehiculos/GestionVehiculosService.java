@@ -276,15 +276,14 @@ public class GestionVehiculosService {
         PermisoCirculacion p = permisos.buscarPorVehiculo(v);
         PermisoVista permiso = p == null ? null
                 : new PermisoVista(p.getNro(), texto(p.getFechaEmision()), texto(p.getFechaVencimiento()),
-                        !hoy.isBefore(p.getFechaEmision()) && !hoy.isAfter(p.getFechaVencimiento()));
+                        p.vigenteEn(hoy));
         ItvVista itv = historial.isEmpty() ? null : itvVista(historial.get(0), hoy);
         return new VehiculoVista(v.getMatricula(), v.getMarca(), v.getModelo(), v.getPeso(), v.getCapacidadCargaKg(),
-                v.isActivo(), permiso, itv,
-                v.isActivo() && permiso != null && permiso.vigente() && itv != null && itv.vigente());
+                v.isActivo(), permiso, itv, v.habilitadoEn(hoy, p, historial));
     }
 
     private static ItvVista itvVista(ITV i, LocalDate hoy) {
-        return new ItvVista(i.getId(), texto(i.getFechaVencimiento()), !hoy.isAfter(i.getFechaVencimiento()));
+        return new ItvVista(i.getId(), texto(i.getFechaVencimiento()), i.vigenteEn(hoy));
     }
 
     private static String texto(LocalDate fecha) {

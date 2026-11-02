@@ -30,7 +30,8 @@ public class ITV implements Serializable {
     public ITV() {
     }
 
-    // ABM de vehiculos del frontoffice de ciudadanos: la empresa solo declara el vencimiento de la ITV
+    // ABM de vehiculos del frontoffice de ciudadanos: la empresa solo declara el
+    // vencimiento de la ITV
     public ITV(LocalDate fechaVencimiento, Vehiculo vehiculo) {
         this(null, fechaVencimiento, vehiculo);
     }
@@ -61,6 +62,10 @@ public class ITV implements Serializable {
         this.fechaVencimiento = fechaVencimiento;
     }
 
+    public boolean vigenteEn(LocalDate fecha) {
+        return fechaVencimiento != null && !fecha.isAfter(fechaVencimiento);
+    }
+
     public Vehiculo getVehiculo() {
         return vehiculo;
     }
@@ -69,4 +74,3 @@ public class ITV implements Serializable {
         this.vehiculo = vehiculo;
     }
 }
-

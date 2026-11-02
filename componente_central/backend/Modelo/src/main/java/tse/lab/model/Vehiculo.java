@@ -7,6 +7,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.io.Serializable;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Locale;
 
 // La matricula se da de alta normalizada (normalizarMatricula): es la clave con la que llegan los
@@ -23,7 +25,8 @@ public class Vehiculo implements Serializable {
     private String modelo;
     private long peso;
     private long capacidadCargaKg;
-    // default en la columna: los INSERT de datos de prueba que no lo mencionan quedan activos
+    // default en la columna: los INSERT de datos de prueba que no lo mencionan
+    // quedan activos
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean activo = true;
     @ManyToOne
@@ -65,6 +68,16 @@ public class Vehiculo implements Serializable {
 
     public long getCapacidadCargaKg() {
         return capacidadCargaKg;
+    }
+
+    // Habilitado para circular el dia "fecha": sigue activo, tiene el permiso
+    // nacional de circulacion vigente y
+    // alguna ITV sin vencer. permiso puede ser null (no se registro) e itvs vacia.
+    // Es la regla que ve la empresa
+    // (ABM de vehiculos), el funcionario (fiscalizacion de habilitaciones) y el
+    // caso VEHICULO_SIN_HABILITACION.
+    public boolean habilitadoEn(LocalDate fecha, PermisoCirculacion permiso, Collection<ITV> itvs) {
+        return activo && permiso != null && permiso.vigenteEn(fecha) && itvs.stream().anyMatch(i -> i.vigenteEn(fecha));
     }
 
     public boolean isActivo() {
