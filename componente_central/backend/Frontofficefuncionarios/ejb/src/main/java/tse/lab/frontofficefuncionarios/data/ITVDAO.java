@@ -31,4 +31,10 @@ public class ITVDAO {
                 .setParameter("empresa", empresa)
                 .getResultList();
     }
+
+    // Todas las ITV, con el mismo orden por vehiculo
+    public List<ITV> listar() {
+        return em.createQuery("SELECT i FROM ITV i ORDER BY i.fechaVencimiento DESC, i.id DESC", ITV.class)
+                .getResultList();
+    }
 }

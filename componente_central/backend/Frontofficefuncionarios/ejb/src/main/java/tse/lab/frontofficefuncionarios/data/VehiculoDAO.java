@@ -25,4 +25,10 @@ public class VehiculoDAO {
                 .setParameter("empresa", empresa)
                 .getResultList();
     }
+
+    // Los vehiculos de todas las empresas (resumen del listado de empresas)
+    public List<Vehiculo> listar() {
+        return em.createQuery("SELECT v FROM Vehiculo v WHERE v.empresa IS NOT NULL", Vehiculo.class)
+                .getResultList();
+    }
 }

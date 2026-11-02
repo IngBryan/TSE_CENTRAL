@@ -1,12 +1,16 @@
+import type { ResumenHabilitaciones } from "./vehiculos";
+
 // Tipos de la API /empresas del backend Frontofficefuncionarios (records de GestionEmpresasService).
 
-// Fila del listado (GET /empresas)
+// Fila del listado (GET /empresas). vehiculos: cuantos tiene habilitados, no habilitados, por vencer y
+// dados de baja; el detalle esta en GET /empresas/{nro}/vehiculos.
 export type EmpresaResumen = {
   nroEmpresa: number;
   nombrePublico: string | null;
   razonSocial: string | null;
   habilitada: boolean;
   ciResponsable: string | null;
+  vehiculos: ResumenHabilitaciones;
 };
 
 // Solo primer nombre y primer apellido del responsable (Ley 18.331); estado frente a la PDI

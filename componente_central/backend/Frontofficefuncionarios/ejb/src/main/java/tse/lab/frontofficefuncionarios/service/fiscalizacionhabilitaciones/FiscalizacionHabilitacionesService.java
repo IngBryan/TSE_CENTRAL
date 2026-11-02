@@ -80,6 +80,8 @@ public class FiscalizacionHabilitacionesService {
     // porVencer: habilitados con el permiso o la ITV POR_VENCER
     public record ResumenHabilitaciones(int total, int habilitados, int noHabilitados, int dadosDeBaja,
             int porVencer) {
+
+        public static final ResumenHabilitaciones SIN_VEHICULOS = new ResumenHabilitaciones(0, 0, 0, 0, 0);
     }
 
     // vehiculos: primero los no habilitados, despues los habilitados y al final los dados de baja; dentro de
@@ -120,6 +122,25 @@ public class FiscalizacionHabilitacionesService {
                 + resumen.noHabilitados() + " porVencer=" + resumen.porVencer());
         return new FiscalizacionEmpresa(empresa.getNroEmpresa(), empresa.getNombrePublico(), empresa.isHabilitada(),
                 hoy.toString(), resumen, lista);
+    }
+
+    // Resumen de los vehiculos de cada empresa, para el listado de empresas. Solo estan las empresas con
+    // vehiculos. Tres consultas en total, no tres por empresa: si las empresas ya se cargaron en la misma
+    // transaccion (GestionEmpresasService.listar), los vehiculos las toman del contexto de persistencia.
+    public Map<Long, ResumenHabilitaciones> resumenPorEmpresa(String ci, String correlationId)
+            throws NoAutorizadoException {
+        autorizacion.funcionario(ci, correlationId);
+        LocalDate hoy = LocalDate.now(reloj);
+        List<Vehiculo> todos = vehiculos.listar();
+        Map<String, PermisoCirculacion> permisoPorMatricula = permisos.listar().stream()
+                .collect(Collectors.toMap(p -> p.getVehiculo().getMatricula(), Function.identity()));
+        Map<String, List<ITV>> itvsPorMatricula = itvs.listar().stream()
+                .collect(Collectors.groupingBy(i -> i.getVehiculo().getMatricula()));
+        return todos.stream().collect(Collectors.groupingBy(v -> v.getEmpresa().getNroEmpresa(),
+                Collectors.collectingAndThen(Collectors.mapping(v -> fiscalizar(v,
+                        permisoPorMatricula.get(v.getMatricula()),
+                        itvsPorMatricula.getOrDefault(v.getMatricula(), List.of()), hoy), Collectors.toList()),
+                        FiscalizacionHabilitacionesService::resumen)));
     }
 
     // 404 VEHICULO_NO_ENCONTRADO si la matricula no existe o es de otra empresa

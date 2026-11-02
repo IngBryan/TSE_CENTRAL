@@ -32,4 +32,8 @@ public class PermisoCirculacionDAO {
                 .setParameter("empresa", empresa)
                 .getResultList();
     }
+
+    public List<PermisoCirculacion> listar() {
+        return em.createQuery("SELECT p FROM PermisoCirculacion p", PermisoCirculacion.class).getResultList();
+    }
 }
