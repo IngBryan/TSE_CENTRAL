@@ -44,6 +44,8 @@ public class RevalidacionPdiJob {
      * revises, so the same profiles are never sent to the PDI twice at the same time.
      */
     private static final long LOCK = "RevalidacionPdiJob".hashCode();
+    private static final String TOMAR_LOCK = "SELECT pg_try_advisory_lock(?)";
+    private static final String LIBERAR_LOCK = "SELECT pg_advisory_unlock(?)";
 
     @Resource
     private TimerService timers;
@@ -77,11 +79,11 @@ public class RevalidacionPdiJob {
     void revisar() {
         Duration proxima = intervalo;
         try (Connection connection = database.getConnection()) {
-            if (advisoryLock(connection, "pg_try_advisory_lock")) {
+            if (advisoryLock(connection, TOMAR_LOCK)) {
                 try {
                     proxima = revalidarPendientes();
                 } finally {
-                    advisoryLock(connection, "pg_advisory_unlock");
+                    advisoryLock(connection, LIBERAR_LOCK);
                 }
             } else {
                 LOG.fine(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "otra_replica")
@@ -99,8 +101,8 @@ public class RevalidacionPdiJob {
      * Takes or releases the lock in the session of the connection (it isn't tied to a transaction: each profile
      * is validated in its own one). If the connection dies before releasing it, PostgreSQL releases it.
      */
-    private static boolean advisoryLock(Connection connection, String function) throws SQLException {
-        try (PreparedStatement query = connection.prepareStatement("SELECT " + function + "(?)")) {
+    private static boolean advisoryLock(Connection connection, String sql) throws SQLException {
+        try (PreparedStatement query = connection.prepareStatement(sql)) {
             query.setLong(1, LOCK);
             try (ResultSet result = query.executeQuery()) {
                 return result.next() && result.getBoolean(1);
