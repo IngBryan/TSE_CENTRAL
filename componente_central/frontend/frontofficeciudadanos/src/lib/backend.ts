@@ -1,4 +1,5 @@
 import { getAuthConfig } from "./auth/config";
+import { registrarLog, segundosDesde } from "./log";
 
 // Cliente de la API REST del backend Frontofficeciudadanos (WildFly). Solo se usa del lado del
 // servidor de Next: la API key nunca llega al navegador.
@@ -21,18 +22,37 @@ export async function llamarBackend<T>(
   // Quien hace la operacion: la cedula de la sesion (el backend controla sus permisos)
   if (opciones.usuarioCi) headers["X-Usuario-Ci"] = opciones.usuarioCi;
 
+  const inicio = performance.now();
+  const metodo = opciones.method ?? "GET";
   let res: Response;
   try {
     res = await fetch(`${cfg.backendUrl}${ruta}`, {
-      method: opciones.method ?? "GET",
+      method: metodo,
       headers,
       body: opciones.body === undefined ? undefined : JSON.stringify(opciones.body),
       cache: "no-store",
       signal: AbortSignal.timeout(cfg.backendTimeoutMs),
     });
   } catch (e) {
+    registrarLog(
+      "error",
+      "backend.llamada",
+      { correlationId: opciones.correlationId, usuario: opciones.usuarioCi, error: (e as Error).message, backendRoundtripSeconds: segundosDesde(inicio) },
+      { metodo, ruta },
+    );
     throw new BackendNoDisponible(`No se pudo contactar el backend: ${(e as Error).message}`);
   }
+  registrarLog(
+    res.status >= 500 ? "error" : "info",
+    "backend.llamada",
+    {
+      correlationId: opciones.correlationId,
+      usuario: opciones.usuarioCi,
+      responseCode: res.status,
+      backendRoundtripSeconds: segundosDesde(inicio),
+    },
+    { metodo, ruta },
+  );
   if (res.status >= 500) {
     throw new BackendNoDisponible(`El backend respondio ${res.status}`);
   }

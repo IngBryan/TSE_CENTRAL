@@ -113,7 +113,7 @@ class CasosAutomaticosServiceTest {
     void notificarPasaElCasoANotificadaYQuedaEnLaAuditoriaComoSistema() {
         DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
 
-        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", notificado.getEstado());
         RegistroAuditoriaCaso cambio = auditoria(creado.getId()).get(1);
@@ -126,9 +126,9 @@ class CasosAutomaticosServiceTest {
     @Test
     void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
         DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
-        enTx(() -> servicio.notificarCaso(creado.getId()));
+        enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
-        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", otraVez.getEstado());
         assertEquals(2, auditoria(creado.getId()).size());

@@ -7,6 +7,7 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import type { EmpresaResumen } from "@/lib/empresas";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -27,11 +28,11 @@ export default async function Empresas() {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} error={NO_DISPONIBLE} />;
   }
-  console.info(`[empresas] correlationId=${correlationId} GET /empresas status=${res.status}`);
+  registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `GET /empresas` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status !== 200 || !Array.isArray(res.data)) {
     const error =

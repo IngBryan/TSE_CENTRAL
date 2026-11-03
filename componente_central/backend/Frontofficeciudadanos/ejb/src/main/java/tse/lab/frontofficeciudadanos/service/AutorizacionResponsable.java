@@ -40,8 +40,8 @@ public class AutorizacionResponsable {
         }
         if (motivo != null) {
             final String m = motivo;
-            LOG.warning(() -> "evento=responsable.no_autorizado correlationId=" + correlationId + " usuario="
-                    + ciResponsable + " detalle=\"" + m + "\"");
+            LOG.warning(() -> LogCiudadanos.evento("responsable.no_autorizado").correlationId(correlationId)
+                    .usuario(ciResponsable).campo("detalle", "\"" + m + "\"").toString());
             throw new NoAutorizadoException(motivo);
         }
         return responsable.getEmpresa();

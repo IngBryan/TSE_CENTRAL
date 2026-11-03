@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { getSesion } from "@/lib/auth/session";
+import { registrarLog } from "@/lib/log";
 
 // CU-02 Dar de alta chofer. La cedula del responsable sale SIEMPRE de la sesion (cookie cifrada),
 // nunca del formulario; el backend controla que sea responsable validado de una empresa habilitada.
@@ -33,14 +34,14 @@ async function llamar(ruta: string, cedula: string): Promise<RespuestaAlta> {
       ruta,
       { method: "POST", body: { cedula: ci }, correlationId, usuarioCi: sesion.perfil.cedula },
     );
-    console.info(`[choferes] correlationId=${correlationId} ruta=${ruta} status=${res.status} resultado=${res.data?.resultado}`);
+    registrarLog("info", "choferes", { correlationId, responseCode: res.status }, { detalle: `ruta=${ruta} resultado=${res.data?.resultado}` });
     if (res.status === 403) return { ok: false, error: "no_autorizado", detalle: res.data?.detalle };
     if (res.status === 400) return { ok: false, error: "cedula_invalida" };
     if (res.status !== 200 || !res.data) return { ok: false, error: "no_disponible" };
     return { ok: true, cedula: ci, ...res.data };
   } catch (e) {
     if (e instanceof BackendNoDisponible) {
-      console.warn(`[choferes] correlationId=${correlationId} ${e.message}`);
+      registrarLog("warn", "choferes", { correlationId }, { detalle: `${e.message}` });
       return { ok: false, error: "no_disponible" };
     }
     throw e;

@@ -14,6 +14,7 @@ import {
   type EstadoCaso,
   type PaginaCasos,
 } from "@/lib/casos";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -52,11 +53,11 @@ export default async function Bandeja({ searchParams }: PageProps<"/casos">) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} filtro={filtro} error={NO_DISPONIBLE} />;
   }
-  console.info(`[casos] correlationId=${correlationId} GET ${ruta} status=${res.status}`);
+  registrarLog("info", "casos", { correlationId, responseCode: res.status }, { detalle: `GET ${ruta}` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[casos] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "casos", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status !== 200 || !Array.isArray(res.data?.casos)) {
     const error =

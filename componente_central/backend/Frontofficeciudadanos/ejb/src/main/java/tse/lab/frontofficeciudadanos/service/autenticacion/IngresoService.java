@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
 import tse.lab.model.Ciudadano;
@@ -50,10 +51,13 @@ public class IngresoService {
         } else if (subGubUy != null) {
             // FA1 (ya habia ingresado) o FA2 (Ciudadano creado al darle un rol, sin cuenta gub.uy todavia)
             if (perfil.getSubGubUy() == null) {
-                LOG.info(() -> "evento=ingreso.vinculacion correlationId=" + correlationId + " ci=" + cedula);
+                LOG.info(() -> LogCiudadanos.evento("ingreso.vinculacion").correlationId(correlationId)
+                        .campo("ci", cedula).toString());
             } else if (!perfil.getSubGubUy().equals(subGubUy)) {
-                LOG.warning(() -> "evento=ingreso.sub_distinto correlationId=" + correlationId + " ci=" + cedula
-                        + " detalle=\"la cedula estaba vinculada a otra cuenta gub.uy, se actualiza\"");
+                LOG.warning(() -> LogCiudadanos.evento("ingreso.sub_distinto").correlationId(correlationId)
+                        .campo("ci", cedula)
+                        .campo("detalle", "\"la cedula estaba vinculada a otra cuenta gub.uy, se actualiza\"")
+                        .toString());
             }
             perfil.setSubGubUy(subGubUy);
             if (email != null && !email.isBlank()) {
@@ -69,9 +73,10 @@ public class IngresoService {
         List<RolPersona> rolesPersona = sesion ? roles.rolesDe(cedula) : List.of();
         final Ciudadano p = perfil;
         final boolean esNuevo = nuevo;
-        LOG.info(() -> "evento=ingreso." + via + " correlationId=" + correlationId + " ci=" + cedula + " nuevo=" + esNuevo
-                + " resultado=" + resultado + " estado=" + p.getEstado() + " sesion=" + sesion
-                + " roles=" + rolesPersona.stream().map(r -> r.rol() + ":" + r.nroEmpresa()).toList());
+        LOG.info(() -> LogCiudadanos.evento("ingreso." + via).correlationId(correlationId).campo("ci", cedula)
+                .campo("nuevo", esNuevo).campo("resultado", resultado).campo("estado", p.getEstado())
+                .campo("sesion", sesion)
+                .campo("roles", rolesPersona.stream().map(r -> r.rol() + ":" + r.nroEmpresa()).toList()).toString());
         return new ResultadoIngreso(perfil, resultado, nuevo, sesion, rolesPersona);
     }
 }

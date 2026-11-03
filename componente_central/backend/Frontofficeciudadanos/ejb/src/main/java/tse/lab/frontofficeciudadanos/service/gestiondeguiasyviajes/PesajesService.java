@@ -8,6 +8,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.EventoPesajesDAO;
 import tse.lab.frontofficeciudadanos.data.NodoBalanzaDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.model.ClaveEvento;
 import tse.lab.model.EventoPesajes;
 import tse.lab.model.NodoBalanza;
@@ -33,7 +34,7 @@ public class PesajesService implements PesajesRemote {
             }
             NodoBalanza balanza = balanzas.buscarPorIdExterno(datos.getIdExternoBalanza());
             if (balanza == null) {
-                LOG.warning("Pesaje de una balanza no dada de alta, se ignora: " + datos);
+                LOG.warning(() -> LogCiudadanos.evento("pesaje.balanza_desconocida").campo("pesaje", datos).toString());
                 continue;
             }
             pesajes.guardar(new EventoPesajes(datos.getIdExterno(), datos.getMatricula(), datos.getFechaHora(),

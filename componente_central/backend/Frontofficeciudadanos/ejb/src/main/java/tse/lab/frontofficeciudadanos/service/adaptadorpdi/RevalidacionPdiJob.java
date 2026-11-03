@@ -25,6 +25,7 @@ import jakarta.ejb.TransactionAttributeType;
 import javax.sql.DataSource;
 import tse.lab.adaptadorpdi.Backoff;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.EstadoValidacion;
 
@@ -65,7 +66,7 @@ public class RevalidacionPdiJob {
     @PostConstruct
     void iniciar() {
         if (intervalo.isZero()) {
-            LOG.info("evento=pdi.revalidacion resultado=apagada");
+            LOG.info(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "apagada").toString());
             return;
         }
         programar(intervalo);
@@ -83,10 +84,12 @@ public class RevalidacionPdiJob {
                     advisoryLock(connection, "pg_advisory_unlock");
                 }
             } else {
-                LOG.fine("evento=pdi.revalidacion resultado=otra_replica");
+                LOG.fine(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "otra_replica")
+                        .toString());
             }
         } catch (SQLException | RuntimeException e) {
-            LOG.log(Level.WARNING, "evento=pdi.revalidacion resultado=error", e);
+            LOG.log(Level.WARNING, () -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "error")
+                    .error(e).toString());
         } finally {
             programar(proxima);
         }
@@ -122,16 +125,17 @@ public class RevalidacionPdiJob {
                 // La PDI sigue caida: no tiene sentido seguir con el resto, se espera mas para la proxima
                 fallosSeguidos++;
                 Duration proxima = Backoff.exponencial(fallosSeguidos + 1, intervalo, intervaloMax);
-                LOG.warning(() -> "evento=pdi.revalidacion correlationId=" + correlationId
-                        + " resultado=pdi_no_disponible pendientes=" + pendientes.size() + " validados=" + resultados
-                        + " proximoIntentoS=" + proxima.toSeconds());
+                LOG.warning(() -> LogCiudadanos.evento("pdi.revalidacion").correlationId(correlationId)
+                        .campo("resultado", "pdi_no_disponible").campo("pendientes", pendientes.size())
+                        .campo("validados", resultados).campo("proximoIntentoS", proxima.toSeconds()).toString());
                 return proxima;
             }
             resultados.merge(r, 1, Integer::sum);
         }
         fallosSeguidos = 0;
-        LOG.info(() -> "evento=pdi.revalidacion correlationId=" + correlationId + " resultado=ok pendientes="
-                + pendientes.size() + " validados=" + resultados);
+        LOG.info(() -> LogCiudadanos.evento("pdi.revalidacion").correlationId(correlationId)
+                .campo("resultado", "ok").campo("pendientes", pendientes.size()).campo("validados", resultados)
+                .toString());
         return intervalo;
     }
 

@@ -4,6 +4,7 @@ import { getAuthConfig, loginTestingHabilitado, mismoOrigen } from "@/lib/auth/c
 import { ErrorLogin } from "@/lib/auth/oidc";
 import { ingresarParaTesting } from "@/lib/auth/perfil";
 import { COOKIE_SESION, DURACION_SESION_S, opcionesCookie, sellar, type Sesion } from "@/lib/auth/session";
+import { registrarLog } from "@/lib/log";
 
 // Ingreso de testing: abre sesion con la cedula del formulario de la portada, sin gub.uy. Solo si
 // LOGIN_TESTING=true (si no, 404). El backend hace el mismo ingreso que con gub.uy (perfil, PDI, roles),
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   const correlationId = randomUUID();
   try {
     const { perfil, resultado, sesionPermitida } = await ingresarParaTesting(cedula, correlationId);
-    console.info(`[login testing] correlationId=${correlationId} ci=${cedula} resultado=${resultado} estado=${perfil.estado}`);
+    registrarLog("info", "login.testing", { correlationId }, { detalle: `ci=${cedula} resultado=${resultado} estado=${perfil.estado}` });
     if (!sesionPermitida) {
       return volver(resultado === "MENOR_DE_EDAD" ? "menor_de_edad" : "no_existe");
     }
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set(COOKIE_SESION, sellar(sesion), opcionesCookie(DURACION_SESION_S));
     return res;
   } catch (e) {
-    console.warn(`[login testing] correlationId=${correlationId} ci=${cedula} ${(e as Error).message}`);
+    registrarLog("warn", "login.testing", { correlationId }, { detalle: `ci=${cedula} ${(e as Error).message}` });
     return volver(e instanceof ErrorLogin ? e.motivo : "ingreso_no_disponible");
   }
 }

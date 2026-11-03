@@ -7,6 +7,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
+
 /**
  * Active GPS ids, kept in memory so checking a tracking event doesn't call WildFly. The list is
  * refreshed periodically; if a refresh fails, the last list is kept.
@@ -43,7 +45,7 @@ public class ActiveGpsRegistry implements AutoCloseable {
         try {
             load();
         } catch (IOException | RuntimeException e) {
-            System.err.println("Could not refresh the active GPS, keeping the last list: " + e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("gps_activos.refresco_fallido").error(e));
         }
     }
 

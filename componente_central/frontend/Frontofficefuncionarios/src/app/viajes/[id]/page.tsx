@@ -18,6 +18,7 @@ import {
   type ModificacionVista,
   type ViajeDetalle,
 } from "@/lib/viajes";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -46,11 +47,11 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} id={id} error={NO_DISPONIBLE} />;
   }
-  console.info(`[viajes] correlationId=${correlationId} GET ${ruta} status=${res.status}`);
+  registrarLog("info", "viajes", { correlationId, responseCode: res.status }, { detalle: `GET ${ruta}` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[viajes] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "viajes", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status !== 200 || !res.data) {
     const error =

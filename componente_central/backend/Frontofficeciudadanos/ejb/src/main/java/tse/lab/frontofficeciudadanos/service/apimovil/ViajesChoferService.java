@@ -19,6 +19,7 @@ import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.Chofer;
@@ -93,8 +94,8 @@ public class ViajesChoferService {
         List<ViajeVista> lista = guias.buscarPorChoferesYEstados(habilitados, PENDIENTES).stream()
                 .map(ViajesChoferService::vista)
                 .toList();
-        LOG.info(() -> "evento=movil.viajes correlationId=" + correlationId + " usuario=" + ci + " cantidad="
-                + lista.size());
+        LOG.info(() -> LogCiudadanos.evento("movil.viajes").correlationId(correlationId).usuario(ci)
+                .campo("cantidad", lista.size()).toString());
         return lista;
     }
 
@@ -145,9 +146,9 @@ public class ViajesChoferService {
         }
         byte[] foto = foto(errores, datos == null ? null : datos.foto());
         if (!errores.isEmpty()) {
-            LOG.warning(() -> "evento=movil.evento.rechazado correlationId=" + correlationId + " usuario=" + ci
-                    + " idEvento=" + (datos == null ? null : datos.idEvento()) + " motivo=datos_invalidos campos="
-                    + errores.keySet());
+            LOG.warning(() -> LogCiudadanos.evento("movil.evento.rechazado").correlationId(correlationId)
+                    .usuario(ci).campo("idEvento", (datos == null ? null : datos.idEvento()))
+                    .campo("motivo", "datos_invalidos").campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
         }
 
@@ -161,8 +162,8 @@ public class ViajesChoferService {
                 throw rechazo(correlationId, ci, idEvento, idGuia,
                         new ConflictoException("ID_EVENTO_EN_USO", "El identificador del evento ya fue usado."));
             }
-            LOG.info(() -> "evento=movil.evento.duplicado correlationId=" + correlationId + " usuario=" + ci
-                    + " idEvento=" + idEvento + " guia=" + previo.getGuia().getId());
+            LOG.info(() -> LogCiudadanos.evento("movil.evento.duplicado").correlationId(correlationId).usuario(ci)
+                    .campo("idEvento", idEvento).campo("guia", previo.getGuia().getId()).toString());
             // en un reenvio: la guia cambio despues de procesar el evento original
             return resultado(previo, true,
                     !Objects.equals(previo.getGuia().getVersion(), previo.getVersionGuiaResultante()), habilitados);
@@ -192,14 +193,16 @@ public class ViajesChoferService {
         eventos.guardar(evento);
         final TipoEventoViaje t = tipo;
         if (decision.resultado() == ResultadoEventoViaje.CONFLICTO) {
-            LOG.warning(() -> "evento=movil.evento.conflicto correlationId=" + correlationId + " usuario=" + ci
-                    + " idEvento=" + idEvento + " guia=" + guia.getId() + " tipo=" + t + " estado=" + anterior
-                    + " motivo=" + decision.codigo() + " fechaHoraDispositivo=" + fechaHora);
+            LOG.warning(() -> LogCiudadanos.evento("movil.evento.conflicto").correlationId(correlationId)
+                    .usuario(ci).campo("idEvento", idEvento).campo("guia", guia.getId()).campo("tipo", t)
+                    .campo("estado", anterior).campo("motivo", decision.codigo())
+                    .campo("fechaHoraDispositivo", fechaHora).toString());
         } else {
-            LOG.info(() -> "evento=movil.evento.registrado correlationId=" + correlationId + " usuario=" + ci
-                    + " idEvento=" + idEvento + " guia=" + guia.getId() + " tipo=" + t + " resultado="
-                    + decision.resultado() + " estado=" + anterior + "->" + guia.getEstado() + " guiaModificada="
-                    + modificada + " foto=" + (foto != null) + " fechaHoraDispositivo=" + fechaHora);
+            LOG.info(() -> LogCiudadanos.evento("movil.evento.registrado").correlationId(correlationId).usuario(ci)
+                    .campo("idEvento", idEvento).campo("guia", guia.getId()).campo("tipo", t)
+                    .campo("resultado", decision.resultado()).campo("estado", anterior + "->" + guia.getEstado())
+                    .campo("guiaModificada", modificada).campo("foto", (foto != null))
+                    .campo("fechaHoraDispositivo", fechaHora).toString());
         }
         return resultado(evento, false, modificada, habilitados);
     }
@@ -253,8 +256,8 @@ public class ViajesChoferService {
         List<Chofer> habilitados = ci == null ? List.of()
                 : choferes.buscarPorCi(ci).stream().filter(c -> c.getEstado() == EstadoChofer.HABILITADO).toList();
         if (habilitados.isEmpty()) {
-            LOG.warning(() -> "evento=movil.no_autorizado correlationId=" + correlationId + " usuario=" + ci
-                    + " detalle=\"no es chofer habilitado de ninguna empresa\"");
+            LOG.warning(() -> LogCiudadanos.evento("movil.no_autorizado").correlationId(correlationId).usuario(ci)
+                    .campo("detalle", "\"no es chofer habilitado de ninguna empresa\"").toString());
             throw new NoAutorizadoException("no es chofer habilitado de ninguna empresa");
         }
         return habilitados;
@@ -263,8 +266,8 @@ public class ViajesChoferService {
     private static <E extends Exception> E rechazo(String correlationId, String ci, String idEvento, String idGuia,
             E e) {
         String codigo = e instanceof ConflictoException c ? c.getCodigo() : "GUIA_NO_ENCONTRADA";
-        LOG.warning(() -> "evento=movil.evento.rechazado correlationId=" + correlationId + " usuario=" + ci
-                + " idEvento=" + idEvento + " guia=" + idGuia + " motivo=" + codigo);
+        LOG.warning(() -> LogCiudadanos.evento("movil.evento.rechazado").correlationId(correlationId).usuario(ci)
+                .campo("idEvento", idEvento).campo("guia", idGuia).campo("motivo", codigo).toString());
         return e;
     }
 

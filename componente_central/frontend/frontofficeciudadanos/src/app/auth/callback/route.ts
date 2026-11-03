@@ -13,6 +13,7 @@ import {
   type Sesion,
   type TransaccionLogin,
 } from "@/lib/auth/session";
+import { registrarLog } from "@/lib/log";
 
 // Vuelta desde ID Uruguay. La redirect URI registrada es la raiz (http://localhost), asi que
 // page.tsx reenvia aca los ?code=...&state=... (o ?error=...).
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   const correlationId = randomUUID();
 
   const fallar = (motivo: MotivoError, detalle: string) => {
-    console.warn(`[login gub.uy] correlationId=${correlationId} ${motivo}: ${detalle}`);
+    registrarLog("warn", "login.gubuy", { correlationId }, { detalle: `${motivo}: ${detalle}` });
     const res = NextResponse.redirect(`${cfg.appBaseUrl}/?error=${motivo}`, 302);
     res.cookies.delete(COOKIE_TRANSACCION);
     return res;
@@ -51,9 +52,7 @@ export async function GET(req: NextRequest) {
     const idToken = await validarIdToken(tokens.id_token, tx.nonce);
     const claims = await obtenerUserinfo(tokens.access_token, idToken.sub!);
     const { perfil, resultado, sesionPermitida, nuevo } = await ingresarEnBackend(claims, correlationId);
-    console.info(
-      `[login gub.uy] correlationId=${correlationId} ci=${perfil.cedula} nuevo=${nuevo} resultado=${resultado} estado=${perfil.estado}`,
-    );
+    registrarLog("info", "login.gubuy", { correlationId }, { detalle: `ci=${perfil.cedula} nuevo=${nuevo} resultado=${resultado} estado=${perfil.estado}` });
 
     // CU-01 FA6 / FA7: la PDI dice que no existe o que es menor de edad, no se inicia sesion
     if (!sesionPermitida) {

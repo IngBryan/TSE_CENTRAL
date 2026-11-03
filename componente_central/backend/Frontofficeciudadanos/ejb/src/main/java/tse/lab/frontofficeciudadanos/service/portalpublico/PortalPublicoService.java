@@ -24,6 +24,7 @@ import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
 import tse.lab.frontofficeciudadanos.data.PortalPublicoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.frontofficeciudadanos.service.portalpublico.Agregacion.Fila;
 import tse.lab.frontofficeciudadanos.service.portalpublico.Agregacion.FilaPublica;
@@ -112,7 +113,8 @@ public class PortalPublicoService {
                 .map(e -> new EmpresaEncontrada(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(),
                         e.isHabilitada()))
                 .toList();
-        LOG.info(() -> "evento=publico.busqueda_empresas correlationId=" + correlationId + " resultados=" + lista.size());
+        LOG.info(() -> LogCiudadanos.evento("publico.busqueda_empresas").correlationId(correlationId)
+                .campo("resultados", lista.size()).toString());
         return lista;
     }
 
@@ -120,17 +122,17 @@ public class PortalPublicoService {
             throws RecursoNoEncontradoException {
         Empresa empresa = nroEmpresa == null ? null : empresas.buscarPorId(nroEmpresa);
         if (empresa == null) {
-            LOG.info(() -> "evento=publico.validacion correlationId=" + correlationId + " nroEmpresa=" + nroEmpresa
-                    + " resultado=no_existe");
+            LOG.info(() -> LogCiudadanos.evento("publico.validacion").correlationId(correlationId)
+                    .campo("nroEmpresa", nroEmpresa).campo("resultado", "no_existe").toString());
             throw new RecursoNoEncontradoException("No hay ninguna empresa registrada con ese número.");
         }
         LocalDate hoy = LocalDate.now(ZONA);
         ValidacionVehiculo vehiculo = matricula == null || matricula.isBlank() ? null
                 : validarVehiculo(empresa, matricula, hoy);
-        LOG.info(() -> "evento=publico.validacion correlationId=" + correlationId + " nroEmpresa=" + nroEmpresa
-                + " habilitada=" + empresa.isHabilitada()
-                + (vehiculo == null ? "" : " matricula=" + vehiculo.matricula() + " deLaEmpresa="
-                        + vehiculo.deLaEmpresa() + " habilitado=" + vehiculo.habilitado()));
+        LOG.info(() -> LogCiudadanos.evento("publico.validacion").correlationId(correlationId)
+                .campo("nroEmpresa", nroEmpresa)
+                .campo("habilitada", empresa.isHabilitada() + (vehiculo == null ? "" : " matricula=" + vehiculo.matricula() + " deLaEmpresa=" + vehiculo.deLaEmpresa() + " habilitado=" + vehiculo.habilitado()))
+                .toString());
         return new ValidacionEmpresa(empresa.getNroEmpresa(), empresa.getNombrePublico(), empresa.getRazonSocial(),
                 empresa.isHabilitada(), vehiculo, Instant.now().toString());
     }
@@ -255,10 +257,10 @@ public class PortalPublicoService {
                 resueltos == 0 ? sinDatos : resueltosPublicables
                         ? new Indicador(redondear(100.0 * desestimados / resueltos), false) : reservado,
                 resueltos == 0 ? sinDatos : resueltosPublicables ? new Indicador(redondear(mediana(dias)), false) : reservado);
-        LOG.info(() -> "evento=publico.estadisticas correlationId=" + correlationId + " anio=" + e.anio()
-                + " umbral=" + umbral + " reservadas=" + (e.viajesPorMes().stream().filter(FilaPublica::reservado).count()
-                        + e.cargaPorRubro().stream().filter(FilaPublica::reservado).count()
-                        + e.infraccionesConfirmadasPorTipo().stream().filter(FilaPublica::reservado).count()));
+        LOG.info(() -> LogCiudadanos.evento("publico.estadisticas").correlationId(correlationId)
+                .campo("anio", e.anio()).campo("umbral", umbral)
+                .campo("reservadas", (e.viajesPorMes().stream().filter(FilaPublica::reservado).count() + e.cargaPorRubro().stream().filter(FilaPublica::reservado).count() + e.infraccionesConfirmadasPorTipo().stream().filter(FilaPublica::reservado).count()))
+                .toString());
         return e;
     }
 

@@ -15,6 +15,7 @@ import tse.lab.frontofficefuncionarios.data.EmpresaDAO;
 import tse.lab.frontofficefuncionarios.data.ResponsableDAO;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
@@ -90,8 +91,8 @@ public class GestionEmpresasService {
     public List<EmpresaResumen> listar(String ci, String correlationId) throws NoAutorizadoException {
         autorizacion.funcionario(ci, correlationId);
         List<EmpresaResumen> lista = empresas.listar().stream().map(GestionEmpresasService::resumen).toList();
-        LOG.info(() -> "evento=empresas.listado correlationId=" + correlationId + " usuario=" + ci + " cantidad="
-                + lista.size());
+        LOG.info(() -> LogFuncionarios.evento("empresas.listado").correlationId(correlationId).usuario(ci)
+                .campo("cantidad", lista.size()).toString());
         return lista;
     }
 
@@ -100,8 +101,8 @@ public class GestionEmpresasService {
             throws NoAutorizadoException, RecursoNoEncontradoException {
         autorizacion.funcionario(ci, correlationId);
         Empresa empresa = empresa(nroEmpresa, ci, correlationId);
-        LOG.info(() -> "evento=empresa.consulta correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
-                + nroEmpresa);
+        LOG.info(() -> LogFuncionarios.evento("empresa.consulta").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).toString());
         return detalle(empresa);
     }
 
@@ -118,8 +119,8 @@ public class GestionEmpresasService {
         List<UsuarioDisponible> lista = ciudadanos.disponiblesComoResponsable(prefijo, MAX_DISPONIBLES).stream()
                 .map(c -> new UsuarioDisponible(c.getCi(), c.getPrimerNombre(), c.getPrimerApellido()))
                 .toList();
-        LOG.info(() -> "evento=empresas.usuarios_disponibles correlationId=" + correlationId + " usuario=" + ci
-                + " filtro=" + prefijo + " cantidad=" + lista.size());
+        LOG.info(() -> LogFuncionarios.evento("empresas.usuarios_disponibles").correlationId(correlationId)
+                .usuario(ci).campo("filtro", prefijo).campo("cantidad", lista.size()).toString());
         return lista;
     }
 
@@ -146,8 +147,8 @@ public class GestionEmpresasService {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
-                    + " motivo=datos_invalidos campos=" + errores.keySet());
+            LOG.warning(() -> LogFuncionarios.evento("empresa.alta.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("motivo", "datos_invalidos").campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
         }
         if (empresas.buscarPorId(nro) != null) {
@@ -168,9 +169,9 @@ public class GestionEmpresasService {
             responsables.guardar(responsable);
             empresa.setResponsable(responsable);
         }
-        LOG.info(() -> "evento=empresa.alta correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa=" + nro
-                + " habilitada=" + empresa.isHabilitada() + " ciResponsable="
-                + (ciudadano == null ? "-" : ciudadano.getCi()));
+        LOG.info(() -> LogFuncionarios.evento("empresa.alta").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nro).campo("habilitada", empresa.isHabilitada())
+                .campo("ciResponsable", (ciudadano == null ? "-" : ciudadano.getCi())).toString());
         return new OperacionRealizada("La empresa fue registrada.", detalle(empresa));
     }
 
@@ -187,9 +188,9 @@ public class GestionEmpresasService {
         }
         Long version = cambios == null ? null : cambios.version();
         if (version == null || !version.equals(empresa.getVersion())) {
-            LOG.warning(() -> "evento=empresa.modificacion.rechazada correlationId=" + correlationId + " usuario="
-                    + ci + " nroEmpresa=" + nroEmpresa + " motivo=EMPRESA_DESACTUALIZADA version=" + version
-                    + " actual=" + empresa.getVersion());
+            LOG.warning(() -> LogFuncionarios.evento("empresa.modificacion.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("motivo", "EMPRESA_DESACTUALIZADA")
+                    .campo("version", version).campo("actual", empresa.getVersion()).toString());
             throw new ConflictoException("EMPRESA_DESACTUALIZADA",
                     "La empresa cambió mientras la estabas modificando. Volvé a cargarla.");
         }
@@ -204,8 +205,9 @@ public class GestionEmpresasService {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> "evento=empresa.modificacion.rechazada correlationId=" + correlationId + " usuario="
-                    + ci + " nroEmpresa=" + nroEmpresa + " motivo=datos_invalidos campos=" + errores.keySet());
+            LOG.warning(() -> LogFuncionarios.evento("empresa.modificacion.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("motivo", "datos_invalidos")
+                    .campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
         }
 
@@ -230,8 +232,8 @@ public class GestionEmpresasService {
             empresa.setHabilitada(habilitada);
         }
         empresas.sincronizar(); // flush: la respuesta lleva la version nueva
-        LOG.info(() -> "evento=empresa.modificada correlationId=" + correlationId + " usuario=" + ci + " nroEmpresa="
-                + nroEmpresa + " campos=" + modificados);
+        LOG.info(() -> LogFuncionarios.evento("empresa.modificada").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).campo("campos", modificados).toString());
         return new OperacionRealizada("La empresa fue modificada.", detalle(empresa));
     }
 
@@ -256,8 +258,9 @@ public class GestionEmpresasService {
 
         Responsable actual = empresa.getResponsable();
         if (actual != null && actual.getCi().equals(ciUsuario)) {
-            LOG.info(() -> "evento=empresa.usuario_asociado correlationId=" + correlationId + " usuario=" + ci
-                    + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario + " resultado=ya_asociado");
+            LOG.info(() -> LogFuncionarios.evento("empresa.usuario_asociado").correlationId(correlationId)
+                    .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("ciUsuario", ciUsuario)
+                    .campo("resultado", "ya_asociado").toString());
             return new OperacionRealizada("El usuario ya estaba asociado a la empresa.", detalle(empresa));
         }
         if (actual != null) {
@@ -269,8 +272,8 @@ public class GestionEmpresasService {
         Responsable responsable = new Responsable(ciudadano, empresa);
         responsables.guardar(responsable);
         empresa.setResponsable(responsable);
-        LOG.info(() -> "evento=empresa.usuario_asociado correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario);
+        LOG.info(() -> LogFuncionarios.evento("empresa.usuario_asociado").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).campo("ciUsuario", ciUsuario).toString());
         return new OperacionRealizada("El usuario fue asociado a la empresa.", detalle(empresa));
     }
 
@@ -282,8 +285,9 @@ public class GestionEmpresasService {
             throws RecursoNoEncontradoException, ConflictoException {
         Ciudadano ciudadano = ciudadanos.buscarPorCiParaActualizar(ciUsuario);
         if (ciudadano == null) {
-            LOG.info(() -> "evento=empresa.asociacion.rechazada correlationId=" + correlationId + " usuario=" + ci
-                    + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario + " motivo=USUARIO_NO_ENCONTRADO");
+            LOG.info(() -> LogFuncionarios.evento("empresa.asociacion.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("ciUsuario", ciUsuario)
+                    .campo("motivo", "USUARIO_NO_ENCONTRADO").toString());
             throw new RecursoNoEncontradoException("USUARIO_NO_ENCONTRADO",
                     "No hay un usuario registrado con esa cédula.");
         }
@@ -308,21 +312,22 @@ public class GestionEmpresasService {
     }
 
     private static RecursoNoEncontradoException noEncontrada(Long nroEmpresa, String ci, String correlationId) {
-        LOG.info(() -> "evento=empresa.no_encontrada correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa);
+        LOG.info(() -> LogFuncionarios.evento("empresa.no_encontrada").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).toString());
         return new RecursoNoEncontradoException("EMPRESA_NO_ENCONTRADA", "La empresa no existe.");
     }
 
     private static ConflictoException empresaExistente(Long nro, String ci, String correlationId) {
-        LOG.warning(() -> "evento=empresa.alta.rechazada correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nro + " motivo=EMPRESA_EXISTENTE");
+        LOG.warning(() -> LogFuncionarios.evento("empresa.alta.rechazada").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nro).campo("motivo", "EMPRESA_EXISTENTE").toString());
         return new ConflictoException("EMPRESA_EXISTENTE", "Ya existe una empresa con el número " + nro + ".");
     }
 
     private static ConflictoException rechazoAsociacion(String ci, Long nroEmpresa, String ciUsuario,
             String correlationId, String codigo, String mensaje) {
-        LOG.warning(() -> "evento=empresa.asociacion.rechazada correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa + " ciUsuario=" + ciUsuario + " motivo=" + codigo);
+        LOG.warning(() -> LogFuncionarios.evento("empresa.asociacion.rechazada").correlationId(correlationId)
+                .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("ciUsuario", ciUsuario).campo("motivo", codigo)
+                .toString());
         return new ConflictoException(codigo, mensaje);
     }
 

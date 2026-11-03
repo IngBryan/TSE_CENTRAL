@@ -22,5 +22,5 @@ public interface CasosAutomaticos {
 
     // Notifica el caso a la empresa: pasa de DETECTADA a NOTIFICADA (auditoria con usuario SISTEMA).
     // No hace nada si el caso ya no esta DETECTADA.
-    DatosCaso notificarCaso(long idCaso);
+    DatosCaso notificarCaso(long idCaso, String correlationId);
 }

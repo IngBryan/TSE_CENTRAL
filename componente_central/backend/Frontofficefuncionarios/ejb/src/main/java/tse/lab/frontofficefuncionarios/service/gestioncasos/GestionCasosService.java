@@ -13,6 +13,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
@@ -161,8 +162,9 @@ public class GestionCasosService {
         List<CasoResumen> lista = desde >= total ? List.of()
                 : casos.bandeja(filtro, (int) desde, cantidad).stream().map(GestionCasosService::resumen).toList();
         final EstadoCaso f = filtro;
-        LOG.info(() -> "evento=casos.bandeja correlationId=" + correlationId + " usuario=" + ci + " estado=" + f
-                + " pagina=" + nroPagina + " tamanio=" + cantidad + " cantidad=" + lista.size() + " total=" + total);
+        LOG.info(() -> LogFuncionarios.evento("casos.bandeja").correlationId(correlationId).usuario(ci)
+                .campo("estado", f).campo("pagina", nroPagina).campo("tamanio", cantidad)
+                .campo("cantidad", lista.size()).campo("total", total).toString());
         return new PaginaCasos(lista, nroPagina, cantidad, total, totalPaginas);
     }
 
@@ -170,8 +172,8 @@ public class GestionCasosService {
             throws NoAutorizadoException, RecursoNoEncontradoException {
         autorizacion.funcionario(ci, correlationId);
         CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
-        LOG.info(() -> "evento=caso.consulta correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
-                + " estado=" + caso.getEstado());
+        LOG.info(() -> LogFuncionarios.evento("caso.consulta").correlationId(correlationId).usuario(ci)
+                .campo("caso", idCaso).campo("estado", caso.getEstado()).toString());
         return detalle(caso);
     }
 
@@ -208,8 +210,9 @@ public class GestionCasosService {
                 caso.getClavesEventosTracking().stream()
                         .map(t -> new EventoTrackingVista(t.getMatricula(), texto(t.getFechaHora())))
                         .toList());
-        LOG.info(() -> "evento=caso.evidencia correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
-                + " pesajes=" + pesajes.size() + " eventosTracking=" + evidencia.eventosTracking().size());
+        LOG.info(() -> LogFuncionarios.evento("caso.evidencia").correlationId(correlationId).usuario(ci)
+                .campo("caso", idCaso).campo("pesajes", pesajes.size())
+                .campo("eventosTracking", evidencia.eventosTracking().size()).toString());
         return evidencia;
     }
 
@@ -221,13 +224,13 @@ public class GestionCasosService {
         CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
         Descargo d = caso.getDescargo();
         if (d == null) {
-            LOG.info(() -> "evento=caso.descargo correlationId=" + correlationId + " usuario=" + ci + " caso="
-                    + idCaso + " resultado=sin_descargo");
+            LOG.info(() -> LogFuncionarios.evento("caso.descargo").correlationId(correlationId).usuario(ci)
+                    .campo("caso", idCaso).campo("resultado", "sin_descargo").toString());
             throw new RecursoNoEncontradoException("SIN_DESCARGO",
                     "La empresa no presentó un descargo para este caso.");
         }
-        LOG.info(() -> "evento=caso.descargo correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
-                + " descargo=" + d.getId());
+        LOG.info(() -> LogFuncionarios.evento("caso.descargo").correlationId(correlationId).usuario(ci)
+                .campo("caso", idCaso).campo("descargo", d.getId()).toString());
         return new DescargoVista(caso.getId(), d.getId(), d.getDescripcion(), d.getEstado(),
                 texto(d.getFechaPresentacion()), d.getCiPresentante());
     }
@@ -246,8 +249,9 @@ public class GestionCasosService {
         }
         EstadoCaso anterior = caso.getEstado();
         if (anterior == null || !anterior.admiteResolucion()) {
-            LOG.warning(() -> "evento=caso.resolucion.rechazada correlationId=" + correlationId + " usuario=" + ci
-                    + " caso=" + idCaso + " estado=" + anterior + " motivo=TRANSICION_NO_PERMITIDA");
+            LOG.warning(() -> LogFuncionarios.evento("caso.resolucion.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("caso", idCaso).campo("estado", anterior)
+                    .campo("motivo", "TRANSICION_NO_PERMITIDA").toString());
             throw new ConflictoException("TRANSICION_NO_PERMITIDA",
                     "El caso no puede ser resuelto en su estado actual (" + anterior + ").");
         }
@@ -265,8 +269,9 @@ public class GestionCasosService {
                     + " caracteres.");
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> "evento=caso.resolucion.rechazada correlationId=" + correlationId + " usuario=" + ci
-                    + " caso=" + idCaso + " motivo=datos_invalidos campos=" + errores.keySet());
+            LOG.warning(() -> LogFuncionarios.evento("caso.resolucion.rechazada").correlationId(correlationId)
+                    .usuario(ci).campo("caso", idCaso).campo("motivo", "datos_invalidos")
+                    .campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
         }
 
@@ -277,8 +282,8 @@ public class GestionCasosService {
         caso.setFundamentoResolucion(resolucion);
         auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), funcionario.getCi(),
                 AccionAuditoriaCaso.RESOLUCION, anterior, nuevo, fundamento, correlationId));
-        LOG.info(() -> "evento=caso.resuelto correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
-                + " estado=" + anterior + "->" + nuevo);
+        LOG.info(() -> LogFuncionarios.evento("caso.resuelto").correlationId(correlationId).usuario(ci)
+                .campo("caso", idCaso).campo("estado", anterior + "->" + nuevo).toString());
         return new ResolucionRegistrada("La resolución fue registrada.", detalle(caso));
     }
 
@@ -291,8 +296,8 @@ public class GestionCasosService {
     }
 
     private static RecursoNoEncontradoException noEncontrado(Long idCaso, String ci, String correlationId) {
-        LOG.info(() -> "evento=caso.no_encontrado correlationId=" + correlationId + " usuario=" + ci + " caso="
-                + idCaso);
+        LOG.info(() -> LogFuncionarios.evento("caso.no_encontrado").correlationId(correlationId).usuario(ci)
+                .campo("caso", idCaso).toString());
         return new RecursoNoEncontradoException("CASO_NO_ENCONTRADO", "El caso de fiscalización no existe.");
     }
 

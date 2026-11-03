@@ -20,6 +20,7 @@ import {
   type EvidenciaVista,
 } from "@/lib/casos";
 import { ResolverCaso } from "./resolver-caso";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -57,13 +58,11 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} id={id} error={NO_DISPONIBLE} />;
   }
-  console.info(
-    `[casos] correlationId=${correlationId} GET /casos/${id} status=${detalle.status} evidencia=${evidencia?.status} descargo=${descargo?.status}`,
-  );
+  registrarLog("info", "casos", { correlationId, responseCode: detalle.status }, { detalle: `GET /casos/${id} evidencia=${evidencia?.status} descargo=${descargo?.status}` });
 
   if (detalle.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[casos] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "casos", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (detalle.status !== 200 || !detalle.data) {
     const error =

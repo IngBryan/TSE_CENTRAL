@@ -26,5 +26,5 @@ public interface CaseStore {
     void addEvidence(long caseId, VehicleEvent event) throws IOException;
 
     /** Notifies the case to the company: DETECTADA to NOTIFICADA. */
-    DatosCaso notify(long caseId) throws IOException;
+    DatosCaso notify(long caseId, String correlationId) throws IOException;
 }
