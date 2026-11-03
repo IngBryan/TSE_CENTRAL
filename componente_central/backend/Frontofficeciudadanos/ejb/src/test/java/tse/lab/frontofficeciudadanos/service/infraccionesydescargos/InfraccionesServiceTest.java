@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import jakarta.persistence.EntityManager;
@@ -167,9 +170,33 @@ class InfraccionesServiceTest {
     }
 
     @Test
-    void conElPlazoVencidoSeRechazaYElCasoNoCambia() throws Exception {
-        servicio = conPlazo(0);
+    void elDiaDeLaNotificacionNoCuentaYElUltimoDiaEsDeUruguay() throws Exception {
+        // 1/11 a las 23:30 en Uruguay es el 2/11 en UTC: el plazo se cuenta desde el 1/11
+        notificadoEl(Instant.parse("2026-11-02T02:30:00Z"));
 
+        InfraccionResumen r = servicio.listar(RESPONSABLE, "t").get(0);
+
+        assertEquals("2026-11-11", r.venceDescargo());
+    }
+
+    @Test
+    void elUltimoDiaSePuedePresentarHastaLas2359() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(10, enUruguay("2026-11-11T23:59:59"));
+
+        assertTrue(servicio.listar(RESPONSABLE, "t").get(0).admiteDescargo());
+        em.getTransaction().begin();
+        InfraccionDetalle d = servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("A tiempo"), "t");
+        em.getTransaction().commit();
+        assertEquals("EN_DESCARGO", d.infraccion().estado());
+    }
+
+    @Test
+    void conElPlazoVencidoSeRechazaYElCasoNoCambia() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(10, enUruguay("2026-11-12T00:00:00"));
+
+        assertFalse(servicio.listar(RESPONSABLE, "t").get(0).admiteDescargo());
         em.getTransaction().begin();
         ConflictoException e = assertThrows(ConflictoException.class,
                 () -> servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Tarde"), "t"));
@@ -227,11 +254,29 @@ class InfraccionesServiceTest {
         return caso.getId();
     }
 
+    // Cambia la fecha del pasaje a NOTIFICADA del caso notificado (la auditoria la pone al crearse)
+    private void notificadoEl(Instant fecha) {
+        em.getTransaction().begin();
+        em.createQuery("UPDATE RegistroAuditoriaCaso r SET r.fechaHora = :fecha WHERE r.idCaso = :id")
+                .setParameter("fecha", fecha).setParameter("id", notificado).executeUpdate();
+        em.getTransaction().commit();
+        em.clear();
+    }
+
+    private static Clock enUruguay(String fechaHora) {
+        return Clock.fixed(LocalDateTime.parse(fechaHora).atZone(InfraccionesService.URUGUAY).toInstant(),
+                InfraccionesService.URUGUAY);
+    }
+
     private InfraccionesService conPlazo(int dias) throws Exception {
+        return conPlazo(dias, Clock.systemUTC());
+    }
+
+    private InfraccionesService conPlazo(int dias, Clock reloj) throws Exception {
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
         set(autorizacion, "responsables", conEm(new ResponsableDAO()));
         set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));
-        InfraccionesService s = new InfraccionesService(dias);
+        InfraccionesService s = new InfraccionesService(dias, reloj);
         set(s, "autorizacion", autorizacion);
         set(s, "casos", conEm(new CasoFiscalizacionDAO()));
         return s;

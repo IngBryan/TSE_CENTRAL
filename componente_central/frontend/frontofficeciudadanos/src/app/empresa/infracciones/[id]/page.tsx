@@ -165,7 +165,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
             </div>
           </>
         ) : i.admiteDescargo && i.venceDescargo ? (
-          <PresentarDescargo idCaso={i.id} vence={fechaHora(i.venceDescargo)} />
+          <PresentarDescargo idCaso={i.id} vence={fecha(i.venceDescargo)} />
         ) : (
           <>
             <h2 className={titulo}>Descargo</h2>

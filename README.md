@@ -765,7 +765,10 @@ recargar. Abrir el detalle de la infraccion tambien la marca vista.
   caracteres. Si no: `400` (texto vacio o largo), `409 DESCARGO_YA_PRESENTADO`,
   `409 TRANSICION_NO_PERMITIDA` o `409 PLAZO_VENCIDO`.
 - **Plazo:** `PLAZO_DESCARGO_DIAS` dias corridos (10 por defecto) desde la notificacion, que se toma de la
-  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion).
+  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion). Se cuenta
+  por dias de Uruguay: el dia de la notificacion no cuenta y el ultimo dia vale entero (vence a las 00:00 del
+  dia siguiente). `venceDescargo` es ese ultimo dia (`yyyy-MM-dd`). Ej.: notificada el 1/11 a cualquier hora,
+  con 10 dias se puede presentar hasta el 11/11 inclusive.
 - Al presentarlo, el caso pasa a `EN_DESCARGO` (la transicion la valida `CasoFiscalizacion`) y queda en
   `auditoria_casos` con la cedula del responsable, el `correlationId` y el fundamento
   "Descargo presentado por la empresa N° ...". El caso se bloquea en la base mientras tanto

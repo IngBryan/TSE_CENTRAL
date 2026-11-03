@@ -1,7 +1,9 @@
 package tse.lab.frontofficeciudadanos.service.infraccionesydescargos;
 
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -32,8 +34,10 @@ import tse.lab.model.Vehiculo;
 // fiscalizacion de sus vehiculos con la evidencia que los origino y presenta un descargo dentro del plazo.
 // - La empresa ve el caso recien cuando se le notifica (NOTIFICADA en adelante), nunca DETECTADA.
 // - El descargo se presenta una sola vez, con el caso NOTIFICADA y dentro de PLAZO_DESCARGO_DIAS dias
-//   corridos (10 por defecto) desde la notificacion. Pasa el caso a EN_DESCARGO (la transicion la controla
-//   CasoFiscalizacion) y queda en la pista de auditoria con la cedula de quien lo presento.
+//   corridos (10 por defecto) desde la notificacion. El plazo se cuenta por dias de Uruguay: el dia de la
+//   notificacion no cuenta y el ultimo dia se puede presentar hasta las 23:59. Pasa el caso a EN_DESCARGO
+//   (la transicion la controla CasoFiscalizacion) y queda en la pista de auditoria con la cedula de quien
+//   lo presento.
 // - No se exige que la empresa este habilitada: una empresa inhabilitada igual tiene que poder defenderse.
 // - Cada caso notificado es una notificacion para la empresa (la campana del front): queda vista cuando el
 //   responsable la marca o abre el detalle del caso.
@@ -44,6 +48,7 @@ public class InfraccionesService {
     private static final Set<EstadoCaso> VISIBLES = Set.of(EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
             EstadoCaso.CONFIRMADA, EstadoCaso.DESESTIMADA);
     static final int MAX_NOTIFICACIONES = 10;
+    static final ZoneId URUGUAY = ZoneId.of("America/Montevideo");
 
     @EJB
     private AutorizacionResponsable autorizacion;
@@ -51,16 +56,19 @@ public class InfraccionesService {
     private CasoFiscalizacionDAO casos;
 
     private final int plazoDias;
+    private final Clock reloj;
 
     public InfraccionesService() {
-        this(plazoConfigurado());
+        this(plazoConfigurado(), Clock.systemUTC());
     }
 
-    // Para los tests: sin leer el entorno
-    InfraccionesService(int plazoDias) {
+    // Para los tests: sin leer el entorno y con la hora que elija el test
+    InfraccionesService(int plazoDias, Clock reloj) {
         this.plazoDias = plazoDias;
+        this.reloj = reloj;
     }
 
+    // venceDescargo: ultimo dia (yyyy-MM-dd, en Uruguay) para presentar el descargo, inclusive
     public record InfraccionResumen(Long id, String tipoCaso, String descripcion, String estado,
             String fechaDeteccion, String matricula, boolean nueva, String venceDescargo, boolean admiteDescargo) {
     }
@@ -194,7 +202,7 @@ public class InfraccionesService {
             throw rechazo(caso, ciResponsable, correlationId, "TRANSICION_NO_PERMITIDA",
                     "La infracción ya no admite descargo (estado " + caso.getEstado() + ").");
         }
-        if (!Instant.now().isBefore(venceDescargo(caso))) {
+        if (!dentroDelPlazo(venceDescargo(caso))) {
             throw rechazo(caso, ciResponsable, correlationId, "PLAZO_VENCIDO",
                     "Venció el plazo de " + plazoDias + " días para presentar el descargo.");
         }
@@ -229,16 +237,23 @@ public class InfraccionesService {
         return new ConflictoException(codigo, mensaje);
     }
 
-    // El plazo corre desde la notificacion (pista de auditoria); si no quedo registrada, desde la deteccion
-    Instant venceDescargo(CasoFiscalizacion caso) {
+    // Ultimo dia para presentar el descargo: el dia (en Uruguay) de la notificacion mas plazoDias. La fecha de
+    // notificacion sale de la pista de auditoria; si no quedo registrada, se usa la de deteccion.
+    LocalDate venceDescargo(CasoFiscalizacion caso) {
         Instant notificada = casos.fechaNotificacion(caso.getId());
-        return (notificada != null ? notificada : caso.getFechaDeteccion()).plus(Duration.ofDays(plazoDias));
+        return LocalDate.ofInstant(notificada != null ? notificada : caso.getFechaDeteccion(), URUGUAY)
+                .plusDays(plazoDias);
+    }
+
+    // El ultimo dia cuenta entero: vence a las 00:00 (hora de Uruguay) del dia siguiente
+    private boolean dentroDelPlazo(LocalDate ultimoDia) {
+        return !LocalDate.now(reloj.withZone(URUGUAY)).isAfter(ultimoDia);
     }
 
     private InfraccionResumen resumen(CasoFiscalizacion caso) {
-        Instant vence = venceDescargo(caso);
+        LocalDate vence = venceDescargo(caso);
         boolean admite = caso.getEstado() == EstadoCaso.NOTIFICADA && caso.getDescargo() == null
-                && Instant.now().isBefore(vence);
+                && dentroDelPlazo(vence);
         return new InfraccionResumen(caso.getId(), caso.getTipoCaso(), caso.getDescripcion(),
                 caso.getEstado().name(), texto(caso.getFechaDeteccion()),
                 caso.getVehiculo() == null ? null : caso.getVehiculo().getMatricula(), !caso.isNotificacionVista(),

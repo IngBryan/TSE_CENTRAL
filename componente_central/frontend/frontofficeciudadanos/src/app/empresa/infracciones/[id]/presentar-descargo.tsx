@@ -18,7 +18,7 @@ export function PresentarDescargo({ idCaso, vence }: { idCaso: number; vence: st
       <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Presentar descargo</h2>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Explicá por qué la empresa no está de acuerdo con la infracción. Lo revisa un funcionario del MTOP antes de
-        resolver el caso. Se puede presentar una sola vez. Plazo: hasta el {vence}
+        resolver el caso. Se puede presentar una sola vez. Plazo: hasta el {vence} inclusive.
       </p>
       {estado.error && (
         <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
