@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,12 +30,17 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficefuncionarios.data.CiudadanoDAO;
 import tse.lab.frontofficefuncionarios.data.EmpresaDAO;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
+import tse.lab.frontofficefuncionarios.data.ITVDAO;
+import tse.lab.frontofficefuncionarios.data.PermisoCirculacionDAO;
 import tse.lab.frontofficefuncionarios.data.ResponsableDAO;
+import tse.lab.frontofficefuncionarios.data.VehiculoDAO;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
+import tse.lab.frontofficefuncionarios.service.fiscalizacionhabilitaciones.FiscalizacionHabilitacionesService;
+import tse.lab.frontofficefuncionarios.service.fiscalizacionhabilitaciones.FiscalizacionHabilitacionesService.ResumenHabilitaciones;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.AltaEmpresa;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.AsociacionUsuario;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.CambiosEmpresa;
@@ -44,7 +51,10 @@ import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Funcionario;
+import tse.lab.model.ITV;
+import tse.lab.model.PermisoCirculacion;
 import tse.lab.model.Responsable;
+import tse.lab.model.Vehiculo;
 
 // CU Gestionar empresas de transporte contra H2 con los DAOs reales.
 class GestionEmpresasServiceTest {
@@ -71,6 +81,12 @@ class GestionEmpresasServiceTest {
         set(servicio, "empresas", conEm(new EmpresaDAO()));
         set(servicio, "ciudadanos", conEm(new CiudadanoDAO()));
         set(servicio, "responsables", conEm(new ResponsableDAO()));
+        FiscalizacionHabilitacionesService habilitaciones = new FiscalizacionHabilitacionesService();
+        set(habilitaciones, "autorizacion", autorizacion);
+        set(habilitaciones, "vehiculos", conEm(new VehiculoDAO()));
+        set(habilitaciones, "permisos", conEm(new PermisoCirculacionDAO()));
+        set(habilitaciones, "itvs", conEm(new ITVDAO()));
+        set(servicio, "habilitaciones", habilitaciones);
 
         Empresa conResponsable = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         conResponsable.setHabilitada(true);
@@ -130,12 +146,28 @@ class GestionEmpresasServiceTest {
     void listaLasEmpresasOrdenadasConSuResponsable() throws Exception {
         List<EmpresaResumen> lista = servicio.listar(FUNCIONARIO, "t");
 
-        assertEquals(List.of(new EmpresaResumen(1L, "Transportes del Este", "TDE S.A.", true, RESPONSABLE),
-                new EmpresaResumen(2L, "Fletes del Norte", "FDN S.R.L.", false, null)), lista);
+        assertEquals(List.of(
+                new EmpresaResumen(1L, "Transportes del Este", "TDE S.A.", true, RESPONSABLE,
+                        ResumenHabilitaciones.SIN_VEHICULOS),
+                new EmpresaResumen(2L, "Fletes del Norte", "FDN S.R.L.", false, null,
+                        ResumenHabilitaciones.SIN_VEHICULOS)),
+                lista);
     }
 
     @Test
-    void elListadoNoHaceUnaConsultaPorEmpresaNiCargaLosCiudadanos() throws Exception {
+    void cadaEmpresaDelListadoTraeElResumenDeSusVehiculos() throws Exception {
+        conVehiculos();
+
+        List<EmpresaResumen> lista = servicio.listar(FUNCIONARIO, "t");
+
+        // Empresa 1: uno al dia y uno sin permiso; empresa 2: uno dado de baja
+        assertEquals(new ResumenHabilitaciones(2, 1, 1, 0, 0), lista.get(0).vehiculos());
+        assertEquals(new ResumenHabilitaciones(1, 0, 0, 1, 0), lista.get(1).vehiculos());
+    }
+
+    @Test
+    void elListadoNoHaceUnaConsultaPorEmpresaNiPorVehiculoNiCargaLosCiudadanos() throws Exception {
+        conVehiculos();
         Statistics estadisticas = emf.unwrap(SessionFactory.class).getStatistics();
         estadisticas.setStatisticsEnabled(true);
         servicio.listar(FUNCIONARIO, "t");
@@ -144,9 +176,28 @@ class GestionEmpresasServiceTest {
 
         servicio.listar(FUNCIONARIO, "t");
 
-        // Una consulta para el funcionario (autorizacion) y una para las empresas con su responsable
-        assertEquals(2, estadisticas.getPrepareStatementCount());
+        // Una consulta para el funcionario (autorizacion), una para las empresas con su responsable y tres para
+        // los vehiculos, sus permisos y sus ITV
+        assertEquals(5, estadisticas.getPrepareStatementCount());
         assertEquals(0, estadisticas.getEntityStatistics(Ciudadano.class.getName()).getLoadCount());
+    }
+
+    private void conVehiculos() {
+        LocalDate hoy = LocalDate.now(ZoneId.of("America/Montevideo"));
+        em.getTransaction().begin();
+        Empresa empresa1 = em.find(Empresa.class, 1L);
+        Vehiculo alDia = new Vehiculo("AAA0001", "Volvo", "FH", 15_000, 25_000, empresa1);
+        em.persist(alDia);
+        em.persist(new PermisoCirculacion("PC-1", hoy.minusMonths(1), hoy.plusYears(1), alDia));
+        em.persist(new ITV(hoy.minusDays(10), hoy.plusYears(1), alDia));
+        Vehiculo sinPermiso = new Vehiculo("AAA0002", "Volvo", "FH", 15_000, 25_000, empresa1);
+        em.persist(sinPermiso);
+        em.persist(new ITV(hoy.minusDays(10), hoy.plusYears(1), sinPermiso));
+        Vehiculo deBaja = new Vehiculo("BBB0001", "Scania", "R", 15_000, 25_000, em.find(Empresa.class, 2L));
+        deBaja.setActivo(false);
+        em.persist(deBaja);
+        em.getTransaction().commit();
+        em.clear();
     }
 
     @Test

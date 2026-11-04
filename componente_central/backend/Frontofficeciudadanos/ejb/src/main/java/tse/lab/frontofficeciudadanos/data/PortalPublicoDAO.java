@@ -36,7 +36,7 @@ public class PortalPublicoDAO {
     }
 
     // [nroEmpresa, cantidad] de vehiculos habilitados al dia `hoy`: activos, de una empresa habilitada, con
-    // permiso vigente e ITV sin vencer (la misma regla que GestionVehiculosService). nroEmpresa null = todas.
+    // permiso vigente e ITV sin vencer (la misma regla que Vehiculo.habilitadoEn). nroEmpresa null = todas.
     public List<Object[]> vehiculosHabilitadosPorEmpresa(LocalDate hoy, Long nroEmpresa) {
         // Sin ":nro IS NULL OR ...": PostgreSQL no puede deducir el tipo de un parametro null
         var query = em.createQuery("SELECT v.empresa.nroEmpresa, COUNT(v) FROM Vehiculo v"

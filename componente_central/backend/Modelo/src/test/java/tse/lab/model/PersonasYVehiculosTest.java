@@ -1,6 +1,7 @@
 package tse.lab.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -196,5 +197,43 @@ class PersonasYVehiculosTest {
         assertEquals(vencimiento.plusYears(1), itv.getFechaVencimiento());
         assertSame(otro, itv.getVehiculo());
         assertNull(new ITV().getVehiculo());
+    }
+
+    @Test
+    void elPermisoEstaVigenteEntreLaEmisionYElVencimientoIncluidos() {
+        PermisoCirculacion permiso = new PermisoCirculacion("PC-1", LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31), new Vehiculo());
+
+        assertFalse(permiso.vigenteEn(LocalDate.of(2025, 12, 31)));
+        assertTrue(permiso.vigenteEn(LocalDate.of(2026, 1, 1)));
+        assertTrue(permiso.vigenteEn(LocalDate.of(2026, 12, 31)));
+        assertFalse(permiso.vigenteEn(LocalDate.of(2027, 1, 1)));
+    }
+
+    @Test
+    void laItvEstaVigenteHastaElVencimientoIncluido() {
+        ITV itv = new ITV(LocalDate.of(2025, 6, 30), LocalDate.of(2026, 6, 30), new Vehiculo());
+
+        assertTrue(itv.vigenteEn(LocalDate.of(2026, 6, 30)));
+        assertFalse(itv.vigenteEn(LocalDate.of(2026, 7, 1)));
+    }
+
+    @Test
+    void elVehiculoEstaHabilitadoSiEstaActivoConPermisoEItvVigentes() {
+        LocalDate hoy = LocalDate.of(2026, 6, 1);
+        Vehiculo vehiculo = new Vehiculo("SBA1234", "Volvo", "FH", 15_000, 25_000, null);
+        PermisoCirculacion permiso = new PermisoCirculacion("PC-1", hoy.minusYears(1), hoy, vehiculo);
+        ITV vencida = new ITV(hoy.minusYears(1), hoy.minusDays(1), vehiculo);
+        ITV vigente = new ITV(hoy.minusDays(1), hoy.plusMonths(6), vehiculo);
+
+        assertTrue(vehiculo.habilitadoEn(hoy, permiso, List.of(vencida, vigente)));
+        // Sin permiso, con el permiso vencido o sin una ITV vigente
+        assertFalse(vehiculo.habilitadoEn(hoy, null, List.of(vigente)));
+        assertFalse(vehiculo.habilitadoEn(hoy.plusDays(1), permiso, List.of(vigente)));
+        assertFalse(vehiculo.habilitadoEn(hoy, permiso, List.of(vencida)));
+        assertFalse(vehiculo.habilitadoEn(hoy, permiso, List.of()));
+        // Dado de baja, aunque los papeles esten al dia
+        vehiculo.setActivo(false);
+        assertFalse(vehiculo.habilitadoEn(hoy, permiso, List.of(vigente)));
     }
 }

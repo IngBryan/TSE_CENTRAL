@@ -145,14 +145,14 @@ public class PortalPublicoService {
             return new ValidacionVehiculo(normalizada, false, null, null, null, null, null, false);
         }
         PermisoCirculacion p = permisos.buscarPorVehiculo(v);
-        boolean permisoVigente = p != null && !hoy.isBefore(p.getFechaEmision()) && !hoy.isAfter(p.getFechaVencimiento());
+        boolean permisoVigente = p != null && p.vigenteEn(hoy);
         List<ITV> historial = itvs.buscarPorVehiculo(v);
         ITV itv = historial.isEmpty() ? null : historial.get(0);
-        boolean itvVigente = itv != null && !hoy.isAfter(itv.getFechaVencimiento());
+        boolean itvVigente = itv != null && itv.vigenteEn(hoy);
         return new ValidacionVehiculo(v.getMatricula(), true, v.isActivo(),
                 p == null ? null : p.getFechaVencimiento().toString(), permisoVigente,
                 itv == null ? null : itv.getFechaVencimiento().toString(), itvVigente,
-                empresa.isHabilitada() && v.isActivo() && permisoVigente && itvVigente);
+                empresa.isHabilitada() && v.habilitadoEn(hoy, p, historial));
     }
 
     public Estadisticas estadisticas(Integer anioPedido, String correlationId) throws DatosInvalidosException {
