@@ -28,4 +28,11 @@ embed-server --server-config=standalone.xml --std-out=echo
 # consultando los usuarios persistidos en PostgreSQL.
 /subsystem=undertow/application-security-domain=BackofficeSecurity:add(security-domain=ApplicationDomain, integrated-jaspi=false)
 
+# Logs de la plataforma (tse.lab): LogEstructurado ya arma el JSON, asi que van a la consola sin el prefijo de
+# WildFly, una linea por log. La consola del servidor va sin colores: sus codigos ANSI ensucian la linea siguiente.
+/subsystem=logging/pattern-formatter=SOLO_MENSAJE:add(pattern="%s%e%n")
+/subsystem=logging/console-handler=CONSOLA_JSON:add(named-formatter=SOLO_MENSAJE)
+/subsystem=logging/logger=tse.lab:add(level=INFO, use-parent-handlers=false, handlers=[CONSOLA_JSON])
+/subsystem=logging/console-handler=CONSOLE:write-attribute(name=named-formatter, value=PATTERN)
+
 stop-embedded-server

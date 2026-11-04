@@ -45,13 +45,13 @@ class RemoteCaseStoreTest {
         when(remote.casoDelEvento(EVENTO)).thenReturn(CASE);
         when(remote.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENTO)).thenReturn(CASE);
         DatosCaso notified = new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA");
-        when(remote.notificarCaso(4L)).thenReturn(notified);
+        when(remote.notificarCaso(4L, "c-1")).thenReturn(notified);
 
         assertEquals(List.of(CASE), store.openCases("SBC1234"));
         assertEquals(CASE, store.caseOf(EVENT));
         assertEquals(CASE, store.create(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENT));
         store.addEvidence(4L, EVENT);
-        assertEquals(notified, store.notify(4L));
+        assertEquals(notified, store.notify(4L, "c-1"));
 
         verify(remote).agregarEvidencia(4L, EVENTO);
     }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { COOKIE_SESION, getSesion, opcionesCookie, sellar } from "@/lib/auth/session";
+import { registrarLog } from "@/lib/log";
 
 // Perfil de la Empresa. La cedula del responsable sale de la sesion, nunca del formulario; el
 // backend controla que sea responsable validado de la empresa.
@@ -41,7 +42,6 @@ export async function actualizarEmpresa(_previo: EstadoFormulario, formulario: F
       correlationId,
       usuarioCi: sesion.perfil.cedula,
     });
-    console.info(`[empresa] correlationId=${correlationId} actualizar status=${res.status}`);
     if (res.status === 400) return { error: "Revisá los datos marcados.", campos: res.data?.campos, valores };
     if (res.status === 403) return { error: `No podés modificar la empresa: ${res.data?.detalle ?? "no sos su responsable"}.`, valores };
     if (res.status !== 200 || !res.data) return { error: "No se pudieron guardar los cambios.", valores };
@@ -61,7 +61,7 @@ export async function actualizarEmpresa(_previo: EstadoFormulario, formulario: F
     };
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
-    console.warn(`[empresa] correlationId=${correlationId} ${e.message}`);
+    registrarLog("warn", "empresa", { correlationId }, { detalle: `${e.message}` });
     return { error: "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.", valores };
   }
 }

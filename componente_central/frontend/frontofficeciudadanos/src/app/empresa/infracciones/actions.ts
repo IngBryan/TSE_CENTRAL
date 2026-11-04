@@ -31,7 +31,6 @@ export async function presentarDescargo(
       correlationId,
       usuarioCi: sesion.perfil.cedula,
     });
-    console.info(`[infracciones] correlationId=${correlationId} POST /empresa/infracciones/${idCaso}/descargo status=${res.status}`);
     if (res.status === 200) {
       revalidatePath("/empresa/infracciones");
       revalidatePath(`/empresa/infracciones/${idCaso}`);

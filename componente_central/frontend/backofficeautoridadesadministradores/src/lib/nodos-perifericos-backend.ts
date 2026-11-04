@@ -1,6 +1,7 @@
 
 import type { AltaNodo, DatosNodo } from "./nodos-perifericos";
 import {
+  fetchBackend,
   idSesion,
   urlBackend,
   wildFlyAuthorization,
@@ -25,7 +26,7 @@ export async function listarNodos(): Promise<ResultadoListado> {
   }
 
   try {
-    const respuesta = await fetch(
+    const respuesta = await fetchBackend(
       urlBackend("nodos-perifericos"),
       {
         method: "GET",
@@ -101,7 +102,7 @@ export async function registrarNodo(
   }
 
   try {
-    const respuesta = await fetch(
+    const respuesta = await fetchBackend(
       urlBackend("nodos-perifericos"),
       {
         method: "POST",

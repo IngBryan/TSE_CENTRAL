@@ -10,6 +10,7 @@ import {
   type ErrorBackend,
   type ResolucionRegistrada,
 } from "@/lib/casos";
+import { registrarLog } from "@/lib/log";
 
 export type ResultadoResolucion =
   | { ok: true; mensaje: string }
@@ -49,9 +50,6 @@ export async function resolverCaso(
         usuarioCi: sesion.usuario.cedula,
       },
     );
-    console.info(
-      `[casos] correlationId=${correlationId} POST /casos/${idCaso}/resolucion status=${res.status}`,
-    );
     if (res.status === 200) {
       revalidatePath(`/casos/${idCaso}`);
       return {
@@ -74,9 +72,7 @@ export async function resolverCaso(
     if (res.status === 404)
       return { ok: false, error: "El caso de fiscalización no existe." };
     if (res.status === 401) {
-      console.error(
-        `[casos] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`,
-      );
+      registrarLog("error", "casos", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
     }
     if (res.status === 403)
       return {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.function.Consumer;
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
@@ -46,30 +47,30 @@ public class CaseAssigner implements Consumer<Detection> {
         VehicleEvent event = detection.event();
         DatosCaso existing = cases.caseOf(event);
         if (existing != null) {
-            notifyIfDetected(existing);
+            notifyIfDetected(existing, event);
             return;
         }
         List<DatosCaso> open = cases.openCases(event.licensePlate());
         for (Situation situation : detection.situations()) {
             if (open.stream().noneMatch(c -> situation.isTypeOf(c.getTipoCaso()))) {
                 DatosCaso created = cases.create(situation.caseType(), guideId(detection), event);
-                log("Created", created, event);
-                notifyIfDetected(created);
+                log("caso.creado", created, event);
+                notifyIfDetected(created, event);
                 return;
             }
         }
         Situation highest = detection.situations().get(0);
         DatosCaso target = open.stream().filter(c -> highest.isTypeOf(c.getTipoCaso())).findFirst().orElseThrow();
         cases.addEvidence(target.getId(), event);
-        log("Added to", target, event);
-        notifyIfDetected(target);
+        log("caso.evidencia_agregada", target, event);
+        notifyIfDetected(target, event);
     }
 
     /** Also covers a case whose notification failed before: it is notified with its next event. */
-    private void notifyIfDetected(DatosCaso caseData) throws IOException {
+    private void notifyIfDetected(DatosCaso caseData, VehicleEvent event) throws IOException {
         if (DETECTADA.equals(caseData.getEstado())) {
-            cases.notify(caseData.getId());
-            System.out.printf("Notified case %d (%s)%n", caseData.getId(), caseData.getTipoCaso());
+            cases.notify(caseData.getId(), event.correlationId());
+            log("caso.notificado", caseData, event);
         }
     }
 
@@ -81,8 +82,9 @@ public class CaseAssigner implements Consumer<Detection> {
         return detection.facts().activeTrips().get(0).getIdGuia();
     }
 
-    private static void log(String action, DatosCaso caseData, VehicleEvent event) {
-        System.out.printf("%s case %d (%s) for %s at %s%n", action, caseData.getId(), caseData.getTipoCaso(),
-                event.licensePlate(), event.timestamp());
+    private static void log(String evento, DatosCaso caseData, VehicleEvent event) {
+        LogFiscalizacion.info(LogFiscalizacion.evento(evento).correlationId(event.correlationId())
+                .campo("caso", caseData.getId()).campo("tipo", caseData.getTipoCaso())
+                .campo("matricula", event.licensePlate()).campo("fechaHora", event.timestamp()));
     }
 }

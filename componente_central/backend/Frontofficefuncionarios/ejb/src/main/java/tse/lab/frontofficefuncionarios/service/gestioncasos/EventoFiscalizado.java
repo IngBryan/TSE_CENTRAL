@@ -12,11 +12,18 @@ public final class EventoFiscalizado implements Serializable {
     private final String matricula;
     private final Instant fechaHora;
     private final OrigenEvento origen;
+    // Para seguir el evento en los logs; no es parte de su identidad
+    private final String correlationId;
 
     public EventoFiscalizado(String matricula, Instant fechaHora, OrigenEvento origen) {
+        this(matricula, fechaHora, origen, null);
+    }
+
+    public EventoFiscalizado(String matricula, Instant fechaHora, OrigenEvento origen, String correlationId) {
         this.matricula = matricula;
         this.fechaHora = fechaHora;
         this.origen = origen;
+        this.correlationId = correlationId;
     }
 
     public String getMatricula() {
@@ -29,6 +36,10 @@ public final class EventoFiscalizado implements Serializable {
 
     public OrigenEvento getOrigen() {
         return origen;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
     }
 
     @Override

@@ -1,4 +1,5 @@
 import { getAuthConfig } from "./auth/config";
+import { registrarLog, segundosDesde } from "./log";
 
 // Cliente de la API REST del backend Frontofficefuncionarios (WildFly). Solo se usa del lado del
 // servidor de Next: la API key nunca llega al navegador.
@@ -21,25 +22,41 @@ export async function llamarBackend<T>(
   // Quien hace la operacion: la cedula de la sesion (el backend controla sus permisos)
   if (opciones.usuarioCi) headers["X-Usuario-Ci"] = opciones.usuarioCi;
 
+  const inicio = performance.now();
+  const metodo = opciones.method ?? "GET";
   let res: Response;
   try {
     res = await fetch(`${cfg.backendUrl}${ruta}`, {
-      method: opciones.method ?? "GET",
+      method: metodo,
       headers,
       body: opciones.body === undefined ? undefined : JSON.stringify(opciones.body),
       cache: "no-store",
       signal: AbortSignal.timeout(cfg.backendTimeoutMs),
     });
   } catch (e) {
+    registrarLog(
+      "error",
+      "backend.llamada",
+      { correlationId: opciones.correlationId, usuario: opciones.usuarioCi, error: (e as Error).message, backendRoundtripSeconds: segundosDesde(inicio) },
+      { metodo, ruta },
+    );
     throw new BackendNoDisponible(`No se pudo contactar el backend: ${(e as Error).message}`);
   }
+  registrarLog(
+    res.status >= 500 ? "error" : "info",
+    "backend.llamada",
+    {
+      correlationId: opciones.correlationId,
+      usuario: opciones.usuarioCi,
+      responseCode: res.status,
+      backendRoundtripSeconds: segundosDesde(inicio),
+    },
+    { metodo, ruta },
+  );
   // Solo 502/503/504 son "no disponible" (proxy, WildFly arrancando, timeout). Un 500 es un error del
   // backend: se registra y la pagina muestra que no se pudo hacer la operacion.
   if (res.status === 502 || res.status === 503 || res.status === 504) {
     throw new BackendNoDisponible(`El backend respondio ${res.status}`);
-  }
-  if (res.status >= 500) {
-    console.error(`[backend] correlationId=${opciones.correlationId} ${opciones.method ?? "GET"} ${ruta} status=${res.status}`);
   }
   return { status: res.status, data: (await res.json().catch(() => null)) as T };
 }

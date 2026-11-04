@@ -11,6 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
+
 /**
  * Last successful communication with each node (ultimaComunicacionExitosa), kept in memory and sent to
  * the backoffice in batches, so receiving an event doesn't call WildFly. A batch that fails is merged
@@ -63,8 +65,7 @@ public class NodeCommunications implements AutoCloseable {
             target.report(batch);
         } catch (IOException | RuntimeException e) {
             batch.forEach((externalId, last) -> pending.merge(externalId, last, NodeCommunications::latest));
-            System.err.println("Could not record the last communication of the nodes, retrying with the next batch: "
-                    + e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("nodos.comunicacion_no_registrada").errorSinPila(e));
         }
     }
 

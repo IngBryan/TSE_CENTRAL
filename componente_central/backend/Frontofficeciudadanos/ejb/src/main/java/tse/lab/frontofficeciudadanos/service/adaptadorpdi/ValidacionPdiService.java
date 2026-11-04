@@ -15,6 +15,7 @@ import tse.lab.adaptadorpdi.MayoriaDeEdad;
 import tse.lab.adaptadorpdi.PdiNoDisponibleException;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.model.Chofer;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Ciudadano;
@@ -90,16 +91,19 @@ public class ValidacionPdiService {
             // CU-02 FA5 6c: las asociaciones como chofer que esperaban la validacion quedan habilitadas
             List<Chofer> habilitados = choferes.habilitarPendientes(perfil.getCi());
             if (!habilitados.isEmpty()) {
-                LOG.info(() -> "evento=chofer.habilitado correlationId=" + correlationId + " ci=" + perfil.getCi()
-                        + " empresas=" + habilitados.stream().map(c -> c.getEmpresa().getNroEmpresa()).toList());
+                LOG.info(() -> LogCiudadanos.evento("chofer.habilitado").correlationId(correlationId)
+                        .campo("ci", perfil.getCi())
+                        .campo("empresas", habilitados.stream().map(c -> c.getEmpresa().getNroEmpresa()).toList())
+                        .toString());
             }
         }
         return resultado;
     }
 
     private static void log(String correlationId, Ciudadano perfil, ResultadoValidacion resultado) {
-        LOG.log(resultado == ResultadoValidacion.NO_DISPONIBLE ? Level.WARNING : Level.INFO,
-                () -> "evento=pdi.validacion correlationId=" + correlationId + " ci=" + perfil.getCi()
-                        + " resultado=" + resultado + " estado=" + perfil.getEstado());
+        LogCiudadanos.evento("pdi.validacion")
+                .nivel(resultado == ResultadoValidacion.NO_DISPONIBLE ? Level.WARNING : Level.INFO)
+                .correlationId(correlationId).campo("ci", perfil.getCi()).campo("resultado", resultado)
+                .campo("estado", perfil.getEstado()).escribirEn(LOG);
     }
 }

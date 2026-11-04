@@ -11,4 +11,9 @@ public sealed interface VehicleEvent permits TrackingEvent, Weighing {
     String licensePlate();
 
     Instant timestamp();
+
+    /** Follows the event through the logs of every component: the same one if it is evaluated again. */
+    default String correlationId() {
+        return "evt-" + licensePlate() + "-" + timestamp();
+    }
 }

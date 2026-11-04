@@ -22,6 +22,7 @@ import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.Empresa;
@@ -123,8 +124,8 @@ public class GestionVehiculosService {
 
         Vehiculo vehiculo = new Vehiculo(matricula, v.marca(), v.modelo(), v.peso(), v.capacidad(), empresa);
         vehiculos.guardar(vehiculo);
-        LOG.info(() -> "evento=vehiculo.alta correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + matricula);
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.alta").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", matricula).toString());
         return vista(vehiculo, List.of(), LocalDate.now(ZONA));
     }
 
@@ -147,9 +148,10 @@ public class GestionVehiculosService {
         vehiculo.setModelo(v.modelo());
         vehiculo.setPeso(v.peso());
         vehiculo.setCapacidadCargaKg(v.capacidad());
-        LOG.info(() -> "evento=vehiculo.modificado correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula()
-                + " cambios=\"" + String.join("; ", cambios) + "\"");
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.modificado").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa())
+                .campo("matricula", vehiculo.getMatricula())
+                .campo("cambios", "\"" + String.join("; ", cambios) + "\"").toString());
         return detalle(vehiculo);
     }
 
@@ -192,9 +194,9 @@ public class GestionVehiculosService {
             }
             permisos.guardar(new PermisoCirculacion(nro, desde, hasta, vehiculo));
         }
-        LOG.info(() -> "evento=vehiculo.permiso correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula() + " permiso="
-                + nro + " vigencia=" + desde + "/" + hasta);
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.permiso").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                .campo("permiso", nro).campo("vigencia", desde + "/" + hasta).toString());
         return detalle(vehiculo);
     }
 
@@ -219,9 +221,9 @@ public class GestionVehiculosService {
         }
 
         itvs.guardar(new ITV(desde, vencimiento, vehiculo));
-        LOG.info(() -> "evento=vehiculo.itv correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula()
-                + " vigencia=" + desde + "/" + vencimiento);
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.itv").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                .campo("vigencia", desde + "/" + vencimiento).toString());
         return detalle(vehiculo);
     }
 
@@ -236,8 +238,9 @@ public class GestionVehiculosService {
                         + "Reasignalos o esperá a que terminen antes de darlo de baja.");
             }
             vehiculo.setActivo(false);
-            LOG.info(() -> "evento=vehiculo.baja correlationId=" + correlationId + " usuario=" + ciResponsable
-                    + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula());
+            LOG.info(() -> LogCiudadanos.evento("vehiculo.baja").correlationId(correlationId).usuario(ciResponsable)
+                    .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                    .toString());
         }
         return vista(vehiculo, itvs.buscarPorVehiculo(vehiculo), LocalDate.now(ZONA));
     }

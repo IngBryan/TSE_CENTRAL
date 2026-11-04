@@ -37,7 +37,6 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresas/[
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} nro={nro} matricula={matricula} error={NO_DISPONIBLE} />;
   }
-  console.info(`[vehiculos] correlationId=${correlationId} GET ${ruta} status=${res.status}`);
 
   if (res.status !== 200 || !res.data) {
     const error =

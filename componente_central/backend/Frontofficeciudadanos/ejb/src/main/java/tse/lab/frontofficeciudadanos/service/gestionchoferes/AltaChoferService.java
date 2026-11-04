@@ -8,6 +8,7 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.RegistroConsultaPersonaDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ValidacionPdiService;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
@@ -125,8 +126,9 @@ public class AltaChoferService {
             ResultadoAltaChofer resultado) {
         auditoria.registrar(new RegistroConsultaPersona(ciUsuario, ciConsultada, operacion,
                 resultado.resultado().name(), correlationId));
-        LOG.info(() -> "evento=persona.consulta correlationId=" + correlationId + " usuario=" + ciUsuario
-                + " ciConsultada=" + ciConsultada + " operacion=" + operacion + " resultado=" + resultado.resultado());
+        LOG.info(() -> LogCiudadanos.evento("persona.consulta").correlationId(correlationId).usuario(ciUsuario)
+                .campo("ciConsultada", ciConsultada).campo("operacion", operacion)
+                .campo("resultado", resultado.resultado()).toString());
         return resultado;
     }
 }
