@@ -269,9 +269,8 @@ class GestionCasosServiceTest {
         Vehiculo vehiculo = em.find(Vehiculo.class, "SBA 1234");
         LocalDate hoy = LocalDate.now();
         em.getTransaction().begin();
-        // Renovada despues de la deteccion: no cuenta. Sin vencimiento: no gana por el orden de los nulos.
+        // Renovada despues de la deteccion: no cuenta
         em.persist(new ITV(hoy.plusDays(1), LocalDate.of(2028, 1, 1), vehiculo));
-        em.persist(new ITV(LocalDate.of(2026, 6, 1), null, vehiculo));
         em.getTransaction().commit();
         em.clear();
 

@@ -107,8 +107,11 @@ export async function registrarPermiso(
   return modificar(matricula, "/permiso", "PUT", datos);
 }
 
-export async function agregarItv(matricula: string, fechaVencimiento: string): Promise<Resultado> {
-  return modificar(matricula, "/itv", "POST", { fechaVencimiento });
+export async function agregarItv(
+  matricula: string,
+  datos: { fechaEmision: string; fechaVencimiento: string },
+): Promise<Resultado> {
+  return modificar(matricula, "/itv", "POST", datos);
 }
 
 export async function darDeBaja(matricula: string): Promise<Resultado> {

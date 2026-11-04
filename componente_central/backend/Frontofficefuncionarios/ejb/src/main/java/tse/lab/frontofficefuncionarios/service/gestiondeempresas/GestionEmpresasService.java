@@ -18,6 +18,8 @@ import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
+import tse.lab.frontofficefuncionarios.service.fiscalizacionhabilitaciones.FiscalizacionHabilitacionesService;
+import tse.lab.frontofficefuncionarios.service.fiscalizacionhabilitaciones.FiscalizacionHabilitacionesService.ResumenHabilitaciones;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
@@ -49,9 +51,13 @@ public class GestionEmpresasService {
     private CiudadanoDAO ciudadanos;
     @EJB
     private ResponsableDAO responsables;
+    @EJB
+    private FiscalizacionHabilitacionesService habilitaciones;
 
+    // vehiculos: cuantos tiene habilitados, no habilitados, por vencer y dados de baja (fiscalizacion de
+    // habilitaciones); el detalle esta en GET /empresas/{nro}/vehiculos
     public record EmpresaResumen(Long nroEmpresa, String nombrePublico, String razonSocial, boolean habilitada,
-            String ciResponsable) {
+            String ciResponsable, ResumenHabilitaciones vehiculos) {
     }
 
     // Solo el primer nombre y primer apellido del responsable (Ley 18.331), y su estado frente a la PDI
@@ -89,7 +95,11 @@ public class GestionEmpresasService {
 
     public List<EmpresaResumen> listar(String ci, String correlationId) throws NoAutorizadoException {
         autorizacion.funcionario(ci, correlationId);
-        List<EmpresaResumen> lista = empresas.listar().stream().map(GestionEmpresasService::resumen).toList();
+        // Las empresas primero: el resumen de vehiculos las encuentra ya cargadas
+        List<Empresa> todas = empresas.listar();
+        Map<Long, ResumenHabilitaciones> vehiculos = habilitaciones.resumenPorEmpresa(ci, correlationId);
+        List<EmpresaResumen> lista = todas.stream().map(e -> resumen(e,
+                vehiculos.getOrDefault(e.getNroEmpresa(), ResumenHabilitaciones.SIN_VEHICULOS))).toList();
         LOG.info(() -> "evento=empresas.listado correlationId=" + correlationId + " usuario=" + ci + " cantidad="
                 + lista.size());
         return lista;
@@ -326,10 +336,10 @@ public class GestionEmpresasService {
         return new ConflictoException(codigo, mensaje);
     }
 
-    private static EmpresaResumen resumen(Empresa e) {
+    private static EmpresaResumen resumen(Empresa e, ResumenHabilitaciones vehiculos) {
         Responsable r = e.getResponsable();
         return new EmpresaResumen(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.isHabilitada(),
-                r == null ? null : r.getCi());
+                r == null ? null : r.getCi(), vehiculos);
     }
 
     private static EmpresaDetalle detalle(Empresa e) {
