@@ -6,7 +6,8 @@
     "dev": "next dev -p 3003",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:polling-gps": "node --experimental-strip-types --test src/lib/polling-gps.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

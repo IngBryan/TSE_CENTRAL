@@ -35,8 +35,11 @@ public class SeguimientoGpsService {
     @EJB private AutorizacionFuncionario autorizacion;
     @EJB private GuiaDAO guias;
     @EJB private MongoSeguimientoDAO tracking;
-    @EJB private IntervalosGuiasGpsRemote intervalos;
-    @EJB private RutasAutorizadasRemote rutas;
+    
+    @EJB(lookup = "java:global/frontofficeciudadanos/frontofficeciudadanos-ejb/RutasAutorizadasService!tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote")
+    private RutasAutorizadasRemote rutas;
+    @EJB(lookup = "java:global/frontofficeciudadanos/frontofficeciudadanos-ejb/IntervalosGuiasGpsService!tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.IntervalosGuiasGpsRemote")
+    private IntervalosGuiasGpsRemote intervalos;
 
     public record PaginaGps(String idGuia, String matricula, String desde, String hasta,
             List<PuntoGpsSeguimiento> posiciones, String siguienteDesde, boolean hayMas) { }

@@ -3,20 +3,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Encabezado } from "@/components/encabezado";
 import { SeguimientoViaje } from "./seguimiento-viaje";
+import { LineaTiempoEnVivo } from "./linea-tiempo-en-vivo";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
-import { BASE_PATH } from "@/lib/base-path";
 import { COLOR_ESTADO, estado, fecha, fechaHora, kg, tipoCaso, type ErrorBackend } from "@/lib/casos";
 import {
   COLOR_ESTADO_VIAJE,
   estadoViaje,
   idValido,
-  MODIFICACIONES,
   nombreChofer,
-  TIPOS_EVENTO,
   type EstadoViaje,
-  type EventoVista,
-  type ModificacionVista,
   type ViajeDetalle,
 } from "@/lib/viajes";
 
@@ -25,9 +21,6 @@ const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá d
 const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
 const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
 const dato = "text-zinc-500";
-
-// Linea de tiempo: eventos del chofer (por la hora del dispositivo) y modificaciones de la empresa
-type Entrada = { cuando: string | null; evento?: EventoVista; modificacion?: ModificacionVista };
 
 // CU Monitorear viajes y pesajes: detalle de un viaje asignado, en curso o finalizado con los pesajes del
 // vehiculo durante el viaje y la linea de tiempo. Que quien consulta sea funcionario lo controla el backend
@@ -65,11 +58,6 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
 
   const v = res.data;
   const conExceso = v.pesajes.filter((p) => p.excesoKg > 0).length;
-  const linea: Entrada[] = [
-    ...v.modificaciones.map((m) => ({ cuando: m.fecha, modificacion: m })),
-    ...v.eventos.map((e) => ({ cuando: e.fechaHoraDispositivo, evento: e })),
-  ].sort((a, b) => (a.cuando ? Date.parse(a.cuando) : 0) - (b.cuando ? Date.parse(b.cuando) : 0));
-
   return (
     <Pagina sesion={sesion} id={id} estado={v.estado} subtitulo={`${v.origen ?? "-"} → ${v.destino ?? "-"}`}>
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
@@ -191,76 +179,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
         </div>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className={titulo}>Línea de tiempo</h2>
-        {linea.length === 0 ? (
-          <p className="text-zinc-600 dark:text-zinc-400">El chofer no registró eventos en este viaje.</p>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {linea.map(({ evento: e, modificacion: m }, i) =>
-              m ? (
-                <li key={`mod-${m.fecha}-${i}`} className="rounded-xl border-l-4 border-[#0068b3] bg-white p-4 text-sm shadow-sm dark:bg-zinc-950">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium text-black dark:text-zinc-50">{MODIFICACIONES[m.tipo] ?? m.tipo}</span>
-                    <span className="text-xs text-zinc-500">
-                      {fechaHora(m.fecha)} · responsable C.I. {m.ciResponsable}
-                    </span>
-                  </div>
-                  {m.cambios && <p className="mt-1">{m.cambios}</p>}
-                  {m.motivo && <p className="mt-1">Motivo: {m.motivo}</p>}
-                </li>
-              ) : e ? (
-                <li
-                  key={e.idEvento}
-                  className={`rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-zinc-950 ${
-                    e.resultado === "CONFLICTO" ? "border-l-4 border-amber-500" : ""
-                  }`}
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium text-black dark:text-zinc-50">{TIPOS_EVENTO[e.tipo] ?? e.tipo}</span>
-                    <span className="text-xs text-zinc-500">
-                      Ocurrió {fechaHora(e.fechaHoraDispositivo)} · recibido {fechaHora(e.fechaRecepcion)}
-                    </span>
-                  </div>
-                  {e.descripcion && <p className="mt-1 whitespace-pre-line">{e.descripcion}</p>}
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Chofer: {nombreChofer(e.chofer)}
-                    {e.latitud != null && e.longitud != null && (
-                      <>
-                        {" · "}
-                        <a
-                          className="underline"
-                          href={`https://www.openstreetmap.org/?mlat=${e.latitud}&mlon=${e.longitud}#map=14/${e.latitud}/${e.longitud}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          ver ubicación
-                        </a>
-                      </>
-                    )}
-                  </p>
-                  {e.resultado === "CONFLICTO" && (
-                    <p className="mt-2 text-amber-800 dark:text-amber-300">
-                      En conflicto: {e.detalle ?? e.codigo}. No cambió el estado de la guía.
-                    </p>
-                  )}
-                  {e.resultado === "SIN_EFECTO" && <p className="mt-2 text-zinc-500">Sin efecto: {e.detalle ?? e.codigo}</p>}
-                  {e.conFoto && (
-                    // La sirve el route handler de esta app (el navegador no tiene la API key): lleva el basePath
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`${BASE_PATH}/viajes/${encodeURIComponent(id)}/eventos/${encodeURIComponent(e.idEvento)}/foto`}
-                      alt={`Foto del ${(TIPOS_EVENTO[e.tipo] ?? e.tipo).toLowerCase()}`}
-                      loading="lazy"
-                      className="mt-3 max-h-80 rounded-lg"
-                    />
-                  )}
-                </li>
-              ) : null,
-            )}
-          </ol>
-        )}
-      </section>
+      <LineaTiempoEnVivo id={id} estadoInicial={v.estado} eventosIniciales={v.eventos} modificacionesIniciales={v.modificaciones} />
     </Pagina>
   );
 }

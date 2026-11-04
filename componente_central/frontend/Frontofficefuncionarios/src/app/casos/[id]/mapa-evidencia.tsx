@@ -4,23 +4,37 @@ import { useEffect, useRef, useState } from "react";
 import { Map as MapaGL, NavigationControl, LngLatBounds, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
 import type { FeatureCollection, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { coordenadasRuta, type PuntoGpsSeguimiento, type RutaAutorizada } from "@/lib/seguimiento";
+import { coordenadasRuta, type Coordenada, type PuntoGpsSeguimiento, type RutaAutorizada } from "@/lib/seguimiento";
 import type { PruebaDesvioVista } from "@/lib/casos";
 
 setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString());
 const ESTILO = "https://tiles.openfreemap.org/styles/liberty";
 const VACIO: FeatureCollection = { type: "FeatureCollection", features: [] };
 const COLORES_RUTA = ["#16a34a", "#2563eb", "#a855f7"];
+const coordenadaGps = (p: PuntoGpsSeguimiento): Coordenada => [p.longitud, p.latitud];
+const valida = (c: Coordenada): boolean => Number.isFinite(c[0]) && Number.isFinite(c[1])
+  && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
 
-export default function MapaEvidencia({ rutas, puntos, pruebas }: {
+/** En el expediente se conserva el contexto completo: rutas admitidas + trayectoria real,
+ * y solo se resaltan las dos mediciones de la confirmación elegida. */
+export default function MapaEvidencia({
+  rutas, puntos, pruebas, mostrarRutas = true, mostrarRecorrido = true,
+  enfocar = 0, modoEncuadre = "todo",
+}: {
   rutas: RutaAutorizada[];
   puntos: PuntoGpsSeguimiento[];
   pruebas: PruebaDesvioVista[];
+  mostrarRutas?: boolean;
+  mostrarRecorrido?: boolean;
+  enfocar?: number;
+  modoEncuadre?: "todo" | "confirmacion";
 }) {
   const nodo = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MapaGL | null>(null);
+  const vistaInicial = useRef(false);
   const [listo, setListo] = useState(false);
   const [error, setError] = useState(false);
+
   useEffect(() => {
     if (!nodo.current) return;
     const m = new MapaGL({ container: nodo.current, style: ESTILO,
@@ -32,9 +46,9 @@ export default function MapaEvidencia({ rutas, puntos, pruebas }: {
         m.addSource(id, { type: "geojson", data: VACIO });
       }
       m.addLayer({ id: "corredores", type: "line", source: "rutas",
-        paint: { "line-color": ["get", "color"], "line-width": 5, "line-opacity": 0.85 } });
+        paint: { "line-color": ["get", "color"], "line-width": 5, "line-opacity": 0.8 } });
       m.addLayer({ id: "circulacion-gps", type: "line", source: "trayectoria",
-        paint: { "line-color": "#ea580c", "line-width": 4 } });
+        paint: { "line-color": "#ea580c", "line-width": 4, "line-dasharray": [2, 1] } });
       m.addLayer({ id: "puntos-confirmacion", type: "circle", source: "confirmaciones",
         paint: { "circle-radius": 8, "circle-color": ["get", "color"],
           "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
@@ -52,39 +66,48 @@ export default function MapaEvidencia({ rutas, puntos, pruebas }: {
       return coords ? [{ type: "Feature" as const, properties: { color: COLORES_RUTA[i % 3] },
         geometry: { type: "LineString" as const, coordinates: coords } }] : [];
     });
-    const rutasFc: FeatureCollection<LineString> = { type: "FeatureCollection", features: rutasValidas };
-    const coordsGps = puntos.filter(p => Number.isFinite(p.longitud) && Number.isFinite(p.latitud))
-      .map(p => [p.longitud, p.latitud]);
-    const gpsFc: FeatureCollection<LineString> = { type: "FeatureCollection", features: coordsGps.length >= 2
+    const coordsGps = puntos.map(coordenadaGps).filter(valida);
+    const rutasFc: FeatureCollection<LineString> = {
+      type: "FeatureCollection", features: mostrarRutas ? rutasValidas : [],
+    };
+    const gpsFc: FeatureCollection<LineString> = { type: "FeatureCollection", features: mostrarRecorrido && coordsGps.length >= 2
       ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coordsGps } }] : [] };
-    const marcas: FeatureCollection<Point> = { type: "FeatureCollection", features: [
-      ...pruebas.flatMap(p => [
-        { coord: [p.lonPareja, p.latPareja], color: "#f97316" },
-        { coord: [p.lonConfirmante, p.latConfirmante], color: "#dc2626" },
-      ]),
-      ...(!pruebas.length && puntos.length > 0 ? [
-        { coord: [puntos[0].longitud, puntos[0].latitud], color: "#16a34a" },
-        { coord: [puntos[puntos.length - 1].longitud, puntos[puntos.length - 1].latitud], color: "#dc2626" },
-      ] : []),
-    ].filter(p => p.coord.every(Number.isFinite)).map(p => ({
-      type: "Feature", properties: { color: p.color },
-      geometry: { type: "Point", coordinates: p.coord },
-    })) };
+    const seleccionadas = pruebas.flatMap<{ coord: Coordenada; color: string }>(p => [
+      { coord: [p.lonPareja, p.latPareja], color: "#eab308" },
+      { coord: [p.lonConfirmante, p.latConfirmante], color: "#dc2626" },
+    ]);
+    // En casos SIN_GUIA no existen confirmaciones; marcamos el inicio y fin del historial.
+    const extremos: { coord: Coordenada; color: string }[] = !pruebas.length && coordsGps.length
+      ? [{ coord: coordsGps[0], color: "#16a34a" },
+         { coord: coordsGps[coordsGps.length - 1], color: "#dc2626" }] : [];
+    const marcas: FeatureCollection<Point> = { type: "FeatureCollection", features:
+      [...seleccionadas, ...extremos].filter(p => valida(p.coord)).map(p => ({
+        type: "Feature", properties: { color: p.color },
+        geometry: { type: "Point", coordinates: p.coord },
+      })),
+    };
     (m.getSource("rutas") as GeoJSONSource).setData(rutasFc);
     (m.getSource("trayectoria") as GeoJSONSource).setData(gpsFc);
     (m.getSource("confirmaciones") as GeoJSONSource).setData(marcas);
-    const bounds = new LngLatBounds();
-    const coord = [
-      ...rutasValidas.flatMap(f => f.geometry.coordinates),
+    const todas: Coordenada[] = [
+      ...rutasValidas.flatMap(f => f.geometry.coordinates as Coordenada[]),
       ...coordsGps,
-      ...marcas.features.map(f => f.geometry.coordinates),
+      ...marcas.features.map(f => f.geometry.coordinates as Coordenada),
     ];
-    coord.forEach(c => bounds.extend([c[0], c[1]]));
-    if (coord.length) m.fitBounds(bounds, { padding: 48, maxZoom: 13, duration: 0 });
-  }, [listo, rutas, puntos, pruebas]);
+    // Enfocar solo cambia la cámara: el resto del recorrido continúa dibujado.
+    const seleccion = seleccionadas.map(p => p.coord).filter(valida);
+    const foco = modoEncuadre === "confirmacion" && seleccion.length ? seleccion : todas;
+    if (foco.length && (!vistaInicial.current || enfocar > 0)) {
+      const bounds = new LngLatBounds();
+      foco.forEach(c => bounds.extend(c));
+      m.fitBounds(bounds, { padding: 48, maxZoom: 13, duration: 0 });
+      vistaInicial.current = true;
+    }
+  }, [listo, rutas, puntos, pruebas, mostrarRutas, mostrarRecorrido, enfocar, modoEncuadre]);
 
   return <div>
-    <div ref={nodo} role="img" aria-label="Mapa de evidencias del caso" className="h-[370px] w-full rounded-xl border border-black/10 dark:border-white/10 sm:h-[480px]" />
+    <div ref={nodo} role="img" aria-label="Comparación de rutas autorizadas, recorrido GPS real y confirmación de desvío"
+      className="h-[370px] w-full rounded-xl border border-black/10 dark:border-white/10 sm:h-[480px]" />
     {error && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
       El mapa base podría no estar disponible. Revisá la conexión con el proveedor cartográfico.
     </p>}

@@ -21,7 +21,7 @@ import {
   type CirculacionVista,
 } from "@/lib/casos";
 import { ResolverCaso } from "./resolver-caso";
-import { GeografiaCaso } from "./geografia-caso";
+import { EvidenciasEnVivo } from "./evidencias-en-vivo";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -233,29 +233,14 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
               )}
             </div>
 
-            {ev.eventosTracking.length > 0 && (
-              <div className={tarjeta}>
-                <h3 className="mb-2 font-medium text-black dark:text-zinc-50">Eventos de tracking asociados</h3>
-                <ul className="flex flex-wrap gap-2">
-                  {ev.eventosTracking.map((t) => (
-                    <li
-                      key={`${t.matricula}|${t.fechaHora}`}
-                      className="rounded bg-zinc-100 px-2 py-1 font-mono text-xs dark:bg-zinc-900"
-                    >
-                      {t.matricula} · {t.fechaHora}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </>
         )}
       </section>
 
-      {(caso.tipoCaso === "VIAJE_SIN_GUIA" || caso.tipoCaso === "DESVIO_RUTA" || caso.tipoCaso === "DESVIO_DE_RUTA") &&
-        <GeografiaCaso id={caso.id} tipo={caso.tipoCaso} guiaId={caso.guia?.id ?? null}
-          pruebas={ev?.pruebasDesvio ?? []}
-          circulacion={circulacion?.status === 200 ? circulacion.data : null} />}
+      <EvidenciasEnVivo id={caso.id} tipo={caso.tipoCaso} guiaId={caso.guia?.id ?? null}
+        estadoCaso={caso.estado} eventosIniciales={ev?.eventosTracking ?? []}
+        pruebasIniciales={ev?.pruebasDesvio ?? []}
+        circulacion={circulacion?.status === 200 ? circulacion.data : null} />
 
       <section className="flex flex-col gap-3">
         <h2 className={titulo}>Descargo de la empresa</h2>

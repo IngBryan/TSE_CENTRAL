@@ -43,7 +43,11 @@ public class ActiveGpsRegistry implements AutoCloseable {
         try {
             load();
         } catch (IOException | RuntimeException e) {
-            System.err.println("Could not refresh the active GPS, keeping the last list: " + e.getMessage());
+            System.err.println(
+                "Could not refresh the active GPS, keeping the last list: "
+                + e.getMessage()
+            );
+            e.printStackTrace(System.err);
         }
     }
 
