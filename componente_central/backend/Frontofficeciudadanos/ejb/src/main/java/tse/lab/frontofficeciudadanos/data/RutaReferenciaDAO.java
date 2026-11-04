@@ -22,6 +22,14 @@ public class RutaReferenciaDAO {
                 .getResultStream().findFirst().orElse(null);
     }
 
+    /** Lectura histórica por la clave inmutable del GeoJSON, sin JOIN con la Guia vigente. */
+    public List<RutaReferencia> buscarPorHuellas(List<String> huellas) {
+        if (huellas == null || huellas.isEmpty()) return List.of();
+        return em.createQuery(
+                "SELECT r FROM RutaReferencia r WHERE r.sha256GeoJson IN :huellas", RutaReferencia.class)
+                .setParameter("huellas", huellas).getResultList();
+    }
+
     public RutaReferencia buscarPorId(Long id) {
         return id == null ? null : em.find(RutaReferencia.class, id);
     }

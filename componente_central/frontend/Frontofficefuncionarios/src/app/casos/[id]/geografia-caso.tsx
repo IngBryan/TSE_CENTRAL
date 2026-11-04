@@ -2,19 +2,21 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BASE_PATH } from "@/lib/base-path";
+import { primeraConfirmacionGps, referenciasDePrueba, soloPosteriores } from "@/lib/evidencia-desvio";
 import { fechaHora, type CirculacionVista, type PaginaGpsCaso, type PruebaDesvioVista } from "@/lib/casos";
 import { unirPosiciones, type PaginaGps, type PuntoGpsSeguimiento, type RutaAutorizada } from "@/lib/seguimiento";
 
 const MapaEvidencia = dynamic(() => import("./mapa-evidencia"), { ssr: false });
 const MAX_PUNTOS = 10000;
+const SOLAPAMIENTO_MS = 2 * 60 * 1000; // Recuperar puntos retrasados del ultimo par de minutos.
 const TAMANIO = 250;
 const SIETE_DIAS = 7 * 24 * 60 * 60 * 1000;
 const CONFIRMACIONES_POR_PAGINA = 10;
 const metros = (n: number) => `${n.toLocaleString("es-UY", { maximumFractionDigits: 1 })} m`;
 
-async function consultar<T>(id: number, recurso: "gps" | "rutas" | "ventana", parametros: URLSearchParams | null,
+async function consultar<T>(id: number, recurso: "gps" | "rutas" | "rutas-evidencia" | "ventana", parametros: URLSearchParams | null,
   signal: AbortSignal): Promise<T> {
   const url = `${BASE_PATH}/casos/${id}/geografia/${recurso}${parametros ? `?${parametros}` : ""}`;
   const res = await fetch(url, { cache: "no-store", signal });
@@ -24,8 +26,9 @@ async function consultar<T>(id: number, recurso: "gps" | "rutas" | "ventana", pa
 
 type VentanaViaje = { idGuia: string; desde: string | null; hasta: string | null };
 
-/** Reutiliza el BFF autenticado de seguimiento. Pagina por fecha real de GPS, no por confirmaciones.
- * Así el recorrido incluye las posiciones anteriores y posteriores al desvío. */
+/** Reutiliza el BFF autenticado de seguimiento para la trayectoria operativa completa.
+ * Las mediciones posteriores se clasifican localmente por la primera confirmación GPS,
+ * sin mezclar el historial completo con las dos coordenadas probatorias archivadas. */
 async function gpsDelViaje(idGuia: string, desdeTexto: string, hastaTexto: string | null, signal: AbortSignal) {
   const desde = Date.parse(desdeTexto);
   const hasta = hastaTexto ? Date.parse(hastaTexto) + 1000 : Date.now() + 1000;
@@ -81,10 +84,13 @@ async function gpsDelCaso(id: number, signal: AbortSignal) {
   return { puntos: unirPosiciones([], puntos), faltantes, incompleto, total };
 }
 
-export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revisionDatos = 0 }: {
+export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circulacion,
+  revisionDatos = 0, actualizacionActiva = false }: {
   id: number;
   tipo: string;
   guiaId: string | null;
+  fechaDeteccion: string | null;
+  actualizacionActiva?: boolean;
   pruebas: PruebaDesvioVista[];
   circulacion: CirculacionVista | null;
   revisionDatos?: number;
@@ -92,6 +98,12 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
   const esDesvio = tipo === "DESVIO_RUTA" || tipo === "DESVIO_DE_RUTA";
   const esSinGuia = tipo === "VIAJE_SIN_GUIA" || tipo === "SIN_GUIA";
   const [rutas, setRutas] = useState<RutaAutorizada[]>([]);
+  const [rutasEvidencia, setRutasEvidencia] = useState<RutaAutorizada[]>([]);
+  const [ventanaGps, setVentanaGps] = useState<VentanaViaje | null>(null);
+  const ventanaDesde = ventanaGps?.desde ?? null;
+  const ventanaHasta = ventanaGps?.hasta ?? null;
+  const ultimaMarcaGps = useRef<number | null>(null);
+  const [vista, setVista] = useState<"evidencia" | "posterior" | "completo">("evidencia");
   const [puntos, setPuntos] = useState<PuntoGpsSeguimiento[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +124,10 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
   const pruebaActual = pruebas[indiceActual];
   const paginaInicio = (paginaActual - 1) * CONFIRMACIONES_POR_PAGINA;
   const mayorSeparacion = pruebas.length ? Math.max(...pruebas.map(p => p.distanciaConfirmanteMetros)) : null;
+  const referenciaGps = primeraConfirmacionGps(pruebas);
+  const posteriores = soloPosteriores(puntos, referenciaGps);
   const seleccionar = (indice: number) => {
+    setVista("evidencia");
     setClaveSeleccionada(clavePrueba(pruebas[indice]));
     setModoEncuadre("confirmacion");
     setRevisionFoco(n => n + 1);
@@ -131,27 +146,41 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
         if (esDesvio) {
           // La consulta del GPS es opcional para el expediente: si falla, se conserva
           // la evidencia persistida y se informa que la trayectoria está incompleta.
-          const [rutasResultado, ventanaResultado] = await Promise.allSettled([
+          const [rutasResultado, evidenciaResultado, ventanaResultado] = await Promise.allSettled([
             consultar<RutaAutorizada[]>(id, "rutas", null, ctrl.signal),
+            consultar<RutaAutorizada[]>(id, "rutas-evidencia", null, ctrl.signal),
             consultar<VentanaViaje>(id, "ventana", null, ctrl.signal),
           ]);
           if (ctrl.signal.aborted) return;
           if (rutasResultado.status === "fulfilled") setRutas(rutasResultado.value);
-          else setError(rutasResultado.reason instanceof Error ? rutasResultado.reason.message : "No se pudieron cargar las rutas.");
+          else setAviso("No se pudieron consultar las rutas actualmente autorizadas.");
+          if (evidenciaResultado.status === "fulfilled") setRutasEvidencia(evidenciaResultado.value);
+          else {
+            setRutasEvidencia([]);
+            setError("No se pudieron recuperar las geometrías archivadas de la evidencia. Se conservan las dos mediciones y sus distancias registradas.");
+          }
           if (ventanaResultado.status === "fulfilled" && ventanaResultado.value.desde && guiaId) {
             try {
               if (ventanaResultado.value.idGuia !== guiaId) throw new Error("La Guía del expediente no coincide con el viaje.");
+              // Reusar UNA consulta para recorrido completo y seguimiento posterior.
+              // No usar fechaDeteccion porque corresponde a la apertura administrativa del expediente.
+              setVentanaGps(ventanaResultado.value);
               const gps = await gpsDelViaje(guiaId, ventanaResultado.value.desde, ventanaResultado.value.hasta, ctrl.signal);
               if (ctrl.signal.aborted) return;
               setPuntos(gps.puntos);
-              if (gps.incompleto) setAviso("Se alcanzó el límite de 10.000 posiciones; el recorrido mostrado es parcial.");
+              ultimaMarcaGps.current = gps.puntos.length
+                ? Date.parse(gps.puntos[gps.puntos.length - 1].fechaHora) : null;
+              if (gps.incompleto) setAviso("Se alcanzó el límite de 10.000 posiciones del viaje; el recorrido mostrado es parcial.");
             } catch (e) {
-              if (!ctrl.signal.aborted) setAviso(`No se pudo cargar la trayectoria completa: ${(e as Error).message}`);
+              if (!ctrl.signal.aborted) setAviso(`No se pudo cargar el seguimiento posterior: ${(e as Error).message}`);
             }
           } else {
+            setVentanaGps(null);
+            setPuntos([]);
+            ultimaMarcaGps.current = null;
             setAviso(ventanaResultado.status === "rejected"
-              ? "No se pudo obtener el período del viaje; el mapa muestra las rutas y las pruebas del caso."
-              : "No hay fechas de asignación o inicio válidas para reconstruir el viaje.");
+              ? "No se pudo obtener el período del viaje. La evidencia registrada sigue disponible."
+              : "No hay fechas válidas para consultar el seguimiento posterior.");
           }
         } else if (esSinGuia) {
           const gps = await gpsDelCaso(id, ctrl.signal);
@@ -169,18 +198,54 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
     };
     void cargar();
     return () => ctrl.abort();
-  }, [id, guiaId, esDesvio, esSinGuia, recarga, revisionDatos]);
+  }, [id, guiaId, fechaDeteccion, esDesvio, esSinGuia, recarga, revisionDatos]);
+
+  // Actualiza solo el delta GPS del viaje, con pequeño solapamiento para mediciones retrasadas.
+  // Las vistas completa y posterior se derivan de la misma lista, sin alterar evidencia archivada.
+  // La pausa de EvidenciasEnVivo también detiene esta actualización.
+  useEffect(() => {
+    if (!esDesvio || !actualizacionActiva || cargando || !guiaId || !ventanaDesde) return;
+    const inicio = Date.parse(ventanaDesde);
+    if (!Number.isFinite(inicio)) return;
+    const ctrl = new AbortController();
+    let consultando = false;
+    const actualizar = async () => {
+      if (document.hidden || consultando) return;
+      const cursor = ultimaMarcaGps.current;
+      const desde = new Date(cursor === null ? inicio : Math.max(inicio, cursor - SOLAPAMIENTO_MS)).toISOString();
+      const hasta = ventanaHasta ? Date.parse(ventanaHasta) : Date.now() + 1000;
+      if (Date.parse(desde) >= hasta) return;
+      consultando = true;
+      try {
+        const gps = await gpsDelViaje(guiaId, desde, ventanaHasta, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+        if (gps.puntos.length) {
+          ultimaMarcaGps.current = Math.max(ultimaMarcaGps.current ?? 0,
+            ...gps.puntos.map(p => Date.parse(p.fechaHora)));
+          setPuntos(anteriores => unirPosiciones(anteriores, gps.puntos).slice(-MAX_PUNTOS));
+        }
+        if (gps.incompleto) setAviso("Se alcanzó el límite de consulta de posiciones GPS.");
+      } catch {
+        if (!ctrl.signal.aborted) setAviso("El recorrido GPS no se pudo actualizar; se mantienen las posiciones cargadas.");
+      } finally { consultando = false; }
+    };
+    const timer = window.setInterval(() => { void actualizar(); }, 15000);
+    return () => { window.clearInterval(timer); ctrl.abort(); };
+  }, [id, guiaId, esDesvio, actualizacionActiva, cargando, ventanaDesde, ventanaHasta]);
 
   if (!esDesvio && !esSinGuia) return null;
-  const mapaVisible = (esDesvio && (pruebas.length > 0 || rutas.length > 0 || puntos.length > 0)) || (esSinGuia && puntos.length > 0);
+  const pruebaVerificada = referenciasDePrueba(pruebaActual, rutasEvidencia);
+  const mapaVisible = esDesvio
+    ? vista === "evidencia" ? Boolean(pruebaActual) : (rutas.length > 0 || (vista === "posterior" ? posteriores.length > 0 : puntos.length > 0))
+    : esSinGuia && puntos.length > 0;
   return <section className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
-        {esDesvio ? "Evidencia geométrica del desvío" : "Circulación detectada sin Guía"}
+        {esDesvio ? "Evidencia y seguimiento del desvío" : "Circulación detectada sin Guía"}
       </h2>
       <button type="button" onClick={() => setRecarga(x => x + 1)}
         className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900">
-        Actualizar mapa
+        Recargar datos del mapa
       </button>
     </div>
     <div className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
@@ -199,32 +264,79 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
       </p>)}
       {esDesvio && <div className="mb-4 space-y-3">
         <p className="text-zinc-600 dark:text-zinc-400">
-          El mapa compara las rutas autorizadas con el recorrido GPS efectivamente registrado. Elegí una confirmación
-          para localizar las dos mediciones que demuestran el desvío sin ocultar el resto del trayecto.
+          La evidencia registrada al confirmar un desvío no cambia cuando llegan nuevas mediciones.
+          El seguimiento y el recorrido operativo son vistas de contexto: nunca reemplazan las confirmaciones archivadas.
         </p>
         <div className="grid gap-3 rounded-xl bg-zinc-50 p-3 sm:grid-cols-3 dark:bg-zinc-900">
-          <p><span className="block text-xs text-zinc-500">Confirmaciones registradas</span>
+          <p><span className="block text-xs text-zinc-500">Confirmaciones archivadas</span>
             <b>{pruebas.length.toLocaleString("es-UY")}</b></p>
-          <p><span className="block text-xs text-zinc-500">Mayor separación a la ruta</span>
+          <p><span className="block text-xs text-zinc-500">Mayor separación registrada</span>
             <b>{mayorSeparacion === null ? "-" : metros(mayorSeparacion)}</b></p>
-          <p><span className="block text-xs text-zinc-500">Rutas autorizadas</span>
-            <b>{rutas.length}</b></p>
+          <p><span className="block text-xs text-zinc-500">Posiciones posteriores a la primera confirmación</span>
+            <b>{posteriores.length.toLocaleString("es-UY")}</b></p>
         </div>
-        {pruebaActual ? <div className="rounded-xl border border-orange-200 p-3 dark:border-orange-900" aria-live="polite">
-          <p className="font-medium">Confirmación seleccionada {indiceActual + 1} de {pruebas.length}</p>
-          <p className="mt-1 text-xs text-zinc-500">{fechaHora(pruebaActual.fechaHora)}</p>
+        <div role="tablist" aria-label="Vistas geográficas del caso" className="flex flex-wrap gap-2">
+          <button type="button" role="tab" aria-selected={vista === "evidencia"}
+            onClick={() => { setVista("evidencia"); verTodo(); }}
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "evidencia" ? "border-orange-600 bg-orange-50 font-semibold text-orange-900 dark:bg-orange-950 dark:text-orange-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            Evidencia registrada
+          </button>
+          <button type="button" role="tab" aria-selected={vista === "posterior"}
+            onClick={() => { setVista("posterior"); verTodo(); }}
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "posterior" ? "border-sky-600 bg-sky-50 font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            Seguimiento posterior
+          </button>
+          <button type="button" role="tab" aria-selected={vista === "completo"}
+            onClick={() => { setVista("completo"); verTodo(); }}
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "completo" ? "border-slate-600 bg-slate-50 font-semibold text-slate-900 dark:bg-slate-900 dark:text-slate-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            Recorrido completo
+          </button>
+        </div>
+        {vista === "evidencia" && (pruebaActual ? <div className="rounded-xl border border-orange-200 p-3 dark:border-orange-900" aria-live="polite">
+          <p className="font-medium">Confirmación archivada {indiceActual + 1} de {pruebas.length}</p>
+          <p className="mt-1 text-xs text-zinc-500">Registrada: {fechaHora(pruebaActual.fechaHora)}</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <p><span className="block text-zinc-500">Primera posición (amarilla)</span>
-              <b>{metros(pruebaActual.distanciaParejaMetros)}</b> de la ruta autorizada</p>
+              <b>{metros(pruebaActual.distanciaParejaMetros)}</b> de las rutas evaluadas</p>
             <p><span className="block text-zinc-500">Segunda posición (roja)</span>
-              <b>{metros(pruebaActual.distanciaConfirmanteMetros)}</b> de la ruta autorizada</p>
+              <b>{metros(pruebaActual.distanciaConfirmanteMetros)}</b> de las rutas evaluadas</p>
           </div>
           <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-            Límite permitido: {metros(pruebaActual.umbralMetros)}.
-            Tiempo entre mediciones: {Math.round((Date.parse(pruebaActual.fechaHora) - Date.parse(pruebaActual.fechaPareja)) / 1000)} s
+            Límite configurado: {metros(pruebaActual.umbralMetros)}.
+            Intervalo entre mediciones: {Math.round((Date.parse(pruebaActual.fechaHora) - Date.parse(pruebaActual.fechaPareja)) / 1000)} s
             (máximo {pruebaActual.ventanaMaximaSegundos} s).
           </p>
-        </div> : <p>No hay pruebas geométricas persistidas para este expediente.</p>}
+          <p className="mt-2 text-xs text-zinc-500">
+            Rutas históricas verificadas: {pruebaVerificada.rutas.length} de {new Set(pruebaActual.hashesRutas).size}.
+          </p>
+          {pruebaVerificada.faltantes > 0 && <p className="mt-2 text-amber-700 dark:text-amber-300" role="status">
+            {pruebaVerificada.faltantes} referencia(s) histórica(s) no están disponibles o no pudieron verificarse.
+            No se sustituyen por las rutas actuales.
+          </p>}
+        </div> : <p>No hay confirmaciones geométricas persistidas para este expediente.</p>)}
+        {vista === "posterior" && <div className="rounded-xl border border-sky-200 p-3 text-sm dark:border-sky-900">
+          <p className="font-medium">Circulación posterior a la primera confirmación GPS</p>
+          {referenciaGps ? <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+            Referencia operativa: <b>{fechaHora(referenciaGps)}</b> (primera confirmación archivada).
+            Solo se muestran posiciones GPS estrictamente posteriores a ese instante y dentro del período de la Guía.
+          </p> : <p className="mt-1 text-amber-700 dark:text-amber-300">
+            Sin confirmación GPS válida no se puede delimitar el seguimiento posterior.
+          </p>}
+          <p className="mt-1 text-xs text-zinc-500">
+            Apertura administrativa del caso: {fechaHora(fechaDeteccion)}. Esta fecha NO se usa para dividir el recorrido GPS.
+            Algunas de estas mediciones también pueden integrar otras confirmaciones archivadas.
+            Las rutas de esta vista son las actualmente autorizadas, no las rutas históricas de la evidencia.
+            {actualizacionActiva ? " Nuevas posiciones se consultan automáticamente cada 15 s." : " La actualización está pausada o el caso fue resuelto."}
+          </p>
+        </div>}
+        {vista === "completo" && <div className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
+          <p className="font-medium">Recorrido operativo completo del viaje</p>
+          <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+            {puntos.length.toLocaleString("es-UY")} posiciones GPS consultadas para la Guía, anteriores y posteriores a la primera confirmación.
+            Son contexto operativo: <b>no sustituyen las confirmaciones probatorias archivadas</b>.
+            Las rutas dibujadas son las autorizadas actualmente.
+          </p>
+        </div>}
       </div>}
       {cargando && <p role="status" className="py-4 text-zinc-500">Cargando información geográfica…</p>}
       {error && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950 dark:text-amber-300">{error}</p>}
@@ -233,31 +345,46 @@ export function GeografiaCaso({ id, tipo, guiaId, pruebas, circulacion, revision
         {esDesvio && <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={mostrarRutas} onChange={e => setMostrarRutas(e.target.checked)} />
-            <span>Rutas autorizadas ({rutas.length})</span>
+            <span>{vista === "evidencia"
+              ? `Rutas históricas verificadas (${pruebaVerificada.rutas.length})`
+              : `Rutas actuales (${rutas.length})`}</span>
           </label>
-          <label className="flex cursor-pointer items-center gap-2">
+          {vista !== "evidencia" && <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={mostrarRecorrido} onChange={e => setMostrarRecorrido(e.target.checked)} />
-            <span>Recorrido GPS ({puntos.length} posiciones)</span>
-          </label>
+            <span>{vista === "posterior" ? `Posiciones posteriores (${posteriores.length})` : `Recorrido GPS completo (${puntos.length})`}</span>
+          </label>}
           <button type="button" onClick={verTodo}
             className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900">
-            Mostrar todo en el mapa
+            Ajustar mapa al contenido
           </button>
           {guiaId && <Link className="text-xs text-sky-700 underline dark:text-sky-300"
-            href={`/viajes/${encodeURIComponent(guiaId)}`}>Ver recorrido operativo del viaje</Link>}
+            href={`/viajes/${encodeURIComponent(guiaId)}`}>Ver recorrido operativo completo</Link>}
         </div>}
-        <MapaEvidencia rutas={rutas} puntos={puntos} pruebas={esDesvio && pruebaActual ? [pruebaActual] : []}
-          mostrarRutas={!esDesvio || mostrarRutas} mostrarRecorrido={!esDesvio || mostrarRecorrido}
+        <MapaEvidencia key={esDesvio ? vista : "sin-guia"}
+          rutas={esDesvio && vista === "evidencia" ? pruebaVerificada.rutas : rutas}
+          puntos={esDesvio && vista === "evidencia" ? [] : esDesvio && vista === "posterior" ? posteriores : puntos}
+          pruebas={esDesvio && vista === "evidencia" && pruebaActual ? [pruebaActual] : []}
+          contexto={esDesvio ? vista === "evidencia" ? "evidencia" : "seguimiento" : "sin-guia"}
+          mostrarRutas={!esDesvio || mostrarRutas}
+          mostrarRecorrido={esDesvio && vista === "evidencia" ? false : !esDesvio || mostrarRecorrido}
           enfocar={revisionFoco} modoEncuadre={modoEncuadre} />
         <p className="mt-2 text-xs text-zinc-500">
-          {esDesvio ? `Verde/azul/violeta: rutas autorizadas. Naranja discontinuo: trayectoria GPS realizada. Amarillo: primera medición; rojo: segunda medición confirmante. La selección no oculta el recorrido.`
-            : `GPS del expediente: ${puntos.length}. Verde: primera posición; rojo: última posición observada.`}
+          {esDesvio && vista === "evidencia"
+            ? "La prueba está fijada en el expediente: amarillo y rojo señalan las dos mediciones utilizadas en esta confirmación. Las rutas se resuelven por sus huellas históricas, no por la selección vigente."
+            : esDesvio
+              ? vista === "posterior"
+                ? "Naranja discontinuo: GPS posteriores a la primera confirmación archivada. Verde/azul/violeta: rutas autorizadas actualmente."
+                : "Naranja discontinuo: recorrido GPS completo de la Guía. No sustituye la evidencia archivada. Verde/azul/violeta: rutas autorizadas actualmente."
+              : `GPS del expediente: ${puntos.length}. Verde: primera posición; rojo: última posición observada.`}
         </p>
-        {esDesvio && puntos.length === 0 && !aviso && <p className="mt-2 text-xs text-zinc-500">
-          No se recuperaron posiciones del seguimiento histórico. Las confirmaciones del expediente siguen disponibles.
+        {esDesvio && vista === "posterior" && posteriores.length === 0 && !aviso && <p className="mt-2 text-xs text-zinc-500">
+          No se recuperaron GPS posteriores a la primera confirmación dentro del intervalo de la Guía.
+          Podés consultar el recorrido completo en la otra pestaña, sin incorporarlo a la evidencia.
         </p>}
-      </> : !cargando && !error && <p className="py-4 text-zinc-500">No hay coordenadas disponibles para mostrar.</p>}
-      {esDesvio && pruebas.length > 0 && <div className="mt-5">
+      </> : !cargando && !error && <p className="py-4 text-zinc-500">
+        {esDesvio && vista === "posterior" ? "Todavía no hay posiciones posteriores ni rutas actuales para representar." : "No hay coordenadas disponibles para mostrar."}
+      </p>}
+      {esDesvio && vista === "evidencia" && pruebas.length > 0 && <div className="mt-5">
         <h3 className="mb-2 font-medium">Historial de confirmaciones ({pruebas.length})</h3>
         <p className="mb-2 text-xs text-zinc-500">Seleccioná una fila para localizar sus dos posiciones en el mapa.</p>
         <div className="overflow-x-auto">

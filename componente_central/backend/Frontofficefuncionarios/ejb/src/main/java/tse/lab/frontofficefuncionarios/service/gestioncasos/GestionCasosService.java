@@ -2,7 +2,9 @@ package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -14,6 +16,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
+import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
+import tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
@@ -66,6 +70,9 @@ public class GestionCasosService {
     private CirculacionSinGuiaDAO circulaciones;
     @EJB
     private MongoSeguimientoDAO tracking;
+    @EJB(lookup = "java:global/frontofficeciudadanos/frontofficeciudadanos-ejb/RutasAutorizadasService!tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote")
+    private RutasAutorizadasRemote rutasEvidencia;
+
 
     public enum Decision {
         CONFIRMAR(EstadoCaso.CONFIRMADA),
@@ -247,6 +254,24 @@ public class GestionCasosService {
         LOG.info(() -> "evento=caso.evidencia correlationId=" + correlationId + " usuario=" + ci + " caso=" + idCaso
                 + " pesajes=" + pesajes.size() + " eventosTracking=" + evidencia.eventosTracking().size());
         return evidencia;
+    }
+
+    /** Rutas del momento de evaluación, resueltas por las huellas archivadas en las pruebas.
+     * No se consulta la selección actual de la Guia, que puede haber cambiado.
+     */
+    public List<DatosRutaAutorizada> rutasEvidencia(String ci, Long idCaso, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException {
+        autorizacion.funcionario(ci, correlationId);
+        CasoFiscalizacion caso = caso(idCaso, ci, correlationId);
+        if (!"DESVIO_RUTA".equals(caso.getTipoCaso())
+                && !"DESVIO_DE_RUTA".equals(caso.getTipoCaso())) return List.of();
+        LinkedHashSet<String> huellas = new LinkedHashSet<>();
+        caso.getEvidenciasDesvio().stream()
+                .sorted(Comparator.comparing(EvidenciaGeometricaDesvio::getFechaHora))
+                .forEach(p -> Arrays.stream(p.getRutasSha().split(","))
+                        .filter(h -> !h.isBlank()).forEach(huellas::add));
+        // No exponer rutas arbitrarias: solo las huellas guardadas en este expediente.
+        return rutasEvidencia.obtenerPorHuellas(List.copyOf(huellas));
     }
 
     public CirculacionVista circulacion(String ci, Long idCaso, String correlationId)

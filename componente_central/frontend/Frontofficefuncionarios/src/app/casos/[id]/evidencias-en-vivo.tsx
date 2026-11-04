@@ -17,10 +17,11 @@ const hashSnapshot = (datos: Snapshot) => JSON.stringify(datos);
 
 /** Una sola consulta periódica alimenta ambas tablas, sin recargar el expediente ni
  * alterar la paginación, la confirmación seleccionada o las acciones administrativas. */
-export function EvidenciasEnVivo({ id, tipo, guiaId, estadoCaso, circulacion, eventosIniciales, pruebasIniciales }: {
+export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso, circulacion, eventosIniciales, pruebasIniciales }: {
   id: number;
   tipo: string;
   guiaId: string | null;
+  fechaDeteccion: string | null;
   estadoCaso: EstadoCaso | null;
   circulacion: CirculacionVista | null;
   eventosIniciales: EventoTrackingVista[];
@@ -108,7 +109,8 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, estadoCaso, circulacion, ev
       </p>}
       <EventosTrackingPaginados eventos={datos.eventosTracking} />
     </section>
-    {esGeografico && <GeografiaCaso id={id} tipo={tipo} guiaId={guiaId}
-      pruebas={datos.pruebasDesvio} circulacion={circulacion} revisionDatos={revisionMapa} />}
+    {esGeografico && <GeografiaCaso id={id} tipo={tipo} guiaId={guiaId} fechaDeteccion={fechaDeteccion}
+      pruebas={datos.pruebasDesvio} circulacion={circulacion} revisionDatos={revisionMapa}
+      actualizacionActiva={activo && !finalizado} />}
   </>;
 }

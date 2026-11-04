@@ -15,11 +15,11 @@ const coordenadaGps = (p: PuntoGpsSeguimiento): Coordenada => [p.longitud, p.lat
 const valida = (c: Coordenada): boolean => Number.isFinite(c[0]) && Number.isFinite(c[1])
   && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
 
-/** En el expediente se conserva el contexto completo: rutas admitidas + trayectoria real,
- * y solo se resaltan las dos mediciones de la confirmación elegida. */
+/** Dos usos excluyentes: la prueba inmutable (rutas por SHA + par de coordenadas)
+ * y el seguimiento posterior. No mezcla sus capas en una única vista probatoria. */
 export default function MapaEvidencia({
   rutas, puntos, pruebas, mostrarRutas = true, mostrarRecorrido = true,
-  enfocar = 0, modoEncuadre = "todo",
+  enfocar = 0, modoEncuadre = "todo", contexto = "seguimiento",
 }: {
   rutas: RutaAutorizada[];
   puntos: PuntoGpsSeguimiento[];
@@ -28,6 +28,7 @@ export default function MapaEvidencia({
   mostrarRecorrido?: boolean;
   enfocar?: number;
   modoEncuadre?: "todo" | "confirmacion";
+  contexto?: "evidencia" | "seguimiento" | "sin-guia";
 }) {
   const nodo = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MapaGL | null>(null);
@@ -106,7 +107,10 @@ export default function MapaEvidencia({
   }, [listo, rutas, puntos, pruebas, mostrarRutas, mostrarRecorrido, enfocar, modoEncuadre]);
 
   return <div>
-    <div ref={nodo} role="img" aria-label="Comparación de rutas autorizadas, recorrido GPS real y confirmación de desvío"
+    <div ref={nodo} role="img" aria-label={contexto === "evidencia"
+      ? "Evidencia registrada: dos mediciones del desvío y geometrías de referencia archivadas"
+      : contexto === "sin-guia" ? "Posiciones vinculadas a la circulación sin guía"
+      : "Recorrido GPS posterior a la detección y rutas actualmente autorizadas"}
       className="h-[370px] w-full rounded-xl border border-black/10 dark:border-white/10 sm:h-[480px]" />
     {error && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
       El mapa base podría no estar disponible. Revisá la conexión con el proveedor cartográfico.

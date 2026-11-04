@@ -54,8 +54,19 @@ class SeguimientoGpsServiceTest {
         set("intervalos", (IntervalosGuiasGpsRemote) (matricula, desde, hasta) ->
                 List.of(new IntervaloGuiaGps("G1", "SBC1234", "EN_CURSO",
                         T.minusSeconds(60), T.minusSeconds(30), null)));
-        set("rutas", (RutasAutorizadasRemote) id ->
-                List.of(new DatosRutaAutorizada(42L, 1, "hash", 1200, "{\"type\":\"LineString\"}")));
+        set("rutas", new RutasAutorizadasRemote() {
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) {
+                return List.of(new DatosRutaAutorizada(42L, 1, "hash", 1200,
+                        "{\"type\":\"LineString\"}"));
+            }
+
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorHuellas(List<String> huellas) {
+                throw new AssertionError(
+                        "El seguimiento no debe consultar rutas de evidencias históricas");
+            }
+        });
         set("tracking", new MongoSeguimientoDAO() {
             @Override public List<PuntoGpsSeguimiento> buscar(String matricula, Instant desde, Instant hasta,
                     int limite) {

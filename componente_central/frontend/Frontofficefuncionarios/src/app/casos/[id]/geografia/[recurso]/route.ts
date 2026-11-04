@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: {
   const sesion = await getSesion();
   if (!sesion) return NextResponse.json({ error: "no_autorizado" }, { status: 401 });
   const { id, recurso } = await params;
-  if (!/^\d+$/.test(id) || !["gps", "rutas", "ventana"].includes(recurso)) {
+  if (!/^\d+$/.test(id) || !["gps", "rutas", "ventana", "rutas-evidencia"].includes(recurso)) {
     return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
   }
   const opciones = { correlationId: randomUUID(), usuarioCi: sesion.usuario.cedula };
@@ -25,6 +25,10 @@ export async function GET(request: NextRequest, { params }: {
         return NextResponse.json({ error: "parametros_invalidos" }, { status: 400 });
       }
       ruta = `/casos/${id}/gps?${new URLSearchParams({ indice, limite })}`;
+    } else if (recurso === "rutas-evidencia") {
+      // El backend valida al funcionario y obtiene las huellas de la evidencia del expediente.
+      // No admite una lista de hashes desde el navegador ni consulta las rutas vigentes de la Guia.
+      ruta = `/casos/${id}/rutas-evidencia`;
     } else {
       // Comprobar el expediente y su Guía en WildFly; nunca aceptar un idGuia enviado por el navegador.
       const caso = await llamarBackend<CasoDetalle>(`/casos/${id}`, opciones);

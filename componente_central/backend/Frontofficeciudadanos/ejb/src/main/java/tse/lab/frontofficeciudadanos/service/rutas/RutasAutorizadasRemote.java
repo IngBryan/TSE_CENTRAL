@@ -10,4 +10,10 @@ public interface RutasAutorizadasRemote {
             + "tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote";
 
     List<DatosRutaAutorizada> obtenerPorGuia(String idGuia);
+
+    /** Reconstruye las rutas evaluadas usando las huellas guardadas en la prueba del caso,
+     * sin depender de las autorizaciones actualmente asociadas a la Guia.
+     */
+    List<DatosRutaAutorizada> obtenerPorHuellas(List<String> huellas);
+
 }

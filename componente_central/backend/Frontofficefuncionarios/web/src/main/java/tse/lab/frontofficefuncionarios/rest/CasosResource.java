@@ -60,6 +60,14 @@ public class CasosResource {
         return ejecutar(() -> casos.evidencia(usuario, id, correlationId(req)));
     }
 
+    /** Geometrías históricas verificadas contra las huellas archivadas en la prueba. */
+    @GET
+    @Path("/{id}/rutas-evidencia")
+    public Response rutasEvidencia(@HeaderParam(USUARIO_CI) String usuario, @PathParam("id") Long id,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> casos.rutasEvidencia(usuario, id, correlationId(req)));
+    }
+
     /** Una circulación inferida, persistida y asociada unívocamente al expediente. */
     @GET
     @Path("/{id}/circulacion")

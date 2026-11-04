@@ -48,12 +48,14 @@ class CasosResourceTest {
         assertEquals(200, recurso.bandeja(CI, "EN_DESCARGO", "1", "20", req).getStatus());
         assertEquals(200, recurso.detalle(CI, 4L, req).getStatus());
         assertEquals(200, recurso.evidencia(CI, 4L, req).getStatus());
+        assertEquals(200, recurso.rutasEvidencia(CI, 4L, req).getStatus());
         assertEquals(200, recurso.descargo(CI, 4L, req).getStatus());
         assertEquals(200, recurso.resolver(CI, 4L, body, req).getStatus());
 
         verify(casos).bandeja(CI, "EN_DESCARGO", "1", "20", CORRELATION);
         verify(casos).detalle(CI, 4L, CORRELATION);
         verify(casos).evidencia(CI, 4L, CORRELATION);
+        verify(casos).rutasEvidencia(CI, 4L, CORRELATION);
         verify(casos).descargo(CI, 4L, CORRELATION);
         verify(casos).resolver(CI, 4L, body, CORRELATION);
     }

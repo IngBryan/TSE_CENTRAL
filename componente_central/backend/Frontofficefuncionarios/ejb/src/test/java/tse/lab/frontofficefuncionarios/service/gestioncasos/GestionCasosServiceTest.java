@@ -45,6 +45,9 @@ import tse.lab.model.Descargo;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoCaso;
 import tse.lab.model.EventoPesajes;
+import tse.lab.model.EvidenciaGeometricaDesvio;
+import tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote;
+import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
 import tse.lab.model.FundamentoResolucion;
 import tse.lab.model.Funcionario;
 import tse.lab.model.Guia;
@@ -136,6 +139,53 @@ class GestionCasosServiceTest {
                 () -> servicio.circulacion(FUNCIONARIO, detectado, "t"));
         assertThrows(NoAutorizadoException.class,
                 () -> servicio.circulacion(NO_FUNCIONARIO, detectado, "t"));
+    }
+
+    @Test
+    void rutasHistoricasSoloParaFuncionarioYHuellasPersistidas() throws Exception {
+        var guia = em.find(Guia.class, "GV-1");
+        CasoFiscalizacion desvio = new CasoFiscalizacion("Desvío real", "DESVIO_RUTA", guia);
+        String sha = "a".repeat(64);
+        desvio.getEvidenciasDesvio().add(new EvidenciaGeometricaDesvio("SBA1234",
+                Instant.parse("2026-10-10T12:00:10Z"), Instant.parse("2026-10-10T12:00:00Z"),
+                -34.9, -56.1, -34.9, -56.2, 2400, 2300, 2000, 30, sha));
+        em.getTransaction().begin();
+        em.persist(desvio);
+        em.getTransaction().commit();
+        em.clear();
+
+        DatosRutaAutorizada dto = new DatosRutaAutorizada(11L, 1, sha, 1000,
+        "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}");
+
+        int[] consultasHistoricas = {0};
+
+        RutasAutorizadasRemote rutas = new RutasAutorizadasRemote() {
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) {
+                throw new AssertionError("Las evidencias no deben consultar rutas actuales");
+            }
+
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorHuellas(List<String> huellas) {
+                assertEquals(List.of(sha), huellas);
+                consultasHistoricas[0]++;
+                return List.of(dto);
+            }
+        };
+
+        set(servicio, "rutasEvidencia", rutas);
+
+        assertEquals(List.of(dto),
+                servicio.rutasEvidencia(FUNCIONARIO, desvio.getId(), "t"));
+
+        assertThrows(NoAutorizadoException.class,
+                () -> servicio.rutasEvidencia(NO_FUNCIONARIO, desvio.getId(), "t"));
+
+        assertEquals(List.of(),
+                servicio.rutasEvidencia(FUNCIONARIO, detectado, "t"));
+
+        assertEquals(1, consultasHistoricas[0],
+                "Solo el caso de desvío consulta sus huellas");
     }
 
     // ===== FA1: usuario no autorizado =====
