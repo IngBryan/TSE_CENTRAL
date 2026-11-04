@@ -46,6 +46,16 @@ public class CasoFiscalizacionDAO {
         return caso;
     }
 
+    // Casos NOTIFICADA sin descargo detectados antes de detectadosAntes. Como la notificacion es posterior a la
+    // deteccion, incluye todos los que pueden tener el plazo vencido; quien llama revisa el plazo de cada uno.
+    public List<CasoFiscalizacion> buscarNotificadosSinDescargo(Instant detectadosAntes) {
+        return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.estado = :notificada"
+                + " AND c.descargo IS NULL AND c.fechaDeteccion < :antes ORDER BY c.id", CasoFiscalizacion.class)
+                .setParameter("notificada", EstadoCaso.NOTIFICADA)
+                .setParameter("antes", detectadosAntes)
+                .getResultList();
+    }
+
     public void guardarDescargo(Descargo descargo) {
         em.persist(descargo);
     }

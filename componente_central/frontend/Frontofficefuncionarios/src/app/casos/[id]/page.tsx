@@ -256,7 +256,9 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           </div>
         ) : sinDescargo ? (
           <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-            La empresa no presentó un descargo para este caso.
+            {caso.estado === "DETECTADA" || caso.estado === "NOTIFICADA"
+              ? "La empresa no presentó un descargo para este caso."
+              : "La empresa no presentó un descargo dentro del plazo: el caso pasó a descargo al vencer."}
           </p>
         ) : (
           <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">

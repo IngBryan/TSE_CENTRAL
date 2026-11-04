@@ -170,8 +170,10 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
           <>
             <h2 className={titulo}>Descargo</h2>
             <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-              {i.estado === "NOTIFICADA"
-                ? `Venció el plazo de ${detalle.plazoDescargoDias} días para presentar el descargo.`
+              {/* Sin descargo, EN_DESCARGO es que el caso paso solo al vencer el plazo; NOTIFICADA, que vencio y
+                  todavia no corrio el vencimiento automatico */}
+              {i.estado === "NOTIFICADA" || i.estado === "EN_DESCARGO"
+                ? `Venció el plazo de ${detalle.plazoDescargoDias} días sin que la empresa presentara un descargo. Un funcionario del MTOP va a resolver el caso.`
                 : "La empresa no presentó un descargo para esta infracción."}
             </p>
           </>

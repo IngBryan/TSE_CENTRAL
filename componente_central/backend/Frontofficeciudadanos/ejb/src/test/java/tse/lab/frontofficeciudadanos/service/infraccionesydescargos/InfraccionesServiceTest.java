@@ -3,6 +3,7 @@ package tse.lab.frontofficeciudadanos.service.infraccionesydescargos;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -208,6 +209,72 @@ class InfraccionesServiceTest {
     }
 
     @Test
+    void alVencerElPlazoElCasoPasaAEnDescargoUnaSolaVezYQuedaEnLaAuditoria() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(10, enUruguay("2026-11-12T00:00:00"));
+
+        assertEquals(List.of(notificado), servicio.casosConPlazoVencido());
+        em.getTransaction().begin();
+        assertTrue(servicio.vencerPlazo(notificado, "venc-1"));
+        em.getTransaction().commit();
+
+        em.clear();
+        CasoFiscalizacion caso = em.find(CasoFiscalizacion.class, notificado);
+        assertEquals(EstadoCaso.EN_DESCARGO, caso.getEstado());
+        assertNull(caso.getDescargo());
+        RegistroAuditoriaCaso ultimo = ultimoRegistro(notificado);
+        assertEquals(RegistroAuditoriaCaso.SISTEMA, ultimo.getUsuario());
+        assertEquals(EstadoCaso.NOTIFICADA, ultimo.getEstadoAnterior());
+        assertEquals(EstadoCaso.EN_DESCARGO, ultimo.getEstadoNuevo());
+        assertEquals("venc-1", ultimo.getCorrelationId());
+
+        // Otra corrida no lo vuelve a tocar ni duplica la auditoria
+        assertTrue(servicio.casosConPlazoVencido().isEmpty());
+        em.getTransaction().begin();
+        assertFalse(servicio.vencerPlazo(notificado, "venc-2"));
+        em.getTransaction().commit();
+        assertEquals(ultimo.getId(), ultimoRegistro(notificado).getId());
+
+        // Y la empresa ya no puede presentar: se le dice que vencio el plazo
+        em.getTransaction().begin();
+        ConflictoException e = assertThrows(ConflictoException.class,
+                () -> servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Tarde"), "t"));
+        em.getTransaction().rollback();
+        assertEquals("PLAZO_VENCIDO", e.getCodigo());
+    }
+
+    @Test
+    void elUltimoDiaDelPlazoElCasoNoSeVence() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(10, enUruguay("2026-11-11T23:59:59"));
+
+        assertTrue(servicio.casosConPlazoVencido().isEmpty());
+        em.getTransaction().begin();
+        assertFalse(servicio.vencerPlazo(notificado, "t"));
+        em.getTransaction().commit();
+        em.clear();
+        assertEquals(EstadoCaso.NOTIFICADA, em.find(CasoFiscalizacion.class, notificado).getEstado());
+    }
+
+    @Test
+    void unCasoConDescargoNoSeVence() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(10, enUruguay("2026-11-11T12:00:00"));
+        em.getTransaction().begin();
+        servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("A tiempo"), "t");
+        em.getTransaction().commit();
+        em.clear();
+        Long registroDescargo = ultimoRegistro(notificado).getId();
+
+        servicio = conPlazo(10, enUruguay("2026-11-12T00:05:00"));
+        assertTrue(servicio.casosConPlazoVencido().isEmpty());
+        em.getTransaction().begin();
+        assertFalse(servicio.vencerPlazo(notificado, "t"));
+        em.getTransaction().commit();
+        assertEquals(registroDescargo, ultimoRegistro(notificado).getId());
+    }
+
+    @Test
     void elDescargoVacioOMuyLargoEsInvalido() {
         em.getTransaction().begin();
         assertThrows(DatosInvalidosException.class,
@@ -254,13 +321,21 @@ class InfraccionesServiceTest {
         return caso.getId();
     }
 
-    // Cambia la fecha del pasaje a NOTIFICADA del caso notificado (la auditoria la pone al crearse)
+    // Cambia la fecha del pasaje a NOTIFICADA del caso notificado (la auditoria la pone al crearse) y la de
+    // deteccion, que no puede ser posterior
     private void notificadoEl(Instant fecha) {
         em.getTransaction().begin();
         em.createQuery("UPDATE RegistroAuditoriaCaso r SET r.fechaHora = :fecha WHERE r.idCaso = :id")
                 .setParameter("fecha", fecha).setParameter("id", notificado).executeUpdate();
+        em.createQuery("UPDATE CasoFiscalizacion c SET c.fechaDeteccion = :fecha WHERE c.id = :id")
+                .setParameter("fecha", fecha).setParameter("id", notificado).executeUpdate();
         em.getTransaction().commit();
         em.clear();
+    }
+
+    private RegistroAuditoriaCaso ultimoRegistro(Long idCaso) {
+        return em.createQuery("SELECT r FROM RegistroAuditoriaCaso r WHERE r.idCaso = :id ORDER BY r.id DESC",
+                RegistroAuditoriaCaso.class).setParameter("id", idCaso).setMaxResults(1).getSingleResult();
     }
 
     private static Clock enUruguay(String fechaHora) {
