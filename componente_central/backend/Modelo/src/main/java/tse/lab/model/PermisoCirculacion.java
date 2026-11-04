@@ -1,5 +1,6 @@
 package tse.lab.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -17,8 +18,10 @@ public class PermisoCirculacion implements Serializable {
     @Id
     private String nro;
 
+    @Column(nullable = false)
     private LocalDate fechaEmision;
 
+    @Column(nullable = false)
     private LocalDate fechaVencimiento;
 
     @OneToOne(optional = false)
@@ -60,8 +63,7 @@ public class PermisoCirculacion implements Serializable {
     }
 
     public boolean vigenteEn(LocalDate fecha) {
-        return fechaEmision != null && fechaVencimiento != null
-                && !fecha.isBefore(fechaEmision) && !fecha.isAfter(fechaVencimiento);
+        return !fecha.isBefore(fechaEmision) && !fecha.isAfter(fechaVencimiento);
     }
 
     public Vehiculo getVehiculo() {

@@ -109,7 +109,7 @@ function Documento({ titulo: nombre, periodo }: { titulo: string; periodo: Perio
 }
 
 function rango(p: PeriodoVista): string {
-  return p.desde ? `${fecha(p.desde)} – ${fecha(p.hasta)}` : `Hasta el ${fecha(p.hasta)}`;
+  return `${fecha(p.desde)} – ${fecha(p.hasta)}`;
 }
 
 function Pagina({

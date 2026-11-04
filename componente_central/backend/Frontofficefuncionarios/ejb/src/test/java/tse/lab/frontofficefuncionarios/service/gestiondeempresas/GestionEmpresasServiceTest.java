@@ -189,10 +189,10 @@ class GestionEmpresasServiceTest {
         Vehiculo alDia = new Vehiculo("AAA0001", "Volvo", "FH", 15_000, 25_000, empresa1);
         em.persist(alDia);
         em.persist(new PermisoCirculacion("PC-1", hoy.minusMonths(1), hoy.plusYears(1), alDia));
-        em.persist(new ITV(hoy.plusYears(1), alDia));
+        em.persist(new ITV(hoy.minusDays(10), hoy.plusYears(1), alDia));
         Vehiculo sinPermiso = new Vehiculo("AAA0002", "Volvo", "FH", 15_000, 25_000, empresa1);
         em.persist(sinPermiso);
-        em.persist(new ITV(hoy.plusYears(1), sinPermiso));
+        em.persist(new ITV(hoy.minusDays(10), hoy.plusYears(1), sinPermiso));
         Vehiculo deBaja = new Vehiculo("BBB0001", "Scania", "R", 15_000, 25_000, em.find(Empresa.class, 2L));
         deBaja.setActivo(false);
         em.persist(deBaja);

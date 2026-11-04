@@ -31,7 +31,7 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
     fechaEmision: vehiculo.permiso?.fechaEmision ?? "",
     fechaVencimiento: vehiculo.permiso?.fechaVencimiento ?? "",
   });
-  const [itv, setItv] = useState("");
+  const [itv, setItv] = useState({ fechaEmision: "", fechaVencimiento: "" });
 
   const abrir = (m: Modo) => {
     setModo(m);
@@ -47,7 +47,7 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
       if (r.ok) {
         abrir(null);
         setOk(mensaje);
-        setItv("");
+        setItv({ fechaEmision: "", fechaVencimiento: "" });
         router.refresh();
       } else {
         setError(r.error);
@@ -157,11 +157,29 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
       )}
 
       {modo === "itv" && (
-        <label className={`${etiqueta} sm:max-w-xs`}>
-          Fecha de vencimiento de la ITV
-          <input type="date" value={itv} onChange={(e) => setItv(e.target.value)} className={campo} />
-          {errorCampo("fechaVencimiento")}
-        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className={etiqueta}>
+            Fecha de emisión
+            <input
+              type="date"
+              value={itv.fechaEmision}
+              onChange={(e) => setItv({ ...itv, fechaEmision: e.target.value })}
+              className={campo}
+            />
+            {errorCampo("fechaEmision")}
+          </label>
+          <label className={etiqueta}>
+            Fecha de vencimiento
+            <input
+              type="date"
+              value={itv.fechaVencimiento}
+              min={itv.fechaEmision || undefined}
+              onChange={(e) => setItv({ ...itv, fechaVencimiento: e.target.value })}
+              className={campo}
+            />
+            {errorCampo("fechaVencimiento")}
+          </label>
+        </div>
       )}
 
       {modo === "baja" && (

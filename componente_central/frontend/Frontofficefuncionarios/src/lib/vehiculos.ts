@@ -113,7 +113,7 @@ export const FILTROS = {
 export type Filtro = keyof typeof FILTROS;
 
 export function esFiltro(valor: unknown): valor is Filtro {
-  return typeof valor === "string" && valor in FILTROS;
+  return typeof valor === "string" && Object.hasOwn(FILTROS, valor);
 }
 
 export function cumpleFiltro(v: VehiculoFiscalizado, filtro: Filtro): boolean {

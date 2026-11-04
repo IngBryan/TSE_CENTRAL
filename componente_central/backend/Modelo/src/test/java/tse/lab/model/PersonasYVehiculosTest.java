@@ -208,16 +208,14 @@ class PersonasYVehiculosTest {
         assertTrue(permiso.vigenteEn(LocalDate.of(2026, 1, 1)));
         assertTrue(permiso.vigenteEn(LocalDate.of(2026, 12, 31)));
         assertFalse(permiso.vigenteEn(LocalDate.of(2027, 1, 1)));
-        assertFalse(new PermisoCirculacion().vigenteEn(LocalDate.of(2026, 6, 1)));
     }
 
     @Test
     void laItvEstaVigenteHastaElVencimientoIncluido() {
-        ITV itv = new ITV(LocalDate.of(2026, 6, 30), new Vehiculo());
+        ITV itv = new ITV(LocalDate.of(2025, 6, 30), LocalDate.of(2026, 6, 30), new Vehiculo());
 
         assertTrue(itv.vigenteEn(LocalDate.of(2026, 6, 30)));
         assertFalse(itv.vigenteEn(LocalDate.of(2026, 7, 1)));
-        assertFalse(new ITV().vigenteEn(LocalDate.of(2026, 6, 1)));
     }
 
     @Test
@@ -225,8 +223,8 @@ class PersonasYVehiculosTest {
         LocalDate hoy = LocalDate.of(2026, 6, 1);
         Vehiculo vehiculo = new Vehiculo("SBA1234", "Volvo", "FH", 15_000, 25_000, null);
         PermisoCirculacion permiso = new PermisoCirculacion("PC-1", hoy.minusYears(1), hoy, vehiculo);
-        ITV vencida = new ITV(hoy.minusDays(1), vehiculo);
-        ITV vigente = new ITV(hoy.plusMonths(6), vehiculo);
+        ITV vencida = new ITV(hoy.minusYears(1), hoy.minusDays(1), vehiculo);
+        ITV vigente = new ITV(hoy.minusDays(1), hoy.plusMonths(6), vehiculo);
 
         assertTrue(vehiculo.habilitadoEn(hoy, permiso, List.of(vencida, vigente)));
         // Sin permiso, con el permiso vencido o sin una ITV vigente

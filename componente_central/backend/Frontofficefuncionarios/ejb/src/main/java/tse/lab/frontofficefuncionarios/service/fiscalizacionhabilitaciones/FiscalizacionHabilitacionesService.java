@@ -51,8 +51,16 @@ public class FiscalizacionHabilitacionesService {
     @EJB
     private ITVDAO itvs;
 
-    // Los tests lo reemplazan para fijar el dia de la consulta
-    private Clock reloj = Clock.system(ZONA);
+    private final Clock reloj;
+
+    public FiscalizacionHabilitacionesService() {
+        this(Clock.system(ZONA));
+    }
+
+    // For tests: fixes the day of the query
+    FiscalizacionHabilitacionesService(Clock reloj) {
+        this.reloj = reloj;
+    }
 
     public enum EstadoDocumento {
         VIGENTE, POR_VENCER, VENCIDO, AUN_NO_VIGENTE, SIN_REGISTRO
@@ -179,15 +187,15 @@ public class FiscalizacionHabilitacionesService {
         if (p == null) {
             return SIN_REGISTRO;
         }
-        EstadoDocumento estado = p.getFechaEmision() != null && hoy.isBefore(p.getFechaEmision())
+        EstadoDocumento estado = hoy.isBefore(p.getFechaEmision())
                 ? EstadoDocumento.AUN_NO_VIGENTE
                 : vigencia(p.vigenteEn(hoy), p.getFechaVencimiento(), hoy);
-        return new PeriodoVista(p.getNro(), texto(p.getFechaEmision()), texto(p.getFechaVencimiento()), estado,
+        return new PeriodoVista(p.getNro(), p.getFechaEmision().toString(), p.getFechaVencimiento().toString(), estado,
                 dias(hoy, p.getFechaVencimiento()));
     }
 
     private static PeriodoVista itv(ITV i, LocalDate hoy) {
-        return new PeriodoVista(null, texto(i.getFechaEmision()), texto(i.getFechaVencimiento()),
+        return new PeriodoVista(null, i.getFechaEmision().toString(), i.getFechaVencimiento().toString(),
                 vigencia(i.vigenteEn(hoy), i.getFechaVencimiento(), hoy), dias(hoy, i.getFechaVencimiento()));
     }
 
@@ -198,8 +206,8 @@ public class FiscalizacionHabilitacionesService {
         return dias(hoy, vencimiento) <= DIAS_POR_VENCER ? EstadoDocumento.POR_VENCER : EstadoDocumento.VIGENTE;
     }
 
-    private static Long dias(LocalDate hoy, LocalDate vencimiento) {
-        return vencimiento == null ? null : ChronoUnit.DAYS.between(hoy, vencimiento);
+    private static long dias(LocalDate hoy, LocalDate vencimiento) {
+        return ChronoUnit.DAYS.between(hoy, vencimiento);
     }
 
     private static ResumenHabilitaciones resumen(List<VehiculoFiscalizado> lista) {
@@ -239,9 +247,5 @@ public class FiscalizacionHabilitacionesService {
             throw new RecursoNoEncontradoException("EMPRESA_NO_ENCONTRADA", "La empresa no existe.");
         }
         return empresa;
-    }
-
-    private static String texto(LocalDate fecha) {
-        return fecha == null ? null : fecha.toString();
     }
 }

@@ -71,7 +71,7 @@ public class GestionVehiculosService {
     public record DatosPermiso(String nro, String fechaEmision, String fechaVencimiento) {
     }
 
-    public record DatosItv(String fechaVencimiento) {
+    public record DatosItv(String fechaEmision, String fechaVencimiento) {
     }
 
     public record PermisoVista(String nro, String fechaEmision, String fechaVencimiento, boolean vigente) {
@@ -203,10 +203,14 @@ public class GestionVehiculosService {
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
         Empresa empresa = empresaDelResponsable(ciResponsable, correlationId);
         Vehiculo vehiculo = vehiculoActivo(empresa, matricula);
+        DatosItv d = datos == null ? new DatosItv(null, null) : datos;
 
         Map<String, String> errores = new LinkedHashMap<>();
-        LocalDate vencimiento = fecha(errores, "fechaVencimiento", datos == null ? null : datos.fechaVencimiento());
-        if (vencimiento != null
+        LocalDate desde = fecha(errores, "fechaEmision", d.fechaEmision());
+        LocalDate vencimiento = fecha(errores, "fechaVencimiento", d.fechaVencimiento());
+        if (desde != null && vencimiento != null && !vencimiento.isAfter(desde)) {
+            errores.put("fechaVencimiento", "El vencimiento tiene que ser posterior a la fecha de emisión.");
+        } else if (vencimiento != null
                 && itvs.buscarPorVehiculo(vehiculo).stream().anyMatch(i -> vencimiento.equals(i.getFechaVencimiento()))) {
             errores.put("fechaVencimiento", "Ya hay una ITV registrada con ese vencimiento.");
         }
@@ -214,10 +218,10 @@ public class GestionVehiculosService {
             throw new DatosInvalidosException(errores);
         }
 
-        itvs.guardar(new ITV(vencimiento, vehiculo));
+        itvs.guardar(new ITV(desde, vencimiento, vehiculo));
         LOG.info(() -> "evento=vehiculo.itv correlationId=" + correlationId + " usuario=" + ciResponsable
                 + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula()
-                + " vencimiento=" + vencimiento);
+                + " vigencia=" + desde + "/" + vencimiento);
         return detalle(vehiculo);
     }
 

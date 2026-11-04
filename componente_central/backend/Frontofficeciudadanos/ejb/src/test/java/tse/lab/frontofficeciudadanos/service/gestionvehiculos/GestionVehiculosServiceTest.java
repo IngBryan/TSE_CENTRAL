@@ -151,9 +151,9 @@ class GestionVehiculosServiceTest {
         assertTrue(conPermiso.vehiculo().permiso().vigente());
         assertFalse(conPermiso.vehiculo().habilitado(), "falta la ITV");
 
-        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusDays(1).toString()), "t"));
+        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.minusDays(1).toString()), "t"));
         VehiculoDetalle d = enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234",
-                new DatosItv(HOY.plusMonths(6).toString()), "t"));
+                new DatosItv(HOY.minusYears(1).toString(), HOY.plusMonths(6).toString()), "t"));
         assertEquals(2, d.itvs().size());
         assertEquals(HOY.plusMonths(6).toString(), d.vehiculo().itv().fechaVencimiento(), "la vigente es la mas lejana");
         assertFalse(d.itvs().get(1).vigente());
@@ -165,7 +165,7 @@ class GestionVehiculosServiceTest {
         alta("SBA1234");
         enTx(() -> servicio.registrarPermiso(RESPONSABLE, "SBA1234",
                 new DatosPermiso("PNC-001", HOY.toString(), HOY.plusYears(1).toString()), "t"));
-        assertTrue(enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.plusMonths(6).toString()),
+        assertTrue(enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.plusMonths(6).toString()),
                 "t")).vehiculo().habilitado());
         assertFalse(enTx(() -> servicio.darDeBaja(RESPONSABLE, "SBA1234", "t")).habilitado());
     }
@@ -173,7 +173,7 @@ class GestionVehiculosServiceTest {
     @Test
     void permisoVencidoNoHabilita() throws Exception {
         alta("SBA1234");
-        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.plusMonths(6).toString()), "t"));
+        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.plusMonths(6).toString()), "t"));
         VehiculoDetalle d = enTx(() -> servicio.registrarPermiso(RESPONSABLE, "SBA1234",
                 new DatosPermiso("PNC-001", HOY.minusYears(2).toString(), HOY.minusDays(1).toString()), "t"));
         assertFalse(d.vehiculo().permiso().vigente());
@@ -204,13 +204,19 @@ class GestionVehiculosServiceTest {
         assertEquals(3, assertThrows(DatosInvalidosException.class, () -> servicio.registrarPermiso(RESPONSABLE,
                 "SBA1234", new DatosPermiso("", "ayer", null), "t")).getErrores().size());
 
-        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.toString()), "t"));
+        enTx(() -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.toString()), "t"));
         assertTrue(assertThrows(DatosInvalidosException.class,
-                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.toString()), "t"))
+                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.toString()), "t"))
                 .getErrores().get("fechaVencimiento").contains("Ya hay"));
         assertTrue(assertThrows(DatosInvalidosException.class,
-                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv("31/12/2027"), "t"))
+                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), "31/12/2027"), "t"))
                 .getErrores().containsKey("fechaVencimiento"));
+        assertTrue(assertThrows(DatosInvalidosException.class,
+                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(null, HOY.plusYears(1).toString()), "t"))
+                .getErrores().containsKey("fechaEmision"));
+        assertTrue(assertThrows(DatosInvalidosException.class,
+                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.toString(), HOY.toString()), "t"))
+                .getErrores().get("fechaVencimiento").contains("posterior"));
     }
 
     @Test
@@ -223,7 +229,7 @@ class GestionVehiculosServiceTest {
         assertEquals("VEHICULO_DADO_DE_BAJA", assertThrows(ConflictoException.class, () -> servicio.editar(RESPONSABLE,
                 "SBA1234", new EdicionVehiculo("Volvo", "FH", 1L, 1L), "t")).getCodigo());
         assertEquals("VEHICULO_DADO_DE_BAJA", assertThrows(ConflictoException.class,
-                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.toString()), "t")).getCodigo());
+                () -> servicio.agregarItv(RESPONSABLE, "SBA1234", new DatosItv(HOY.minusYears(1).toString(), HOY.toString()), "t")).getCodigo());
         assertFalse(enTx(() -> servicio.darDeBaja(RESPONSABLE, "SBA1234", "t")).activo(), "la segunda baja no falla");
     }
 

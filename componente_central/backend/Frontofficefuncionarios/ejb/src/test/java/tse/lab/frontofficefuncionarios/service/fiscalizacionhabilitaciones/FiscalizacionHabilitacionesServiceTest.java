@@ -68,13 +68,12 @@ class FiscalizacionHabilitacionesServiceTest {
         em = emf.createEntityManager();
         AutorizacionFuncionario autorizacion = new AutorizacionFuncionario();
         set(autorizacion, "funcionarios", conEm(new FuncionarioDAO()));
-        servicio = new FiscalizacionHabilitacionesService();
+        servicio = new FiscalizacionHabilitacionesService(Clock.fixed(HOY.atStartOfDay(ZONA).toInstant(), ZONA));
         set(servicio, "autorizacion", autorizacion);
         set(servicio, "empresas", conEm(new EmpresaDAO()));
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "permisos", conEm(new PermisoCirculacionDAO()));
         set(servicio, "itvs", conEm(new ITVDAO()));
-        set(servicio, "reloj", Clock.fixed(HOY.atStartOfDay(ZONA).toInstant(), ZONA));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         empresa.setHabilitada(true);
@@ -94,26 +93,26 @@ class FiscalizacionHabilitacionesServiceTest {
         // Habilitado con el permiso por vencer: vence justo dentro de 30 dias
         Vehiculo porVencer = vehiculo("AAA0002", empresa);
         em.persist(new PermisoCirculacion("PC-2", HOY.minusYears(1), HOY.plusDays(30), porVencer));
-        em.persist(new ITV(HOY.plusYears(1), porVencer));
+        em.persist(new ITV(HOY.minusDays(10), HOY.plusYears(1), porVencer));
         // Permiso vencido ayer
         Vehiculo permisoVencido = vehiculo("AAA0003", empresa);
         em.persist(new PermisoCirculacion("PC-3", HOY.minusYears(1), HOY.minusDays(1), permisoVencido));
-        em.persist(new ITV(HOY.plusYears(1), permisoVencido));
+        em.persist(new ITV(HOY.minusDays(10), HOY.plusYears(1), permisoVencido));
         // Sin permiso ni ITV registrados
         vehiculo("AAA0004", empresa);
         // Permiso que empieza manana; la ITV vence hoy (sigue vigente)
         Vehiculo aunNoVigente = vehiculo("AAA0005", empresa);
         em.persist(new PermisoCirculacion("PC-5", HOY.plusDays(1), HOY.plusYears(1), aunNoVigente));
-        em.persist(new ITV(HOY, aunNoVigente));
+        em.persist(new ITV(HOY.minusYears(1), HOY, aunNoVigente));
         // Dado de baja con los papeles al dia
         Vehiculo deBaja = vehiculo("AAA0006", empresa);
         deBaja.setActivo(false);
         em.persist(new PermisoCirculacion("PC-6", HOY.minusMonths(1), HOY.plusYears(1), deBaja));
-        em.persist(new ITV(HOY.plusYears(1), deBaja));
+        em.persist(new ITV(HOY.minusDays(10), HOY.plusYears(1), deBaja));
         // De otra empresa
         Vehiculo ajeno = vehiculo("BBB0001", otra);
         em.persist(new PermisoCirculacion("PC-9", HOY.minusMonths(1), HOY.plusYears(1), ajeno));
-        em.persist(new ITV(HOY.plusYears(1), ajeno));
+        em.persist(new ITV(HOY.minusDays(10), HOY.plusYears(1), ajeno));
         em.getTransaction().commit();
         em.clear();
     }

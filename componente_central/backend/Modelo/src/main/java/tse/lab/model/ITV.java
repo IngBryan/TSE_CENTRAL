@@ -1,5 +1,6 @@
 package tse.lab.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,8 +20,10 @@ public class ITV implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private LocalDate fechaEmision;
 
+    @Column(nullable = false)
     private LocalDate fechaVencimiento;
 
     @ManyToOne(optional = false)
@@ -28,12 +31,6 @@ public class ITV implements Serializable {
     private Vehiculo vehiculo;
 
     public ITV() {
-    }
-
-    // ABM de vehiculos del frontoffice de ciudadanos: la empresa solo declara el
-    // vencimiento de la ITV
-    public ITV(LocalDate fechaVencimiento, Vehiculo vehiculo) {
-        this(null, fechaVencimiento, vehiculo);
     }
 
     public ITV(LocalDate fechaEmision, LocalDate fechaVencimiento, Vehiculo vehiculo) {
@@ -63,7 +60,7 @@ public class ITV implements Serializable {
     }
 
     public boolean vigenteEn(LocalDate fecha) {
-        return fechaVencimiento != null && !fecha.isAfter(fechaVencimiento);
+        return !fecha.isAfter(fechaVencimiento);
     }
 
     public Vehiculo getVehiculo() {
