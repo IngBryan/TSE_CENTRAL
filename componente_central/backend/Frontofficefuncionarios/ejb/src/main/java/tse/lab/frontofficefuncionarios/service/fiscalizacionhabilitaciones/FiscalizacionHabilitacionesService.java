@@ -17,6 +17,7 @@ import tse.lab.frontofficefuncionarios.data.EmpresaDAO;
 import tse.lab.frontofficefuncionarios.data.ITVDAO;
 import tse.lab.frontofficefuncionarios.data.PermisoCirculacionDAO;
 import tse.lab.frontofficefuncionarios.data.VehiculoDAO;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
@@ -125,9 +126,9 @@ public class FiscalizacionHabilitacionesService {
                 .toList();
 
         ResumenHabilitaciones resumen = resumen(lista);
-        LOG.info(() -> "evento=empresa.vehiculos.listado correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa + " cantidad=" + resumen.total() + " noHabilitados="
-                + resumen.noHabilitados() + " porVencer=" + resumen.porVencer());
+        LOG.info(() -> LogFuncionarios.evento("empresa.vehiculos.listado").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).campo("cantidad", resumen.total())
+                .campo("noHabilitados", resumen.noHabilitados()).campo("porVencer", resumen.porVencer()).toString());
         return new FiscalizacionEmpresa(empresa.getNroEmpresa(), empresa.getNombrePublico(), empresa.isHabilitada(),
                 hoy.toString(), resumen, lista);
     }
@@ -159,16 +160,17 @@ public class FiscalizacionHabilitacionesService {
         String normalizada = Vehiculo.normalizarMatricula(matricula);
         Vehiculo v = normalizada == null || normalizada.isEmpty() ? null : vehiculos.buscarPorMatricula(normalizada);
         if (v == null || v.getEmpresa() == null || !empresa.getNroEmpresa().equals(v.getEmpresa().getNroEmpresa())) {
-            LOG.info(() -> "evento=empresa.vehiculo.no_encontrado correlationId=" + correlationId + " usuario=" + ci
-                    + " nroEmpresa=" + nroEmpresa + " matricula=" + normalizada);
+            LOG.info(() -> LogFuncionarios.evento("empresa.vehiculo.no_encontrado").correlationId(correlationId).usuario(ci)
+                    .campo("nroEmpresa", nroEmpresa).campo("matricula", normalizada).toString());
             throw new RecursoNoEncontradoException("VEHICULO_NO_ENCONTRADO",
                     "La empresa no tiene un vehículo con esa matrícula.");
         }
         LocalDate hoy = LocalDate.now(reloj);
         List<ITV> historial = itvs.buscarPorVehiculo(v);
         VehiculoFiscalizado fiscalizado = fiscalizar(v, permisos.buscarPorVehiculo(v), historial, hoy);
-        LOG.info(() -> "evento=empresa.vehiculo.consulta correlationId=" + correlationId + " usuario=" + ci
-                + " nroEmpresa=" + nroEmpresa + " matricula=" + v.getMatricula() + " estado=" + fiscalizado.estado());
+        LOG.info(() -> LogFuncionarios.evento("empresa.vehiculo.consulta").correlationId(correlationId).usuario(ci)
+                .campo("nroEmpresa", nroEmpresa).campo("matricula", v.getMatricula())
+                .campo("estado", fiscalizado.estado()).toString());
         return new VehiculoDetalle(empresa.getNroEmpresa(), hoy.toString(), fiscalizado,
                 historial.stream().map(i -> itv(i, hoy)).toList());
     }
@@ -242,8 +244,8 @@ public class FiscalizacionHabilitacionesService {
     private Empresa empresa(Long nroEmpresa, String ci, String correlationId) throws RecursoNoEncontradoException {
         Empresa empresa = nroEmpresa == null ? null : empresas.buscarPorId(nroEmpresa);
         if (empresa == null) {
-            LOG.info(() -> "evento=empresa.no_encontrada correlationId=" + correlationId + " usuario=" + ci
-                    + " nroEmpresa=" + nroEmpresa);
+            LOG.info(() -> LogFuncionarios.evento("empresa.no_encontrada").correlationId(correlationId).usuario(ci)
+                    .campo("nroEmpresa", nroEmpresa).toString());
             throw new RecursoNoEncontradoException("EMPRESA_NO_ENCONTRADA", "La empresa no existe.");
         }
         return empresa;

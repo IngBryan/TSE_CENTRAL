@@ -29,7 +29,6 @@ export default async function Empresas() {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} error={NO_DISPONIBLE} />;
   }
-  registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `GET /empresas` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly

@@ -7,6 +7,8 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 // Un log de la plataforma: toString() lo devuelve como JSON en una linea, para seguir una operacion por su
 // correlationId entre los componentes. Se usa siempre asi:
@@ -19,6 +21,7 @@ public final class LogEstructurado {
     private final Instant timestamp = Instant.now();
     private final String componente;
     private final String evento;
+    private Level nivel = Level.INFO;
     private String correlationId;
     private String usuario;
     private Integer responseCode;
@@ -40,6 +43,12 @@ public final class LogEstructurado {
     // Segundos desde un System.nanoTime(), para los roundtrip
     public static double segundosDesde(long inicioNanos) {
         return (System.nanoTime() - inicioNanos) / 1_000_000_000d;
+    }
+
+    // Goes in the JSON: the console formatter of WildFly only writes the message
+    public LogEstructurado nivel(Level valor) {
+        nivel = valor;
+        return this;
     }
 
     public LogEstructurado correlationId(String valor) {
@@ -77,15 +86,34 @@ public final class LogEstructurado {
         return this;
     }
 
+    // For expected failures that repeat (retries): the exception and its cause, without the stack
+    public LogEstructurado errorSinPila(Throwable e) {
+        error = e.getCause() == null ? e.toString() : e + ": " + e.getCause();
+        return this;
+    }
+
+    // Access log of a request: ERROR on a 5xx
+    public LogEstructurado http(String metodo, String ruta, int status, long inicioNanos) {
+        nivel = status >= 500 ? Level.SEVERE : Level.INFO;
+        responseCode = status;
+        roundtripSeconds = segundosDesde(inicioNanos);
+        return campo("metodo", metodo).campo("ruta", ruta);
+    }
+
     public LogEstructurado campo(String nombre, Object valor) {
         datos.put(nombre, valor);
         return this;
+    }
+
+    public void escribirEn(Logger logger) {
+        logger.log(nivel, this::toString);
     }
 
     @Override
     public String toString() {
         StringJoiner json = new StringJoiner(",", "{", "}");
         agregar(json, "timestamp", timestamp);
+        agregar(json, "nivel", nombreNivel());
         agregar(json, "componente", componente);
         agregar(json, "evento", evento);
         agregar(json, "correlationId", correlationId);
@@ -101,6 +129,14 @@ public final class LogEstructurado {
             json.add(texto("datos") + ":" + propios);
         }
         return json.toString();
+    }
+
+    // The same names as src/lib/log.ts of the fronts
+    private String nombreNivel() {
+        if (nivel == Level.SEVERE) {
+            return "ERROR";
+        }
+        return nivel == Level.WARNING ? "WARN" : nivel.getName();
     }
 
     private static void agregar(StringJoiner json, String nombre, Object valor) {

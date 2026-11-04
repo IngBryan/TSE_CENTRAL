@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const correlationId = randomUUID();
 
   const fallar = (motivo: MotivoError, detalle: string) => {
-    registrarLog("warn", "login.gubuy", { correlationId }, { detalle: `${motivo}: ${detalle}` });
+    registrarLog("warn", "login.gubuy", { correlationId }, { motivo, detalle });
     const res = NextResponse.redirect(`${cfg.appBaseUrl}/?error=${motivo}`, 302);
     res.cookies.delete({ name: COOKIE_TRANSACCION, ...borrarCookie });
     return res;
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     const claims = await obtenerUserinfo(tokens.access_token, idToken.sub!);
     // Funcionario registrado + validacion contra la PDI (ErrorLogin si no se puede entrar)
     const { usuario, resultado } = await ingresarConGubUy(claims, correlationId);
-    registrarLog("info", "login.gubuy", { correlationId }, { detalle: `ci=${usuario.cedula} resultado=${resultado}` });
+    registrarLog("info", "login.gubuy", { correlationId, usuario: usuario.cedula }, { resultado });
 
     const sesion: Sesion = {
       usuario,

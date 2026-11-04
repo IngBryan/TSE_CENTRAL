@@ -65,7 +65,7 @@ public class NodeCommunications implements AutoCloseable {
             target.report(batch);
         } catch (IOException | RuntimeException e) {
             batch.forEach((externalId, last) -> pending.merge(externalId, last, NodeCommunications::latest));
-            LogFiscalizacion.error(LogFiscalizacion.evento("nodos.comunicacion_no_registrada").error(e));
+            LogFiscalizacion.error(LogFiscalizacion.evento("nodos.comunicacion_no_registrada").errorSinPila(e));
         }
     }
 

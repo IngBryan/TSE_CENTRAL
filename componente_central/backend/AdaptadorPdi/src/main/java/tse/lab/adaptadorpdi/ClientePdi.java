@@ -167,7 +167,7 @@ public class ClientePdi {
     private static void log(Level nivel, String correlationId, String cedula, String evento, int intento,
             long duracionMs, String detalle) {
         LOG.log(nivel, () -> {
-            LogEstructurado log = LogEstructurado.de("adaptadorpdi", "pdi.consulta").correlationId(correlationId)
+            LogEstructurado log = LogEstructurado.de("adaptadorpdi", "pdi.consulta").nivel(nivel).correlationId(correlationId)
                     .campo("ci", cedula).campo("resultado", evento).campo("detalle", detalle);
             if (intento > 0) {
                 log.backendRoundtripSeconds(duracionMs / 1000d).campo("intento", intento);

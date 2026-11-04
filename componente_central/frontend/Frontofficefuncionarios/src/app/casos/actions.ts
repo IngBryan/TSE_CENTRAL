@@ -50,7 +50,6 @@ export async function resolverCaso(
         usuarioCi: sesion.usuario.cedula,
       },
     );
-    registrarLog("info", "casos", { correlationId, responseCode: res.status }, { detalle: `POST /casos/${idCaso}/resolucion` });
     if (res.status === 200) {
       revalidatePath(`/casos/${idCaso}`);
       return {

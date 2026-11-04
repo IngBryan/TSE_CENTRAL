@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { Notificaciones } from "@/lib/infracciones";
-import { registrarLog } from "@/lib/log";
 
 // Notificaciones de casos de fiscalizacion para la campana del encabezado. Solo las ve el responsable de la
 // empresa: la cedula sale de la sesion y el backend controla que sea responsable. Si no se pueden obtener
@@ -17,9 +16,6 @@ async function llamar(ruta: string, method: "GET" | "POST"): Promise<Notificacio
   const correlationId = randomUUID();
   try {
     const res = await llamarBackend<Notificaciones>(ruta, { method, correlationId, usuarioCi: sesion.perfil.cedula });
-    if (method === "POST") {
-      registrarLog("info", "notificaciones", { correlationId, responseCode: res.status }, { detalle: `POST ${ruta}` });
-    }
     return res.status === 200 ? res.data : null;
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;

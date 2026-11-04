@@ -4,10 +4,12 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
+import jakarta.annotation.Resource;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.TransactionSynchronizationRegistry;
 import tse.lab.log.PistaAuditoria;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
@@ -23,6 +25,8 @@ public class CasoFiscalizacionDAO {
 
     @PersistenceContext(unitName = "frontofficeciudadanosPersistenceUnit")
     private EntityManager em;
+    @Resource
+    private TransactionSynchronizationRegistry transacciones;
 
     public List<CasoFiscalizacion> buscarPorEmpresa(Empresa empresa, Collection<EstadoCaso> estados) {
         return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.vehiculo.empresa = :empresa"
@@ -51,11 +55,9 @@ public class CasoFiscalizacionDAO {
         em.persist(descargo);
     }
 
-    // flush: la linea de la pista por consola solo se escribe si la base acepto el registro
     public void registrarAuditoria(RegistroAuditoriaCaso registro) {
         em.persist(registro);
-        em.flush();
-        PistaAuditoria.registrar("frontofficeciudadanos", registro);
+        PistaAuditoria.alConfirmar(transacciones, "frontofficeciudadanos", registro);
     }
 
     // Cuando se le notifico el caso a la empresa: el ultimo pasaje a NOTIFICADA de la pista de auditoria

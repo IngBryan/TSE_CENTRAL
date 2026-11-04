@@ -42,7 +42,6 @@ export async function actualizarEmpresa(_previo: EstadoFormulario, formulario: F
       correlationId,
       usuarioCi: sesion.perfil.cedula,
     });
-    registrarLog("info", "empresa", { correlationId, responseCode: res.status }, { detalle: `actualizar` });
     if (res.status === 400) return { error: "Revisá los datos marcados.", campos: res.data?.campos, valores };
     if (res.status === 403) return { error: `No podés modificar la empresa: ${res.data?.detalle ?? "no sos su responsable"}.`, valores };
     if (res.status !== 200 || !res.data) return { error: "No se pudieron guardar los cambios.", valores };

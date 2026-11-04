@@ -128,7 +128,7 @@ public class LoginMovilService {
     }
 
     private static ErrorLoginMovil fallar(ErrorLoginMovil e, String correlationId) {
-        LOG.warning(() -> LogCiudadanos.evento("movil.login").correlationId(correlationId)
+        LOG.warning(() -> LogCiudadanos.aviso("movil.login").correlationId(correlationId)
                 .campo("resultado", e.getMotivo().codigo()).campo("detalle", "\"" + e.getMessage() + "\"")
                 .toString());
         return e;

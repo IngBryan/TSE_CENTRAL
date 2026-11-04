@@ -157,7 +157,7 @@ public class GestionEmpresasService {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> LogFuncionarios.evento("empresa.alta.rechazada").correlationId(correlationId)
+            LOG.warning(() -> LogFuncionarios.aviso("empresa.alta.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("motivo", "datos_invalidos").campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
         }
@@ -198,7 +198,7 @@ public class GestionEmpresasService {
         }
         Long version = cambios == null ? null : cambios.version();
         if (version == null || !version.equals(empresa.getVersion())) {
-            LOG.warning(() -> LogFuncionarios.evento("empresa.modificacion.rechazada").correlationId(correlationId)
+            LOG.warning(() -> LogFuncionarios.aviso("empresa.modificacion.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("motivo", "EMPRESA_DESACTUALIZADA")
                     .campo("version", version).campo("actual", empresa.getVersion()).toString());
             throw new ConflictoException("EMPRESA_DESACTUALIZADA",
@@ -215,7 +215,7 @@ public class GestionEmpresasService {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> LogFuncionarios.evento("empresa.modificacion.rechazada").correlationId(correlationId)
+            LOG.warning(() -> LogFuncionarios.aviso("empresa.modificacion.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("motivo", "datos_invalidos")
                     .campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
@@ -328,14 +328,14 @@ public class GestionEmpresasService {
     }
 
     private static ConflictoException empresaExistente(Long nro, String ci, String correlationId) {
-        LOG.warning(() -> LogFuncionarios.evento("empresa.alta.rechazada").correlationId(correlationId).usuario(ci)
+        LOG.warning(() -> LogFuncionarios.aviso("empresa.alta.rechazada").correlationId(correlationId).usuario(ci)
                 .campo("nroEmpresa", nro).campo("motivo", "EMPRESA_EXISTENTE").toString());
         return new ConflictoException("EMPRESA_EXISTENTE", "Ya existe una empresa con el número " + nro + ".");
     }
 
     private static ConflictoException rechazoAsociacion(String ci, Long nroEmpresa, String ciUsuario,
             String correlationId, String codigo, String mensaje) {
-        LOG.warning(() -> LogFuncionarios.evento("empresa.asociacion.rechazada").correlationId(correlationId)
+        LOG.warning(() -> LogFuncionarios.aviso("empresa.asociacion.rechazada").correlationId(correlationId)
                 .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("ciUsuario", ciUsuario).campo("motivo", codigo)
                 .toString());
         return new ConflictoException(codigo, mensaje);

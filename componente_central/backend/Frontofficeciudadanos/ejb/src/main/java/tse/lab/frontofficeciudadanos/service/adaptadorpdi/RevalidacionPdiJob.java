@@ -9,7 +9,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import jakarta.annotation.PostConstruct;
@@ -90,7 +89,7 @@ public class RevalidacionPdiJob {
                         .toString());
             }
         } catch (SQLException | RuntimeException e) {
-            LOG.log(Level.WARNING, () -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "error")
+            LOG.warning(() -> LogCiudadanos.aviso("pdi.revalidacion").campo("resultado", "error")
                     .error(e).toString());
         } finally {
             programar(proxima);
@@ -127,7 +126,7 @@ public class RevalidacionPdiJob {
                 // La PDI sigue caida: no tiene sentido seguir con el resto, se espera mas para la proxima
                 fallosSeguidos++;
                 Duration proxima = Backoff.exponencial(fallosSeguidos + 1, intervalo, intervaloMax);
-                LOG.warning(() -> LogCiudadanos.evento("pdi.revalidacion").correlationId(correlationId)
+                LOG.warning(() -> LogCiudadanos.aviso("pdi.revalidacion").correlationId(correlationId)
                         .campo("resultado", "pdi_no_disponible").campo("pendientes", pendientes.size())
                         .campo("validados", resultados).campo("proximoIntentoS", proxima.toSeconds()).toString());
                 return proxima;

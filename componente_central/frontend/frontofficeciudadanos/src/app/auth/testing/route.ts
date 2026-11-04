@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const correlationId = randomUUID();
   try {
     const { perfil, resultado, sesionPermitida } = await ingresarParaTesting(cedula, correlationId);
-    registrarLog("info", "login.testing", { correlationId }, { detalle: `ci=${cedula} resultado=${resultado} estado=${perfil.estado}` });
+    registrarLog("info", "login.testing", { correlationId, usuario: cedula }, { resultado, estado: perfil.estado });
     if (!sesionPermitida) {
       return volver(resultado === "MENOR_DE_EDAD" ? "menor_de_edad" : "no_existe");
     }
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set(COOKIE_SESION, sellar(sesion), opcionesCookie(DURACION_SESION_S));
     return res;
   } catch (e) {
-    registrarLog("warn", "login.testing", { correlationId }, { detalle: `ci=${cedula} ${(e as Error).message}` });
+    registrarLog("warn", "login.testing", { correlationId, usuario: cedula, error: (e as Error).message });
     return volver(e instanceof ErrorLogin ? e.motivo : "ingreso_no_disponible");
   }
 }

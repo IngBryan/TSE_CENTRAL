@@ -43,7 +43,7 @@ public class PendingWeighingsDetection {
                 failed++;
                 LogFiscalizacion.error(LogFiscalizacion.evento("pesaje.no_evaluado").correlationId(weighing.correlationId())
                         .campo("matricula", weighing.licensePlate()).campo("fechaHora", weighing.timestamp())
-                        .error(e));
+                        .errorSinPila(e));
             }
         }
         return failed;

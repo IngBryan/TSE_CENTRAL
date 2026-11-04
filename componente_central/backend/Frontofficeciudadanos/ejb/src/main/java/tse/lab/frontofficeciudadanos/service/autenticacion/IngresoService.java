@@ -54,7 +54,7 @@ public class IngresoService {
                 LOG.info(() -> LogCiudadanos.evento("ingreso.vinculacion").correlationId(correlationId)
                         .campo("ci", cedula).toString());
             } else if (!perfil.getSubGubUy().equals(subGubUy)) {
-                LOG.warning(() -> LogCiudadanos.evento("ingreso.sub_distinto").correlationId(correlationId)
+                LOG.warning(() -> LogCiudadanos.aviso("ingreso.sub_distinto").correlationId(correlationId)
                         .campo("ci", cedula)
                         .campo("detalle", "\"la cedula estaba vinculada a otra cuenta gub.uy, se actualiza\"")
                         .toString());

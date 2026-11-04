@@ -40,7 +40,7 @@ public class AutorizacionResponsable {
         }
         if (motivo != null) {
             final String m = motivo;
-            LOG.warning(() -> LogCiudadanos.evento("responsable.no_autorizado").correlationId(correlationId)
+            LOG.warning(() -> LogCiudadanos.aviso("responsable.no_autorizado").correlationId(correlationId)
                     .usuario(ciResponsable).campo("detalle", "\"" + m + "\"").toString());
             throw new NoAutorizadoException(motivo);
         }

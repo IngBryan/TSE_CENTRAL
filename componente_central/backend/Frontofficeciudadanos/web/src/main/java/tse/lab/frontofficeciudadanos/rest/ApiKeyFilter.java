@@ -4,10 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Priority;
+import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ContainerResponseContext;
@@ -17,14 +18,15 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
 import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
-import tse.lab.log.LogEstructurado;
 
 // El puerto 8080 esta publicado: toda la API exige la clave compartida con el frontoffice de Next
 // en el header X-Api-Key (CIUDADANOS_API_KEY, del .env raiz). Sin clave configurada no atiende nada.
 // Excepcion: /movil/*, que llama la app del chofer con su propio token (MovilTokenFilter).
 // Tambien toma el X-Correlation-Id que manda el front (o genera uno), lo devuelve en la respuesta y deja el
 // log de acceso de cada pedido con su codigo de respuesta y lo que tardo.
+// Runs before MovilTokenFilter: a rejected token also needs its correlation id and its access log.
 @Provider
+@Priority(Priorities.AUTHENTICATION - 1)
 public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFilter {
 
     static final String CORRELATION_ID = "X-Correlation-Id";
@@ -61,10 +63,8 @@ public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFi
             res.getHeaders().putSingle(CORRELATION_ID, id);
         }
         if (req.getProperty(INICIO) instanceof Long inicio) {
-            LOG.log(res.getStatus() >= 500 ? Level.SEVERE : Level.INFO, () -> LogCiudadanos.evento("http.request")
-                    .correlationId(String.valueOf(id)).usuario(req.getHeaderString("X-Usuario-Ci"))
-                    .responseCode(res.getStatus()).roundtripSeconds(LogEstructurado.segundosDesde(inicio))
-                    .campo("metodo", req.getMethod()).campo("ruta", req.getUriInfo().getPath()).toString());
+            LogCiudadanos.evento("http.request").correlationId(String.valueOf(id)).usuario(req.getHeaderString("X-Usuario-Ci"))
+                    .http(req.getMethod(), req.getUriInfo().getPath(), res.getStatus(), inicio).escribirEn(LOG);
         }
     }
 

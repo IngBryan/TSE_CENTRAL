@@ -65,7 +65,6 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} filtros={filtros} error={NO_DISPONIBLE} />;
   }
-  registrarLog("info", "viajes", { correlationId, responseCode: res.status }, { detalle: `GET ${ruta}` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly

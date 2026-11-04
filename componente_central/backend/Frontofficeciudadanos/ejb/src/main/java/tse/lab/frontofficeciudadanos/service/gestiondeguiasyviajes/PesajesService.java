@@ -34,7 +34,7 @@ public class PesajesService implements PesajesRemote {
             }
             NodoBalanza balanza = balanzas.buscarPorIdExterno(datos.getIdExternoBalanza());
             if (balanza == null) {
-                LOG.warning(() -> LogCiudadanos.evento("pesaje.balanza_desconocida").campo("pesaje", datos).toString());
+                LOG.warning(() -> LogCiudadanos.aviso("pesaje.balanza_desconocida").campo("pesaje", datos).toString());
                 continue;
             }
             pesajes.guardar(new EventoPesajes(datos.getIdExterno(), datos.getMatricula(), datos.getFechaHora(),

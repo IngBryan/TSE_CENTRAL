@@ -28,14 +28,14 @@ export async function POST(req: NextRequest) {
   const correlationId = randomUUID();
   try {
     const { usuario, resultado } = await ingresarParaTesting(cedula, correlationId);
-    registrarLog("info", "login.testing", { correlationId }, { detalle: `ci=${cedula} resultado=${resultado}` });
+    registrarLog("info", "login.testing", { correlationId, usuario: cedula }, { resultado });
     // Sin idToken: el logout cierra solo la sesion local (no hay sesion en gub.uy)
     const sesion: Sesion = { usuario, idToken: "", exp: Math.floor(Date.now() / 1000) + DURACION_SESION_S };
     const res = NextResponse.redirect(`${cfg.appBaseUrl}/`, 303);
     res.cookies.set(COOKIE_SESION, sellar(sesion), opcionesCookie(DURACION_SESION_S));
     return res;
   } catch (e) {
-    registrarLog("warn", "login.testing", { correlationId }, { detalle: `ci=${cedula} ${(e as Error).message}` });
+    registrarLog("warn", "login.testing", { correlationId, usuario: cedula, error: (e as Error).message });
     return volver(e instanceof ErrorLogin ? e.motivo : "ingreso_no_disponible");
   }
 }

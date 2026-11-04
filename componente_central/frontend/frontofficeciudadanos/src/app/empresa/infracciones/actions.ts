@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { InfraccionDetalle } from "@/lib/infracciones";
-import { registrarLog } from "@/lib/log";
 
 // Presentar el descargo de una infraccion. La cedula del responsable sale de la sesion; el backend controla
 // que el caso sea de su empresa, que este notificado, que no tenga descargo y que no haya vencido el plazo.
@@ -32,7 +31,6 @@ export async function presentarDescargo(
       correlationId,
       usuarioCi: sesion.perfil.cedula,
     });
-    registrarLog("info", "infracciones", { correlationId, responseCode: res.status }, { detalle: `POST /empresa/infracciones/${idCaso}/descargo` });
     if (res.status === 200) {
       revalidatePath("/empresa/infracciones");
       revalidatePath(`/empresa/infracciones/${idCaso}`);

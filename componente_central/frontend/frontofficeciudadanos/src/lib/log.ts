@@ -23,6 +23,7 @@ export function registrarLog(nivel: Nivel, evento: string, campos: Campos = {}, 
   console[nivel](
     JSON.stringify({
       timestamp: new Date().toISOString(),
+      nivel: nivel.toUpperCase(),
       componente: COMPONENTE,
       evento,
       ...campos,

@@ -58,7 +58,6 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} id={id} error={NO_DISPONIBLE} />;
   }
-  registrarLog("info", "casos", { correlationId, responseCode: detalle.status }, { detalle: `GET /casos/${id} evidencia=${evidencia?.status} descargo=${descargo?.status}` });
 
   if (detalle.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly

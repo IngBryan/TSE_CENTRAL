@@ -101,8 +101,9 @@ public class ValidacionPdiService {
     }
 
     private static void log(String correlationId, Ciudadano perfil, ResultadoValidacion resultado) {
-        LOG.log(resultado == ResultadoValidacion.NO_DISPONIBLE ? Level.WARNING : Level.INFO, () -> LogCiudadanos.evento("pdi.validacion")
+        LogCiudadanos.evento("pdi.validacion")
+                .nivel(resultado == ResultadoValidacion.NO_DISPONIBLE ? Level.WARNING : Level.INFO)
                 .correlationId(correlationId).campo("ci", perfil.getCi()).campo("resultado", resultado)
-                .campo("estado", perfil.getEstado()).toString());
+                .campo("estado", perfil.getEstado()).escribirEn(LOG);
     }
 }

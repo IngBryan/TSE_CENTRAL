@@ -902,7 +902,7 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
 Todos los componentes escriben sus logs como **JSON de una linea** con los mismos campos:
 
 ```json
-{"timestamp":"...","componente":"frontofficefuncionarios","evento":"caso.resuelto","correlationId":"...","usuario":"...","responseCode":200,"roundtripSeconds":0.042,"backendRoundtripSeconds":0.012,"datos":{"caso":7}}
+{"timestamp":"...","nivel":"INFO","componente":"frontofficefuncionarios","evento":"caso.resuelto","correlationId":"...","usuario":"...","responseCode":200,"roundtripSeconds":0.042,"backendRoundtripSeconds":0.012,"datos":{"caso":7}}
 ```
 
 - **Clase comun:** `LogEstructurado` (libreria `Modelo`, paquete `tse.lab.log`) tiene los campos que comparten todos
@@ -912,11 +912,15 @@ Todos los componentes escriben sus logs como **JSON de una linea** con los mismo
 - **Correlacion:** el front genera el `X-Correlation-Id` y lo manda al backend, que lo devuelve y lo pasa a la PDI. En
   la app movil es el `idEvento`. La fiscalizacion automatica lo deriva del evento (`evt-<matricula>-<fecha>`) y lo pasa
   por EJB remoto, asi que un caso creado se sigue desde la deteccion hasta su pista de auditoria.
+- **Nivel:** el campo `nivel` (`INFO`, `WARN` o `ERROR`) va dentro del JSON, porque la consola de WildFly solo escribe
+  el mensaje.
 - **Pedidos HTTP:** cada backend deja un `http.request` con `responseCode` y `roundtripSeconds`, y cada front un
-  `backend.llamada` con `backendRoundtripSeconds`.
+  `backend.llamada` con `backendRoundtripSeconds`. Lo que ningun recurso atrapo deja ademas un `http.error` con la
+  pila y responde 500 (`UnhandledExceptionMapper`).
 - **Pista de auditoria:** ademas de la tabla `auditoria_casos`, cada accion de fiscalizacion deja por consola una linea
-  `evento=auditoria.caso` (`PistaAuditoria`) con usuario, accion, estados, fundamento y fecha. Se escribe al guardar el
-  registro, asi que cubre creacion, notificacion, descargo y resolucion. Solo se agrega: la aplicacion no tiene forma
+  `evento=auditoria.caso` (`PistaAuditoria`) con usuario, accion, estados, fundamento y fecha. Se escribe cuando confirma la
+  transaccion que guarda el registro, asi que cubre creacion, notificacion, descargo y resolucion, y una accion
+  deshecha por un rollback no deja linea. Solo se agrega: la aplicacion no tiene forma
   de modificarla ni borrarla.
 - **WildFly:** los loggers `tse.lab` salen por un handler propio, sin el prefijo del servidor
   (`wildfly/datasources.cli`).

@@ -249,7 +249,7 @@ public class GestionCasosService {
         }
         EstadoCaso anterior = caso.getEstado();
         if (anterior == null || !anterior.admiteResolucion()) {
-            LOG.warning(() -> LogFuncionarios.evento("caso.resolucion.rechazada").correlationId(correlationId)
+            LOG.warning(() -> LogFuncionarios.aviso("caso.resolucion.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("caso", idCaso).campo("estado", anterior)
                     .campo("motivo", "TRANSICION_NO_PERMITIDA").toString());
             throw new ConflictoException("TRANSICION_NO_PERMITIDA",
@@ -269,7 +269,7 @@ public class GestionCasosService {
                     + " caracteres.");
         }
         if (!errores.isEmpty()) {
-            LOG.warning(() -> LogFuncionarios.evento("caso.resolucion.rechazada").correlationId(correlationId)
+            LOG.warning(() -> LogFuncionarios.aviso("caso.resolucion.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("caso", idCaso).campo("motivo", "datos_invalidos")
                     .campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);

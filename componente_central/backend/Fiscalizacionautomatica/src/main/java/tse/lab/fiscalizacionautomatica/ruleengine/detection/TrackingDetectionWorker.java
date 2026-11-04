@@ -87,7 +87,7 @@ public class TrackingDetectionWorker implements AutoCloseable {
             dao.markDetected(event);
         } catch (IOException | RuntimeException e) {
             LogFiscalizacion.error(LogFiscalizacion.evento("tracking.no_evaluado").correlationId(event.correlationId())
-                    .campo("matricula", event.licensePlate()).campo("fechaHora", event.timestamp()).error(e));
+                    .campo("matricula", event.licensePlate()).campo("fechaHora", event.timestamp()).errorSinPila(e));
         }
     }
 
@@ -101,7 +101,7 @@ public class TrackingDetectionWorker implements AutoCloseable {
         try {
             dao.findPendingDetection(clock.instant().minus(pendingFor), RECOVERY_BATCH).forEach(this::submit);
         } catch (RuntimeException e) {
-            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.pendientes_no_consultados").error(e));
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.pendientes_no_consultados").errorSinPila(e));
         }
     }
 

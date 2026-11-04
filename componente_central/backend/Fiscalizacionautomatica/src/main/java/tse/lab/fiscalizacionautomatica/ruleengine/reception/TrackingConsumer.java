@@ -84,7 +84,7 @@ public class TrackingConsumer extends DefaultConsumer {
             // Saving failed: the whole batch back to the queue to retry it
             getChannel().basicNack(deliveries.getLast().tag(), true, true);
             LogFiscalizacion.error(LogFiscalizacion.evento("tracking.lote_reencolado")
-                    .campo("mensajes", deliveries.size()).error(e));
+                    .campo("mensajes", deliveries.size()).errorSinPila(e));
             return;
         }
         long lastAcknowledged = 0;
@@ -111,7 +111,7 @@ public class TrackingConsumer extends DefaultConsumer {
         try {
             flush();
         } catch (IOException | RuntimeException e) {
-            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.lote_no_guardado").error(e));
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.lote_no_guardado").errorSinPila(e));
         }
     }
 

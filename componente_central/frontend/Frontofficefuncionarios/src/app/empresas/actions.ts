@@ -37,7 +37,6 @@ export async function buscarUsuariosDisponibles(filtro: string): Promise<Resulta
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `GET ${ruta}` });
     if (res.status === 200 && Array.isArray(res.data)) return { ok: true, usuarios: res.data };
     if (res.status === 403) return { ok: false, error: "No estás registrado como funcionario del MTOP." };
     return { ok: false, error: "No se pudieron obtener los usuarios registrados." };
@@ -83,7 +82,6 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return { ok: false, error: NO_DISPONIBLE };
   }
-  registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `POST /empresas` });
   if (res.status === 200) {
     revalidatePath("/empresas");
     // Fuera del try: redirect() funciona tirando una excepcion que Next tiene que recibir
@@ -141,7 +139,6 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `PUT /empresas/${nroEmpresa}` });
     if (res.status === 200) {
       revalidatePath(`/empresas/${nroEmpresa}`);
       revalidatePath("/empresas");
@@ -193,7 +190,6 @@ export async function asociarResponsable(nroEmpresa: number, ci: string): Promis
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `POST /empresas/${nroEmpresa}/responsable` });
     if (res.status === 200) {
       revalidatePath(`/empresas/${nroEmpresa}`);
       revalidatePath("/empresas");

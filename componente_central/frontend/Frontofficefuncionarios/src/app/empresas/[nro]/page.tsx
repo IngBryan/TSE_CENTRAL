@@ -45,7 +45,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   // Los vehiculos se piden en paralelo con el detalle; si fallan, la pagina de la empresa se muestra igual
   const pedidoVehiculos = vehiculosDeEmpresa(nro, sesion.usuario.cedula, correlationId).catch(
     (e): ResultadoVehiculos => {
-      if (!(e instanceof BackendNoDisponible)) console.error(`[empresas] correlationId=${correlationId}`, e);
+      if (!(e instanceof BackendNoDisponible)) registrarLog("error", "empresas", { correlationId, error: (e as Error).message });
       return { error: NO_DISPONIBLE };
     },
   );
@@ -59,7 +59,6 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} nro={nro} error={NO_DISPONIBLE} />;
   }
-  registrarLog("info", "empresas", { correlationId, responseCode: res.status }, { detalle: `GET /empresas/${nro}` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
@@ -117,7 +116,6 @@ async function vehiculosDeEmpresa(nro: string, ci: string, correlationId: string
     correlationId,
     usuarioCi: ci,
   });
-  console.info(`[empresas] correlationId=${correlationId} GET /empresas/${nro}/vehiculos status=${res.status}`);
   if (res.status !== 200 || !res.data) return { error: "No se pudieron obtener los vehículos de la empresa." };
   return { fiscalizacion: res.data };
 }

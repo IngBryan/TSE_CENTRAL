@@ -53,7 +53,6 @@ export default async function Bandeja({ searchParams }: PageProps<"/casos">) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} filtro={filtro} error={NO_DISPONIBLE} />;
   }
-  registrarLog("info", "casos", { correlationId, responseCode: res.status }, { detalle: `GET ${ruta}` });
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly

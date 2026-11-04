@@ -170,7 +170,7 @@ public class Main {
                 return true;
             } catch (IOException e) {
                 LogFiscalizacion.error(LogFiscalizacion.evento("gps_activos.no_disponibles").campo("reintentoSegundos", RETRY_DELAY_MS / 1000)
-                        .error(e));
+                        .errorSinPila(e));
                 if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
                     return false;
                 }

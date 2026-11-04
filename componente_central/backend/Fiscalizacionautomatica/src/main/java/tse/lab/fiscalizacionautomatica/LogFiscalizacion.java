@@ -1,5 +1,7 @@
 package tse.lab.fiscalizacionautomatica;
 
+import java.util.logging.Level;
+
 import tse.lab.log.LogEstructurado;
 
 /** Logs of the automatic fiscalization: standard output for the normal flow, standard error for failures. */
@@ -19,6 +21,6 @@ public final class LogFiscalizacion {
     }
 
     public static void error(LogEstructurado log) {
-        System.err.println(log);
+        System.err.println(log.nivel(Level.SEVERE));
     }
 }

@@ -34,7 +34,6 @@ async function llamar(ruta: string, cedula: string): Promise<RespuestaAlta> {
       ruta,
       { method: "POST", body: { cedula: ci }, correlationId, usuarioCi: sesion.perfil.cedula },
     );
-    registrarLog("info", "choferes", { correlationId, responseCode: res.status }, { detalle: `ruta=${ruta} resultado=${res.data?.resultado}` });
     if (res.status === 403) return { ok: false, error: "no_autorizado", detalle: res.data?.detalle };
     if (res.status === 400) return { ok: false, error: "cedula_invalida" };
     if (res.status !== 200 || !res.data) return { ok: false, error: "no_disponible" };

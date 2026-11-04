@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { getSesion } from "@/lib/auth/session";
-import { registrarLog } from "@/lib/log";
 
 // Gestion de Viajes de Carga y CU-07. La cedula del responsable sale de la sesion; el backend
 // controla permisos y reglas.
@@ -36,7 +35,6 @@ async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: un
   if (!sesion) return null;
   const correlationId = randomUUID();
   const res = await llamarBackend<T & ErrorBackend>(ruta, { method, body, correlationId, usuarioCi: sesion.perfil.cedula });
-  registrarLog("info", "guias", { correlationId, responseCode: res.status }, { detalle: `${method} ${ruta}` });
   return res;
 }
 

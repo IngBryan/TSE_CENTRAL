@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
+import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
@@ -50,7 +51,7 @@ class CasosAutomaticosServiceTest {
         em = emf.createEntityManager();
         servicio = new CasosAutomaticosService();
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
-        set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "auditoria", conEm(NoOpTransactions.wired(new AuditoriaCasoDAO())));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBC1234", "Mercedes-Benz", "Actros", 8500, 25000, empresa);

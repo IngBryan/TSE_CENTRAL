@@ -146,7 +146,7 @@ public class ViajesChoferService {
         }
         byte[] foto = foto(errores, datos == null ? null : datos.foto());
         if (!errores.isEmpty()) {
-            LOG.warning(() -> LogCiudadanos.evento("movil.evento.rechazado").correlationId(correlationId)
+            LOG.warning(() -> LogCiudadanos.aviso("movil.evento.rechazado").correlationId(correlationId)
                     .usuario(ci).campo("idEvento", (datos == null ? null : datos.idEvento()))
                     .campo("motivo", "datos_invalidos").campo("campos", errores.keySet()).toString());
             throw new DatosInvalidosException(errores);
@@ -193,7 +193,7 @@ public class ViajesChoferService {
         eventos.guardar(evento);
         final TipoEventoViaje t = tipo;
         if (decision.resultado() == ResultadoEventoViaje.CONFLICTO) {
-            LOG.warning(() -> LogCiudadanos.evento("movil.evento.conflicto").correlationId(correlationId)
+            LOG.warning(() -> LogCiudadanos.aviso("movil.evento.conflicto").correlationId(correlationId)
                     .usuario(ci).campo("idEvento", idEvento).campo("guia", guia.getId()).campo("tipo", t)
                     .campo("estado", anterior).campo("motivo", decision.codigo())
                     .campo("fechaHoraDispositivo", fechaHora).toString());
@@ -256,7 +256,7 @@ public class ViajesChoferService {
         List<Chofer> habilitados = ci == null ? List.of()
                 : choferes.buscarPorCi(ci).stream().filter(c -> c.getEstado() == EstadoChofer.HABILITADO).toList();
         if (habilitados.isEmpty()) {
-            LOG.warning(() -> LogCiudadanos.evento("movil.no_autorizado").correlationId(correlationId).usuario(ci)
+            LOG.warning(() -> LogCiudadanos.aviso("movil.no_autorizado").correlationId(correlationId).usuario(ci)
                     .campo("detalle", "\"no es chofer habilitado de ninguna empresa\"").toString());
             throw new NoAutorizadoException("no es chofer habilitado de ninguna empresa");
         }
@@ -266,7 +266,7 @@ public class ViajesChoferService {
     private static <E extends Exception> E rechazo(String correlationId, String ci, String idEvento, String idGuia,
             E e) {
         String codigo = e instanceof ConflictoException c ? c.getCodigo() : "GUIA_NO_ENCONTRADA";
-        LOG.warning(() -> LogCiudadanos.evento("movil.evento.rechazado").correlationId(correlationId).usuario(ci)
+        LOG.warning(() -> LogCiudadanos.aviso("movil.evento.rechazado").correlationId(correlationId).usuario(ci)
                 .campo("idEvento", idEvento).campo("guia", idGuia).campo("motivo", codigo).toString());
         return e;
     }

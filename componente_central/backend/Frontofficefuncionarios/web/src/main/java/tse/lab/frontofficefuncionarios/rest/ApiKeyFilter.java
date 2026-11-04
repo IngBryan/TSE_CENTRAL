@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -17,7 +16,6 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
 import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
-import tse.lab.log.LogEstructurado;
 
 // Igual que en Frontofficeciudadanos: toda la API exige la clave compartida con el frontoffice de Next
 // en el header X-Api-Key. Es FUNCIONARIOS_API_KEY y no la CIUDADANOS_API_KEY: como quien llama
@@ -58,10 +56,8 @@ public class ApiKeyFilter implements ContainerRequestFilter, ContainerResponseFi
             res.getHeaders().putSingle(CORRELATION_ID, id);
         }
         if (req.getProperty(INICIO) instanceof Long inicio) {
-            LOG.log(res.getStatus() >= 500 ? Level.SEVERE : Level.INFO, () -> LogFuncionarios.evento("http.request")
-                    .correlationId(String.valueOf(id)).usuario(req.getHeaderString("X-Usuario-Ci"))
-                    .responseCode(res.getStatus()).roundtripSeconds(LogEstructurado.segundosDesde(inicio))
-                    .campo("metodo", req.getMethod()).campo("ruta", req.getUriInfo().getPath()).toString());
+            LogFuncionarios.evento("http.request").correlationId(String.valueOf(id)).usuario(req.getHeaderString("X-Usuario-Ci"))
+                    .http(req.getMethod(), req.getUriInfo().getPath(), res.getStatus(), inicio).escribirEn(LOG);
         }
     }
 

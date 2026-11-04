@@ -85,9 +85,10 @@ public class IngresoFuncionarioService {
     }
 
     private static ResultadoIngreso log(String via, String correlationId, ResultadoIngreso r) {
-        LOG.log(r.sesionPermitida() && r.resultado() == Resultado.VALIDADO ? Level.INFO : Level.WARNING, () -> LogFuncionarios.evento("ingreso_funcionario." + via)
+        LogFuncionarios.evento("ingreso_funcionario." + via)
+                .nivel(r.sesionPermitida() && r.resultado() == Resultado.VALIDADO ? Level.INFO : Level.WARNING)
                 .correlationId(correlationId).campo("ci", r.cedula()).campo("resultado", r.resultado())
-                .campo("sesion", r.sesionPermitida()).toString());
+                .campo("sesion", r.sesionPermitida()).escribirEn(LOG);
         return r;
     }
 }

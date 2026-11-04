@@ -2,7 +2,6 @@ package tse.lab.backofficeautoridadesadministradores.rest;
 
 import java.security.Principal;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -13,7 +12,6 @@ import jakarta.ws.rs.container.ContainerResponseFilter;
 import jakarta.ws.rs.ext.Provider;
 
 import tse.lab.backofficeautoridadesadministradores.service.LogBackoffice;
-import tse.lab.log.LogEstructurado;
 
 /**
  * Toma el X-Correlation-Id que manda el front (o genera uno), lo devuelve
@@ -43,10 +41,9 @@ public class CorrelacionFilter implements ContainerRequestFilter, ContainerRespo
         }
         if (req.getProperty(INICIO) instanceof Long inicio) {
             Principal usuario = req.getSecurityContext().getUserPrincipal();
-            LOG.log(res.getStatus() >= 500 ? Level.SEVERE : Level.INFO, () -> LogBackoffice.evento("http.request")
-                    .correlationId(String.valueOf(id)).usuario(usuario == null ? null : usuario.getName())
-                    .responseCode(res.getStatus()).roundtripSeconds(LogEstructurado.segundosDesde(inicio))
-                    .campo("metodo", req.getMethod()).campo("ruta", req.getUriInfo().getPath()).toString());
+            LogBackoffice.evento("http.request").correlationId(String.valueOf(id))
+                    .usuario(usuario == null ? null : usuario.getName())
+                    .http(req.getMethod(), req.getUriInfo().getPath(), res.getStatus(), inicio).escribirEn(LOG);
         }
     }
 }

@@ -45,7 +45,7 @@ public class ActiveGpsRegistry implements AutoCloseable {
         try {
             load();
         } catch (IOException | RuntimeException e) {
-            LogFiscalizacion.error(LogFiscalizacion.evento("gps_activos.refresco_fallido").error(e));
+            LogFiscalizacion.error(LogFiscalizacion.evento("gps_activos.refresco_fallido").errorSinPila(e));
         }
     }
 
