@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -18,6 +19,9 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
@@ -41,7 +45,7 @@ class VencimientoDescargoJobTest {
     @BeforeEach
     void setUp() throws Exception {
         infracciones = new InfraccionesFalso();
-        job = new VencimientoDescargoJob();
+        job = new VencimientoDescargoJob(true);
         set(job, "infracciones", infracciones);
         set(job, "timers", timers);
         set(job, "database", database);
@@ -59,6 +63,33 @@ class VencimientoDescargoJobTest {
         assertEquals("0", cuando.getValue().getSecond());
         assertEquals("America/Montevideo", cuando.getValue().getTimezone());
         verify(timers).createSingleActionTimer(eq(VencimientoDescargoJob.ESPERA_INICIAL_MS), any(TimerConfig.class));
+    }
+
+    @Test
+    void theLogConfirmsThatTheTimersAreProgrammed() {
+        List<String> lineas = capturar(job::iniciar);
+
+        assertEquals(1, lineas.size());
+        assertTrue(lineas.get(0).contains("\"evento\":\"descargo.vencimiento\""), lineas.get(0));
+        assertTrue(lineas.get(0).contains("\"resultado\":\"programado\""), lineas.get(0));
+    }
+
+    @Test
+    void turnedOffItProgramsNothing() throws Exception {
+        VencimientoDescargoJob apagado = new VencimientoDescargoJob(false);
+        set(apagado, "timers", timers);
+
+        apagado.iniciar();
+
+        verifyNoInteractions(timers);
+    }
+
+    @Test
+    void aRoundWithoutExpiredCasesStillLeavesItsLine() {
+        List<String> lineas = capturar(job::vencerPlazos);
+
+        assertEquals(1, lineas.size());
+        assertTrue(lineas.get(0).contains("\"vencidos\":0"), lineas.get(0));
     }
 
     @Test
@@ -116,6 +147,44 @@ class VencimientoDescargoJobTest {
         assertTrue(infracciones.intentados.isEmpty());
     }
 
+    @Test
+    void aRoundThatFailsReleasesTheLock() throws Exception {
+        lockTaken(true);
+        infracciones.consultaFalla = true;
+
+        job.revisar();
+
+        verify(connection).prepareStatement("SELECT pg_advisory_unlock(?)");
+    }
+
+    private static List<String> capturar(Runnable accion) {
+        List<String> lineas = new ArrayList<>();
+        Handler captura = new Handler() {
+            @Override
+            public void publish(LogRecord r) {
+                lineas.add(r.getMessage());
+            }
+
+            @Override
+            public void flush() {
+                // Nothing buffered
+            }
+
+            @Override
+            public void close() {
+                // Nothing to release
+            }
+        };
+        Logger logger = Logger.getLogger(VencimientoDescargoJob.class.getName());
+        logger.addHandler(captura);
+        try {
+            accion.run();
+        } finally {
+            logger.removeHandler(captura);
+        }
+        return lineas;
+    }
+
     /** pg_try_advisory_lock answers {@code taken}; pg_advisory_unlock always works. */
     private void lockTaken(boolean taken) throws SQLException {
         PreparedStatement tryLock = query(taken);
@@ -135,6 +204,7 @@ class VencimientoDescargoJobTest {
 
     private static class InfraccionesFalso extends InfraccionesService {
         List<Long> vencidos = List.of();
+        boolean consultaFalla;
         Set<Long> fallan = Set.of();
         Set<Long> yaNoCorresponden = Set.of();
         final List<Long> intentados = new ArrayList<>();
@@ -146,6 +216,9 @@ class VencimientoDescargoJobTest {
 
         @Override
         public List<Long> casosConPlazoVencido() {
+            if (consultaFalla) {
+                throw new IllegalStateException("falla de prueba");
+            }
             return vencidos;
         }
 

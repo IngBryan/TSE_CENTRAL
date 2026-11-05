@@ -16,3 +16,6 @@ data:
   # POST /api/funcionarios/ingreso-testing. Va junto con LOGIN_TESTING del front de funcionarios
   # (deployment.yaml). Pasar los dos a "false" cuando ande el login con gub.uy en /funcionarios.
   FUNCIONARIOS_INGRESO_TESTING: "true"
+  # false stops moving the cases with an expired term to EN_DESCARGO. Check it before the first deploy: one
+  # minute after starting, WildFly moves all the ones already expired.
+  VENCIMIENTO_DESCARGO_ACTIVO: "false"

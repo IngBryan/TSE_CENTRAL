@@ -776,8 +776,10 @@ recargar. Abrir el detalle de la infraccion tambien la marca vista.
   `InfraccionesService` (no la calcula de nuevo). Cada caso va en su propia transaccion, bloqueado y
   revisado otra vez (si justo se presento un descargo no lo toca), y queda en la auditoria con usuario
   `SISTEMA` y el fundamento "Vencio el plazo de N dias sin descargo de la empresa". Con varias replicas lo
-  corre una sola (advisory lock de PostgreSQL). Si el job todavia no corrio, `presentarDescargo` igual
-  rechaza con `409 PLAZO_VENCIDO`. `VENCIMIENTO_DESCARGO_ACTIVO=false` lo apaga.
+  corre una sola (advisory lock de PostgreSQL). Cada corrida deja una linea `descargo.vencimiento` en el log, aunque no haya
+  casos vencidos, y al arrancar queda otra con `resultado=programado`. Si el job todavia no corrio, `presentarDescargo` igual
+  rechaza con `409 PLAZO_VENCIDO`. `VENCIMIENTO_DESCARGO_ACTIVO=false` lo apaga (en k8s, en
+  `k8s/apps/wildfly/configmap.yaml`).
 - Al presentarlo, el caso pasa a `EN_DESCARGO` (la transicion la valida `CasoFiscalizacion`) y queda en
   `auditoria_casos` con la cedula del responsable, el `correlationId` y el fundamento
   "Descargo presentado por la empresa N° ...". El caso se bloquea en la base mientras tanto

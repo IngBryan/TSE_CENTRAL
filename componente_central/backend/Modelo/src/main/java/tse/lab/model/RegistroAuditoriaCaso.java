@@ -18,7 +18,7 @@ import java.time.Instant;
 // fundamento y cuando. No tiene setters, todas las columnas son updatable = false y el entity listener
 // rechaza update y delete: desde la aplicacion solo se puede insertar y leer.
 // El caso se guarda por id (sin FK de JPA) para que el registro no dependa del ciclo de vida del caso.
-// usuario: ci del funcionario, o SISTEMA para las acciones automaticas (creacion, notificacion).
+// usuario: ci del funcionario, o SISTEMA para las acciones automaticas (creacion, notificacion, vencimiento del descargo).
 @Entity
 @Table(name = "auditoria_casos", indexes = @Index(name = "idx_auditoria_casos_caso", columnList = "id_caso"))
 public class RegistroAuditoriaCaso implements Serializable {

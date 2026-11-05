@@ -1,6 +1,6 @@
 # Scales WildFly by CPU. Possible because it keeps no state of its own: the backoffice authenticates with a
-# signed token instead of a session, and the PDI revalidation timer takes a PostgreSQL lock so one replica
-# runs it at a time. Requires metrics-server in the cluster (kubectl top pods must answer).
+# signed token instead of a session, and the timers (PDI revalidation, descargo expiry) take a PostgreSQL lock
+# so one replica runs each at a time. Requires metrics-server in the cluster (kubectl top pods must answer).
 #
 # - Minimum 2: WildFly takes minutes to deploy the 3 EARs, so a replica started when a peak arrives comes too
 #   late. Besides, fiscalizacion calls WildFly over persistent EJB connections (remote+http) that don't move

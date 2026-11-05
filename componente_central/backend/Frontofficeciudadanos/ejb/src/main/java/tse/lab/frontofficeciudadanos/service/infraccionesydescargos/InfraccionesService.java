@@ -231,16 +231,11 @@ public class InfraccionesService {
     }
 
     // Es para VencimientoDescargoJob: los casos NOTIFICADA sin descargo con el plazo vencido. Usa la misma regla
-    // (venceDescargo y dentroDelPlazo) que el chequeo de presentarDescargo y la fecha que ve la empresa.
+    // (ultimoDia y dentroDelPlazo) que el chequeo de presentarDescargo y la fecha que ve la empresa.
     public List<Long> casosConPlazoVencido() {
-        // Prefiltro para no revisar todos los casos: el plazo solo pudo vencer si el caso se notifico antes del dia
-        // hoy - plazoDias, y como la deteccion es anterior a la notificacion, se filtra por fechaDeteccion. La regla
-        // real es el filter de abajo.
-        Instant limite = LocalDate.now(reloj.withZone(URUGUAY)).minusDays(plazoDias).atStartOfDay(URUGUAY)
-                .toInstant();
-        return casos.buscarNotificadosSinDescargo(limite).stream()
-                .filter(c -> !dentroDelPlazo(venceDescargo(c)))
-                .map(CasoFiscalizacion::getId)
+        return casos.buscarNotificadosSinDescargo().stream()
+                .filter(c -> !dentroDelPlazo(ultimoDia(c.notificado())))
+                .map(CasoFiscalizacionDAO.CasoNotificado::id)
                 .toList();
     }
 
@@ -258,8 +253,8 @@ public class InfraccionesService {
         casos.registrarAuditoria(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
                 AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
                 "Venció el plazo de " + plazoDias + " días sin descargo de la empresa", correlationId));
-        LOG.info(() -> "evento=infraccion.plazo_vencido correlationId=" + correlationId + " usuario="
-                + RegistroAuditoriaCaso.SISTEMA + " caso=" + idCaso);
+        LOG.info(() -> LogCiudadanos.evento("infraccion.plazo_vencido").correlationId(correlationId)
+                .usuario(RegistroAuditoriaCaso.SISTEMA).campo("caso", idCaso).toString());
         return true;
     }
 
@@ -281,12 +276,15 @@ public class InfraccionesService {
         return new ConflictoException(codigo, mensaje);
     }
 
-    // Ultimo dia para presentar el descargo: el dia (en Uruguay) de la notificacion mas plazoDias. La fecha de
-    // notificacion sale de la pista de auditoria; si no quedo registrada, se usa la de deteccion.
+    // La fecha de notificacion sale de la pista de auditoria; si no quedo registrada, se usa la de deteccion.
     LocalDate venceDescargo(CasoFiscalizacion caso) {
         Instant notificada = casos.fechaNotificacion(caso.getId());
-        return LocalDate.ofInstant(notificada != null ? notificada : caso.getFechaDeteccion(), URUGUAY)
-                .plusDays(plazoDias);
+        return ultimoDia(notificada != null ? notificada : caso.getFechaDeteccion());
+    }
+
+    // Ultimo dia para presentar el descargo: el dia (en Uruguay) de la notificacion mas plazoDias
+    private LocalDate ultimoDia(Instant notificada) {
+        return LocalDate.ofInstant(notificada, URUGUAY).plusDays(plazoDias);
     }
 
     // El ultimo dia cuenta entero: vence a las 00:00 (hora de Uruguay) del dia siguiente

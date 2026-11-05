@@ -1,12 +1,8 @@
 package tse.lab.frontofficeciudadanos.service.infraccionesydescargos;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import jakarta.annotation.PostConstruct;
@@ -21,6 +17,8 @@ import jakarta.ejb.TimerService;
 import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
 import javax.sql.DataSource;
+import tse.lab.frontofficeciudadanos.service.AdvisoryLock;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 
 // Vencimiento del plazo de descargo: los casos NOTIFICADA a los que se les vencio el plazo sin descargo pasan
 // solos a EN_DESCARGO, asi el funcionario los puede resolver. Corre todos los dias a las 00:05 de Uruguay (el
@@ -32,6 +30,8 @@ import javax.sql.DataSource;
 public class VencimientoDescargoJob {
 
     private static final Logger LOG = Logger.getLogger(VencimientoDescargoJob.class.getName());
+    private static final String EVENTO = "descargo.vencimiento";
+    private static final String RESULTADO = "resultado";
     // Con varias replicas de WildFly cada una tiene este timer: corre la revision solo la que tiene este advisory
     // lock de PostgreSQL. No protege los datos (vencerPlazo ya es idempotente), solo evita hacer el trabajo dos veces.
     private static final long LOCK = "VencimientoDescargoJob".hashCode();
@@ -46,43 +46,39 @@ public class VencimientoDescargoJob {
     @EJB
     private InfraccionesService infracciones;
 
-    private final boolean activo = !"false".equalsIgnoreCase(env("VENCIMIENTO_DESCARGO_ACTIVO", "true").trim());
+    private final boolean activo;
+
+    public VencimientoDescargoJob() {
+        this(activoConfigurado());
+    }
+
+    // For the tests: without reading the environment
+    VencimientoDescargoJob(boolean activo) {
+        this.activo = activo;
+    }
 
     @PostConstruct
     void iniciar() {
         if (!activo) {
-            LOG.info("evento=descargo.vencimiento resultado=apagado");
+            LogCiudadanos.evento(EVENTO).campo(RESULTADO, "apagado").escribirEn(LOG);
             return;
         }
         timers.createCalendarTimer(new ScheduleExpression().hour(0).minute(5).second(0)
                 .timezone(InfraccionesService.URUGUAY.getId()), new TimerConfig(null, false));
         timers.createSingleActionTimer(ESPERA_INICIAL_MS, new TimerConfig(null, false));
+        LogCiudadanos.evento(EVENTO).campo(RESULTADO, "programado").campo("hora", "00:05")
+                .campo("zona", InfraccionesService.URUGUAY.getId()).escribirEn(LOG);
     }
 
     @Timeout
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     void revisar() {
-        try (Connection connection = database.getConnection()) {
-            if (advisoryLock(connection, "pg_try_advisory_lock")) {
-                try {
-                    vencerPlazos();
-                } finally {
-                    advisoryLock(connection, "pg_advisory_unlock");
-                }
-            } else {
-                LOG.fine("evento=descargo.vencimiento resultado=otra_replica");
+        try {
+            if (AdvisoryLock.correr(database, LOCK, this::vencerPlazos).isEmpty()) {
+                LogCiudadanos.evento(EVENTO).campo(RESULTADO, "otra_replica").escribirEn(LOG);
             }
         } catch (SQLException | RuntimeException e) {
-            LOG.log(Level.WARNING, "evento=descargo.vencimiento resultado=error", e);
-        }
-    }
-
-    private static boolean advisoryLock(Connection connection, String function) throws SQLException {
-        try (PreparedStatement query = connection.prepareStatement("SELECT " + function + "(?)")) {
-            query.setLong(1, LOCK);
-            try (ResultSet result = query.executeQuery()) {
-                return result.next() && result.getBoolean(1);
-            }
+            LogCiudadanos.aviso(EVENTO).campo(RESULTADO, "error").error(e).escribirEn(LOG);
         }
     }
 
@@ -90,10 +86,6 @@ public class VencimientoDescargoJob {
     // (InfraccionesService.vencerPlazo): si uno falla se sigue con el resto y se reintenta en la proxima.
     int vencerPlazos() {
         List<Long> vencidos = infracciones.casosConPlazoVencido();
-        if (vencidos.isEmpty()) {
-            LOG.fine("evento=descargo.vencimiento resultado=ok vencidos=0");
-            return 0;
-        }
         String correlationId = "vencimiento-" + UUID.randomUUID();
         int pasados = 0;
         int fallidos = 0;
@@ -104,19 +96,18 @@ public class VencimientoDescargoJob {
                 }
             } catch (RuntimeException e) {
                 fallidos++;
-                LOG.log(Level.WARNING, "evento=descargo.vencimiento correlationId=" + correlationId + " caso="
-                        + idCaso + " resultado=error", e);
+                LogCiudadanos.aviso(EVENTO).correlationId(correlationId).campo("caso", idCaso)
+                        .campo(RESULTADO, "error").error(e).escribirEn(LOG);
             }
         }
-        int ok = pasados;
-        int error = fallidos;
-        LOG.info(() -> "evento=descargo.vencimiento correlationId=" + correlationId + " resultado=ok vencidos="
-                + vencidos.size() + " enDescargo=" + ok + " fallidos=" + error);
+        LogCiudadanos.evento(EVENTO).correlationId(correlationId).campo(RESULTADO, "ok")
+                .campo("vencidos", vencidos.size()).campo("enDescargo", pasados).campo("fallidos", fallidos)
+                .escribirEn(LOG);
         return pasados;
     }
 
-    private static String env(String nombre, String porDefecto) {
-        String valor = System.getenv(nombre);
-        return valor == null || valor.isBlank() ? porDefecto : valor;
+    private static boolean activoConfigurado() {
+        String valor = System.getenv("VENCIMIENTO_DESCARGO_ACTIVO");
+        return valor == null || !"false".equalsIgnoreCase(valor.trim());
     }
 }

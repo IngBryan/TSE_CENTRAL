@@ -245,6 +245,34 @@ class InfraccionesServiceTest {
     }
 
     @Test
+    void sinRegistroDeNotificacionElPlazoCorreDesdeLaDeteccion() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        em.getTransaction().begin();
+        em.createQuery("DELETE FROM RegistroAuditoriaCaso r WHERE r.idCaso = :id").setParameter("id", notificado)
+                .executeUpdate();
+        em.getTransaction().commit();
+
+        servicio = conPlazo(10, enUruguay("2026-11-12T00:00:00"));
+
+        assertEquals(List.of(notificado), servicio.casosConPlazoVencido());
+    }
+
+    @Test
+    void unCasoDetectadoHaceTiempoCuentaDesdeQueSeNotifico() throws Exception {
+        notificadoEl(Instant.parse("2026-11-10T15:00:00Z"));
+        em.getTransaction().begin();
+        em.createQuery("UPDATE CasoFiscalizacion c SET c.fechaDeteccion = :fecha WHERE c.id = :id")
+                .setParameter("fecha", Instant.parse("2026-01-01T15:00:00Z")).setParameter("id", notificado)
+                .executeUpdate();
+        em.getTransaction().commit();
+        em.clear();
+
+        servicio = conPlazo(10, enUruguay("2026-11-12T00:00:00"));
+
+        assertTrue(servicio.casosConPlazoVencido().isEmpty());
+    }
+
+    @Test
     void elUltimoDiaDelPlazoElCasoNoSeVence() throws Exception {
         notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
         servicio = conPlazo(10, enUruguay("2026-11-11T23:59:59"));
