@@ -7,6 +7,8 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import type { EmpresaResumen } from "@/lib/empresas";
+import type { ResumenHabilitaciones } from "@/lib/vehiculos";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -27,11 +29,10 @@ export default async function Empresas() {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} error={NO_DISPONIBLE} />;
   }
-  console.info(`[empresas] correlationId=${correlationId} GET /empresas status=${res.status}`);
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status !== 200 || !Array.isArray(res.data)) {
     const error =
@@ -58,6 +59,7 @@ export default async function Empresas() {
                   <th className="px-4 py-3 font-normal">Nombre público</th>
                   <th className="px-4 py-3 font-normal">Razón social</th>
                   <th className="px-4 py-3 font-normal">Responsable</th>
+                  <th className="px-4 py-3 font-normal">Vehículos</th>
                   <th className="px-4 py-3 font-normal">Estado</th>
                 </tr>
               </thead>
@@ -89,6 +91,9 @@ export default async function Empresas() {
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      <ResumenVehiculos nroEmpresa={e.nroEmpresa} resumen={e.vehiculos} />
+                    </td>
+                    <td className="px-4 py-3">
                       <Habilitada habilitada={e.habilitada} />
                     </td>
                   </tr>
@@ -102,6 +107,39 @@ export default async function Empresas() {
         </>
       )}
     </Pagina>
+  );
+}
+
+// Fiscalizacion de habilitaciones: cuantos vehiculos activos estan habilitados y, debajo, una nota con los
+// que no lo estan o estan por vencer. Cada parte lleva al listado de vehiculos de la empresa ya filtrado.
+function ResumenVehiculos({ nroEmpresa, resumen }: { nroEmpresa: number; resumen: ResumenHabilitaciones }) {
+  if (resumen.total === 0) return <span className="text-zinc-500">Sin vehículos</span>;
+  const activos = resumen.habilitados + resumen.noHabilitados;
+  const avisos = [
+    resumen.noHabilitados > 0 && {
+      filtro: "no_habilitados",
+      texto: resumen.noHabilitados === 1 ? "1 no habilitado" : `${resumen.noHabilitados} no habilitados`,
+    },
+    resumen.porVencer > 0 && { filtro: "por_vencer", texto: `${resumen.porVencer} por vencer` },
+  ].filter((a) => a !== false);
+  return (
+    <div className="flex flex-col whitespace-nowrap">
+      <Link href={`/empresas/${nroEmpresa}#vehiculos`} className="hover:underline">
+        {resumen.habilitados} de {activos} habilitados
+      </Link>
+      {avisos.length > 0 && (
+        <span className="text-xs text-zinc-500">
+          {avisos.map((a, i) => (
+            <span key={a.filtro}>
+              {i > 0 && " · "}
+              <Link href={`/empresas/${nroEmpresa}?estado=${a.filtro}#vehiculos`} className="hover:underline">
+                {a.texto}
+              </Link>
+            </span>
+          ))}
+        </span>
+      )}
+    </div>
   );
 }
 

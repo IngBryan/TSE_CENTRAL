@@ -22,6 +22,7 @@ import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.Empresa;
@@ -71,7 +72,7 @@ public class GestionVehiculosService {
     public record DatosPermiso(String nro, String fechaEmision, String fechaVencimiento) {
     }
 
-    public record DatosItv(String fechaVencimiento) {
+    public record DatosItv(String fechaEmision, String fechaVencimiento) {
     }
 
     public record PermisoVista(String nro, String fechaEmision, String fechaVencimiento, boolean vigente) {
@@ -123,8 +124,8 @@ public class GestionVehiculosService {
 
         Vehiculo vehiculo = new Vehiculo(matricula, v.marca(), v.modelo(), v.peso(), v.capacidad(), empresa);
         vehiculos.guardar(vehiculo);
-        LOG.info(() -> "evento=vehiculo.alta correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + matricula);
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.alta").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", matricula).toString());
         return vista(vehiculo, List.of(), LocalDate.now(ZONA));
     }
 
@@ -147,9 +148,10 @@ public class GestionVehiculosService {
         vehiculo.setModelo(v.modelo());
         vehiculo.setPeso(v.peso());
         vehiculo.setCapacidadCargaKg(v.capacidad());
-        LOG.info(() -> "evento=vehiculo.modificado correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula()
-                + " cambios=\"" + String.join("; ", cambios) + "\"");
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.modificado").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa())
+                .campo("matricula", vehiculo.getMatricula())
+                .campo("cambios", "\"" + String.join("; ", cambios) + "\"").toString());
         return detalle(vehiculo);
     }
 
@@ -192,9 +194,9 @@ public class GestionVehiculosService {
             }
             permisos.guardar(new PermisoCirculacion(nro, desde, hasta, vehiculo));
         }
-        LOG.info(() -> "evento=vehiculo.permiso correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula() + " permiso="
-                + nro + " vigencia=" + desde + "/" + hasta);
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.permiso").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                .campo("permiso", nro).campo("vigencia", desde + "/" + hasta).toString());
         return detalle(vehiculo);
     }
 
@@ -203,10 +205,14 @@ public class GestionVehiculosService {
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
         Empresa empresa = empresaDelResponsable(ciResponsable, correlationId);
         Vehiculo vehiculo = vehiculoActivo(empresa, matricula);
+        DatosItv d = datos == null ? new DatosItv(null, null) : datos;
 
         Map<String, String> errores = new LinkedHashMap<>();
-        LocalDate vencimiento = fecha(errores, "fechaVencimiento", datos == null ? null : datos.fechaVencimiento());
-        if (vencimiento != null
+        LocalDate desde = fecha(errores, "fechaEmision", d.fechaEmision());
+        LocalDate vencimiento = fecha(errores, "fechaVencimiento", d.fechaVencimiento());
+        if (desde != null && vencimiento != null && !vencimiento.isAfter(desde)) {
+            errores.put("fechaVencimiento", "El vencimiento tiene que ser posterior a la fecha de emisión.");
+        } else if (vencimiento != null
                 && itvs.buscarPorVehiculo(vehiculo).stream().anyMatch(i -> vencimiento.equals(i.getFechaVencimiento()))) {
             errores.put("fechaVencimiento", "Ya hay una ITV registrada con ese vencimiento.");
         }
@@ -214,10 +220,10 @@ public class GestionVehiculosService {
             throw new DatosInvalidosException(errores);
         }
 
-        itvs.guardar(new ITV(vencimiento, vehiculo));
-        LOG.info(() -> "evento=vehiculo.itv correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula()
-                + " vencimiento=" + vencimiento);
+        itvs.guardar(new ITV(desde, vencimiento, vehiculo));
+        LOG.info(() -> LogCiudadanos.evento("vehiculo.itv").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                .campo("vigencia", desde + "/" + vencimiento).toString());
         return detalle(vehiculo);
     }
 
@@ -232,8 +238,9 @@ public class GestionVehiculosService {
                         + "Reasignalos o esperá a que terminen antes de darlo de baja.");
             }
             vehiculo.setActivo(false);
-            LOG.info(() -> "evento=vehiculo.baja correlationId=" + correlationId + " usuario=" + ciResponsable
-                    + " nroEmpresa=" + empresa.getNroEmpresa() + " matricula=" + vehiculo.getMatricula());
+            LOG.info(() -> LogCiudadanos.evento("vehiculo.baja").correlationId(correlationId).usuario(ciResponsable)
+                    .campo("nroEmpresa", empresa.getNroEmpresa()).campo("matricula", vehiculo.getMatricula())
+                    .toString());
         }
         return vista(vehiculo, itvs.buscarPorVehiculo(vehiculo), LocalDate.now(ZONA));
     }
@@ -276,15 +283,14 @@ public class GestionVehiculosService {
         PermisoCirculacion p = permisos.buscarPorVehiculo(v);
         PermisoVista permiso = p == null ? null
                 : new PermisoVista(p.getNro(), texto(p.getFechaEmision()), texto(p.getFechaVencimiento()),
-                        !hoy.isBefore(p.getFechaEmision()) && !hoy.isAfter(p.getFechaVencimiento()));
+                        p.vigenteEn(hoy));
         ItvVista itv = historial.isEmpty() ? null : itvVista(historial.get(0), hoy);
         return new VehiculoVista(v.getMatricula(), v.getMarca(), v.getModelo(), v.getPeso(), v.getCapacidadCargaKg(),
-                v.isActivo(), permiso, itv,
-                v.isActivo() && permiso != null && permiso.vigente() && itv != null && itv.vigente());
+                v.isActivo(), permiso, itv, v.habilitadoEn(hoy, p, historial));
     }
 
     private static ItvVista itvVista(ITV i, LocalDate hoy) {
-        return new ItvVista(i.getId(), texto(i.getFechaVencimiento()), !hoy.isAfter(i.getFechaVencimiento()));
+        return new ItvVista(i.getId(), texto(i.getFechaVencimiento()), i.vigenteEn(hoy));
     }
 
     private static String texto(LocalDate fecha) {

@@ -20,6 +20,7 @@ import {
   type EvidenciaVista,
 } from "@/lib/casos";
 import { ResolverCaso } from "./resolver-caso";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -57,13 +58,10 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} id={id} error={NO_DISPONIBLE} />;
   }
-  console.info(
-    `[casos] correlationId=${correlationId} GET /casos/${id} status=${detalle.status} evidencia=${evidencia?.status} descargo=${descargo?.status}`,
-  );
 
   if (detalle.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[casos] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "casos", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (detalle.status !== 200 || !detalle.data) {
     const error =
@@ -95,7 +93,20 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           {caso.nroEmpresa != null && <span className="text-zinc-500"> (N° {caso.nroEmpresa})</span>}
         </p>
         <p><span className={dato}>Guía:</span> <span className="font-mono">{caso.guia?.id ?? "Sin guía"}</span></p>
-        <p><span className={dato}>Vehículo:</span> <span className="font-mono">{caso.matricula ?? "-"}</span></p>
+        <p>
+          <span className={dato}>Vehículo:</span>{" "}
+          {caso.matricula && caso.nroEmpresa != null ? (
+            // Su permiso de circulacion y sus ITV: la evidencia de un caso VEHICULO_SIN_HABILITACION
+            <Link
+              href={`/empresas/${caso.nroEmpresa}/vehiculos/${encodeURIComponent(caso.matricula)}`}
+              className="font-mono text-[#0068b3] hover:underline dark:text-sky-400"
+            >
+              {caso.matricula}
+            </Link>
+          ) : (
+            <span className="font-mono">{caso.matricula ?? "-"}</span>
+          )}
+        </p>
         {caso.descripcion && (
           <p className="sm:col-span-2"><span className={dato}>Descripción:</span> {caso.descripcion}</p>
         )}

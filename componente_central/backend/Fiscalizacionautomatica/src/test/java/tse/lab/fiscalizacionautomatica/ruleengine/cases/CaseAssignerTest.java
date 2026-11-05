@@ -75,7 +75,7 @@ class CaseAssignerTest {
         }
 
         @Override
-        public DatosCaso notify(long caseId) throws IOException {
+        public DatosCaso notify(long caseId, String correlationId) throws IOException {
             failIfDown();
             StoredCase stored = find(caseId);
             if (stored.state()[0].equals("DETECTADA")) {

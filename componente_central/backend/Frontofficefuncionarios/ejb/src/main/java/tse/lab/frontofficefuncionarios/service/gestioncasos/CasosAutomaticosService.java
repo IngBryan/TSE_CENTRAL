@@ -7,6 +7,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.ClaveEvento;
@@ -65,9 +66,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
                 AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA, "Detectado por la fiscalizacion"
                         + " automatica en un evento de " + evento.getOrigen() + " del " + evento.getFechaHora(),
-                null));
-        LOG.info(() -> "evento=caso.creado caso=" + caso.getId() + " tipo=" + tipoCaso + " matricula="
-                + evento.getMatricula() + " fechaHora=" + evento.getFechaHora());
+                evento.getCorrelationId()));
+        LOG.info(() -> LogFuncionarios.evento("caso.creado").correlationId(evento.getCorrelationId()).campo("caso", caso.getId()).campo("tipo", tipoCaso)
+                .campo("matricula", evento.getMatricula()).campo("fechaHora", evento.getFechaHora()).toString());
         return datos(caso);
     }
 
@@ -78,12 +79,12 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
             throw new IllegalArgumentException("El caso no existe: " + idCaso);
         }
         asociar(caso, evento);
-        LOG.info(() -> "evento=caso.evidencia_agregada caso=" + idCaso + " matricula=" + evento.getMatricula()
-                + " fechaHora=" + evento.getFechaHora());
+        LOG.info(() -> LogFuncionarios.evento("caso.evidencia_agregada").correlationId(evento.getCorrelationId()).campo("caso", idCaso)
+                .campo("matricula", evento.getMatricula()).campo("fechaHora", evento.getFechaHora()).toString());
     }
 
     @Override
-    public DatosCaso notificarCaso(long idCaso) {
+    public DatosCaso notificarCaso(long idCaso, String correlationId) {
         CasoFiscalizacion caso = casos.buscarPorIdParaActualizar(idCaso);
         if (caso == null) {
             throw new IllegalArgumentException("El caso no existe: " + idCaso);
@@ -94,8 +95,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                     : caso.getVehiculo().getEmpresa().getNroEmpresa();
             auditoria.registrar(new RegistroAuditoriaCaso(idCaso, RegistroAuditoriaCaso.SISTEMA,
                     AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.DETECTADA, EstadoCaso.NOTIFICADA,
-                    "Caso notificado a la empresa N° " + nroEmpresa, null));
-            LOG.info(() -> "evento=caso.notificado caso=" + idCaso + " empresa=" + nroEmpresa);
+                    "Caso notificado a la empresa N° " + nroEmpresa, correlationId));
+            LOG.info(() -> LogFuncionarios.evento("caso.notificado").correlationId(correlationId).campo("caso", idCaso)
+                    .campo("empresa", nroEmpresa).toString());
         }
         return datos(caso);
     }

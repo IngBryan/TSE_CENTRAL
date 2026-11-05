@@ -16,9 +16,6 @@ async function llamar(ruta: string, method: "GET" | "POST"): Promise<Notificacio
   const correlationId = randomUUID();
   try {
     const res = await llamarBackend<Notificaciones>(ruta, { method, correlationId, usuarioCi: sesion.perfil.cedula });
-    if (method === "POST") {
-      console.info(`[notificaciones] correlationId=${correlationId} POST ${ruta} status=${res.status}`);
-    }
     return res.status === 200 ? res.data : null;
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;

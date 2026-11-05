@@ -9,7 +9,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import jakarta.annotation.PostConstruct;
@@ -25,6 +24,7 @@ import jakarta.ejb.TransactionAttributeType;
 import javax.sql.DataSource;
 import tse.lab.adaptadorpdi.Backoff;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.EstadoValidacion;
 
@@ -43,6 +43,8 @@ public class RevalidacionPdiJob {
      * revises, so the same profiles are never sent to the PDI twice at the same time.
      */
     private static final long LOCK = "RevalidacionPdiJob".hashCode();
+    private static final String TOMAR_LOCK = "SELECT pg_try_advisory_lock(?)";
+    private static final String LIBERAR_LOCK = "SELECT pg_advisory_unlock(?)";
 
     @Resource
     private TimerService timers;
@@ -65,7 +67,7 @@ public class RevalidacionPdiJob {
     @PostConstruct
     void iniciar() {
         if (intervalo.isZero()) {
-            LOG.info("evento=pdi.revalidacion resultado=apagada");
+            LOG.info(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "apagada").toString());
             return;
         }
         programar(intervalo);
@@ -76,17 +78,19 @@ public class RevalidacionPdiJob {
     void revisar() {
         Duration proxima = intervalo;
         try (Connection connection = database.getConnection()) {
-            if (advisoryLock(connection, "pg_try_advisory_lock")) {
+            if (advisoryLock(connection, TOMAR_LOCK)) {
                 try {
                     proxima = revalidarPendientes();
                 } finally {
-                    advisoryLock(connection, "pg_advisory_unlock");
+                    advisoryLock(connection, LIBERAR_LOCK);
                 }
             } else {
-                LOG.fine("evento=pdi.revalidacion resultado=otra_replica");
+                LOG.fine(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "otra_replica")
+                        .toString());
             }
         } catch (SQLException | RuntimeException e) {
-            LOG.log(Level.WARNING, "evento=pdi.revalidacion resultado=error", e);
+            LOG.warning(() -> LogCiudadanos.aviso("pdi.revalidacion").campo("resultado", "error")
+                    .error(e).toString());
         } finally {
             programar(proxima);
         }
@@ -96,8 +100,8 @@ public class RevalidacionPdiJob {
      * Takes or releases the lock in the session of the connection (it isn't tied to a transaction: each profile
      * is validated in its own one). If the connection dies before releasing it, PostgreSQL releases it.
      */
-    private static boolean advisoryLock(Connection connection, String function) throws SQLException {
-        try (PreparedStatement query = connection.prepareStatement("SELECT " + function + "(?)")) {
+    private static boolean advisoryLock(Connection connection, String sql) throws SQLException {
+        try (PreparedStatement query = connection.prepareStatement(sql)) {
             query.setLong(1, LOCK);
             try (ResultSet result = query.executeQuery()) {
                 return result.next() && result.getBoolean(1);
@@ -122,16 +126,17 @@ public class RevalidacionPdiJob {
                 // La PDI sigue caida: no tiene sentido seguir con el resto, se espera mas para la proxima
                 fallosSeguidos++;
                 Duration proxima = Backoff.exponencial(fallosSeguidos + 1, intervalo, intervaloMax);
-                LOG.warning(() -> "evento=pdi.revalidacion correlationId=" + correlationId
-                        + " resultado=pdi_no_disponible pendientes=" + pendientes.size() + " validados=" + resultados
-                        + " proximoIntentoS=" + proxima.toSeconds());
+                LOG.warning(() -> LogCiudadanos.aviso("pdi.revalidacion").correlationId(correlationId)
+                        .campo("resultado", "pdi_no_disponible").campo("pendientes", pendientes.size())
+                        .campo("validados", resultados).campo("proximoIntentoS", proxima.toSeconds()).toString());
                 return proxima;
             }
             resultados.merge(r, 1, Integer::sum);
         }
         fallosSeguidos = 0;
-        LOG.info(() -> "evento=pdi.revalidacion correlationId=" + correlationId + " resultado=ok pendientes="
-                + pendientes.size() + " validados=" + resultados);
+        LOG.info(() -> LogCiudadanos.evento("pdi.revalidacion").correlationId(correlationId)
+                .campo("resultado", "ok").campo("pendientes", pendientes.size()).campo("validados", resultados)
+                .toString());
         return intervalo;
     }
 

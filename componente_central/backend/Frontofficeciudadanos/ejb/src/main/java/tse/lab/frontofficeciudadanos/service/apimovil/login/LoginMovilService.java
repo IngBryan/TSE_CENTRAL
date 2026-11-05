@@ -13,6 +13,7 @@ import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
 import jakarta.json.JsonObject;
 
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.apimovil.login.ErrorLoginMovil.Motivo;
 import tse.lab.frontofficeciudadanos.service.autenticacion.IngresoService;
@@ -88,7 +89,8 @@ public class LoginMovilService {
 
             String nombre = nombre(r, claims);
             TokenMovil.Emitido t = TokenMovil.emitir(cedula, nombre, secretoToken, Instant.now());
-            LOG.info(() -> "evento=movil.login correlationId=" + correlationId + " ci=" + cedula + " resultado=ok");
+            LOG.info(() -> LogCiudadanos.evento("movil.login").correlationId(correlationId).campo("ci", cedula)
+                    .campo("resultado", "ok").toString());
             return new ResultadoLoginMovil(t.token(), t.expira(), new UsuarioMovil(cedula, nombre, r.roles()));
         } catch (ErrorLoginMovil e) {
             throw fallar(e, correlationId);
@@ -126,8 +128,9 @@ public class LoginMovilService {
     }
 
     private static ErrorLoginMovil fallar(ErrorLoginMovil e, String correlationId) {
-        LOG.warning(() -> "evento=movil.login correlationId=" + correlationId + " resultado=" + e.getMotivo().codigo()
-                + " detalle=\"" + e.getMessage() + "\"");
+        LOG.warning(() -> LogCiudadanos.aviso("movil.login").correlationId(correlationId)
+                .campo("resultado", e.getMotivo().codigo()).campo("detalle", "\"" + e.getMessage() + "\"")
+                .toString());
         return e;
     }
 }

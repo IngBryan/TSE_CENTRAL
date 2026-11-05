@@ -167,7 +167,7 @@ docker compose up --build
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
 | `frontofficefuncionarios-front`               | http://localhost:8080/funcionarios |
-| `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
+| `backofficeautoridadesadministradores-front`  | http://localhost:3004/backoffice |
 | `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
@@ -910,6 +910,32 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
 - **Secretos:** credenciales y claves van en `.env` / `.env.local`, que no se commitean.
 
 ### Observabilidad
+
+Todos los componentes escriben sus logs como **JSON de una linea** con los mismos campos:
+
+```json
+{"timestamp":"...","nivel":"INFO","componente":"frontofficefuncionarios","evento":"caso.resuelto","correlationId":"...","usuario":"...","responseCode":200,"roundtripSeconds":0.042,"backendRoundtripSeconds":0.012,"datos":{"caso":7}}
+```
+
+- **Clase comun:** `LogEstructurado` (libreria `Modelo`, paquete `tse.lab.log`) tiene los campos que comparten todos
+  los modulos. Lo propio de cada uno va con `campo(...)`, dentro de `datos`. Cada modulo tiene su fabrica, que fija el
+  componente: `LogCiudadanos`, `LogFuncionarios`, `LogBackoffice`, `LogFiscalizacion`. Los fronts usan `src/lib/log.ts`,
+  con el mismo formato; la app movil, `LogMovil`.
+- **Correlacion:** el front genera el `X-Correlation-Id` y lo manda al backend, que lo devuelve y lo pasa a la PDI. En
+  la app movil es el `idEvento`. La fiscalizacion automatica lo deriva del evento (`evt-<matricula>-<fecha>`) y lo pasa
+  por EJB remoto, asi que un caso creado se sigue desde la deteccion hasta su pista de auditoria.
+- **Nivel:** el campo `nivel` (`INFO`, `WARN` o `ERROR`) va dentro del JSON, porque la consola de WildFly solo escribe
+  el mensaje.
+- **Pedidos HTTP:** cada backend deja un `http.request` con `responseCode` y `roundtripSeconds`, y cada front un
+  `backend.llamada` con `backendRoundtripSeconds`. Lo que ningun recurso atrapo deja ademas un `http.error` con la
+  pila y responde 500 (`UnhandledExceptionMapper`).
+- **Pista de auditoria:** ademas de la tabla `auditoria_casos`, cada accion de fiscalizacion deja por consola una linea
+  `evento=auditoria.caso` (`PistaAuditoria`) con usuario, accion, estados, fundamento y fecha. Se escribe cuando confirma la
+  transaccion que guarda el registro, asi que cubre creacion, notificacion, descargo y resolucion, y una accion
+  deshecha por un rollback no deja linea. Solo se agrega: la aplicacion no tiene forma
+  de modificarla ni borrarla.
+- **WildFly:** los loggers `tse.lab` salen por un handler propio, sin el prefijo del servidor
+  (`wildfly/datasources.cli`).
 
 - **Logs:** cada contenedor escribe sus logs por consola. En local: `docker logs <contenedor>`
   (por ejemplo `docker logs wildfly-server`). En el cluster: `kubectl -n tse logs <pod>`.

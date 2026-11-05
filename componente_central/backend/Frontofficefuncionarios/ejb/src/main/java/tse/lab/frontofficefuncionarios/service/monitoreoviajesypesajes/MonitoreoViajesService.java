@@ -18,6 +18,7 @@ import tse.lab.frontofficefuncionarios.data.EventoViajeFila;
 import tse.lab.frontofficefuncionarios.data.GuiaDAO;
 import tse.lab.frontofficefuncionarios.data.ModificacionGuiaDAO;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
@@ -145,9 +146,10 @@ public class MonitoreoViajesService {
                         .map(MonitoreoViajesService::resumen).toList();
         final EstadoGuia e = filtroEstado;
         final Long emp = filtroEmpresa;
-        LOG.info(() -> "evento=viajes.listado correlationId=" + correlationId + " usuario=" + ci + " estado=" + e
-                + " matricula=" + filtroMatricula + " nroEmpresa=" + emp + " pagina=" + nroPagina + " tamanio="
-                + cantidad + " cantidad=" + lista.size() + " total=" + total);
+        LOG.info(() -> LogFuncionarios.evento("viajes.listado").correlationId(correlationId).usuario(ci)
+                .campo("estado", e).campo("matricula", filtroMatricula).campo("nroEmpresa", emp)
+                .campo("pagina", nroPagina).campo("tamanio", cantidad).campo("cantidad", lista.size())
+                .campo("total", total).toString());
         return new PaginaViajes(lista, nroPagina, cantidad, total, totalPaginas);
     }
 
@@ -199,9 +201,10 @@ public class MonitoreoViajesService {
                                 v.getCapacidadCargaKg(), pesoMaximo),
                 chofer(g.getChofer()), texto(inicio), texto(fin), lineaDeTiempo, mods, pesajesDelViaje,
                 casosDelViaje);
-        LOG.info(() -> "evento=viaje.consulta correlationId=" + correlationId + " usuario=" + ci + " guia=" + idGuia
-                + " estado=" + detalle.estado() + " eventos=" + lineaDeTiempo.size() + " modificaciones="
-                + mods.size() + " pesajes=" + pesajesDelViaje.size() + " casos=" + casosDelViaje.size());
+        LOG.info(() -> LogFuncionarios.evento("viaje.consulta").correlationId(correlationId).usuario(ci)
+                .campo("guia", idGuia).campo("estado", detalle.estado()).campo("eventos", lineaDeTiempo.size())
+                .campo("modificaciones", mods.size()).campo("pesajes", pesajesDelViaje.size())
+                .campo("casos", casosDelViaje.size()).toString());
         return detalle;
     }
 
@@ -214,16 +217,17 @@ public class MonitoreoViajesService {
         guia(idGuia, ci, correlationId);
         List<byte[]> resultado = idEvento == null ? List.of() : eventos.foto(idGuia, idEvento);
         if (resultado.isEmpty()) {
-            LOG.info(() -> "evento=viaje.foto correlationId=" + correlationId + " usuario=" + ci + " guia=" + idGuia
-                    + " idEvento=" + idEvento + " resultado=no_encontrado");
+            LOG.info(() -> LogFuncionarios.evento("viaje.foto").correlationId(correlationId).usuario(ci)
+                    .campo("guia", idGuia).campo("idEvento", idEvento).campo("resultado", "no_encontrado")
+                    .toString());
             throw new RecursoNoEncontradoException("EVENTO_NO_ENCONTRADO", "El evento no existe en este viaje.");
         }
         byte[] foto = resultado.get(0);
         if (foto == null) {
             throw new RecursoNoEncontradoException("SIN_FOTO", "El evento no tiene foto.");
         }
-        LOG.info(() -> "evento=viaje.foto correlationId=" + correlationId + " usuario=" + ci + " guia=" + idGuia
-                + " idEvento=" + idEvento + " bytes=" + foto.length);
+        LOG.info(() -> LogFuncionarios.evento("viaje.foto").correlationId(correlationId).usuario(ci)
+                .campo("guia", idGuia).campo("idEvento", idEvento).campo("bytes", foto.length).toString());
         return foto;
     }
 
@@ -247,8 +251,8 @@ public class MonitoreoViajesService {
     private Guia guia(String idGuia, String ci, String correlationId) throws RecursoNoEncontradoException {
         Guia g = idGuia == null ? null : guias.buscarPorId(idGuia);
         if (g == null || !VISIBLES.contains(g.getEstado())) {
-            LOG.info(() -> "evento=viaje.no_encontrado correlationId=" + correlationId + " usuario=" + ci + " guia="
-                    + idGuia);
+            LOG.info(() -> LogFuncionarios.evento("viaje.no_encontrado").correlationId(correlationId).usuario(ci)
+                    .campo("guia", idGuia).toString());
             throw new RecursoNoEncontradoException("VIAJE_NO_ENCONTRADO", "El viaje no existe.");
         }
         return g;

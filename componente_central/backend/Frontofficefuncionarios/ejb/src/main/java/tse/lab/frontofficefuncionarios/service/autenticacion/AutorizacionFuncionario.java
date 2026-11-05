@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.model.Funcionario;
 
@@ -22,8 +23,8 @@ public class AutorizacionFuncionario {
     public Funcionario funcionario(String ci, String correlationId) throws NoAutorizadoException {
         Funcionario funcionario = ci == null || ci.isBlank() ? null : funcionarios.buscarPorCi(ci.trim());
         if (funcionario == null) {
-            LOG.warning(() -> "evento=funcionario.no_autorizado correlationId=" + correlationId + " usuario=" + ci
-                    + " detalle=\"no es funcionario\"");
+            LOG.warning(() -> LogFuncionarios.aviso("funcionario.no_autorizado").correlationId(correlationId)
+                    .usuario(ci).campo("detalle", "\"no es funcionario\"").toString());
             throw new NoAutorizadoException("no es funcionario del MTOP");
         }
         return funcionario;

@@ -2,9 +2,12 @@ package tse.lab.frontofficefuncionarios.data;
 
 import java.util.List;
 
+import jakarta.annotation.Resource;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.TransactionSynchronizationRegistry;
+import tse.lab.log.PistaAuditoria;
 import tse.lab.model.RegistroAuditoriaCaso;
 
 // Pista de auditoria de solo agregado: este DAO solo inserta y lee, no tiene update ni delete.
@@ -13,9 +16,12 @@ public class AuditoriaCasoDAO {
 
     @PersistenceContext(unitName = "frontofficefuncionariosPersistenceUnit")
     private EntityManager em;
+    @Resource
+    private TransactionSynchronizationRegistry transacciones;
 
     public void registrar(RegistroAuditoriaCaso registro) {
         em.persist(registro);
+        PistaAuditoria.alConfirmar(transacciones, "frontofficefuncionarios", registro);
     }
 
     public List<RegistroAuditoriaCaso> historialDelCaso(Long idCaso) {

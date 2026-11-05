@@ -12,6 +12,7 @@ import tse.lab.adaptadorpdi.ClientePdi;
 import tse.lab.adaptadorpdi.DatosPersonaPdi;
 import tse.lab.adaptadorpdi.MayoriaDeEdad;
 import tse.lab.adaptadorpdi.PdiNoDisponibleException;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.model.Funcionario;
 
 // Ingreso de funcionarios con Usuario gub.uy (o, en testing, con la cedula). El OIDC y la sesion los hace
@@ -84,9 +85,10 @@ public class IngresoFuncionarioService {
     }
 
     private static ResultadoIngreso log(String via, String correlationId, ResultadoIngreso r) {
-        LOG.log(r.sesionPermitida() && r.resultado() == Resultado.VALIDADO ? Level.INFO : Level.WARNING,
-                () -> "evento=ingreso_funcionario." + via + " correlationId=" + correlationId + " ci=" + r.cedula()
-                        + " resultado=" + r.resultado() + " sesion=" + r.sesionPermitida());
+        LogFuncionarios.evento("ingreso_funcionario." + via)
+                .nivel(r.sesionPermitida() && r.resultado() == Resultado.VALIDADO ? Level.INFO : Level.WARNING)
+                .correlationId(correlationId).campo("ci", r.cedula()).campo("resultado", r.resultado())
+                .campo("sesion", r.sesionPermitida()).escribirEn(LOG);
         return r;
     }
 }

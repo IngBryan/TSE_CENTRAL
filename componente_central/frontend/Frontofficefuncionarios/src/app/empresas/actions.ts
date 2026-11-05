@@ -7,6 +7,7 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, UsuarioDisponible } from "@/lib/empresas";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 const SESION_VENCIDA = "Tu sesión venció. Volvé a ingresar.";
@@ -36,7 +37,6 @@ export async function buscarUsuariosDisponibles(filtro: string): Promise<Resulta
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    console.info(`[empresas] correlationId=${correlationId} GET ${ruta} status=${res.status}`);
     if (res.status === 200 && Array.isArray(res.data)) return { ok: true, usuarios: res.data };
     if (res.status === 403) return { ok: false, error: "No estás registrado como funcionario del MTOP." };
     return { ok: false, error: "No se pudieron obtener los usuarios registrados." };
@@ -82,7 +82,6 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     if (!(e instanceof BackendNoDisponible)) throw e;
     return { ok: false, error: NO_DISPONIBLE };
   }
-  console.info(`[empresas] correlationId=${correlationId} POST /empresas status=${res.status}`);
   if (res.status === 200) {
     revalidatePath("/empresas");
     // Fuera del try: redirect() funciona tirando una excepcion que Next tiene que recibir
@@ -103,7 +102,7 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     };
   }
   if (res.status === 401) {
-    console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status === 403)
     return { ok: false, error: "No podés registrar empresas: no estás registrado como funcionario del MTOP." };
@@ -140,7 +139,6 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    console.info(`[empresas] correlationId=${correlationId} PUT /empresas/${nroEmpresa} status=${res.status}`);
     if (res.status === 200) {
       revalidatePath(`/empresas/${nroEmpresa}`);
       revalidatePath("/empresas");
@@ -158,7 +156,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
       };
     }
     if (res.status === 401) {
-      console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+      registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
     }
     if (res.status === 403)
       return { ok: false, error: "No podés modificar empresas: no estás registrado como funcionario del MTOP." };
@@ -192,7 +190,6 @@ export async function asociarResponsable(nroEmpresa: number, ci: string): Promis
       correlationId,
       usuarioCi: sesion.usuario.cedula,
     });
-    console.info(`[empresas] correlationId=${correlationId} POST /empresas/${nroEmpresa}/responsable status=${res.status}`);
     if (res.status === 200) {
       revalidatePath(`/empresas/${nroEmpresa}`);
       revalidatePath("/empresas");
@@ -219,7 +216,7 @@ export async function asociarResponsable(nroEmpresa: number, ci: string): Promis
     }
     if (res.status === 400) return { ok: false, error: "Elegí un usuario de la lista." };
     if (res.status === 401) {
-      console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+      registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
     }
     if (res.status === 403)
       return { ok: false, error: "No podés asociar responsables: no estás registrado como funcionario del MTOP." };

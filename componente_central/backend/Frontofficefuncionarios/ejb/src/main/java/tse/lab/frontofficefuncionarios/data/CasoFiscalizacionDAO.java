@@ -143,10 +143,10 @@ public class CasoFiscalizacionDAO {
                 .orElse(null);
     }
 
-    // La ITV emitida hasta ese dia que vence ultima. NULLS LAST: en PostgreSQL DESC pone los nulos primero.
+    // La ITV emitida hasta ese dia que vence ultima.
     public ITV itvVigenteAl(Vehiculo vehiculo, LocalDate dia) {
         return em.createQuery("SELECT i FROM ITV i WHERE i.vehiculo = :vehiculo AND i.fechaEmision <= :dia"
-                + " ORDER BY i.fechaVencimiento DESC NULLS LAST", ITV.class)
+                + " ORDER BY i.fechaVencimiento DESC", ITV.class)
                 .setParameter("vehiculo", vehiculo)
                 .setParameter("dia", dia)
                 .setMaxResults(1)

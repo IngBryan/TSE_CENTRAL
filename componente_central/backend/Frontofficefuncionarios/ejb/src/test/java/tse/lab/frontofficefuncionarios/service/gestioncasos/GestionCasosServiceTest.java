@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
+import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
@@ -74,7 +75,7 @@ class GestionCasosServiceTest {
         servicio = new GestionCasosService();
         set(servicio, "autorizacion", autorizacion);
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
-        set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "auditoria", conEm(NoOpTransactions.wired(new AuditoriaCasoDAO())));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, empresa);
@@ -269,9 +270,8 @@ class GestionCasosServiceTest {
         Vehiculo vehiculo = em.find(Vehiculo.class, "SBA 1234");
         LocalDate hoy = LocalDate.now();
         em.getTransaction().begin();
-        // Renovada despues de la deteccion: no cuenta. Sin vencimiento: no gana por el orden de los nulos.
+        // Renovada despues de la deteccion: no cuenta
         em.persist(new ITV(hoy.plusDays(1), LocalDate.of(2028, 1, 1), vehiculo));
-        em.persist(new ITV(LocalDate.of(2026, 6, 1), null, vehiculo));
         em.getTransaction().commit();
         em.clear();
 

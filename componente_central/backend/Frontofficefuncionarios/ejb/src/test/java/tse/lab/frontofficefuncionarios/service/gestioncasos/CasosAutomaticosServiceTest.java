@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
+import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
@@ -50,7 +51,7 @@ class CasosAutomaticosServiceTest {
         em = emf.createEntityManager();
         servicio = new CasosAutomaticosService();
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
-        set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "auditoria", conEm(NoOpTransactions.wired(new AuditoriaCasoDAO())));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBC1234", "Mercedes-Benz", "Actros", 8500, 25000, empresa);
@@ -113,7 +114,7 @@ class CasosAutomaticosServiceTest {
     void notificarPasaElCasoANotificadaYQuedaEnLaAuditoriaComoSistema() {
         DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
 
-        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", notificado.getEstado());
         RegistroAuditoriaCaso cambio = auditoria(creado.getId()).get(1);
@@ -126,9 +127,9 @@ class CasosAutomaticosServiceTest {
     @Test
     void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
         DatosCaso creado = enTx(() -> servicio.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1));
-        enTx(() -> servicio.notificarCaso(creado.getId()));
+        enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
-        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", otraVez.getEstado());
         assertEquals(2, auditoria(creado.getId()).size());

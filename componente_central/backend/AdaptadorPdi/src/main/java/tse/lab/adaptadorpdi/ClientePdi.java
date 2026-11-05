@@ -16,6 +16,8 @@ import java.util.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import tse.lab.log.LogEstructurado;
+
 // Cliente SOAP del Servicio de Informacion DNIC expuesto por la PDI (TSE_NODOS/pdi-service). Lo usan
 // Frontofficeciudadanos (ValidacionPdiService) y Frontofficefuncionarios (IngresoFuncionarioService).
 //
@@ -164,9 +166,14 @@ public class ClientePdi {
 
     private static void log(Level nivel, String correlationId, String cedula, String evento, int intento,
             long duracionMs, String detalle) {
-        LOG.log(nivel, () -> "evento=pdi.consulta correlationId=" + correlationId + " ci=" + cedula
-                + " resultado=" + evento + (intento > 0 ? " intento=" + intento + " duracionMs=" + duracionMs : "")
-                + (detalle != null ? " detalle=\"" + detalle.replace('"', '\'') + "\"" : ""));
+        LOG.log(nivel, () -> {
+            LogEstructurado log = LogEstructurado.de("adaptadorpdi", "pdi.consulta").nivel(nivel).correlationId(correlationId)
+                    .campo("ci", cedula).campo("resultado", evento).campo("detalle", detalle);
+            if (intento > 0) {
+                log.backendRoundtripSeconds(duracionMs / 1000d).campo("intento", intento);
+            }
+            return log.toString();
+        });
     }
 
     private static String env(String nombre, String porDefecto) {

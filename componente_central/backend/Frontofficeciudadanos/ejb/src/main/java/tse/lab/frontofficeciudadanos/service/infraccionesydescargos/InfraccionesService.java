@@ -19,6 +19,7 @@ import tse.lab.frontofficeciudadanos.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.AccionAuditoriaCaso;
@@ -114,8 +115,9 @@ public class InfraccionesService {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, false, correlationId);
         List<InfraccionResumen> lista = casos.buscarPorEmpresa(empresa, VISIBLES).stream().map(this::resumen)
                 .toList();
-        LOG.info(() -> "evento=infracciones.listado correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " casos=" + lista.size());
+        LOG.info(() -> LogCiudadanos.evento("infracciones.listado").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa()).campo("casos", lista.size())
+                .toString());
         return lista;
     }
 
@@ -177,8 +179,8 @@ public class InfraccionesService {
     private static void marcarVista(CasoFiscalizacion caso, String ciResponsable, String correlationId) {
         if (!caso.isNotificacionVista()) {
             caso.marcarNotificacionVista();
-            LOG.info(() -> "evento=infraccion.notificacion_vista correlationId=" + correlationId + " usuario="
-                    + ciResponsable + " caso=" + caso.getId());
+            LOG.info(() -> LogCiudadanos.evento("infraccion.notificacion_vista").correlationId(correlationId)
+                    .usuario(ciResponsable).campo("caso", caso.getId()).toString());
         }
     }
 
@@ -222,8 +224,9 @@ public class InfraccionesService {
         casos.registrarAuditoria(new RegistroAuditoriaCaso(caso.getId(), ciResponsable,
                 AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
                 "Descargo presentado por la empresa N° " + empresa.getNroEmpresa(), correlationId));
-        LOG.info(() -> "evento=infraccion.descargo correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " caso=" + idCaso + " caracteres=" + texto.length());
+        LOG.info(() -> LogCiudadanos.evento("infraccion.descargo").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa()).campo("caso", idCaso)
+                .campo("caracteres", texto.length()).toString());
         return detalle(caso);
     }
 
@@ -273,8 +276,8 @@ public class InfraccionesService {
 
     private ConflictoException rechazo(CasoFiscalizacion caso, String ci, String correlationId, String codigo,
             String mensaje) {
-        LOG.info(() -> "evento=infraccion.descargo_rechazado correlationId=" + correlationId + " usuario=" + ci
-                + " caso=" + caso.getId() + " motivo=" + codigo);
+        LOG.info(() -> LogCiudadanos.evento("infraccion.descargo_rechazado").correlationId(correlationId)
+                .usuario(ci).campo("caso", caso.getId()).campo("motivo", codigo).toString());
         return new ConflictoException(codigo, mensaje);
     }
 

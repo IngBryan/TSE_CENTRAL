@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficeciudadanos.data.NoOpTransactions;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
@@ -353,7 +354,7 @@ class InfraccionesServiceTest {
         set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));
         InfraccionesService s = new InfraccionesService(dias, reloj);
         set(s, "autorizacion", autorizacion);
-        set(s, "casos", conEm(new CasoFiscalizacionDAO()));
+        set(s, "casos", conEm(NoOpTransactions.wired(new CasoFiscalizacionDAO())));
         return s;
     }
 
