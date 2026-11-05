@@ -75,6 +75,28 @@ class RutasCompartidasTest {
     }
 
     @Test
+    void vincularLocalidadesHistoricasConNombreIdenticoConservaLasRutas() {
+        Guia guia = guia("G-HIST");
+        RutaReferencia ruta = new RutaReferencia(GEO_A, 40000);
+        guia.reemplazarRutasAutorizadas(List.of(ruta));
+        guia.setOrigenLocalidad(new Localidad(1L, "Mercedes", "Soriano", -33.2, -58.0));
+        guia.setDestinoLocalidad(new Localidad(2L, "Nueva Palmira", "Colonia", -33.9, -58.4));
+        assertEquals(1, guia.getRutasAutorizadas().size());
+        assertEquals(1L, guia.getOrigenLocalidad().getId());
+        assertEquals(2L, guia.getDestinoLocalidad().getId());
+    }
+
+    @Test
+    void cambiarIdentidadDeLocalidadInvalidaRutasAunqueElNombreCoincida() {
+        Guia guia = guia("G-IDS");
+        guia.setOrigenLocalidad(new Localidad(5L, "Mercedes", "Soriano", -33.2, -58.0));
+        guia.reemplazarRutasAutorizadas(List.of(new RutaReferencia(GEO_A, 40000)));
+        guia.setOrigenLocalidad(new Localidad(6L, "Mercedes", "Otro", -34.0, -57.0));
+        assertTrue(guia.getRutasAutorizadas().isEmpty());
+        assertEquals(6L, guia.getOrigenLocalidad().getId());
+    }
+
+    @Test
     void noPermiteCambiarOrigenConRutasFijadasTrasInicio() {
         Guia guia = guia("G6");
         guia.reemplazarRutasAutorizadas(List.of(new RutaReferencia(GEO_A, 40000)));

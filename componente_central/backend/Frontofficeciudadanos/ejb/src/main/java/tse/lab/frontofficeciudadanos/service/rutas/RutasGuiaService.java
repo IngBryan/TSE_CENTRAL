@@ -11,6 +11,10 @@ import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.frontofficeciudadanos.service.ConflictoException;
+import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.GuiaVista;
 import tse.lab.model.Empresa;
 import tse.lab.model.Guia;
 
@@ -24,6 +28,7 @@ public class RutasGuiaService {
     @EJB private PrevisualizacionRutasService planificador;
     @EJB private GeometriasService geometrias;
     @EJB private AsignacionRutasService asignacion;
+    @EJB private GuiasService viajes;
 
     public List<DatosRutaAutorizada> consultar(String ciResponsable, String idGuia,
             String correlationId) throws NoAutorizadoException, RecursoNoEncontradoException {
@@ -31,10 +36,26 @@ public class RutasGuiaService {
         return rutas.obtenerPorGuia(idGuia);
     }
 
+    public GuiaVista asignarViaje(String ciResponsable, String idGuia, String matricula, Long idChofer,
+            Long origenId, Long destinoId, String previsualizacionId, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
+        // No se modifican ni la guia ni sus asociaciones hasta terminar el calculo y revisar el resumen.
+        viajes.opcionesAsignacion(ciResponsable, idGuia, correlationId);
+        List<Long> ids = preparar(origenId, destinoId, previsualizacionId);
+        return viajes.asignarConRutas(ciResponsable, idGuia, matricula, idChofer,
+                origenId, destinoId, ids, correlationId);
+    }
+
     public List<DatosRutaAutorizada> confirmar(String ciResponsable, String idGuia,
             Long origenId, Long destinoId, String previsualizacionId, String correlationId)
             throws NoAutorizadoException, RecursoNoEncontradoException {
         comprobarPertenencia(ciResponsable, idGuia, correlationId);
+        List<Long> ids = preparar(origenId, destinoId, previsualizacionId);
+        asignacion.asociar(ciResponsable, idGuia, origenId, destinoId, ids, correlationId);
+        return rutas.obtenerPorGuia(idGuia);
+    }
+
+    private List<Long> preparar(Long origenId, Long destinoId, String previsualizacionId) {
         if (previsualizacionId == null || !previsualizacionId.matches("[0-9a-f]{64}")) {
             throw new RutasException(400, "previsualizacion_requerida", "Debe previsualizar las rutas primero");
         }
@@ -53,8 +74,7 @@ public class RutasGuiaService {
                 ids.add(existente);
             }
         }
-        asignacion.asociar(ciResponsable, idGuia, origenId, destinoId, ids, correlationId);
-        return rutas.obtenerPorGuia(idGuia);
+        return ids;
     }
 
     private void comprobarPertenencia(String ciResponsable, String idGuia, String correlationId)

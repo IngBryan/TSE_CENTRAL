@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import { Map as MapaGL, NavigationControl, LngLatBounds, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
 import type { FeatureCollection, LineString } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -26,10 +26,32 @@ function coordenadas(texto?: string): [number, number][] | null {
   } catch { return null; }
 }
 
-export default function MapaRutas({ rutas, visible }: {
+type PropsMapa = {
   rutas: (RutaVista | RutaAsignada)[];
   visible: number | null;
-}) {
+};
+
+// El mapa es una ayuda visual: un navegador sin soporte grafico no debe impedir asignar el viaje.
+class LimiteMapa extends Component<{ children: ReactNode }, { fallo: boolean }> {
+  state = { fallo: false };
+
+  static getDerivedStateFromError() {
+    return { fallo: true };
+  }
+
+  render() {
+    if (this.state.fallo) return <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      No se pudo mostrar el mapa en este navegador. Las alternativas calculadas siguen disponibles para revisar y confirmar.
+    </p>;
+    return this.props.children;
+  }
+}
+
+export default function MapaRutas(props: PropsMapa) {
+  return <LimiteMapa><ContenidoMapa {...props} /></LimiteMapa>;
+}
+
+function ContenidoMapa({ rutas, visible }: PropsMapa) {
   const nodo = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MapaGL | null>(null);
   const [listo, setListo] = useState(false);

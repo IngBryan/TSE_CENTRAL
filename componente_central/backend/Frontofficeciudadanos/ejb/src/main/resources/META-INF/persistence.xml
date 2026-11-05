@@ -13,7 +13,7 @@
       <properties>
          <!-- Este persistence unit es el UNICO que genera el esquema de main_db; los de
               Frontofficefuncionarios y Backofficeautoridadesadministradores usan "none" -->
-         <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
+         <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
          <property name="jakarta.persistence.schema-generation.create-source" value="metadata-then-script"/>
          <!-- Lo que las anotaciones JPA no pueden expresar, como indices parciales -->
          <property name="jakarta.persistence.schema-generation.create-script-source" value="META-INF/esquema-adicional.sql"/>

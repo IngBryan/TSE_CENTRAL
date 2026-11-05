@@ -4,23 +4,30 @@ import dynamic from "next/dynamic";
 import { useState, useTransition } from "react";
 import type { Guia } from "../../actions";
 import { confirmarRutas, previsualizarRutas } from "./actions";
-import { normalizarLocalidad, type LocalidadVista, type Previsualizacion, type RutaAsignada } from "./tipos-rutas";
+import { localidadDeGuia, mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
+import type { Previsualizacion, RutaAsignada } from "./tipos-rutas";
 
 const MapaRutas = dynamic(() => import("./mapa-rutas"), { ssr: false });
 const COLORES = ["#16a34a", "#2563eb", "#a855f7"];
 const km = (metros: number) => `${(metros / 1000).toLocaleString("es-UY", { maximumFractionDigits: 1 })} km`;
 const minutos = (segundos: number) => `${Math.round(segundos / 60)} min aprox.`;
 
-export function SelectorRutas({ guia, localidades, iniciales }: {
+export function SelectorRutas({ guia, localidades, iniciales, seleccion }: {
   guia: Guia;
   localidades: LocalidadVista[];
   iniciales: RutaAsignada[];
+  seleccion?: { valor: Previsualizacion | null; onChange: (valor: Previsualizacion | null) => void };
 }) {
-  const origenPorGuia = localidades.find(l => normalizarLocalidad(l.nombre) === normalizarLocalidad(guia.origen));
-  const destinoPorGuia = localidades.find(l => normalizarLocalidad(l.nombre) === normalizarLocalidad(guia.destino));
+  const origenPorGuia = localidadDeGuia(localidades, guia.origenId, guia.origen);
+  const destinoPorGuia = localidadDeGuia(localidades, guia.destinoId, guia.destino);
   const [origenId, setOrigenId] = useState<number>(origenPorGuia?.id ?? 0);
   const [destinoId, setDestinoId] = useState<number>(destinoPorGuia?.id ?? 0);
-  const [preview, setPreview] = useState<Previsualizacion | null>(null);
+  const [previewLocal, setPreviewLocal] = useState<Previsualizacion | null>(null);
+  const preview = seleccion ? seleccion.valor : previewLocal;
+  const setPreview = (valor: Previsualizacion | null) => {
+    if (seleccion) seleccion.onChange(valor);
+    else setPreviewLocal(valor);
+  };
   const [asignadas, setAsignadas] = useState(iniciales);
   const [visible, setVisible] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +44,7 @@ export function SelectorRutas({ guia, localidades, iniciales }: {
   };
   const previsualizar = () => iniciar(async () => {
     setError(null); setExito(null);
+    setPreview(null);
     const res = await previsualizarRutas(origenId, destinoId);
     if (!res.ok) { setError(res.error); return; }
     setPreview(res.datos); setVisible(null);
@@ -53,22 +61,22 @@ export function SelectorRutas({ guia, localidades, iniciales }: {
   };
   return <div className="flex flex-col gap-5">
     <section className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
-      <h2 className="mb-2 text-lg font-semibold">1. Seleccionar localidades</h2>
+      <h2 className="mb-2 text-lg font-semibold">{seleccion ? "Localidades del recorrido" : "1. Seleccionar localidades"}</h2>
       <p className="mb-4 text-zinc-600 dark:text-zinc-400">
-        Recorrido registrado en la guía: <b>{guia.origen} → {guia.destino}</b>.
+        Recorrido registrado en la guía: <b>{mostrarLocalidad(guia.origen, guia.origenDepartamento)} → {mostrarLocalidad(guia.destino, guia.destinoDepartamento)}</b>.
         Las localidades elegidas deben coincidir con esos datos para poder confirmar rutas.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">Origen
           <select className="rounded-lg border border-zinc-300 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-950"
-            value={origenId} disabled={ocupado || !editable} onChange={e => cambiar("origen", Number(e.target.value))}>
+            value={origenId} disabled={ocupado || !editable || !!seleccion} onChange={e => cambiar("origen", Number(e.target.value))}>
             <option value={0}>Seleccionar localidad…</option>
             {localidades.map(l => <option key={l.id} value={l.id}>{l.nombre} ({l.departamento})</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-1">Destino
           <select className="rounded-lg border border-zinc-300 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-950"
-            value={destinoId} disabled={ocupado || !editable} onChange={e => cambiar("destino", Number(e.target.value))}>
+            value={destinoId} disabled={ocupado || !editable || !!seleccion} onChange={e => cambiar("destino", Number(e.target.value))}>
             <option value={0}>Seleccionar localidad…</option>
             {localidades.map(l => <option key={l.id} value={l.id}>{l.nombre} ({l.departamento})</option>)}
           </select>
@@ -98,7 +106,7 @@ export function SelectorRutas({ guia, localidades, iniciales }: {
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
     {exito && <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800 dark:bg-green-950 dark:text-green-200">{exito}</p>}
     <section className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
-      <h2 className="mb-2 text-lg font-semibold">2. {preview ? "Alternativas calculadas" : "Rutas autorizadas de la guía"}</h2>
+      <h2 className="mb-2 text-lg font-semibold">{seleccion ? "" : "2. "}{preview ? "Alternativas calculadas" : "Rutas autorizadas de la guía"}</h2>
       {rutasVisibles.length === 0 ? <p className="text-zinc-500">Todavía no hay rutas para mostrar. Elegí localidades y previsualizá.</p> : <>
         <div className="mb-3 flex flex-wrap gap-2">
           <button type="button" aria-pressed={visible === null} onClick={() => setVisible(null)}
@@ -122,12 +130,13 @@ export function SelectorRutas({ guia, localidades, iniciales }: {
       {preview && <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <p className="mb-3 text-zinc-600 dark:text-zinc-400">
           Encontramos {preview.rutas.length} alternativa(s) que cumplen las condiciones de recorrido.
-          Al confirmar, se guardarán las rutas mostradas para esta guía.
+          {seleccion ? "Se guardarán junto con el vehículo y el chofer al confirmar la asignación en el siguiente paso."
+            : "Al confirmar, se guardarán las rutas mostradas para esta guía."}
         </p>
-        <button type="button" disabled={ocupado || !coinciden || !editable} onClick={confirmar}
+        {!seleccion && <button type="button" disabled={ocupado || !coinciden || !editable} onClick={confirmar}
           className="rounded-lg bg-green-700 px-4 py-2 font-medium text-white disabled:opacity-40">
           {ocupado ? "Confirmando…" : "Confirmar rutas para esta guía"}
-        </button>
+        </button>}
       </div>}
     </section>
   </div>;

@@ -1,5 +1,5 @@
 /** Contratos existentes de Frontoffice Ciudadanos para catálogo, OSRM y rutas de Guía. */
-export type LocalidadVista = { id: number; nombre: string; departamento: string };
+export type { LocalidadVista } from "@/lib/localidades";
 export type RutaVista = {
   alternativa: number;
   sha256: string;
@@ -21,5 +21,4 @@ export type RutaAsignada = {
 };
 export type RespuestaRutas<T> = { ok: true; datos: T } | { ok: false; error: string };
 
-export const normalizarLocalidad = (valor: string) => valor.normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
+export { normalizarLocalidad } from "@/lib/localidades";

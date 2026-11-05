@@ -37,8 +37,16 @@ public class Guia implements Serializable {
     private String tipoCarga;
     private long pesoCargaKg; /* lo dejo como peso en vez de volumen */
     private LocalDate fecha;
+    // Se conservan los nombres para la API movil, los listados y las guias anteriores al catalogo.
+    // Las referencias son opcionales: los registros historicos pueden seguir sin catalogarse.
     private String origen;
     private String destino;
+    @ManyToOne
+    @JoinColumn(name = "id_localidad_origen")
+    private Localidad origenLocalidad;
+    @ManyToOne
+    @JoinColumn(name = "id_localidad_destino")
+    private Localidad destinoLocalidad;
     @ManyToOne
     @JoinColumn(name = "nro_empresa")
     private Empresa empresa;
@@ -110,6 +118,9 @@ public class Guia implements Serializable {
         return destino;
     }
 
+    public Localidad getOrigenLocalidad() { return origenLocalidad; }
+    public Localidad getDestinoLocalidad() { return destinoLocalidad; }
+
     public Empresa getEmpresa() {
         return empresa;
     }
@@ -141,6 +152,7 @@ public class Guia implements Serializable {
     public void setOrigen(String origen) {
         if (!Objects.equals(this.origen, origen)) {
             invalidarRutasSiCambioLocalidad();
+            this.origenLocalidad = null;
         }
         this.origen = origen;
     }
@@ -148,8 +160,30 @@ public class Guia implements Serializable {
     public void setDestino(String destino) {
         if (!Objects.equals(this.destino, destino)) {
             invalidarRutasSiCambioLocalidad();
+            this.destinoLocalidad = null;
         }
         this.destino = destino;
+    }
+
+    /** Asocia la localidad inequívoca y sincroniza el texto requerido por contratos anteriores. */
+    public void setOrigenLocalidad(Localidad localidad) {
+        Objects.requireNonNull(localidad, "origenLocalidad");
+        if ((this.origenLocalidad != null && !Objects.equals(this.origenLocalidad.getId(), localidad.getId()))
+                || !Objects.equals(origen, localidad.getNombre())) {
+            invalidarRutasSiCambioLocalidad();
+        }
+        this.origenLocalidad = localidad;
+        this.origen = localidad.getNombre();
+    }
+
+    public void setDestinoLocalidad(Localidad localidad) {
+        Objects.requireNonNull(localidad, "destinoLocalidad");
+        if ((this.destinoLocalidad != null && !Objects.equals(this.destinoLocalidad.getId(), localidad.getId()))
+                || !Objects.equals(destino, localidad.getNombre())) {
+            invalidarRutasSiCambioLocalidad();
+        }
+        this.destinoLocalidad = localidad;
+        this.destino = localidad.getNombre();
     }
 
     private void invalidarRutasSiCambioLocalidad() {

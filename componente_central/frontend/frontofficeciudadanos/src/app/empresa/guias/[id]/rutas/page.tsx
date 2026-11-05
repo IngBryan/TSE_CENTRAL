@@ -10,7 +10,7 @@ import { SelectorRutas } from "./selector-rutas";
 
 type RespuestaError = { detalle?: string };
 
-/** Pantalla nueva y aislada: no modifica los formularios de Guías existentes. */
+/** Consulta y autoriza rutas usando los mismos IDs de localidad que el alta y la edición de guías. */
 export default async function RutasGuia({ params }: PageProps<"/empresa/guias/[id]/rutas">) {
   const sesion = await getSesion();
   if (!sesion) redirect("/");

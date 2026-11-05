@@ -1,9 +1,7 @@
 package tse.lab.frontofficeciudadanos.service.rutas;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
@@ -37,8 +35,9 @@ public class AsignacionRutasService {
         }
         Localidad origen = localidades.buscarPorId(origenId);
         Localidad destino = localidades.buscarPorId(destinoId);
-        if (origen == null || destino == null || !normalizar(guia.getOrigen()).equals(normalizar(origen.getNombre()))
-                || !normalizar(guia.getDestino()).equals(normalizar(destino.getNombre()))) {
+        if (origen == null || destino == null
+                || !corresponde(guia.getOrigenLocalidad(), guia.getOrigen(), origen)
+                || !corresponde(guia.getDestinoLocalidad(), guia.getDestino(), destino)) {
             throw new RutasException(409, "origen_destino_desactualizado",
                     "Las localidades no coinciden con el origen y destino actuales de la Guia");
         }
@@ -59,9 +58,11 @@ public class AsignacionRutasService {
 
     }
 
-    private static String normalizar(String valor) {
-        if (valor == null) return "";
-        return Normalizer.normalize(valor.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "").replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+    // Las guias nuevas se comparan por identidad; las historicas solo por nombre unico en catalogo.
+    private boolean corresponde(Localidad asociada, String nombreHistorico, Localidad seleccionada) {
+        if (asociada != null) return Objects.equals(asociada.getId(), seleccionada.getId());
+        Localidad unica = localidades.buscarUnicaPorNombre(nombreHistorico);
+        return unica != null && Objects.equals(unica.getId(), seleccionada.getId());
     }
+
 }

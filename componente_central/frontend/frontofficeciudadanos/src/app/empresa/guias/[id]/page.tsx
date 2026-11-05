@@ -7,6 +7,7 @@ import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
 import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
 import { ModificarGuia } from "./modificar-guia";
+import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
 import type { RutaAsignada } from "./rutas/tipos-rutas";
 
 type EventoViaje = {
@@ -79,6 +80,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   let error: string | null = null;
   let rutasAutorizadas: RutaAsignada[] = [];
   let errorRutas = false;
+  let localidades: LocalidadVista[] = [];
   try {
     const res = await llamarBackend<DetalleGuia & { detalle?: string }>(
       `/empresa/guias/${encodeURIComponent(id)}/eventos`,
@@ -104,6 +106,16 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
     } catch (e) {
       if (!(e instanceof BackendNoDisponible)) throw e;
       errorRutas = true;
+    }
+  }
+  if (datos?.guia.estado === "ASIGNADA") {
+    try {
+      const res = await llamarBackend<LocalidadVista[]>("/localidades", {
+        correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
+      });
+      if (res.status === 200 && Array.isArray(res.data)) localidades = res.data;
+    } catch (e) {
+      if (!(e instanceof BackendNoDisponible)) throw e;
     }
   }
   // Linea de tiempo: eventos del chofer (por la hora en que ocurrieron) y modificaciones de la empresa
@@ -139,7 +151,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             <section className="grid gap-x-6 gap-y-2 rounded-2xl bg-white p-6 text-sm shadow-sm sm:grid-cols-2 dark:bg-zinc-950">
               <p><span className="text-zinc-500">Estado:</span> {ESTADOS[datos.guia.estado] ?? datos.guia.estado}</p>
               <p><span className="text-zinc-500">Fecha:</span> {datos.guia.fecha.split("-").reverse().join("/")}</p>
-              <p><span className="text-zinc-500">Recorrido:</span> {datos.guia.origen} → {datos.guia.destino}</p>
+              <p><span className="text-zinc-500">Recorrido:</span> {mostrarLocalidad(datos.guia.origen, datos.guia.origenDepartamento)} → {mostrarLocalidad(datos.guia.destino, datos.guia.destinoDepartamento)}</p>
               <p>
                 <span className="text-zinc-500">Carga:</span> {datos.guia.pesoCargaKg.toLocaleString("es-UY")} kg
                 {datos.guia.tipoCarga ? ` · ${datos.guia.tipoCarga}` : ""}
@@ -183,7 +195,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             </section>
 
             {datos.guia.estado === "ASIGNADA" && (
-              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} />
+              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} localidades={localidades} />
             )}
 
             <section className="flex flex-col gap-3">
