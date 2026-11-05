@@ -28,6 +28,9 @@ public class CasoFiscalizacionDAO {
     @Resource
     private TransactionSynchronizationRegistry transacciones;
 
+    public record CasoNotificado(Long id, Instant notificado) {
+    }
+
     public List<CasoFiscalizacion> buscarPorEmpresa(Empresa empresa, Collection<EstadoCaso> estados) {
         return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.vehiculo.empresa = :empresa"
                 + " AND c.estado IN :estados ORDER BY c.fechaDeteccion DESC, c.id DESC", CasoFiscalizacion.class)
@@ -49,6 +52,20 @@ public class CasoFiscalizacionDAO {
             em.refresh(caso);
         }
         return caso;
+    }
+
+    // Casos NOTIFICADA sin descargo, con su fecha de notificacion (la de fechaNotificacion o, si no quedo
+    // registrada, la de deteccion) en una sola consulta.
+    public List<CasoNotificado> buscarNotificadosSinDescargo() {
+        return em.createQuery("SELECT c.id, c.fechaDeteccion, (SELECT MAX(r.fechaHora) FROM RegistroAuditoriaCaso r"
+                + " WHERE r.idCaso = c.id AND r.accion = :accion AND r.estadoNuevo = :notificada)"
+                + " FROM CasoFiscalizacion c WHERE c.estado = :notificada AND c.descargo IS NULL ORDER BY c.id",
+                Object[].class)
+                .setParameter("accion", AccionAuditoriaCaso.CAMBIO_ESTADO)
+                .setParameter("notificada", EstadoCaso.NOTIFICADA)
+                .getResultList().stream()
+                .map(fila -> new CasoNotificado((Long) fila[0], (Instant) (fila[2] != null ? fila[2] : fila[1])))
+                .toList();
     }
 
     public void guardarDescargo(Descargo descargo) {

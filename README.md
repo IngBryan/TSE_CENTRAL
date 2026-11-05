@@ -137,6 +137,7 @@ FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
 #Infracciones y descargos - WildFly
 #PLAZO_DESCARGO_DIAS=10                 # opcional: dias corridos desde la notificacion para presentar el descargo
+#VENCIMIENTO_DESCARGO_ACTIVO=true       # opcional: false apaga el pasaje automatico a EN_DESCARGO al vencer el plazo
 
 #Portal publico - WildFly
 #PORTAL_UMBRAL_EMPRESAS=3               # opcional: minimo de empresas distintas por numero publicado (nunca menos de 3)
@@ -765,7 +766,20 @@ recargar. Abrir el detalle de la infraccion tambien la marca vista.
   caracteres. Si no: `400` (texto vacio o largo), `409 DESCARGO_YA_PRESENTADO`,
   `409 TRANSICION_NO_PERMITIDA` o `409 PLAZO_VENCIDO`.
 - **Plazo:** `PLAZO_DESCARGO_DIAS` dias corridos (10 por defecto) desde la notificacion, que se toma de la
-  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion).
+  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion). Se cuenta
+  por dias de Uruguay: el dia de la notificacion no cuenta y el ultimo dia vale entero (vence a las 00:00 del
+  dia siguiente). `venceDescargo` es ese ultimo dia (`yyyy-MM-dd`). Ej.: notificada el 1/11 a cualquier hora,
+  con 10 dias se puede presentar hasta el 11/11 inclusive.
+- **Vencimiento automatico:** `VencimientoDescargoJob` corre todos los dias a las 00:05 (hora de Uruguay) y
+  una vez al minuto de arrancar WildFly. Pasa a `EN_DESCARGO` (sin descargo) los casos `NOTIFICADA` con el
+  plazo vencido, para que el funcionario los pueda resolver. Usa la misma regla del plazo que
+  `InfraccionesService` (no la calcula de nuevo). Cada caso va en su propia transaccion, bloqueado y
+  revisado otra vez (si justo se presento un descargo no lo toca), y queda en la auditoria con usuario
+  `SISTEMA` y el fundamento "Vencio el plazo de N dias sin descargo de la empresa". Con varias replicas lo
+  corre una sola (advisory lock de PostgreSQL). Cada corrida deja una linea `descargo.vencimiento` en el log, aunque no haya
+  casos vencidos, y al arrancar queda otra con `resultado=programado`. Si el job todavia no corrio, `presentarDescargo` igual
+  rechaza con `409 PLAZO_VENCIDO`. `VENCIMIENTO_DESCARGO_ACTIVO=false` lo apaga (en k8s, en
+  `k8s/apps/wildfly/configmap.yaml`).
 - Al presentarlo, el caso pasa a `EN_DESCARGO` (la transicion la valida `CasoFiscalizacion`) y queda en
   `auditoria_casos` con la cedula del responsable, el `correlationId` y el fundamento
   "Descargo presentado por la empresa N° ...". El caso se bloquea en la base mientras tanto

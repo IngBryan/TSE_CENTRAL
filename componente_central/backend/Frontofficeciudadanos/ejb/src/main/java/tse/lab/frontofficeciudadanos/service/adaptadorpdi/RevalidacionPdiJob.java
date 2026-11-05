@@ -1,13 +1,11 @@
 package tse.lab.frontofficeciudadanos.service.adaptadorpdi;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -24,6 +22,7 @@ import jakarta.ejb.TransactionAttributeType;
 import javax.sql.DataSource;
 import tse.lab.adaptadorpdi.Backoff;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
+import tse.lab.frontofficeciudadanos.service.AdvisoryLock;
 import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.EstadoValidacion;
@@ -43,8 +42,6 @@ public class RevalidacionPdiJob {
      * revises, so the same profiles are never sent to the PDI twice at the same time.
      */
     private static final long LOCK = "RevalidacionPdiJob".hashCode();
-    private static final String TOMAR_LOCK = "SELECT pg_try_advisory_lock(?)";
-    private static final String LIBERAR_LOCK = "SELECT pg_advisory_unlock(?)";
 
     @Resource
     private TimerService timers;
@@ -77,13 +74,10 @@ public class RevalidacionPdiJob {
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     void revisar() {
         Duration proxima = intervalo;
-        try (Connection connection = database.getConnection()) {
-            if (advisoryLock(connection, TOMAR_LOCK)) {
-                try {
-                    proxima = revalidarPendientes();
-                } finally {
-                    advisoryLock(connection, LIBERAR_LOCK);
-                }
+        try {
+            Optional<Duration> revision = AdvisoryLock.correr(database, LOCK, this::revalidarPendientes);
+            if (revision.isPresent()) {
+                proxima = revision.get();
             } else {
                 LOG.fine(() -> LogCiudadanos.evento("pdi.revalidacion").campo("resultado", "otra_replica")
                         .toString());
@@ -93,19 +87,6 @@ public class RevalidacionPdiJob {
                     .error(e).toString());
         } finally {
             programar(proxima);
-        }
-    }
-
-    /**
-     * Takes or releases the lock in the session of the connection (it isn't tied to a transaction: each profile
-     * is validated in its own one). If the connection dies before releasing it, PostgreSQL releases it.
-     */
-    private static boolean advisoryLock(Connection connection, String sql) throws SQLException {
-        try (PreparedStatement query = connection.prepareStatement(sql)) {
-            query.setLong(1, LOCK);
-            try (ResultSet result = query.executeQuery()) {
-                return result.next() && result.getBoolean(1);
-            }
         }
     }
 
