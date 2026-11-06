@@ -37,7 +37,6 @@ async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: un
   if (!sesion) return null;
   const correlationId = randomUUID();
   const res = await llamarBackend<T & ErrorBackend>(ruta, { method, body, correlationId, usuarioCi: sesion.perfil.cedula });
-  console.info(`[vehiculos] correlationId=${correlationId} ${method} ${ruta} status=${res.status}`);
   return res;
 }
 
@@ -107,8 +106,11 @@ export async function registrarPermiso(
   return modificar(matricula, "/permiso", "PUT", datos);
 }
 
-export async function agregarItv(matricula: string, fechaVencimiento: string): Promise<Resultado> {
-  return modificar(matricula, "/itv", "POST", { fechaVencimiento });
+export async function agregarItv(
+  matricula: string,
+  datos: { fechaEmision: string; fechaVencimiento: string },
+): Promise<Resultado> {
+  return modificar(matricula, "/itv", "POST", datos);
 }
 
 export async function darDeBaja(matricula: string): Promise<Resultado> {

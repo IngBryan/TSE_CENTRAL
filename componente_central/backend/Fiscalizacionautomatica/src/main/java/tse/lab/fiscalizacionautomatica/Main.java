@@ -152,12 +152,14 @@ public class Main {
                 for (int i = 0; i < CONSUMER_CHANNELS; i++) {
                     new TrackingConsumer(connection.createChannel(), receiver).start();
                 }
-                System.out.printf("Consuming %s from %s:%d with %d channels, saving to %s.%s (%d active GPS)%n",
-                        TrackingConsumer.QUEUE, factory.getHost(), factory.getPort(), CONSUMER_CHANNELS,
-                        database.getName(), MongoTrackingEventDAO.COLLECTION, activeGps.size());
+                LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_iniciado").campo("cola", TrackingConsumer.QUEUE)
+                        .campo("rabbitmq", factory.getHost() + ":" + factory.getPort())
+                        .campo("canales", CONSUMER_CHANNELS).campo("coleccion", database.getName() + "."
+                                + MongoTrackingEventDAO.COLLECTION)
+                        .campo("gpsActivos", activeGps.size()));
 
                 stopRequested.await();
-                System.out.println("Stopping: closing RabbitMQ, then the queued detections");
+                LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_detenido"));
             }
         } finally {
             stopped.countDown();
@@ -184,8 +186,8 @@ public class Main {
                 activeGps.load();
                 return true;
             } catch (IOException e) {
-                System.err.printf("Could not get the active GPS from WildFly (%s), retrying in %d s%n",
-                        e.getCause(), RETRY_DELAY_MS / 1000);
+                LogFiscalizacion.error(LogFiscalizacion.evento("gps_activos.no_disponibles").campo("reintentoSegundos", RETRY_DELAY_MS / 1000)
+                        .errorSinPila(e));
                 if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
                     return false;
                 }
@@ -206,14 +208,14 @@ public class Main {
         try {
             balanzas = BalanzasConfig.load();
         } catch (IOException e) {
-            System.err.println(e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("balanzas.configuracion_invalida").error(e));
             return 1;
         }
         try (ActiveNodesClient nodes = new ActiveNodesClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
             return pollWeighings(nodes, balanzas);
         } catch (IOException e) {
-            System.err.println(e.getMessage() + ": " + e.getCause());
+            LogFiscalizacion.error(LogFiscalizacion.evento("balanzas.nodos_no_disponibles").error(e));
             return 1;
         }
     }
@@ -224,11 +226,11 @@ public class Main {
         try {
             scaleIds = nodes.findActiveScaleIds();
         } catch (IOException e) {
-            System.err.println("Could not get the active scales: " + e.getMessage() + ": " + e.getCause());
+            LogFiscalizacion.error(LogFiscalizacion.evento("balanzas.activas_no_disponibles").error(e));
             return 1;
         }
         if (scaleIds.isEmpty()) {
-            System.out.println("No active scales: nothing to poll");
+            LogFiscalizacion.info(LogFiscalizacion.evento("balanzas.sin_activas"));
             return 0;
         }
 
@@ -246,11 +248,11 @@ public class Main {
             PollResult result = new WeighingsPoller(scaleIds, api, weighingDAO,
                     new MongoScalesMetadataDAO(database), Clock.systemUTC()).poll();
 
-            System.out.printf("Fetched %d weighings (%d new) of scales %s from %s (until %s)%n",
-                    result.weighings().size(), result.saved(), scaleIds, url, result.to());
+            LogFiscalizacion.info(LogFiscalizacion.evento("balanzas.consultadas").campo("pesajes", result.weighings().size())
+                    .campo("nuevos", result.saved()).campo("balanzas", scaleIds).campo("url", url)
+                    .campo("hasta", result.to()));
             if (!result.failedScaleIds().isEmpty()) {
-                System.err.println("Could not poll or save scales " + result.failedScaleIds()
-                        + ": their last timestamp was not updated");
+                LogFiscalizacion.error(LogFiscalizacion.evento("balanzas.fallidas").campo("balanzas", result.failedScaleIds()));
             }
             reportScaleCommunications(nodes, result);
 
@@ -258,15 +260,15 @@ public class Main {
             int notEvaluated = new PendingWeighingsDetection(createDetector(facts, new ContextoEventoSource(intervalos)), weighingDAO,
                     new CaseAssigner(cases)).detectPending();
             if (notEvaluated > 0) {
-                System.err.println(notEvaluated + " weighings could not be evaluated: they stay pending");
+                LogFiscalizacion.error(LogFiscalizacion.evento("pesajes.no_evaluados").campo("cantidad", notEvaluated));
             }
             return result.failedScaleIds().isEmpty() && notEvaluated == 0 ? 0 : 1;
         } catch (MongoException e) {
             // Without the last timestamp the range is unknown: the next run retries
-            System.err.println("MongoDB unavailable: " + e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("mongodb.no_disponible").error(e));
             return 1;
         } catch (IOException e) {
-            System.err.println("Could not evaluate the pending weighings: " + e.getMessage() + ": " + e.getCause());
+            LogFiscalizacion.error(LogFiscalizacion.evento("pesajes.evaluacion_fallida").error(e));
             return 1;
         }
     }
@@ -284,8 +286,8 @@ public class Main {
         try {
             nodes.reportScaleCommunications(communications);
         } catch (IOException e) {
-            System.err.println("Could not record the last communication of scales " + result.polledScaleIds()
-                    + ": " + e.getMessage() + ": " + e.getCause());
+            LogFiscalizacion.error(LogFiscalizacion.evento("balanzas.comunicacion_no_registrada")
+                    .campo("balanzas", result.polledScaleIds()).error(e));
         }
     }
 
@@ -307,12 +309,14 @@ public class Main {
 
         try (VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
                 System.getenv("EJB_PASSWORD"))) {
-            System.out.println("Vehicle facts: " + facts.find(licensePlate).map(Object::toString).orElse("not registered"));
+            LogFiscalizacion.info(LogFiscalizacion.evento("deteccion_manual.hechos").campo("matricula", licensePlate)
+                    .campo("hechos", facts.find(licensePlate).map(Object::toString).orElse("not registered")));
             TrackingEvent event = new TrackingEvent("manual", 0, 0, licensePlate, 0, 0, Instant.now());
-            System.out.println("Situations: " + createDetector(facts).detect(event).situations());
+            LogFiscalizacion.info(LogFiscalizacion.evento("deteccion_manual.situaciones").campo("matricula", licensePlate)
+                    .campo("situaciones", createDetector(facts).detect(event).situations()));
             return 0;
         } catch (IOException e) {
-            System.err.println(e.getMessage() + ": " + e.getCause());
+            LogFiscalizacion.error(LogFiscalizacion.evento("deteccion_manual.fallida").error(e));
             return 1;
         }
     }
@@ -361,7 +365,7 @@ public class Main {
             } catch (MongoSecurityException e) {
                 throw e; // wrong credentials: retrying won't help
             } catch (MongoTimeoutException e) {
-                System.err.printf("MongoDB unavailable, retrying in %d s%n", RETRY_DELAY_MS / 1000);
+                LogFiscalizacion.error(LogFiscalizacion.evento("mongodb.reintentando").campo("reintentoSegundos", RETRY_DELAY_MS / 1000));
                 if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
                     return false;
                 }
@@ -393,8 +397,9 @@ public class Main {
             } catch (AuthenticationFailureException e) {
                 throw e;
             } catch (IOException | TimeoutException e) {
-                System.err.printf("RabbitMQ unavailable at %s:%d, retrying in %d s%n",
-                        factory.getHost(), factory.getPort(), RETRY_DELAY_MS / 1000);
+                LogFiscalizacion.error(LogFiscalizacion.evento("rabbitmq.reintentando")
+                        .campo("rabbitmq", factory.getHost() + ":" + factory.getPort())
+                        .campo("reintentoSegundos", RETRY_DELAY_MS / 1000));
                 if (stop.await(RETRY_DELAY_MS, TimeUnit.MILLISECONDS)) {
                     return null;
                 }

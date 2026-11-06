@@ -108,6 +108,12 @@
             <artifactId>mongodb-driver-sync</artifactId>
             <version>${version.mongodb.driver}</version>
         </dependency>
+        <!-- Shared library: the structured log of the platform -->
+        <dependency>
+            <groupId>tse.lab.modelo</groupId>
+            <artifactId>modelo</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
         <!-- Remote EJB contracts of Frontofficeciudadanos, Frontofficefuncionarios and
             Backofficeautoridadesadministradores. Install them first: mvn -f ../Modelo/pom.xml install, then
             the same for each of the three projects -->

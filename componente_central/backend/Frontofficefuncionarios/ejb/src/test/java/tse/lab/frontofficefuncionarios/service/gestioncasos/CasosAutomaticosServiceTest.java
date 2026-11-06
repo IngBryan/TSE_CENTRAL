@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
+import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
 import tse.lab.model.CirculacionSinGuia;
@@ -60,7 +61,7 @@ class CasosAutomaticosServiceTest {
         em = emf.createEntityManager();
         servicio = new CasosAutomaticosService();
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
-        set(servicio, "auditoria", conEm(new AuditoriaCasoDAO()));
+        set(servicio, "auditoria", conEm(NoOpTransactions.wired(new AuditoriaCasoDAO())));
         set(servicio, "circulaciones", conEm(new CirculacionSinGuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
@@ -127,18 +128,20 @@ class CasosAutomaticosServiceTest {
 
     @Test
     void unCasoConGuiaQuedaAsociadoAEllaYAlPesaje() {
-        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
+        var evento = new EventoFiscalizado("SBC1234", T1, OrigenEvento.PESAJE, "c-pesaje");
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", evento));
 
         CasoFiscalizacion c = caso(creado.getId());
         assertEquals("GV-1", c.getGuia().getId());
         assertEquals(1, c.getEventosPesajes().size());
+        assertEquals("c-pesaje", auditoria(creado.getId()).getFirst().getCorrelationId());
     }
 
     @Test
     void notificarPasaElCasoANotificadaYQuedaEnLaAuditoriaComoSistema() {
         DatosCaso creado = iniciarCirculacion();
 
-        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso notificado = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", notificado.getEstado());
         RegistroAuditoriaCaso cambio = auditoria(creado.getId()).get(1);
@@ -151,9 +154,9 @@ class CasosAutomaticosServiceTest {
     @Test
     void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
         DatosCaso creado = iniciarCirculacion();
-        enTx(() -> servicio.notificarCaso(creado.getId()));
+        enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
-        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId()));
+        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
 
         assertEquals("NOTIFICADA", otraVez.getEstado());
         assertEquals(2, auditoria(creado.getId()).size());
@@ -198,7 +201,7 @@ class CasosAutomaticosServiceTest {
     @Test
     void cierreYReinicioCreanExpedientesIndependientesAunqueElPrimeroSigaNotificado() {
         DatosCaso primero = iniciarCirculacion();
-        enTx(() -> servicio.notificarCaso(primero.getId()));
+        enTx(() -> servicio.notificarCaso(primero.getId(), "c-1"));
         Instant tarde = T1.plusSeconds(3600);
         assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.8, -56.0))));
         DatosCaso segundo = enTx(() -> servicio.registrarCirculacionSinGuia(

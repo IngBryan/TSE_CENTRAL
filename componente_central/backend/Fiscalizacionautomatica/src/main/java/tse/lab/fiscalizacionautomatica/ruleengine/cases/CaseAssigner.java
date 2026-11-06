@@ -3,9 +3,11 @@ package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.function.Consumer;
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 
@@ -62,9 +64,17 @@ public class CaseAssigner implements Consumer<Detection> {
             } else {
                 caso = cases.registrar(situacion.caseType(), guia, detection.event());
             }
+            if (caso != null) log("caso.registrado", caso, detection.event());
             if (caso != null && DETECTADA.equals(caso.getEstado())) {
-                cases.notify(caso.getId());
+                cases.notify(caso.getId(), detection.event().correlationId());
+                log("caso.notificado", caso, detection.event());
             }
         }
+    }
+
+    private static void log(String evento, DatosCaso caso, VehicleEvent event) {
+        LogFiscalizacion.info(LogFiscalizacion.evento(evento).correlationId(event.correlationId())
+                .campo("caso", caso.getId()).campo("tipo", caso.getTipoCaso())
+                .campo("matricula", event.licensePlate()).campo("fechaHora", event.timestamp()));
     }
 }

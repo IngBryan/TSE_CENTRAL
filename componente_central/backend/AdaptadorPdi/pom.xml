@@ -40,6 +40,12 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Libreria compartida: el log estructurado de la plataforma -->
+        <dependency>
+            <groupId>tse.lab.modelo</groupId>
+            <artifactId>modelo</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
         <!-- @ApplicationScoped de ClientePdi (lo provee WildFly) -->
         <dependency>
             <groupId>jakarta.enterprise</groupId>

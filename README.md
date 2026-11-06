@@ -137,6 +137,7 @@ FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
 #Infracciones y descargos - WildFly
 #PLAZO_DESCARGO_DIAS=10                 # opcional: dias corridos desde la notificacion para presentar el descargo
+#VENCIMIENTO_DESCARGO_ACTIVO=true       # opcional: false apaga el pasaje automatico a EN_DESCARGO al vencer el plazo
 
 #Portal publico - WildFly
 #PORTAL_UMBRAL_EMPRESAS=3               # opcional: minimo de empresas distintas por numero publicado (nunca menos de 3)
@@ -166,7 +167,7 @@ docker compose up --build
 | `rabbitmq` (AMQP)                             | `amqp://localhost:5672`  |
 | `frontofficeciudadanos-front`                 | http://localhost:3002    |
 | `frontofficefuncionarios-front`               | http://localhost:8080/funcionarios |
-| `backofficeautoridadesadministradores-front`  | http://localhost:3004    |
+| `backofficeautoridadesadministradores-front`  | http://localhost:3004/backoffice |
 | `fiscalizacionautomatica` / `fiscalizacionautomatica-poller` | sin puertos (ver [Fiscalizacion automatica](#fiscalizacion-automatica)) |
 
 Los puertos `3000`, `3001` y `3005` los usan `tracking`, `balanzas` y `pdi` (`TSE_NODOS`), asi
@@ -765,7 +766,20 @@ recargar. Abrir el detalle de la infraccion tambien la marca vista.
   caracteres. Si no: `400` (texto vacio o largo), `409 DESCARGO_YA_PRESENTADO`,
   `409 TRANSICION_NO_PERMITIDA` o `409 PLAZO_VENCIDO`.
 - **Plazo:** `PLAZO_DESCARGO_DIAS` dias corridos (10 por defecto) desde la notificacion, que se toma de la
-  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion).
+  pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion). Se cuenta
+  por dias de Uruguay: el dia de la notificacion no cuenta y el ultimo dia vale entero (vence a las 00:00 del
+  dia siguiente). `venceDescargo` es ese ultimo dia (`yyyy-MM-dd`). Ej.: notificada el 1/11 a cualquier hora,
+  con 10 dias se puede presentar hasta el 11/11 inclusive.
+- **Vencimiento automatico:** `VencimientoDescargoJob` corre todos los dias a las 00:05 (hora de Uruguay) y
+  una vez al minuto de arrancar WildFly. Pasa a `EN_DESCARGO` (sin descargo) los casos `NOTIFICADA` con el
+  plazo vencido, para que el funcionario los pueda resolver. Usa la misma regla del plazo que
+  `InfraccionesService` (no la calcula de nuevo). Cada caso va en su propia transaccion, bloqueado y
+  revisado otra vez (si justo se presento un descargo no lo toca), y queda en la auditoria con usuario
+  `SISTEMA` y el fundamento "Vencio el plazo de N dias sin descargo de la empresa". Con varias replicas lo
+  corre una sola (advisory lock de PostgreSQL). Cada corrida deja una linea `descargo.vencimiento` en el log, aunque no haya
+  casos vencidos, y al arrancar queda otra con `resultado=programado`. Si el job todavia no corrio, `presentarDescargo` igual
+  rechaza con `409 PLAZO_VENCIDO`. `VENCIMIENTO_DESCARGO_ACTIVO=false` lo apaga (en k8s, en
+  `k8s/apps/wildfly/configmap.yaml`).
 - Al presentarlo, el caso pasa a `EN_DESCARGO` (la transicion la valida `CasoFiscalizacion`) y queda en
   `auditoria_casos` con la cedula del responsable, el `correlationId` y el fundamento
   "Descargo presentado por la empresa N° ...". El caso se bloquea en la base mientras tanto
@@ -898,6 +912,32 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
 - **Secretos:** credenciales y claves van en `.env` / `.env.local`, que no se commitean.
 
 ### Observabilidad
+
+Todos los componentes escriben sus logs como **JSON de una linea** con los mismos campos:
+
+```json
+{"timestamp":"...","nivel":"INFO","componente":"frontofficefuncionarios","evento":"caso.resuelto","correlationId":"...","usuario":"...","responseCode":200,"roundtripSeconds":0.042,"backendRoundtripSeconds":0.012,"datos":{"caso":7}}
+```
+
+- **Clase comun:** `LogEstructurado` (libreria `Modelo`, paquete `tse.lab.log`) tiene los campos que comparten todos
+  los modulos. Lo propio de cada uno va con `campo(...)`, dentro de `datos`. Cada modulo tiene su fabrica, que fija el
+  componente: `LogCiudadanos`, `LogFuncionarios`, `LogBackoffice`, `LogFiscalizacion`. Los fronts usan `src/lib/log.ts`,
+  con el mismo formato; la app movil, `LogMovil`.
+- **Correlacion:** el front genera el `X-Correlation-Id` y lo manda al backend, que lo devuelve y lo pasa a la PDI. En
+  la app movil es el `idEvento`. La fiscalizacion automatica lo deriva del evento (`evt-<matricula>-<fecha>`) y lo pasa
+  por EJB remoto, asi que un caso creado se sigue desde la deteccion hasta su pista de auditoria.
+- **Nivel:** el campo `nivel` (`INFO`, `WARN` o `ERROR`) va dentro del JSON, porque la consola de WildFly solo escribe
+  el mensaje.
+- **Pedidos HTTP:** cada backend deja un `http.request` con `responseCode` y `roundtripSeconds`, y cada front un
+  `backend.llamada` con `backendRoundtripSeconds`. Lo que ningun recurso atrapo deja ademas un `http.error` con la
+  pila y responde 500 (`UnhandledExceptionMapper`).
+- **Pista de auditoria:** ademas de la tabla `auditoria_casos`, cada accion de fiscalizacion deja por consola una linea
+  `evento=auditoria.caso` (`PistaAuditoria`) con usuario, accion, estados, fundamento y fecha. Se escribe cuando confirma la
+  transaccion que guarda el registro, asi que cubre creacion, notificacion, descargo y resolucion, y una accion
+  deshecha por un rollback no deja linea. Solo se agrega: la aplicacion no tiene forma
+  de modificarla ni borrarla.
+- **WildFly:** los loggers `tse.lab` salen por un handler propio, sin el prefijo del servidor
+  (`wildfly/datasources.cli`).
 
 - **Logs:** cada contenedor escribe sus logs por consola. En local: `docker logs <contenedor>`
   (por ejemplo `docker logs wildfly-server`). En el cluster: `kubectl -n tse logs <pod>`.

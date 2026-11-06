@@ -41,7 +41,6 @@ async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: un
   if (!sesion) return null;
   const correlationId = randomUUID();
   const res = await llamarBackend<T & ErrorBackend>(ruta, { method, body, correlationId, usuarioCi: sesion.perfil.cedula });
-  console.info(`[guias] correlationId=${correlationId} ${method} ${ruta} status=${res.status}`);
   return res;
 }
 

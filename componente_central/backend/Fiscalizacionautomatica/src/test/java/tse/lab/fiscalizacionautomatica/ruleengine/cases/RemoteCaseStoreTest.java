@@ -25,6 +25,7 @@ class RemoteCaseStoreTest {
 
     @Test void convierteAmbosTiposDeEvento() {
         assertEquals(EVENTO, RemoteCaseStore.toEventoFiscalizado(EVENT));
+        assertEquals(EVENT.correlationId(), RemoteCaseStore.toEventoFiscalizado(EVENT).getCorrelationId());
         assertEquals(new EventoFiscalizado("SBC1234", NOW, OrigenEvento.PESAJE),
                 RemoteCaseStore.toEventoFiscalizado(new Weighing(3, 4, "SBC1234", NOW, 18_390)));
     }
@@ -39,8 +40,9 @@ class RemoteCaseStoreTest {
         verify(remote).registrarCirculacionSinGuia(captor.capture());
         assertEquals(NOW, captor.getValue().getFechaHora());
         assertEquals(-34.9, captor.getValue().getLatitud());
-        when(remote.notificarCaso(4L)).thenReturn(new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA"));
-        assertEquals("NOTIFICADA", store.notify(4L).getEstado());
+        when(remote.notificarCaso(4L, "c-1")).thenReturn(new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA"));
+        assertEquals("NOTIFICADA", store.notify(4L, "c-1").getEstado());
+        verify(remote).notificarCaso(4L, "c-1");
     }
     @Test void transmitePruebaGeometricaConElEventoAlEjb() throws IOException {
         TrackingEvent otra = new TrackingEvent("msg-2", 8, 1, "SBC1234", -34.91, -56.12,

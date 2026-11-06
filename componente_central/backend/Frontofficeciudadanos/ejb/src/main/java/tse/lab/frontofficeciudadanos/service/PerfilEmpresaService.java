@@ -69,8 +69,9 @@ public class PerfilEmpresaService {
         empresa.setNombrePublico(nombre);
         empresa.setRazonSocial(razon);
         empresa.setDireccion(direccion);
-        LOG.info(() -> "evento=empresa.actualizada correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " campos=" + modificados);
+        LOG.info(() -> LogCiudadanos.evento("empresa.actualizada").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa()).campo("campos", modificados)
+                .toString());
         return DatosEmpresa.de(empresa);
     }
 

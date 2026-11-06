@@ -2,6 +2,7 @@ package tse.lab.fiscalizacionautomatica.ruleengine.detection;
 
 import java.io.IOException;
 import java.util.function.Consumer;
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.WeighingDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 
@@ -40,8 +41,9 @@ public class PendingWeighingsDetection {
                 weighingDAO.markDetected(weighing);
             } catch (IOException | RuntimeException e) {
                 failed++;
-                System.err.printf("Could not evaluate the weighing of %s at %s, it stays pending: %s%n",
-                        weighing.licensePlate(), weighing.timestamp(), e.getMessage());
+                LogFiscalizacion.error(LogFiscalizacion.evento("pesaje.no_evaluado").correlationId(weighing.correlationId())
+                        .campo("matricula", weighing.licensePlate()).campo("fechaHora", weighing.timestamp())
+                        .errorSinPila(e));
             }
         }
         return failed;

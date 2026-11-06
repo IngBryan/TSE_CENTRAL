@@ -4,10 +4,13 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
+import jakarta.annotation.Resource;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.TransactionSynchronizationRegistry;
+import tse.lab.log.PistaAuditoria;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.Descargo;
@@ -22,6 +25,11 @@ public class CasoFiscalizacionDAO {
 
     @PersistenceContext(unitName = "frontofficeciudadanosPersistenceUnit")
     private EntityManager em;
+    @Resource
+    private TransactionSynchronizationRegistry transacciones;
+
+    public record CasoNotificado(Long id, Instant notificado) {
+    }
 
     public List<CasoFiscalizacion> buscarPorEmpresa(Empresa empresa, Collection<EstadoCaso> estados) {
         return em.createQuery("SELECT c FROM CasoFiscalizacion c WHERE c.vehiculo.empresa = :empresa"
@@ -46,12 +54,27 @@ public class CasoFiscalizacionDAO {
         return caso;
     }
 
+    // Casos NOTIFICADA sin descargo, con su fecha de notificacion (la de fechaNotificacion o, si no quedo
+    // registrada, la de deteccion) en una sola consulta.
+    public List<CasoNotificado> buscarNotificadosSinDescargo() {
+        return em.createQuery("SELECT c.id, c.fechaDeteccion, (SELECT MAX(r.fechaHora) FROM RegistroAuditoriaCaso r"
+                + " WHERE r.idCaso = c.id AND r.accion = :accion AND r.estadoNuevo = :notificada)"
+                + " FROM CasoFiscalizacion c WHERE c.estado = :notificada AND c.descargo IS NULL ORDER BY c.id",
+                Object[].class)
+                .setParameter("accion", AccionAuditoriaCaso.CAMBIO_ESTADO)
+                .setParameter("notificada", EstadoCaso.NOTIFICADA)
+                .getResultList().stream()
+                .map(fila -> new CasoNotificado((Long) fila[0], (Instant) (fila[2] != null ? fila[2] : fila[1])))
+                .toList();
+    }
+
     public void guardarDescargo(Descargo descargo) {
         em.persist(descargo);
     }
 
     public void registrarAuditoria(RegistroAuditoriaCaso registro) {
         em.persist(registro);
+        PistaAuditoria.alConfirmar(transacciones, "frontofficeciudadanos", registro);
     }
 
     // Cuando se le notifico el caso a la empresa: el ultimo pasaje a NOTIFICADA de la pista de auditoria

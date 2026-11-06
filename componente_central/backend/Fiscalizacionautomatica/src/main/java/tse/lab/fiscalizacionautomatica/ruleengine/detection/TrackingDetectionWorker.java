@@ -16,6 +16,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.TrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 
@@ -85,8 +86,8 @@ public class TrackingDetectionWorker implements AutoCloseable {
             onDetected.accept(detector.detect(event));
             dao.markDetected(event);
         } catch (IOException | RuntimeException e) {
-            System.err.printf("Could not evaluate the event of %s at %s, it stays pending: %s%n",
-                    event.licensePlate(), event.timestamp(), e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.no_evaluado").correlationId(event.correlationId())
+                    .campo("matricula", event.licensePlate()).campo("fechaHora", event.timestamp()).errorSinPila(e));
         }
     }
 
@@ -100,7 +101,7 @@ public class TrackingDetectionWorker implements AutoCloseable {
         try {
             dao.findPendingDetection(clock.instant().minus(pendingFor), RECOVERY_BATCH).forEach(this::submit);
         } catch (RuntimeException e) {
-            System.err.println("Could not look for events pending detection: " + e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.pendientes_no_consultados").errorSinPila(e));
         }
     }
 

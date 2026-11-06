@@ -18,5 +18,6 @@ public interface CasosAutomaticos {
     /** Cierra la circulación activa si comenzó una Guía sin superponer mediciones históricas. */
     void cerrarCirculacionPorGuia(String matricula, java.time.Instant fechaInicioGuia);
 
-    DatosCaso notificarCaso(long idCaso);
+    /** Notifica solo si sigue DETECTADA, conservando la correlación del evento. */
+    DatosCaso notificarCaso(long idCaso, String correlationId);
 }

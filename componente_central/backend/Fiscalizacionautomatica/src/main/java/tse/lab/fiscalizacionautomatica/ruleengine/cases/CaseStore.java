@@ -27,6 +27,6 @@ public interface CaseStore {
         // Implementaciones locales de pruebas pueden no gestionar circulaciones.
     }
 
-    /** Notifica el caso a la empresa: DETECTADA -> NOTIFICADA. */
-    DatosCaso notify(long caseId) throws IOException;
+    /** Notifies the case to the company: DETECTADA to NOTIFICADA. */
+    DatosCaso notify(long caseId, String correlationId) throws IOException;
 }

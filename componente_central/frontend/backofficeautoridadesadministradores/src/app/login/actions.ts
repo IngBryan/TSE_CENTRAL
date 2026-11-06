@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
+  fetchBackend,
   idSesion,
   NOMBRE_COOKIE_SESION,
   RUTA_COOKIE_SESION,
@@ -41,7 +42,7 @@ export async function iniciarSesionAction(
   let duracionSesion: number;
 
   try {
-    const respuesta = await fetch(urlBackend("auth/login"), {
+    const respuesta = await fetchBackend(urlBackend("auth/login"), {
       method: "POST",
       cache: "no-store",
       headers: {
@@ -90,7 +91,7 @@ export async function iniciarSesionAction(
     duracionSesion = login.expiraEn;
 
     // Comprobar la identidad y el rol en WildFly.
-    const comprobacion = await fetch(urlBackend("auth/me"), {
+    const comprobacion = await fetchBackend(urlBackend("auth/me"), {
       cache: "no-store",
       headers: {
         Accept: "application/json",
@@ -113,7 +114,7 @@ export async function iniciarSesionAction(
       !("rol" in identidad) ||
       identidad.rol !== "ADMINISTRADOR"
     ) {
-      await fetch(urlBackend("auth/logout"), {
+      await fetchBackend(urlBackend("auth/logout"), {
         method: "POST",
         headers: {
           Authorization: wildFlyAuthorization(sesion),
@@ -150,7 +151,7 @@ export async function cerrarSesionAction(): Promise<void> {
 
   if (sesion) {
     try {
-      await fetch(urlBackend("auth/logout"), {
+      await fetchBackend(urlBackend("auth/logout"), {
         method: "POST",
         cache: "no-store",
         headers: {

@@ -14,6 +14,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
 import tse.lab.model.ClaveEvento;
@@ -111,13 +112,19 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
             auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
                     AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA,
                     "Detectado por fiscalización automática en evento " + evento.getOrigen() + " del "
-                            + evento.getFechaHora(), null));
+                            + evento.getFechaHora(), evento.getCorrelationId()));
             Long id = caso.getId();
-            LOG.info(() -> "evento=caso.creado caso=" + id + " tipo=" + tipoCaso);
+            LOG.info(() -> LogFuncionarios.evento("caso.creado").correlationId(evento.getCorrelationId())
+                    .campo("caso", id).campo("tipo", tipoCaso).campo("matricula", evento.getMatricula())
+                    .campo("fechaHora", evento.getFechaHora()).toString());
         } else {
             caso = casos.buscarPorIdParaActualizar(caso.getId());
             asociarSiFalta(caso, evento);
             if (prueba != null) agregarPruebaSiFalta(caso, evento, prueba);
+            Long id = caso.getId();
+            LOG.info(() -> LogFuncionarios.evento("caso.evidencia_agregada")
+                    .correlationId(evento.getCorrelationId()).campo("caso", id)
+                    .campo("matricula", evento.getMatricula()).campo("fechaHora", evento.getFechaHora()).toString());
         }
         return datos(caso);
     }
@@ -193,7 +200,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                     AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA,
                     "Circulación sin Guía inferida por desplazamiento GPS entre "
                             + actual.getFechaInicio() + " y " + gps.getFechaHora(), null));
-            LOG.info(() -> "evento=circulacion.confirmada caso=" + caso.getId());
+            LOG.info(() -> LogFuncionarios.evento("circulacion.confirmada")
+                    .campo("caso", caso.getId()).campo("matricula", gps.getMatricula())
+                    .campo("fechaHora", gps.getFechaHora()).toString());
             return datos(caso);
         }
         // Un salto incompatible con el transporte se conserva en Mongo, pero no se
@@ -300,7 +309,7 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
     }
 
     @Override
-    public DatosCaso notificarCaso(long idCaso) {
+    public DatosCaso notificarCaso(long idCaso, String correlationId) {
         CasoFiscalizacion caso = casos.buscarPorIdParaActualizar(idCaso);
         if (caso == null) {
             throw new IllegalArgumentException("El caso no existe: " + idCaso);
@@ -311,8 +320,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                     : caso.getVehiculo().getEmpresa().getNroEmpresa();
             auditoria.registrar(new RegistroAuditoriaCaso(idCaso, RegistroAuditoriaCaso.SISTEMA,
                     AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.DETECTADA, EstadoCaso.NOTIFICADA,
-                    "Caso notificado a la empresa N° " + nroEmpresa, null));
-            LOG.info(() -> "evento=caso.notificado caso=" + idCaso + " empresa=" + nroEmpresa);
+                    "Caso notificado a la empresa N° " + nroEmpresa, correlationId));
+            LOG.info(() -> LogFuncionarios.evento("caso.notificado").correlationId(correlationId).campo("caso", idCaso)
+                    .campo("empresa", nroEmpresa).toString());
         }
         return datos(caso);
     }

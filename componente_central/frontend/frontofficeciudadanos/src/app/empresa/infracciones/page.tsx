@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
-import { ESTADOS, fechaHora, tipoInfraccion, type InfraccionResumen } from "@/lib/infracciones";
+import { ESTADOS, fecha, fechaHora, tipoInfraccion, type InfraccionResumen } from "@/lib/infracciones";
 
 // Gestion de Infracciones: casos de fiscalizacion notificados a la empresa del responsable (el backend
 // decide si puede verlos).
@@ -96,7 +96,7 @@ export default async function Infracciones() {
                             {ESTADOS[i.estado].texto}
                           </span>
                           {i.admiteDescargo && (
-                            <span className="whitespace-nowrap text-xs text-zinc-500">descargo hasta {fechaHora(i.venceDescargo)}</span>
+                            <span className="whitespace-nowrap text-xs text-zinc-500">descargo hasta el {fecha(i.venceDescargo)}</span>
                           )}
                           {i.estado === "NOTIFICADA" && !i.admiteDescargo && (
                             <span className="whitespace-nowrap text-xs text-zinc-500">plazo de descargo vencido</span>

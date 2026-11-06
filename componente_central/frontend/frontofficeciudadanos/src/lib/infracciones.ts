@@ -10,7 +10,7 @@ export type InfraccionResumen = {
   fechaDeteccion: string;
   matricula: string | null;
   nueva: boolean;
-  venceDescargo: string | null; // solo mientras esta NOTIFICADA
+  venceDescargo: string | null; // ultimo dia (yyyy-mm-dd) para el descargo, inclusive; solo mientras esta NOTIFICADA
   admiteDescargo: boolean;
 };
 

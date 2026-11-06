@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import tse.lab.fiscalizacionautomatica.LogFiscalizacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver.Message;
 import tse.lab.fiscalizacionautomatica.ruleengine.reception.TrackingEventReceiver.Result;
 
@@ -82,6 +83,8 @@ public class TrackingConsumer extends DefaultConsumer {
         } catch (RuntimeException e) {
             // Saving failed: the whole batch back to the queue to retry it
             getChannel().basicNack(deliveries.getLast().tag(), true, true);
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.lote_reencolado")
+                    .campo("mensajes", deliveries.size()).errorSinPila(e));
             return;
         }
         long lastAcknowledged = 0;
@@ -90,7 +93,11 @@ public class TrackingConsumer extends DefaultConsumer {
             switch (results.get(i)) {
                 case SAVED, DUPLICATE -> lastAcknowledged = tag;
                 // Retrying would give the same result: discard it (there is no dead letter queue)
-                case INVALID, UNKNOWN_GPS -> getChannel().basicReject(tag, false);
+                case INVALID, UNKNOWN_GPS -> {
+                    getChannel().basicReject(tag, false);
+                    LogFiscalizacion.error(LogFiscalizacion.evento("tracking.mensaje_descartado")
+                            .correlationId(deliveries.get(i).message().messageId()).campo("motivo", results.get(i)));
+                }
             }
         }
         // One ack for the rest of the batch: the earlier deliveries of the channel are already settled and the
@@ -104,7 +111,7 @@ public class TrackingConsumer extends DefaultConsumer {
         try {
             flush();
         } catch (IOException | RuntimeException e) {
-            System.err.println("Could not save the pending tracking batch: " + e.getMessage());
+            LogFiscalizacion.error(LogFiscalizacion.evento("tracking.lote_no_guardado").errorSinPila(e));
         }
     }
 

@@ -7,8 +7,11 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
 import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
+import { esFiltro, type FiscalizacionEmpresa } from "@/lib/vehiculos";
 import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "../actions";
 import { AccionesEmpresa } from "./acciones-empresa";
+import { VehiculosEmpresa } from "./vehiculos-empresa";
+import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -23,8 +26,11 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const sesion = await getSesion();
   if (!sesion) redirect("/");
   const { nro } = await params;
+  const query = await searchParams;
   // ?creada=1: viene del alta (FA1, paso 7)
-  const creada = (await searchParams).creada === "1";
+  const creada = query.creada === "1";
+  // ?estado=: filtro de los vehiculos (fiscalizacion de habilitaciones)
+  const filtro = esFiltro(query.estado) ? query.estado : "todos";
   // Hasta 18 digitos para que entre en el Long del backend
   if (!/^\d{1,18}$/.test(nro)) notFound();
 
@@ -36,6 +42,13 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   );
 
   const correlationId = randomUUID();
+  // Los vehiculos se piden en paralelo con el detalle; si fallan, la pagina de la empresa se muestra igual
+  const pedidoVehiculos = vehiculosDeEmpresa(nro, sesion.usuario.cedula, correlationId).catch(
+    (e): ResultadoVehiculos => {
+      if (!(e instanceof BackendNoDisponible)) registrarLog("error", "empresas", { correlationId, error: (e as Error).message });
+      return { error: NO_DISPONIBLE };
+    },
+  );
   let res: RespuestaBackend<EmpresaDetalle & ErrorBackend>;
   try {
     res = await llamarBackend<EmpresaDetalle & ErrorBackend>(`/empresas/${nro}`, {
@@ -46,11 +59,10 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
     if (!(e instanceof BackendNoDisponible)) throw e;
     return <Pagina sesion={sesion} nro={nro} error={NO_DISPONIBLE} />;
   }
-  console.info(`[empresas] correlationId=${correlationId} GET /empresas/${nro} status=${res.status}`);
 
   if (res.status === 401) {
     // Error de configuracion, no del usuario: la X-Api-Key no coincide con la de WildFly
-    console.error(`[empresas] correlationId=${correlationId} el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY`);
+    registrarLog("error", "empresas", { correlationId }, { detalle: `el backend rechazo la X-Api-Key: revisar BACKEND_API_KEY` });
   }
   if (res.status !== 200 || !res.data) {
     const error =
@@ -65,6 +77,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const empresa = res.data;
   const r = empresa.responsable;
   const disponibles = r ? null : await pedidoDisponibles;
+  const vehiculos = await pedidoVehiculos;
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
@@ -89,8 +102,22 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
       </section>
 
       <AccionesEmpresa empresa={empresa} disponibles={disponibles} creada={creada} />
+
+      <VehiculosEmpresa nro={nro} fiscalizacion={vehiculos.fiscalizacion} error={vehiculos.error} filtro={filtro} />
     </Pagina>
   );
+}
+
+type ResultadoVehiculos = { fiscalizacion?: FiscalizacionEmpresa; error?: string };
+
+// GET /empresas/{nro}/vehiculos con el mismo correlation id que el detalle
+async function vehiculosDeEmpresa(nro: string, ci: string, correlationId: string): Promise<ResultadoVehiculos> {
+  const res = await llamarBackend<FiscalizacionEmpresa & ErrorBackend>(`/empresas/${nro}/vehiculos`, {
+    correlationId,
+    usuarioCi: ci,
+  });
+  if (res.status !== 200 || !res.data) return { error: "No se pudieron obtener los vehículos de la empresa." };
+  return { fiscalizacion: res.data };
 }
 
 function Pagina({

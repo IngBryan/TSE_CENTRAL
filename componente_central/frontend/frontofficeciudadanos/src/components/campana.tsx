@@ -8,7 +8,7 @@ import {
   marcarTodasVistas,
   obtenerNotificaciones,
 } from "@/app/empresa/infracciones/notificaciones";
-import { fechaHora, tipoInfraccion, type Notificaciones } from "@/lib/infracciones";
+import { fecha, fechaHora, tipoInfraccion, type Notificaciones } from "@/lib/infracciones";
 
 // Cada cuanto se vuelve a consultar si hay casos nuevos, mientras la pestaña esta visible
 const INTERVALO_MS = 60_000;
@@ -133,7 +133,7 @@ export function Campana({ inicial }: { inicial: Notificaciones }) {
                       </span>
                       <span className="text-xs text-zinc-500">
                         {n.admiteDescargo && n.venceDescargo
-                          ? `Podés presentar el descargo hasta el ${fechaHora(n.venceDescargo)}`
+                          ? `Podés presentar el descargo hasta el ${fecha(n.venceDescargo)} inclusive`
                           : `Notificada el ${fechaHora(n.fecha)}`}
                       </span>
                     </span>

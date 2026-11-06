@@ -24,6 +24,7 @@ import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.frontofficeciudadanos.service.rutas.AsignacionRutasService;
@@ -134,8 +135,8 @@ public class GuiasService {
         guia.setDestinoLocalidad(d.localidadDestino());
         guia.setTipoCarga(d.tipoCarga());
         guias.guardar(guia);
-        LOG.info(() -> "evento=guia.creada correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " guia=" + guia.getId());
+        LOG.info(() -> LogCiudadanos.evento("guia.creada").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("guia", guia.getId()).toString());
         return vista(guia);
     }
 
@@ -184,9 +185,9 @@ public class GuiasService {
 
         guia.asignar(vehiculo, chofer);
         guias.sincronizar(); // flush: la respuesta lleva la version nueva (la usa la modificacion de guias)
-        LOG.info(() -> "evento=guia.asignada correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " guia=" + guia.getId() + " vehiculo="
-                + vehiculo.getMatricula() + " chofer=" + chofer.getCi());
+        LOG.info(() -> LogCiudadanos.evento("guia.asignada").correlationId(correlationId).usuario(ciResponsable)
+                .campo("nroEmpresa", empresa.getNroEmpresa()).campo("guia", guia.getId())
+                .campo("vehiculo", vehiculo.getMatricula()).campo("chofer", chofer.getCi()).toString());
         return vista(guia);
     }
 
@@ -286,9 +287,10 @@ public class GuiasService {
         String texto = String.join("; ", cambios);
         modificaciones.guardar(new ModificacionGuia(guia, tipo, ciResponsable, texto, motivo, anterior,
                 guia.getVersion()));
-        LOG.info(() -> "evento=guia.modificada correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " guia=" + guia.getId() + " tipo=" + tipo + " version=" + anterior + "->" + guia.getVersion()
-                + " cambios=\"" + texto + "\"");
+        LOG.info(() -> LogCiudadanos.evento("guia.modificada").correlationId(correlationId).usuario(ciResponsable)
+                .campo("guia", guia.getId()).campo("tipo", tipo)
+                .campo("version", anterior + "->" + guia.getVersion()).campo("cambios", "\"" + texto + "\"")
+                .toString());
         return vista(guia);
     }
 

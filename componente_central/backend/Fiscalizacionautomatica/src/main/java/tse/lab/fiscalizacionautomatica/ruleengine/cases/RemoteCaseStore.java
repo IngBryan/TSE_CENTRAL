@@ -74,8 +74,8 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
-    public DatosCaso notify(long caseId) throws IOException {
-        return call(() -> cases.notificarCaso(caseId));
+    public DatosCaso notify(long caseId, String correlationId) throws IOException {
+        return call(() -> cases.notificarCaso(caseId, correlationId));
     }
 
     private static <T> T call(Call<T> call) throws IOException {
@@ -93,7 +93,7 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
             case TrackingEvent tracking -> OrigenEvento.TRACKING;
             case Weighing weighing -> OrigenEvento.PESAJE;
         };
-        return new EventoFiscalizado(event.licensePlate(), event.timestamp(), origin);
+        return new EventoFiscalizado(event.licensePlate(), event.timestamp(), origin, event.correlationId());
     }
 
     @Override

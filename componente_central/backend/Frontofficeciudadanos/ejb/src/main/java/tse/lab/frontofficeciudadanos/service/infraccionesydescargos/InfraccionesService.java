@@ -1,7 +1,9 @@
 package tse.lab.frontofficeciudadanos.service.infraccionesydescargos;
 
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -11,10 +13,13 @@ import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
+import jakarta.ejb.TransactionAttribute;
+import jakarta.ejb.TransactionAttributeType;
 import tse.lab.frontofficeciudadanos.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.model.AccionAuditoriaCaso;
@@ -32,8 +37,11 @@ import tse.lab.model.Vehiculo;
 // fiscalizacion de sus vehiculos con la evidencia que los origino y presenta un descargo dentro del plazo.
 // - La empresa ve el caso recien cuando se le notifica (NOTIFICADA en adelante), nunca DETECTADA.
 // - El descargo se presenta una sola vez, con el caso NOTIFICADA y dentro de PLAZO_DESCARGO_DIAS dias
-//   corridos (10 por defecto) desde la notificacion. Pasa el caso a EN_DESCARGO (la transicion la controla
-//   CasoFiscalizacion) y queda en la pista de auditoria con la cedula de quien lo presento.
+//   corridos (10 por defecto) desde la notificacion. El plazo se cuenta por dias de Uruguay: el dia de la
+//   notificacion no cuenta y el ultimo dia se puede presentar hasta las 23:59. Pasa el caso a EN_DESCARGO
+//   (la transicion la controla CasoFiscalizacion) y queda en la pista de auditoria con la cedula de quien
+//   lo presento. Si vence el plazo sin descargo, VencimientoDescargoJob pasa el caso a EN_DESCARGO (sin
+//   descargo) con la misma regla del plazo (casosConPlazoVencido y vencerPlazo).
 // - No se exige que la empresa este habilitada: una empresa inhabilitada igual tiene que poder defenderse.
 // - Cada caso notificado es una notificacion para la empresa (la campana del front): queda vista cuando el
 //   responsable la marca o abre el detalle del caso.
@@ -44,6 +52,7 @@ public class InfraccionesService {
     private static final Set<EstadoCaso> VISIBLES = Set.of(EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
             EstadoCaso.CONFIRMADA, EstadoCaso.DESESTIMADA);
     static final int MAX_NOTIFICACIONES = 10;
+    static final ZoneId URUGUAY = ZoneId.of("America/Montevideo");
 
     @EJB
     private AutorizacionResponsable autorizacion;
@@ -51,16 +60,19 @@ public class InfraccionesService {
     private CasoFiscalizacionDAO casos;
 
     private final int plazoDias;
+    private final Clock reloj;
 
     public InfraccionesService() {
-        this(plazoConfigurado());
+        this(plazoConfigurado(), Clock.systemUTC());
     }
 
-    // Para los tests: sin leer el entorno
-    InfraccionesService(int plazoDias) {
+    // Para los tests: sin leer el entorno y con la hora que elija el test
+    InfraccionesService(int plazoDias, Clock reloj) {
         this.plazoDias = plazoDias;
+        this.reloj = reloj;
     }
 
+    // venceDescargo: ultimo dia (yyyy-MM-dd, en Uruguay) para presentar el descargo, inclusive
     public record InfraccionResumen(Long id, String tipoCaso, String descripcion, String estado,
             String fechaDeteccion, String matricula, boolean nueva, String venceDescargo, boolean admiteDescargo) {
     }
@@ -103,8 +115,9 @@ public class InfraccionesService {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, false, correlationId);
         List<InfraccionResumen> lista = casos.buscarPorEmpresa(empresa, VISIBLES).stream().map(this::resumen)
                 .toList();
-        LOG.info(() -> "evento=infracciones.listado correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " casos=" + lista.size());
+        LOG.info(() -> LogCiudadanos.evento("infracciones.listado").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa()).campo("casos", lista.size())
+                .toString());
         return lista;
     }
 
@@ -166,8 +179,8 @@ public class InfraccionesService {
     private static void marcarVista(CasoFiscalizacion caso, String ciResponsable, String correlationId) {
         if (!caso.isNotificacionVista()) {
             caso.marcarNotificacionVista();
-            LOG.info(() -> "evento=infraccion.notificacion_vista correlationId=" + correlationId + " usuario="
-                    + ciResponsable + " caso=" + caso.getId());
+            LOG.info(() -> LogCiudadanos.evento("infraccion.notificacion_vista").correlationId(correlationId)
+                    .usuario(ciResponsable).campo("caso", caso.getId()).toString());
         }
     }
 
@@ -190,11 +203,16 @@ public class InfraccionesService {
             throw rechazo(caso, ciResponsable, correlationId, "DESCARGO_YA_PRESENTADO",
                     "Ya se presentó un descargo para esta infracción.");
         }
+        if (caso.getEstado() == EstadoCaso.EN_DESCARGO) {
+            // Si no tiene descargo pero el caso ya esta EN_DESCARGO: lo paso VencimientoDescargoJob al vencer el plazo
+            throw rechazo(caso, ciResponsable, correlationId, "PLAZO_VENCIDO",
+                    "Venció el plazo de " + plazoDias + " días para presentar el descargo.");
+        }
         if (caso.getEstado() != EstadoCaso.NOTIFICADA) {
             throw rechazo(caso, ciResponsable, correlationId, "TRANSICION_NO_PERMITIDA",
                     "La infracción ya no admite descargo (estado " + caso.getEstado() + ").");
         }
-        if (!Instant.now().isBefore(venceDescargo(caso))) {
+        if (!dentroDelPlazo(venceDescargo(caso))) {
             throw rechazo(caso, ciResponsable, correlationId, "PLAZO_VENCIDO",
                     "Venció el plazo de " + plazoDias + " días para presentar el descargo.");
         }
@@ -206,9 +224,38 @@ public class InfraccionesService {
         casos.registrarAuditoria(new RegistroAuditoriaCaso(caso.getId(), ciResponsable,
                 AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
                 "Descargo presentado por la empresa N° " + empresa.getNroEmpresa(), correlationId));
-        LOG.info(() -> "evento=infraccion.descargo correlationId=" + correlationId + " usuario=" + ciResponsable
-                + " nroEmpresa=" + empresa.getNroEmpresa() + " caso=" + idCaso + " caracteres=" + texto.length());
+        LOG.info(() -> LogCiudadanos.evento("infraccion.descargo").correlationId(correlationId)
+                .usuario(ciResponsable).campo("nroEmpresa", empresa.getNroEmpresa()).campo("caso", idCaso)
+                .campo("caracteres", texto.length()).toString());
         return detalle(caso);
+    }
+
+    // Es para VencimientoDescargoJob: los casos NOTIFICADA sin descargo con el plazo vencido. Usa la misma regla
+    // (ultimoDia y dentroDelPlazo) que el chequeo de presentarDescargo y la fecha que ve la empresa.
+    public List<Long> casosConPlazoVencido() {
+        return casos.buscarNotificadosSinDescargo().stream()
+                .filter(c -> !dentroDelPlazo(ultimoDia(c.notificado())))
+                .map(CasoFiscalizacionDAO.CasoNotificado::id)
+                .toList();
+    }
+
+    // Pasa a EN_DESCARGO un caso al que se le vencio el plazo sin descargo, en su propia transaccion (si uno
+    // falla no deshace los demas). Con el caso bloqueado se vuelve a revisar todo: si mientras tanto se presento
+    // un descargo, ya cambio de estado o el plazo no vencio, no hace nada. Por eso correrlo de nuevo es seguro.
+    @TransactionAttribute(TransactionAttributeType.REQUIRES_NEW)
+    public boolean vencerPlazo(Long idCaso, String correlationId) {
+        CasoFiscalizacion caso = idCaso == null ? null : casos.buscarPorIdParaActualizar(idCaso);
+        if (caso == null || caso.getEstado() != EstadoCaso.NOTIFICADA || caso.getDescargo() != null
+                || dentroDelPlazo(venceDescargo(caso))) {
+            return false;
+        }
+        caso.cambiarEstado(EstadoCaso.EN_DESCARGO);
+        casos.registrarAuditoria(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
+                AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
+                "Venció el plazo de " + plazoDias + " días sin descargo de la empresa", correlationId));
+        LOG.info(() -> LogCiudadanos.evento("infraccion.plazo_vencido").correlationId(correlationId)
+                .usuario(RegistroAuditoriaCaso.SISTEMA).campo("caso", idCaso).toString());
+        return true;
     }
 
     // Un caso de otra empresa (o todavia no notificado) se trata igual que uno que no existe
@@ -224,21 +271,31 @@ public class InfraccionesService {
 
     private ConflictoException rechazo(CasoFiscalizacion caso, String ci, String correlationId, String codigo,
             String mensaje) {
-        LOG.info(() -> "evento=infraccion.descargo_rechazado correlationId=" + correlationId + " usuario=" + ci
-                + " caso=" + caso.getId() + " motivo=" + codigo);
+        LOG.info(() -> LogCiudadanos.evento("infraccion.descargo_rechazado").correlationId(correlationId)
+                .usuario(ci).campo("caso", caso.getId()).campo("motivo", codigo).toString());
         return new ConflictoException(codigo, mensaje);
     }
 
-    // El plazo corre desde la notificacion (pista de auditoria); si no quedo registrada, desde la deteccion
-    Instant venceDescargo(CasoFiscalizacion caso) {
+    // La fecha de notificacion sale de la pista de auditoria; si no quedo registrada, se usa la de deteccion.
+    LocalDate venceDescargo(CasoFiscalizacion caso) {
         Instant notificada = casos.fechaNotificacion(caso.getId());
-        return (notificada != null ? notificada : caso.getFechaDeteccion()).plus(Duration.ofDays(plazoDias));
+        return ultimoDia(notificada != null ? notificada : caso.getFechaDeteccion());
+    }
+
+    // Ultimo dia para presentar el descargo: el dia (en Uruguay) de la notificacion mas plazoDias
+    private LocalDate ultimoDia(Instant notificada) {
+        return LocalDate.ofInstant(notificada, URUGUAY).plusDays(plazoDias);
+    }
+
+    // El ultimo dia cuenta entero: vence a las 00:00 (hora de Uruguay) del dia siguiente
+    private boolean dentroDelPlazo(LocalDate ultimoDia) {
+        return !LocalDate.now(reloj.withZone(URUGUAY)).isAfter(ultimoDia);
     }
 
     private InfraccionResumen resumen(CasoFiscalizacion caso) {
-        Instant vence = venceDescargo(caso);
+        LocalDate vence = venceDescargo(caso);
         boolean admite = caso.getEstado() == EstadoCaso.NOTIFICADA && caso.getDescargo() == null
-                && Instant.now().isBefore(vence);
+                && dentroDelPlazo(vence);
         return new InfraccionResumen(caso.getId(), caso.getTipoCaso(), caso.getDescripcion(),
                 caso.getEstado().name(), texto(caso.getFechaDeteccion()),
                 caso.getVehiculo() == null ? null : caso.getVehiculo().getMatricula(), !caso.isNotificacionVista(),

@@ -21,6 +21,7 @@ class CaseAssignerTest {
     static class FakeStore implements CaseStore {
         record Caso(long id, TipoCasoAutomatico tipo, String guia, List<VehicleEvent> evidencias, String[] estado) { }
         final List<Caso> casos = new ArrayList<>();
+        final List<String> correlacionesNotificadas = new ArrayList<>();
         TipoCasoAutomatico fallarTipo;
 
         @Override
@@ -51,7 +52,8 @@ class CaseAssignerTest {
             return registrar(TipoCasoAutomatico.DESVIO_RUTA, guia, evento);
         }
         @Override
-        public DatosCaso notify(long id) {
+        public DatosCaso notify(long id, String correlationId) {
+            correlacionesNotificadas.add(correlationId);
             Caso c = casos.get((int)id - 1);
             c.estado()[0] = "NOTIFICADA";
             return data(c);
@@ -86,6 +88,7 @@ class CaseAssignerTest {
         assertEquals(List.of(gps(0)), store.casos.get(0).evidencias());
         assertEquals(List.of(gps(0)), store.casos.get(1).evidencias());
         assertEquals("NOTIFICADA", store.casos.get(1).estado()[0]);
+        assertEquals(List.of(gps(0).correlationId(), gps(0).correlationId()), store.correlacionesNotificadas);
     }
 
     @Test

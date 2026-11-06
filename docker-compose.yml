@@ -93,6 +93,9 @@ services:
       - "3004:3000"
     environment:
       - NODE_ENV=production
+      - BACKOFFICE_API_URL=http://wildfly:8080/backofficeautoridadesadministradores-web/api
+    depends_on:
+      - wildfly
     restart: unless-stopped
 
   # --- Backend (componente central) ---
@@ -193,6 +196,8 @@ services:
       - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
       # Dias corridos desde la notificacion para que la empresa presente el descargo de una infraccion
       - PLAZO_DESCARGO_DIAS=${PLAZO_DESCARGO_DIAS:-10}
+      # Pasar solos a EN_DESCARGO los casos con el plazo vencido sin descargo (todos los dias a las 00:05)
+      - VENCIMIENTO_DESCARGO_ACTIVO=${VENCIMIENTO_DESCARGO_ACTIVO:-true}
       # Portal publico: minimo de empresas distintas para publicar un numero (nunca menos de 3)
       - PORTAL_UMBRAL_EMPRESAS=${PORTAL_UMBRAL_EMPRESAS:-3}
       # POST /api/ciudadanos/ingreso-testing (ingreso con cedula, sin gub.uy): mismo interruptor que el front

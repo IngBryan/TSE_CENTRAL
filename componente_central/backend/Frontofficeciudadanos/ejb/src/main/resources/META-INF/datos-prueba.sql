@@ -170,7 +170,7 @@ INSERT INTO autoridades (ci) VALUES ('88888888');
 INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mtop.gub.uy');
 -- Gestion de empresas: ciudadano ficticio ya validado y sin ningun rol, para elegirlo como responsable de una
 -- empresa sin mezclarlo con los datos de los otros casos de prueba
-UPDATE ciudadanos SET primerNombre = 'Laura', primerApellido = 'Gomez', nombres = 'Laura', apellidos = 'Gomez', estado = 'VALIDADO', ultimaValidacion = CURRENT_TIMESTAMP WHERE ci = '22222222';
+INSERT INTO ciudadanos (ci, primerNombre, primerApellido, nombres, apellidos, estado, creado, ultimaValidacion) VALUES ('44444444', 'Laura', 'Gomez', 'Laura', 'Gomez', 'VALIDADO', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- Balanza solo para la evidencia de los casos: inactiva, asi el poller no la consulta en la API de balanzas.
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) VALUES ('BALANZA', 1, 'Balanza Peaje Pando', 'Peaje Pando', false);
 INSERT INTO nodos_balanza (id) SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1;
@@ -219,6 +219,43 @@ INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM3001');
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM4001');
 INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SEM5001');
+
+-- DEMO / Fiscalizacion de habilitaciones (frontoffice de funcionarios): la empresa 6 tiene un vehiculo en cada
+-- estado del permiso y la ITV. Sin viajes ni GPS: no cambia las estadisticas del portal ni genera casos.
+-- Al dia: 3 habilitados (2 por vencer), 4 no habilitados y 1 dado de baja.
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (6, 'Fletes del Centro', 'Fletes del Centro S.A.', 'Ruta 5 km 183, Durazno', true, 0);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1001', 'Volvo', 'FH 540', 9400, 27000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1002', 'Scania', 'R 500', 9200, 26000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1003', 'Iveco', 'S-Way', 8700, 25000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1004', 'Mercedes-Benz', 'Actros', 8500, 25000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1005', 'DAF', 'XF 480', 8900, 26000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1006', 'Volvo', 'FM 460', 9100, 27000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1007', 'Scania', 'G 410', 8800, 26000, true, 6);
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1008', 'Iveco', 'Tector', 6800, 15000, false, 6);
+-- SFH1001 al dia, con una ITV anterior ya vencida (historial)
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-01', CURRENT_DATE - 60, CURRENT_DATE + 300, 'SFH1001');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 425, CURRENT_DATE - 60, 'SFH1001');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 60, CURRENT_DATE + 200, 'SFH1001');
+-- SFH1002 habilitado con el permiso por vencer (12 dias)
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-02', CURRENT_DATE - 353, CURRENT_DATE + 12, 'SFH1002');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 30, CURRENT_DATE + 335, 'SFH1002');
+-- SFH1003 habilitado con la ITV que vence hoy
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-03', CURRENT_DATE - 90, CURRENT_DATE + 270, 'SFH1003');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 365, CURRENT_DATE, 'SFH1003');
+-- SFH1004 con el permiso vencido ayer
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-04', CURRENT_DATE - 366, CURRENT_DATE - 1, 'SFH1004');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 100, CURRENT_DATE + 265, 'SFH1004');
+-- SFH1005 con la ITV vencida hace 20 dias
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-05', CURRENT_DATE - 120, CURRENT_DATE + 240, 'SFH1005');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 385, CURRENT_DATE - 20, 'SFH1005');
+-- SFH1006 con un permiso que todavia no empezo (desde dentro de 10 dias)
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-06', CURRENT_DATE + 10, CURRENT_DATE + 375, 'SFH1006');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 15, CURRENT_DATE + 350, 'SFH1006');
+-- SFH1007 con permiso vigente pero sin ninguna ITV registrada
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-07', CURRENT_DATE - 45, CURRENT_DATE + 320, 'SFH1007');
+-- SFH1008 dado de baja, con los papeles vencidos
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) VALUES ('PNC-SFH-08', CURRENT_DATE - 700, CURRENT_DATE - 335, 'SFH1008');
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE - 700, CURRENT_DATE - 335, 'SFH1008');
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-301', 'Agropecuario', 'Soja a granel', 22000, CURRENT_DATE - 20, 'Young', 'Nueva Palmira', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-302', 'Forestal', 'Rollizos de pino', 25000, CURRENT_DATE - 45, 'Rivera', 'Fray Bentos', 3, 'SEM3001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '46 days', 0);
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, estado, fechaAsignacion, version) VALUES ('GV-PUB-401', 'Agropecuario', 'Arroz', 19000, CURRENT_DATE - 20, 'Treinta y Tres', 'Montevideo', 4, 'SEM4001', 'FINALIZADA', CURRENT_TIMESTAMP - INTERVAL '21 days', 0);
