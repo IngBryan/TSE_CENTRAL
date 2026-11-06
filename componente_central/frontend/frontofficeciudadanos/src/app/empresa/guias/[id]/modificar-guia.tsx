@@ -14,6 +14,7 @@ import {
   type TipoCarga,
   type VehiculoResumen,
 } from "../actions";
+import { OpcionesCatalogo } from "../opciones-catalogo";
 
 type Modo = "editar" | "reasignar" | "cancelar" | null;
 
@@ -147,18 +148,11 @@ export function ModificarGuia({
                   onChange={(e) => setDatos({ ...datos, [n]: e.target.value })}
                   className={`${campo} dark:bg-zinc-950`}
                 >
-                  <option value="" disabled>
-                    {n === "rubroCliente" ? "Elegí un rubro" : "Elegí un tipo de carga"}
-                  </option>
-                  {(opciones[n] ?? []).map((t) => (
-                    <option key={t.id} value={t.nombre}>
-                      {t.nombre}
-                    </option>
-                  ))}
-                  {/* Si el actual no esta en el catalogo (o no se pudo obtener), se muestra igual */}
-                  {datos[n] && !(opciones[n] ?? []).some((t) => t.nombre === datos[n]) && (
-                    <option value={datos[n]}>{datos[n]}</option>
-                  )}
+                  <OpcionesCatalogo
+                    items={opciones[n] ?? []}
+                    vacio={n === "rubroCliente" ? "Elegí un rubro" : "Elegí un tipo de carga"}
+                    actual={datos[n]}
+                  />
                 </select>
               ) : (
                 <input

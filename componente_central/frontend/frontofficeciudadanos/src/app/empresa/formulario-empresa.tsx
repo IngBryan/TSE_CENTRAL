@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { botonGubUy } from "@/components/estilos";
+import { Etiquetas } from "@/components/etiquetas";
 import { actualizarEmpresa, type DatosEmpresa, type EstadoFormulario } from "./actions";
 
 const CAMPOS = [
@@ -35,20 +36,7 @@ export function FormularioEmpresa({ empresa }: { empresa: DatosEmpresa }) {
 
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Rubros</span>
-        {empresa.rubros?.length ? (
-          <ul className="flex flex-wrap gap-2">
-            {empresa.rubros.map((r) => (
-              <li
-                key={r}
-                className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
-              >
-                {r}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <span className="text-zinc-600 dark:text-zinc-400">Sin rubros asignados.</span>
-        )}
+        <Etiquetas valores={empresa.rubros} vacio="Sin rubros asignados." />
         <span className="text-xs text-zinc-500">Los asigna el MTOP y no se pueden modificar.</span>
       </div>
 

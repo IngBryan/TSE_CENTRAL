@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { Encabezado, botonGubUy } from "@/components/encabezado";
+import { Etiquetas } from "@/components/etiquetas";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { fecha, fechaHora } from "@/lib/infracciones";
@@ -160,18 +161,7 @@ function Resultado({ v }: { v: ValidacionEmpresa }) {
         </p>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-zinc-500">Rubros:</span>
-          {v.rubros?.length ? (
-            v.rubros.map((r) => (
-              <span
-                key={r}
-                className="rounded-full bg-zinc-100 px-3 py-0.5 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
-              >
-                {r}
-              </span>
-            ))
-          ) : (
-            <span className="text-zinc-600 dark:text-zinc-400">sin rubros registrados</span>
-          )}
+          <Etiquetas valores={v.rubros} vacio="sin rubros registrados" />
         </div>
       </div>
       {v.vehiculo && <Vehiculo v={v.vehiculo} empresa={v.nombrePublico} />}

@@ -107,11 +107,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         filas={d.viajesPorMes}
         primera="Mes"
         etiqueta={(f) => f.etiqueta.charAt(0).toUpperCase() + f.etiqueta.slice(1)}
-        columnas={[
-          { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
-          { titulo: "Carga", valor: (f) => toneladas(f.kg) },
-          { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
-        ]}
+        columnas={COLUMNAS_CARGA}
       />
       <Tabla
         titulo={`Carga transportada por rubro del cliente (${d.anio})`}
@@ -120,11 +116,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         primera="Rubro"
         etiqueta={(f) => f.etiqueta}
         barra={(f) => f.kg}
-        columnas={[
-          { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
-          { titulo: "Carga", valor: (f) => toneladas(f.kg) },
-          { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
-        ]}
+        columnas={COLUMNAS_CARGA}
         vacio="No hay viajes finalizados en el año."
       />
       <Tabla
@@ -134,11 +126,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         primera="Tipo de carga"
         etiqueta={(f) => f.etiqueta}
         barra={(f) => f.kg}
-        columnas={[
-          { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
-          { titulo: "Carga", valor: (f) => toneladas(f.kg) },
-          { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
-        ]}
+        columnas={COLUMNAS_CARGA}
         vacio="No hay viajes finalizados en el año."
       />
       <Tabla
@@ -209,6 +197,13 @@ function Indicador({
 }
 
 type Columna = { titulo: string; valor: (f: FilaPublica) => string };
+
+// Viajes, carga y promedio: las columnas de las tablas por mes, por rubro y por tipo de carga
+const COLUMNAS_CARGA: Columna[] = [
+  { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
+  { titulo: "Carga", valor: (f) => toneladas(f.kg) },
+  { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
+];
 
 // Tabla con una barra proporcional bajo cada etiqueta (por defecto, a la cantidad) y enlace al CSV
 function Tabla({

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { crearGuia, type EstadoNuevaGuia, type Rubro, type TipoCarga } from "./actions";
+import { OpcionesCatalogo } from "./opciones-catalogo";
 
 // rubroCliente y tipoCarga son listas: los catalogos precargados de rubros y de tipos de carga
 const CAMPOS = [
@@ -64,14 +65,7 @@ export function NuevaGuia({ hoy, tiposCarga, rubros }: { hoy: string; tiposCarga
                     error ? "border-red-500" : "border-black/15 dark:border-white/20"
                   }`}
                 >
-                  <option value="" disabled>
-                    {c.vacio}
-                  </option>
-                  {opciones[c.nombre].map((t) => (
-                    <option key={t.id} value={t.nombre}>
-                      {t.nombre}
-                    </option>
-                  ))}
+                  <OpcionesCatalogo items={opciones[c.nombre]} vacio={c.vacio} />
                 </select>
               ) : (
                 <input
