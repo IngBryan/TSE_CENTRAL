@@ -35,6 +35,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.VehicleWithoutValidPermitRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.routes.RemoteRutasAutorizadasSource;
@@ -130,7 +131,7 @@ public class Main {
             dao.createIndexes();
             ConnectionFactory factory = createRabbitConnectionFactory();
             List<SituationRule> reglas = new java.util.ArrayList<>(List.of(
-                    new TripWithoutGuideRule(), new OverloadRule()));
+                    new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()));
             // La regla puede evaluarse en pruebas; en producción se habilita una vez
             // integrado el agrupamiento y las evidencias de 4B/4C.
             if (desvioHabilitado) {
@@ -293,11 +294,11 @@ public class Main {
 
     /** The situations that are detected; adding a situation means adding its rule here. */
     private static SituationDetector createDetector(VehicleFactsSource facts) {
-        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()));
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()));
     }
 
     private static SituationDetector createDetector(VehicleFactsSource facts, ContextoEventoSource contexto) {
-        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()), contexto);
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()), contexto);
     }
 
     /**

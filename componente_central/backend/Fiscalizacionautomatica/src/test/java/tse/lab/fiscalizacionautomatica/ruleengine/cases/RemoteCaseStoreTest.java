@@ -13,6 +13,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviation
 import java.util.List;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.*;
+import tse.lab.model.EvidenciaHabilitacion;
 
 class RemoteCaseStoreTest {
     private static final Instant NOW = Instant.parse("2026-10-17T13:00:00Z");
@@ -30,10 +31,10 @@ class RemoteCaseStoreTest {
                 RemoteCaseStore.toEventoFiscalizado(new Weighing(3, 4, "SBC1234", NOW, 18_390)));
     }
     @Test void registraYNotificaMedianteEjb() throws IOException {
-        when(remote.registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENTO))
+        when(remote.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, null, EVENTO))
                 .thenReturn(CASE);
-        assertEquals(CASE, store.registrar(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENT));
-        verify(remote).registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENTO);
+        assertEquals(CASE, store.registrar(TipoCasoAutomatico.EXCESO_CARGA, null, EVENT));
+        verify(remote).registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, null, EVENTO);
         when(remote.registrarCirculacionSinGuia(any(PosicionSinGuiaRemota.class))).thenReturn(CASE);
         assertEquals(CASE, store.registrarCirculacionSinGuia(EVENT));
         var captor = org.mockito.ArgumentCaptor.forClass(PosicionSinGuiaRemota.class);
@@ -43,6 +44,14 @@ class RemoteCaseStoreTest {
         when(remote.notificarCaso(4L, "c-1")).thenReturn(new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA"));
         assertEquals("NOTIFICADA", store.notify(4L, "c-1").getEstado());
         verify(remote).notificarCaso(4L, "c-1");
+    }
+    @Test void transmiteLaPruebaDocumentalConElEventoYPropagaErroresRemotos() throws IOException {
+        var prueba = new EvidenciaHabilitacion("SBC1234", NOW, null, null, null, null, null);
+        when(remote.registrarHabilitacion("GV-1", EVENTO, prueba)).thenReturn(CASE);
+        assertEquals(CASE, store.registrarHabilitacion("GV-1", EVENT, prueba));
+        verify(remote).registrarHabilitacion("GV-1", EVENTO, prueba);
+        when(remote.registrarHabilitacion("GV-1", EVENTO, prueba)).thenThrow(new EJBException("fallo"));
+        assertThrows(IOException.class, () -> store.registrarHabilitacion("GV-1", EVENT, prueba));
     }
     @Test void transmitePruebaGeometricaConElEventoAlEjb() throws IOException {
         TrackingEvent otra = new TrackingEvent("msg-2", 8, 1, "SBC1234", -34.91, -56.12,

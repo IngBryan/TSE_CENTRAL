@@ -32,6 +32,8 @@ import tse.lab.model.FundamentoResolucion;
 import tse.lab.model.Guia;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacionVista;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // Gestion de Infracciones (frontoffice de ciudadanos): el responsable de la empresa consulta los casos de
 // fiscalizacion de sus vehiculos con la evidencia que los origino y presenta un descargo dentro del plazo.
@@ -97,7 +99,7 @@ public class InfraccionesService {
 
     public record InfraccionDetalle(InfraccionResumen infraccion, GuiaVista guia, VehiculoVista vehiculo,
             List<PesajeVista> pesajes, int eventosTracking, DescargoVista descargo, ResolucionVista resolucion,
-            int plazoDescargoDias) {
+            int plazoDescargoDias, List<EvidenciaHabilitacionVista> pruebasHabilitacion) {
     }
 
     public record NuevoDescargo(String descripcion) {
@@ -328,7 +330,10 @@ public class InfraccionesService {
                         d.getCiPresentante()),
                 resuelto ? new ResolucionVista(caso.getEstado().name(), f == null ? null : f.getDescripcion(),
                         f == null ? null : texto(f.getFechaHora())) : null,
-                plazoDias);
+                plazoDias, caso.getEvidenciasHabilitacion().stream()
+                        .sorted(Comparator.comparing(EvidenciaHabilitacion::getFechaHora)
+                                .thenComparing(EvidenciaHabilitacion::getOrigen))
+                        .map(EvidenciaHabilitacionVista::de).toList());
     }
 
     private static String texto(Object valor) {

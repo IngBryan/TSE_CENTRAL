@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFacts;
+import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
+import tse.lab.model.EvidenciaHabilitacion;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
@@ -16,6 +19,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
+import java.util.Objects;
 
 class CaseAssignerTest {
     static class FakeStore implements CaseStore {
@@ -27,10 +31,10 @@ class CaseAssignerTest {
         @Override
         public DatosCaso registrar(TipoCasoAutomatico tipo, String guia, VehicleEvent evento) throws IOException {
             if (tipo == fallarTipo) throw new IOException("Falló segundo caso");
-            Caso caso = casos.stream().filter(c -> c.tipo() == tipo && java.util.Objects.equals(c.guia(), guia)
+            Caso caso = casos.stream().filter(c -> c.tipo() == tipo && Objects.equals(c.guia(), guia)
                     && c.evidencias().contains(evento)).findFirst().orElse(null);
             if (caso != null) return data(caso); // reentrega, también tras el cierre
-            caso = casos.stream().filter(c -> c.tipo() == tipo && java.util.Objects.equals(c.guia(), guia)
+            caso = casos.stream().filter(c -> c.tipo() == tipo && Objects.equals(c.guia(), guia)
                     && (c.estado()[0].equals("DETECTADA") || c.estado()[0].equals("NOTIFICADA")))
                     .findFirst().orElse(null);
             if (caso == null) {
@@ -39,6 +43,12 @@ class CaseAssignerTest {
             }
             if (!caso.evidencias().contains(evento)) caso.evidencias().add(evento);
             return data(caso);
+        }
+        @Override
+        public DatosCaso registrarHabilitacion(String guia, VehicleEvent evento, EvidenciaHabilitacion prueba)
+                throws IOException {
+            assertEquals(evento.timestamp(), prueba.getFechaHora());
+            return registrar(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, guia, evento);
         }
         @Override
         public DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) throws IOException {
@@ -77,7 +87,9 @@ class CaseAssignerTest {
         return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.asociado(guia));
     }
     private static Detection sinGuia(VehicleEvent e, Situation... tipos) {
-        return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.sinGuia());
+        var prueba = new EvidenciaHabilitacion(e.licensePlate(), e.timestamp(), null, null, null, null, null);
+        var facts = new VehicleFacts(new DatosVehiculo(e.licensePlate(), 1L, 8500, 25000, prueba), List.of());
+        return new Detection(e, facts, List.of(tipos), ResultadoAsociacionGpsGuia.sinGuia());
     }
 
     @Test

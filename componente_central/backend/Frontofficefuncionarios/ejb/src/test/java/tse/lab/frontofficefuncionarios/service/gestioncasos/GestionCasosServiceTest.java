@@ -57,6 +57,7 @@ import tse.lab.model.NodoBalanza;
 import tse.lab.model.PermisoCirculacion;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // CU Gestionar casos de fiscalizacion contra H2 con los DAOs reales.
 class GestionCasosServiceTest {
@@ -310,6 +311,26 @@ class GestionCasosServiceTest {
     }
 
     // ===== FA2: evidencia =====
+
+    @Test
+    void evidenciaDocumentalConservaLaFechaDelHechoAunqueElPermisoActualEsteVigente() throws Exception {
+        var fecha = Instant.parse("2026-10-10T12:00:00Z");
+        var prueba = new EvidenciaHabilitacion("SBA 1234", fecha, "PNC-ANTERIOR",
+                LocalDate.of(2025, 1, 1), LocalDate.of(2026, 10, 9), null, null).conOrigen("PESAJE");
+        em.getTransaction().begin();
+        var caso = em.find(CasoFiscalizacion.class, enDescargo);
+        caso.setTipoCaso("VEHICULO_SIN_HABILITACION");
+        caso.getEvidenciasHabilitacion().add(prueba);
+        em.getTransaction().commit();
+        em.clear();
+        var evidencia = servicio.evidencia(FUNCIONARIO, enDescargo, "t");
+        assertEquals("PNC-1", evidencia.vehiculo().nroPermiso()); // Documento actual
+        var historica = evidencia.pruebasHabilitacion().get(0);
+        assertEquals("PNC-ANTERIOR", historica.nroPermiso());
+        assertEquals("VENCIDO", historica.estadoPermiso());
+        assertEquals("SIN_REGISTRO", historica.estadoItv());
+        assertEquals(fecha.toString(), historica.fechaHora());
+    }
 
     @Test
     void evidenciaMuestraPesajeContraCapacidadDeclaradaYHabilitacion() throws Exception {

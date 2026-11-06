@@ -44,6 +44,7 @@ import tse.lab.model.EstadoValidacion;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Responsable;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // Gestion de Infracciones contra H2 con los DAOs reales: que ve la empresa y las reglas del descargo.
 class InfraccionesServiceTest {
@@ -88,6 +89,24 @@ class InfraccionesServiceTest {
     void tearDown() {
         em.close();
         emf.close();
+    }
+
+    @Test
+    void detalleExponeLosDocumentosQueOriginaronElCaso() throws Exception {
+        var fecha = Instant.parse("2026-11-06T12:00:00Z");
+        var prueba = new EvidenciaHabilitacion("SAB5678", fecha, null, null, null, null, null)
+                .conOrigen("TRACKING");
+        em.getTransaction().begin();
+        var caso = em.find(CasoFiscalizacion.class, notificado);
+        caso.setTipoCaso("VEHICULO_SIN_HABILITACION");
+        caso.getEvidenciasHabilitacion().add(prueba);
+        em.getTransaction().commit();
+        em.clear();
+        var detalle = servicio.detalle(RESPONSABLE, notificado, "t");
+        assertEquals(1, detalle.pruebasHabilitacion().size());
+        assertEquals("SIN_REGISTRO", detalle.pruebasHabilitacion().get(0).estadoPermiso());
+        assertEquals("SIN_REGISTRO", detalle.pruebasHabilitacion().get(0).estadoItv());
+        assertEquals(fecha.toString(), detalle.pruebasHabilitacion().get(0).fechaHora());
     }
 
     @Test

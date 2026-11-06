@@ -1,3 +1,4 @@
+import { EvidenciaHabilitacion } from "@/components/evidencia-habilitacion";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -152,6 +153,9 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           </p>
         ) : (
           <>
+            {caso.tipoCaso === "VEHICULO_SIN_HABILITACION" && (
+              <EvidenciaHabilitacion pruebas={ev.pruebasHabilitacion ?? []} />
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className={`flex flex-col gap-1 ${tarjeta}`}>
                 <h3 className="font-medium text-black dark:text-zinc-50">Guía de viaje</h3>
@@ -185,6 +189,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                       <span className={dato}>Peso + capacidad:</span> {kg(ev.vehiculo.pesoKg)} + {kg(ev.vehiculo.capacidadCargaKg)} ={" "}
                       <span className="font-medium">{kg(ev.vehiculo.pesoMaximoKg)}</span>
                     </p>
+                    {caso.tipoCaso !== "VEHICULO_SIN_HABILITACION" && <>
                     <p>
                       <span className={dato}>Permiso de circulación:</span>{" "}
                       {ev.vehiculo.nroPermiso ? `N° ${ev.vehiculo.nroPermiso}, vence ${fecha(ev.vehiculo.vencimientoPermiso)}` : "sin permiso"}
@@ -201,6 +206,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                       {ev.vehiculo.vencimientoItv ? `vence ${fecha(ev.vehiculo.vencimientoItv)}` : "sin ITV"}
                       {vencida(ev.vehiculo.vencimientoItv) && <Vencido />}
                     </p>
+                    </>}
                   </>
                 ) : (
                   <p className="text-zinc-600 dark:text-zinc-400">La guía no tiene vehículo asignado.</p>
