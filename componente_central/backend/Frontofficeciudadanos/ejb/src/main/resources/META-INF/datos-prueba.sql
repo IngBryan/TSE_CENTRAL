@@ -194,3 +194,5 @@ INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) SELECT CURRENT_DATE 
 INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, id_vehiculo, id_chofer, estado, fechaAsignacion, version) SELECT 'GV-LT' || LPAD(n::text, 5, '0'), 'Agropecuario', 'Granos a granel', 20000, CURRENT_DATE, 'Montevideo', 'Paysandu', 900, 'LT' || LPAD(n::text, 5, '0'), (SELECT id FROM choferes WHERE ci = '90000000' AND nro_empresa = 900), 'EN_CURSO', CURRENT_TIMESTAMP, 0 FROM generate_series(1, 500) AS n;
 INSERT INTO nodos_perifericos (tipo, id_externo, nombre, ubicacion, activo) SELECT 'TRACKING', 100000 + n, 'GPS LT' || LPAD(n::text, 5, '0'), 'Vehiculo LT' || LPAD(n::text, 5, '0'), true FROM generate_series(1, 500) AS n;
 INSERT INTO nodos_tracking (id) SELECT id FROM nodos_perifericos WHERE tipo = 'TRACKING' AND id_externo BETWEEN 100001 AND 100500;
+-- Rubros de las empresas de prueba (catalogo precargado en esquema-adicional.sql)
+INSERT INTO empresa_rubros (nro_empresa, id_rubro) VALUES (1, 1), (1, 2), (1, 3), (2, 1), (3, 1), (3, 2), (4, 1), (4, 5), (5, 1), (5, 3), (6, 7), (900, 1);

@@ -43,6 +43,24 @@ public class GuiasResource {
         return ejecutar(() -> guias.listar(usuario, correlationId(req)));
     }
 
+    // Catalogo precargado de tipos de carga [{"id": 1, "nombre": "Granos a granel"}, ...]: el tipoCarga de la
+    // guia tiene que ser uno de estos (400 con el campo "tipoCarga" si no)
+    @GET
+    @Path("/tipos-carga")
+    public Response tiposCarga(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> guias.tiposCarga(usuario, correlationId(req)));
+    }
+
+    // Catalogo precargado de rubros [{"id": 1, "nombre": "Agropecuario"}, ...]: el rubroCliente de la guia
+    // tiene que ser uno de estos (400 con el campo "rubroCliente" si no)
+    @GET
+    @Path("/rubros")
+    public Response rubros(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> guias.rubros(usuario, correlationId(req)));
+    }
+
     @POST
     public Response crear(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, NuevaGuia datos,
             @Context HttpServletRequest req) {

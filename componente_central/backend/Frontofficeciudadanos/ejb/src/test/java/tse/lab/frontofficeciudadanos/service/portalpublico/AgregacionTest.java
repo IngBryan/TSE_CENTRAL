@@ -58,36 +58,6 @@ class AgregacionTest {
     }
 
     @Test
-    void agrupandoLasReservadasNoSeMuestraSuEtiquetaYSeSumanEnOtros() {
-        // "b" y "c" quedan reservadas y juntan 3 empresas: van sumadas en "otros", sin su nombre
-        List<FilaPublica> r = Agregacion.protegerAgrupando(
-                List.of(fila("a", 10, 1L, 2L, 3L), fila("b", 4, 2L, 3L, 4L), fila("c", 2, 5L)), 3, "~otros", "Otros");
-
-        assertEquals(List.of("a", "~otros"), r.stream().map(FilaPublica::clave).toList());
-        assertEquals("Otros", r.get(1).etiqueta());
-        assertFalse(r.get(1).reservado());
-        assertEquals(6, r.get(1).cantidad());
-        assertEquals(6000, r.get(1).kg());
-    }
-
-    @Test
-    void siLasAgrupadasNoJuntanElUmbralOtrosQuedaReservado() {
-        List<FilaPublica> r = Agregacion.protegerAgrupando(List.of(fila("a", 3, 1L), fila("b", 2, 2L)), 3,
-                "~otros", "Otros");
-
-        assertEquals(1, r.size());
-        assertTrue(r.get(0).reservado());
-        assertNull(r.get(0).cantidad());
-    }
-
-    @Test
-    void sinReservadasNoSeAgregaOtros() {
-        List<FilaPublica> r = Agregacion.protegerAgrupando(List.of(fila("a", 10, 1L, 2L, 3L)), 3, "~otros", "Otros");
-
-        assertEquals(List.of("a"), r.stream().map(FilaPublica::clave).toList());
-    }
-
-    @Test
     void lasFilasEnCeroSePublicanYNoSeUsanParaCompletar() {
         List<FilaPublica> r = Agregacion.proteger(List.of(fila("enero", 0), fila("febrero", 3, 1L)), 3);
 

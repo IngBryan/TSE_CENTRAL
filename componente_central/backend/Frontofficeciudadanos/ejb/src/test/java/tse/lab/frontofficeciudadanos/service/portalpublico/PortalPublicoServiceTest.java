@@ -23,6 +23,8 @@ import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
 import tse.lab.frontofficeciudadanos.data.PortalPublicoDAO;
+import tse.lab.frontofficeciudadanos.data.RubroDAO;
+import tse.lab.frontofficeciudadanos.data.TipoCargaDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
@@ -38,6 +40,8 @@ import tse.lab.model.FundamentoResolucion;
 import tse.lab.model.Guia;
 import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
+import tse.lab.model.Rubro;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Vehiculo;
 
 // Portal publico contra H2 con los DAOs reales: validacion de empresas y estadisticas con el umbral.
@@ -60,22 +64,33 @@ class PortalPublicoServiceTest {
         set(servicio, "vehiculos", conEm(new VehiculoDAO()));
         set(servicio, "permisos", conEm(new PermisoCirculacionDAO()));
         set(servicio, "itvs", conEm(new ITVDAO()));
+        set(servicio, "rubros", conEm(new RubroDAO()));
+        set(servicio, "tiposCarga", conEm(new TipoCargaDAO()));
 
         em.getTransaction().begin();
-        // Empresas 1 a 3 habilitadas, cada una con un vehiculo habilitado; la 4 no habilitada
+        Rubro agro = new Rubro(1L, "Agropecuario");
+        Rubro construccion = new Rubro(2L, "Construccion");
+        em.persist(agro);
+        em.persist(construccion);
+        em.persist(new Rubro(3L, "Forestal"));
+        em.persist(new TipoCarga(1L, "Granos a granel"));
+        em.persist(new TipoCarga(2L, "Arena"));
+        // Empresas 1 a 3 habilitadas y de rubro "Agropecuario", cada una con un vehiculo habilitado; la 4 no
+        // habilitada y de rubro "Construccion", cada una con un vehiculo habilitado; la 4 no habilitada
         for (long nro = 1; nro <= 4; nro++) {
             Empresa e = new Empresa(nro, "Transportes " + nro, "Transportes " + nro + " S.A.", "Ruta " + nro, null);
             e.setHabilitada(nro <= 3);
+            e.setRubros(List.of(nro <= 3 ? agro : construccion));
             em.persist(e);
             Vehiculo v = new Vehiculo("SAA000" + nro, "Scania", "R 450", 9000, 26000, e);
             em.persist(v);
             em.persist(new PermisoCirculacion("PNC-" + nro, HOY.minusDays(10), HOY.plusDays(300), v));
             em.persist(new ITV(HOY.minusDays(10), HOY.plusDays(100), v));
             // Todas viajan en "Agropecuario"; solo la 4 en "Construccion"
-            viaje(e, v, "Agropecuario", 20000);
+            viaje(e, v, "Agropecuario", "Granos a granel", 20000);
         }
         Empresa cuatro = em.find(Empresa.class, 4L);
-        viaje(cuatro, em.find(Vehiculo.class, "SAA0004"), "construcción ", 10000);
+        viaje(cuatro, em.find(Vehiculo.class, "SAA0004"), "construcción ", "Contenedor", 10000);
         // Vehiculo de la 1 con la ITV vencida
         Vehiculo vencido = new Vehiculo("SBB9999", "Volvo", "FH", 9000, 26000, em.find(Empresa.class, 1L));
         em.persist(vencido);
@@ -151,16 +166,59 @@ class PortalPublicoServiceTest {
         assertEquals(90000, e.kgTransportados().valor());
         assertEquals(12, e.viajesPorMes().size());
 
+        // Carga por rubro: una fila por rubro del catalogo, por kg. "construcción " se cuenta en "Construccion".
         // "Construccion" es de una sola empresa: se reserva, y con ella "Agropecuario" (supresion
-        // complementaria), porque si no se deduciria restando del total. Los rubros reservados no se muestran
-        // por nombre (el de "Construccion" delataria a la empresa): van sumados en "Otros rubros", que junta
-        // las 3 empresas y se publica
-        assertEquals(List.of(PortalPublicoService.OTROS_RUBROS),
-                e.cargaPorRubro().stream().map(FilaPublica::clave).toList());
-        FilaPublica otros = e.cargaPorRubro().get(0);
-        assertEquals("Otros rubros", otros.etiqueta());
-        assertFalse(otros.reservado());
-        assertEquals(5, otros.cantidad());
+        // complementaria), porque si no se deduciria restando del total. "Forestal" no tiene viajes: 0 se publica.
+        assertEquals(List.of("Agropecuario", "Construccion", "Forestal"),
+                e.cargaPorRubro().stream().map(FilaPublica::etiqueta).toList());
+        assertEquals(List.of(true, true, false), e.cargaPorRubro().stream().map(FilaPublica::reservado).toList());
+        assertEquals(0, e.cargaPorRubro().get(2).cantidad());
+    }
+
+    @Test
+    void laCargaPorTipoJuntaEnOtrosLoQueNoEstaEnElCatalogo() throws Exception {
+        Estadisticas e = servicio.estadisticas(HOY.getYear(), "t");
+
+        // "Contenedor" no esta en el catalogo: va a "Otros tipos de carga" (sin su nombre), de una sola empresa,
+        // asi que se reserva y con ella "Granos a granel". "Arena" en 0.
+        assertEquals(List.of("Granos a granel", "Arena", "Otros tipos de carga"),
+                e.cargaPorTipoCarga().stream().map(FilaPublica::etiqueta).toList());
+        assertEquals(PortalPublicoService.OTROS, e.cargaPorTipoCarga().get(2).clave());
+        assertEquals(List.of(true, false, true), e.cargaPorTipoCarga().stream().map(FilaPublica::reservado).toList());
+    }
+
+    @Test
+    void empresasHabilitadasPorRubroSinContarLasNoHabilitadas() throws Exception {
+        Estadisticas e = servicio.estadisticas(HOY.getYear(), "t");
+
+        // La 4 es de "Construccion" pero no esta habilitada: no cuenta
+        assertEquals(List.of("Agropecuario", "Construccion", "Forestal"),
+                e.empresasPorRubro().stream().map(FilaPublica::etiqueta).toList());
+        assertEquals(java.util.Arrays.asList(3L, 0L, 0L),
+                e.empresasPorRubro().stream().map(FilaPublica::cantidad).toList());
+    }
+
+    @Test
+    void unRubroConMenosDeTresEmpresasSeReservaConSupresionComplementaria() throws Exception {
+        em.getTransaction().begin();
+        em.find(Empresa.class, 1L).setRubros(List.of(em.find(Rubro.class, 1L), em.find(Rubro.class, 3L)));
+        em.getTransaction().commit();
+        em.clear();
+
+        Estadisticas e = servicio.estadisticas(HOY.getYear(), "t");
+
+        // "Forestal" solo lo tiene la empresa 1: se reserva y con ella "Agropecuario", la mas chica visible
+        FilaPublica forestal = e.empresasPorRubro().stream().filter(f -> f.etiqueta().equals("Forestal"))
+                .findFirst().orElseThrow();
+        assertTrue(forestal.reservado());
+        assertNull(forestal.cantidad());
+        assertTrue(e.empresasPorRubro().get(0).reservado());
+    }
+
+    @Test
+    void laValidacionMuestraLosRubrosDeLaEmpresa() throws Exception {
+        assertEquals(List.of("Agropecuario"), servicio.validarEmpresa(1L, null, "t").rubros());
+        assertEquals(List.of("Construccion"), servicio.validarEmpresa(4L, null, "t").rubros());
     }
 
     @Test
@@ -235,8 +293,9 @@ class PortalPublicoServiceTest {
         em.persist(new FundamentoResolucion("t", funcionario, c));
     }
 
-    private void viaje(Empresa empresa, Vehiculo vehiculo, String rubro, long kg) {
+    private void viaje(Empresa empresa, Vehiculo vehiculo, String rubro, String tipoCarga, long kg) {
         Guia g = new Guia("GV-T" + (++guias), rubro, kg, HOY, "Montevideo", "Paysandu", empresa);
+        g.setTipoCarga(tipoCarga);
         g.setVehiculo(vehiculo);
         g.cambiarEstado(EstadoGuia.FINALIZADA);
         em.persist(g);

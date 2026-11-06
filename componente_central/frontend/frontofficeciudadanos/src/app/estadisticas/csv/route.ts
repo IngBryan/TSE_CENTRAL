@@ -3,12 +3,14 @@ import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { tipoInfraccion } from "@/lib/infracciones";
 import { TABLAS, type Estadisticas, type FilaPublica, type Tabla } from "@/lib/portal";
 
-// Descarga en CSV de una tabla del portal publico, como dato abierto: ?tabla=meses|rubros|infracciones.
+// Descarga en CSV de una tabla del portal publico, como dato abierto: ?tabla=meses|rubros|tipos-carga|empresas-rubro|infracciones.
 // Separador ";" y BOM UTF-8, para que Excel en es-UY lo abra con las columnas y las tildes bien. Lo reservado
 // por el umbral de agregacion sale como "Reservado", igual que en la pagina.
 const COLUMNAS: Record<Tabla, string[]> = {
   meses: ["Mes", "Viajes", "Kg transportados"],
   rubros: ["Rubro", "Viajes", "Kg transportados"],
+  "tipos-carga": ["Tipo de carga", "Viajes", "Kg transportados"],
+  "empresas-rubro": ["Rubro", "Empresas habilitadas"],
   infracciones: ["Tipo", "Infracciones confirmadas"],
 };
 
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
     return new Response("El servicio no está disponible", { status: 503 });
   }
 
-  const conKg = tabla !== "infracciones";
+  const conKg = tabla !== "infracciones" && tabla !== "empresas-rubro";
   const fila = (f: FilaPublica) => {
     const etiqueta =
       tabla === "infracciones"
@@ -54,8 +56,8 @@ export async function GET(request: Request) {
   });
 }
 
-// Comillas solo si hace falta (separador, comillas o salto de linea). El rubro lo escriben las empresas: si
-// empieza como una formula (=, +, -, @) se le antepone un apostrofo para que Excel no la ejecute.
+// Comillas solo si hace falta (separador, comillas o salto de linea). Por las dudas (datos viejos de texto libre):
+// si empieza como una formula (=, +, -, @) se le antepone un apostrofo para que Excel no la ejecute.
 function celda(texto: string) {
   const seguro = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
   return /[;"\r\n]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro;

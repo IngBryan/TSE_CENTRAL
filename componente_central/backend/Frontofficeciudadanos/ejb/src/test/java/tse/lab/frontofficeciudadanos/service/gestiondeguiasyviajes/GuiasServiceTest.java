@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -22,6 +23,8 @@ import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
+import tse.lab.frontofficeciudadanos.data.RubroDAO;
+import tse.lab.frontofficeciudadanos.data.TipoCargaDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
@@ -42,6 +45,8 @@ import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Guia;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Vehiculo;
 
 // Gestion de Viajes de Carga y CU-07 contra H2 con los DAOs reales.
@@ -73,6 +78,8 @@ class GuiasServiceTest {
         set(servicio, "perfiles", perfiles);
         set(servicio, "eventos", conEm(new EventoViajeDAO()));
         set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
+        set(servicio, "tiposCarga", conEm(new TipoCargaDAO()));
+        set(servicio, "rubros", conEm(new RubroDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         empresa.setHabilitada(true);
@@ -88,6 +95,10 @@ class GuiasServiceTest {
         em.getTransaction().begin();
         em.persist(empresa);
         em.persist(otra);
+        em.persist(new Rubro(1L, "Agropecuario"));
+        em.persist(new Rubro(2L, "Forestal"));
+        em.persist(new TipoCarga(1L, "Granos a granel"));
+        em.persist(new TipoCarga(2L, "Rollizos"));
         em.persist(responsable);
         em.persist(new Responsable(responsable, empresa));
         em.persist(bryan);
@@ -120,6 +131,38 @@ class GuiasServiceTest {
         assertEquals("SIN_ASIGNAR", g.estado());
         assertNull(g.vehiculo());
         assertEquals(List.of(g), servicio.listar(RESPONSABLE, "t"));
+    }
+
+    @Test
+    void elTipoDeCargaTieneQueSerDelCatalogoYSeGuardaConSuNombre() throws Exception {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Agropecuario", "Cohetes", 18000L, MANANA, "Montevideo", "Paysandú"), "t"));
+        assertEquals(Map.of("tipoCarga", "Elegí un tipo de carga de la lista."), e.getErrores());
+
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Forestal", "ROLLIZOS", 18000L, MANANA, "Rivera", "Montevideo"), "t"));
+        assertEquals("Rollizos", g.tipoCarga());
+    }
+
+    @Test
+    void elRubroDelClienteTieneQueSerDelCatalogoYSeGuardaConSuNombre() throws Exception {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Agro", "Rollizos", 18000L, MANANA, "Rivera", "Montevideo"), "t"));
+        assertEquals(Map.of("rubroCliente", "Elegí un rubro de la lista."), e.getErrores());
+
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("forestal", "Rollizos", 18000L, MANANA, "Rivera", "Montevideo"), "t"));
+        assertEquals("Forestal", g.rubroCliente());
+        assertEquals(List.of(new GuiasService.RubroVista(1L, "Agropecuario"), new GuiasService.RubroVista(2L, "Forestal")),
+                servicio.rubros(RESPONSABLE, "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.rubros("99999999", "t"));
+    }
+
+    @Test
+    void elCatalogoDeTiposDeCargaVieneOrdenadoYSoloParaElResponsable() throws Exception {
+        assertEquals(List.of(new GuiasService.TipoCargaVista(1L, "Granos a granel"),
+                new GuiasService.TipoCargaVista(2L, "Rollizos")), servicio.tiposCarga(RESPONSABLE, "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.tiposCarga("99999999", "t"));
     }
 
     @Test

@@ -75,6 +75,24 @@ public class PortalPublicoDAO {
                 .getResultList();
     }
 
+    // [nroEmpresa, tipoCarga, viajes, kg] de los viajes FINALIZADOS entre las dos fechas (inclusive)
+    public List<Object[]> viajesPorEmpresaYTipoCarga(LocalDate desde, LocalDate hasta) {
+        return em.createQuery("SELECT g.empresa.nroEmpresa, g.tipoCarga, COUNT(g), SUM(g.pesoCargaKg) FROM Guia g"
+                + " WHERE g.estado = :finalizada AND g.fecha BETWEEN :desde AND :hasta"
+                + " GROUP BY g.empresa.nroEmpresa, g.tipoCarga", Object[].class)
+                .setParameter("finalizada", EstadoGuia.FINALIZADA)
+                .setParameter("desde", desde)
+                .setParameter("hasta", hasta)
+                .getResultList();
+    }
+
+    // [nombre del rubro, nroEmpresa] de cada rubro de cada empresa habilitada (una empresa puede tener varios)
+    public List<Object[]> rubrosDeEmpresasHabilitadas() {
+        return em.createQuery("SELECT r.nombre, e.nroEmpresa FROM Empresa e JOIN e.rubros r"
+                + " WHERE e.habilitada = true", Object[].class)
+                .getResultList();
+    }
+
     // [nroEmpresa, tipoCaso, cantidad] de los casos CONFIRMADOS detectados en [desde, hasta)
     public List<Object[]> infraccionesConfirmadasPorEmpresaYTipo(Instant desde, Instant hasta) {
         return em.createQuery("SELECT c.vehiculo.empresa.nroEmpresa, c.tipoCaso, COUNT(c) FROM CasoFiscalizacion c"

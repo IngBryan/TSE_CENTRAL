@@ -38,6 +38,34 @@ async function llamar<T>(ruta: string, method: "GET" | "POST" | "PUT", body?: un
   return res;
 }
 
+// Un tipo de carga del catalogo precargado. Lista vacia si no se pudo obtener: el formulario lo avisa.
+export type TipoCarga = { id: number; nombre: string };
+
+// Catalogo precargado de tipos de carga: el de la guia se elige de esta lista
+export async function obtenerTiposCarga(): Promise<TipoCarga[]> {
+  try {
+    const res = await llamar<TipoCarga[]>("/empresa/guias/tipos-carga", "GET");
+    return res?.status === 200 && Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return [];
+  }
+}
+
+// Un rubro del catalogo precargado: el rubro del cliente de la guia
+export type Rubro = { id: number; nombre: string };
+
+// Catalogo precargado de rubros: el rubro del cliente se elige de esta lista. Vacia si no se pudo obtener.
+export async function obtenerRubros(): Promise<Rubro[]> {
+  try {
+    const res = await llamar<Rubro[]>("/empresa/guias/rubros", "GET");
+    return res?.status === 200 && Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return [];
+  }
+}
+
 export async function crearGuia(_previo: EstadoNuevaGuia, formulario: FormData): Promise<EstadoNuevaGuia> {
   const valores: ValoresGuia = {
     rubroCliente: String(formulario.get("rubroCliente") ?? ""),

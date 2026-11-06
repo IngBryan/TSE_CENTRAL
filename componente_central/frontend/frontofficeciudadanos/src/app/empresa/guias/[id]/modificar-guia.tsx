@@ -10,6 +10,8 @@ import {
   type ChoferResumen,
   type Guia,
   type ResultadoModificacion,
+  type Rubro,
+  type TipoCarga,
   type VehiculoResumen,
 } from "../actions";
 
@@ -27,13 +29,22 @@ export function ModificarGuia({
   guia,
   vehiculos,
   choferes,
+  tiposCarga,
+  rubros,
   hoy,
 }: {
   guia: Guia;
   vehiculos: VehiculoResumen[];
   choferes: ChoferResumen[];
+  tiposCarga: TipoCarga[];
+  rubros: Rubro[];
   hoy: string;
 }) {
+  // Opciones de los campos que se eligen de un catalogo
+  const opciones: Partial<Record<string, { id: number; nombre: string }[]>> = {
+    rubroCliente: rubros,
+    tipoCarga: tiposCarga,
+  };
   const router = useRouter();
   const [modo, setModo] = useState<Modo>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,8 +130,8 @@ export function ModificarGuia({
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
-              ["rubroCliente", "Rubro del cliente", "text"],
-              ["tipoCarga", "Tipo de carga", "text"],
+              ["rubroCliente", "Rubro del cliente", "select"],
+              ["tipoCarga", "Tipo de carga", "select"],
               ["pesoCargaKg", "Carga (kg)", "number"],
               ["fecha", "Fecha del viaje", "date"],
               ["origen", "Origen", "text"],
@@ -129,13 +140,35 @@ export function ModificarGuia({
           ).map(([n, texto, tipo]) => (
             <label key={n} className={etiqueta}>
               {texto}
-              <input
-                type={tipo}
-                value={datos[n]}
-                min={tipo === "date" ? hoy : tipo === "number" ? 1 : undefined}
-                onChange={(e) => setDatos({ ...datos, [n]: e.target.value })}
-                className={campo}
-              />
+              {tipo === "select" ? (
+                // Rubro del cliente y tipo de carga: de los catalogos precargados
+                <select
+                  value={datos[n]}
+                  onChange={(e) => setDatos({ ...datos, [n]: e.target.value })}
+                  className={`${campo} dark:bg-zinc-950`}
+                >
+                  <option value="" disabled>
+                    {n === "rubroCliente" ? "Elegí un rubro" : "Elegí un tipo de carga"}
+                  </option>
+                  {(opciones[n] ?? []).map((t) => (
+                    <option key={t.id} value={t.nombre}>
+                      {t.nombre}
+                    </option>
+                  ))}
+                  {/* Si el actual no esta en el catalogo (o no se pudo obtener), se muestra igual */}
+                  {datos[n] && !(opciones[n] ?? []).some((t) => t.nombre === datos[n]) && (
+                    <option value={datos[n]}>{datos[n]}</option>
+                  )}
+                </select>
+              ) : (
+                <input
+                  type={tipo}
+                  value={datos[n]}
+                  min={tipo === "date" ? hoy : tipo === "number" ? 1 : undefined}
+                  onChange={(e) => setDatos({ ...datos, [n]: e.target.value })}
+                  className={campo}
+                />
+              )}
               {errorCampo(n)}
             </label>
           ))}

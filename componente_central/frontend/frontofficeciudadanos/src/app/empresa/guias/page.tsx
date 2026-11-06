@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Encabezado, botonSecundario } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
-import type { Guia } from "./actions";
+import { obtenerRubros, obtenerTiposCarga, type Guia, type Rubro, type TipoCarga } from "./actions";
 import { NuevaGuia } from "./nueva-guia";
 
 function formatoFecha(iso: string) {
@@ -29,6 +29,10 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   if (!sesion) redirect("/");
   const params = await searchParams;
 
+  // Los catalogos de tipos de carga y rubros, para el formulario de nueva guia (en paralelo con el listado)
+  // El catch evita un rechazo sin atender si la pagina termina antes de esperarla
+  const pedidoTiposCarga = obtenerTiposCarga().catch((): TipoCarga[] => []);
+  const pedidoRubros = obtenerRubros().catch((): Rubro[] => []);
   let guias: Guia[] | null = null;
   let error: string | null = null;
   try {
@@ -43,6 +47,8 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
   }
+  const tiposCarga = await pedidoTiposCarga;
+  const rubros = await pedidoRubros;
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" }); // yyyy-mm-dd
 
@@ -72,7 +78,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
           </p>
         ) : (
           <>
-            <NuevaGuia hoy={hoy} />
+            <NuevaGuia hoy={hoy} tiposCarga={tiposCarga} rubros={rubros} />
 
             {guias && guias.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">

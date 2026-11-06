@@ -18,6 +18,8 @@ import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
+import tse.lab.frontofficeciudadanos.data.RubroDAO;
+import tse.lab.frontofficeciudadanos.data.TipoCargaDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
@@ -33,6 +35,8 @@ import tse.lab.model.EstadoGuia;
 import tse.lab.model.EventoViaje;
 import tse.lab.model.Guia;
 import tse.lab.model.ModificacionGuia;
+import tse.lab.model.Rubro;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.TipoModificacionGuia;
 import tse.lab.model.Vehiculo;
@@ -64,7 +68,20 @@ public class GuiasService {
     private EventoViajeDAO eventos;
     @EJB
     private ModificacionGuiaDAO modificaciones;
+    @EJB
+    private TipoCargaDAO tiposCarga;
+    @EJB
+    private RubroDAO rubros;
 
+    // Un tipo de carga del catalogo precargado (tabla tipos_carga)
+    public record TipoCargaVista(Long id, String nombre) {
+    }
+
+    // Un rubro del catalogo precargado (tabla rubros): el rubro del cliente de la guia
+    public record RubroVista(Long id, String nombre) {
+    }
+
+    // rubroCliente y tipoCarga: el nombre de uno de sus catalogos (ver rubros y tiposCarga)
     public record NuevaGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha, String origen, String destino) {
     }
 
@@ -112,6 +129,18 @@ public class GuiasService {
     public List<GuiaVista> listar(String ciResponsable, String correlationId) throws NoAutorizadoException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
         return guias.buscarPorEmpresaOrdenadas(empresa).stream().map(this::vista).toList();
+    }
+
+    // Catalogo precargado de tipos de carga, para elegir el de la guia al crearla o editarla
+    public List<TipoCargaVista> tiposCarga(String ciResponsable, String correlationId) throws NoAutorizadoException {
+        autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
+        return tiposCarga.listar().stream().map(t -> new TipoCargaVista(t.getId(), t.getNombre())).toList();
+    }
+
+    // Catalogo precargado de rubros, para elegir el rubro del cliente al crear o editar una guia
+    public List<RubroVista> rubros(String ciResponsable, String correlationId) throws NoAutorizadoException {
+        autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
+        return rubros.listar().stream().map(r -> new RubroVista(r.getId(), r.getNombre())).toList();
     }
 
     public GuiaVista crear(String ciResponsable, NuevaGuia datos, String correlationId)
@@ -400,13 +429,30 @@ public class GuiasService {
             String destino) {
     }
 
-    // Reglas de los datos de una guia (alta y edicion): rubro y tipo de carga obligatorios, carga entre 1 y
-    // MAX_CARGA_KG, fecha >= hoy, origen y destino obligatorios y distintos.
-    private static DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
+    // Reglas de los datos de una guia (alta y edicion): rubro del cliente y tipo de carga obligatorios y de sus
+    // catalogos precargados (se guardan con el nombre del catalogo), carga entre 1 y MAX_CARGA_KG, fecha >= hoy,
+    // origen y destino obligatorios y distintos.
+    private DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
             String origenTexto, String destinoTexto) throws DatosInvalidosException {
         Map<String, String> errores = new LinkedHashMap<>();
         String rubro = texto(errores, "rubroCliente", "El rubro del cliente", rubroCliente, MAX_TEXTO);
         String tipoCarga = texto(errores, "tipoCarga", "El tipo de carga", tipoCargaTexto, MAX_TEXTO);
+        if (rubro != null) {
+            Rubro delCatalogo = rubros.buscarPorNombre(rubro);
+            if (delCatalogo == null) {
+                errores.put("rubroCliente", "Elegí un rubro de la lista.");
+            } else {
+                rubro = delCatalogo.getNombre();
+            }
+        }
+        if (tipoCarga != null) {
+            TipoCarga delCatalogo = tiposCarga.buscarPorNombre(tipoCarga);
+            if (delCatalogo == null) {
+                errores.put("tipoCarga", "Elegí un tipo de carga de la lista.");
+            } else {
+                tipoCarga = delCatalogo.getNombre();
+            }
+        }
         String origen = texto(errores, "origen", "El origen", origenTexto, MAX_LUGAR);
         String destino = texto(errores, "destino", "El destino", destinoTexto, MAX_LUGAR);
         if (pesoCargaKg == null || pesoCargaKg <= 0) {

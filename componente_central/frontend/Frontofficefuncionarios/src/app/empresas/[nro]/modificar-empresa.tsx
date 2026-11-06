@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { botonPrimario, botonSecundario } from "@/components/encabezado";
 import { MAX_DIRECCION, MAX_NOMBRE, type EmpresaDetalle } from "@/lib/empresas";
-import { modificarEmpresa } from "../actions";
+import { modificarEmpresa, type ResultadoRubros } from "../actions";
+import { ElegirRubros } from "../elegir-rubros";
 
 const entrada =
   "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:text-zinc-50";
@@ -14,11 +15,13 @@ const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:tex
 // Lo abre AccionesEmpresa, que tambien muestra el mensaje cuando sale bien.
 export function ModificarEmpresa({
   empresa,
+  rubros,
   onCerrar,
   onModificada,
   onDesactualizada,
 }: {
   empresa: EmpresaDetalle;
+  rubros: ResultadoRubros;
   onCerrar: () => void;
   onModificada: (mensaje: string) => void;
   // Otro funcionario la modifico mientras tanto: el formulario se cierra y la pagina muestra los datos actuales
@@ -32,6 +35,7 @@ export function ModificarEmpresa({
     direccion: empresa.direccion ?? "",
     habilitada: empresa.habilitada,
   });
+  const [rubrosElegidos, setRubrosElegidos] = useState<number[]>((empresa.rubros ?? []).map((r) => r.id));
   const [error, setError] = useState<string | null>(null);
   const [campos, setCampos] = useState<Record<string, string>>({});
   const [pendiente, iniciar] = useTransition();
@@ -46,7 +50,12 @@ export function ModificarEmpresa({
     setError(null);
     iniciar(async () => {
       // Si sale bien, revalidatePath en la action vuelve a renderizar la pagina con los datos nuevos
-      const r = await modificarEmpresa(empresa.nroEmpresa, { ...datos, version });
+      // Si el catalogo no se pudo cargar no se mandan los rubros: el backend conserva los actuales
+      const r = await modificarEmpresa(empresa.nroEmpresa, {
+        ...datos,
+        rubros: rubros.ok ? rubrosElegidos : undefined,
+        version,
+      });
       if (r.ok) {
         onModificada(r.mensaje);
       } else if (r.desactualizada) {
@@ -112,6 +121,14 @@ export function ModificarEmpresa({
         />
         {errorCampo("direccion")}
       </label>
+
+      <ElegirRubros
+        catalogo={rubros}
+        elegidos={rubrosElegidos}
+        onCambiar={setRubrosElegidos}
+        deshabilitado={pendiente}
+        error={campos.rubros}
+      />
 
       <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
         <input

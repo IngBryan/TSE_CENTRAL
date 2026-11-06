@@ -2,9 +2,11 @@ package tse.lab.frontofficefuncionarios.service.gestiondeempresas;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -13,6 +15,7 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficefuncionarios.data.CiudadanoDAO;
 import tse.lab.frontofficefuncionarios.data.EmpresaDAO;
 import tse.lab.frontofficefuncionarios.data.ResponsableDAO;
+import tse.lab.frontofficefuncionarios.data.RubroDAO;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.LogFuncionarios;
@@ -25,6 +28,7 @@ import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
 
 // CU Gestionar empresas de transporte (funcionario): listado, alta, consulta, modificacion y asociacion
 // de un usuario (ciudadano) como responsable de la empresa. Cada operacion verifica primero que quien
@@ -54,6 +58,12 @@ public class GestionEmpresasService {
     private ResponsableDAO responsables;
     @EJB
     private FiscalizacionHabilitacionesService habilitaciones;
+    @EJB
+    private RubroDAO rubros;
+
+    // Un rubro del catalogo precargado (tabla rubros)
+    public record RubroVista(Long id, String nombre) {
+    }
 
     // vehiculos: cuantos tiene habilitados, no habilitados, por vencer y dados de baja (fiscalizacion de
     // habilitaciones); el detalle esta en GET /empresas/{nro}/vehiculos
@@ -66,15 +76,17 @@ public class GestionEmpresasService {
     }
 
     // version: la de la entidad (@Version). El front la manda al modificar para detectar cambios concurrentes.
+    // rubros: los de la empresa, ordenados por nombre
     public record EmpresaDetalle(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            boolean habilitada, ResponsableVista responsable, Long version) {
+            boolean habilitada, ResponsableVista responsable, List<RubroVista> rubros, Long version) {
     }
 
     // habilitada es opcional: en el alta, por defecto la empresa queda no habilitada. ciResponsable es
     // opcional: la cedula de un usuario registrado y validado (ver usuariosDisponibles) que queda como
-    // responsable de la empresa en la misma transaccion.
+    // responsable de la empresa en la misma transaccion. rubros (opcional): ids del catalogo de rubros; la
+    // empresa puede tener varios o ninguno.
     public record AltaEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            Boolean habilitada, String ciResponsable) {
+            Boolean habilitada, String ciResponsable, List<Long> rubros) {
     }
 
     // Un usuario que se puede asociar como responsable: validado y sin ser responsable de otra empresa.
@@ -83,9 +95,10 @@ public class GestionEmpresasService {
     }
 
     // El nroEmpresa no se modifica: es la clave con la que la referencian choferes, vehiculos, guias y el
-    // responsable. habilitada es opcional: si no viene, se conserva. version: la que se estaba mirando al editar.
+    // responsable. habilitada es opcional: si no viene, se conserva. rubros (ids del catalogo) tambien: si no
+    // viene (null) se conservan; una lista vacia los quita todos. version: la que se estaba mirando al editar.
     public record CambiosEmpresa(String nombrePublico, String razonSocial, String direccion, Boolean habilitada,
-            Long version) {
+            List<Long> rubros, Long version) {
     }
 
     public record AsociacionUsuario(String ci) {
@@ -104,6 +117,12 @@ public class GestionEmpresasService {
         LOG.info(() -> LogFuncionarios.evento("empresas.listado").correlationId(correlationId).usuario(ci)
                 .campo("cantidad", lista.size()).toString());
         return lista;
+    }
+
+    // Catalogo precargado de rubros, para elegir los de la empresa en el alta y la modificacion
+    public List<RubroVista> rubros(String ci, String correlationId) throws NoAutorizadoException {
+        autorizacion.funcionario(ci, correlationId);
+        return rubros.listar().stream().map(GestionEmpresasService::vista).toList();
     }
 
     // FA2: consulta de una empresa
@@ -156,6 +175,7 @@ public class GestionEmpresasService {
         if (Boolean.TRUE.equals(datos == null ? null : datos.habilitada()) && ciResponsable.isEmpty()) {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
+        List<Rubro> rubrosElegidos = rubrosDelCatalogo(errores, datos == null ? null : datos.rubros());
         if (!errores.isEmpty()) {
             LOG.warning(() -> LogFuncionarios.aviso("empresa.alta.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("motivo", "datos_invalidos").campo("campos", errores.keySet()).toString());
@@ -169,6 +189,7 @@ public class GestionEmpresasService {
 
         Empresa empresa = new Empresa(nro, nombre, razon, direccion, null);
         empresa.setHabilitada(Boolean.TRUE.equals(datos.habilitada()));
+        empresa.setRubros(rubrosElegidos == null ? List.of() : rubrosElegidos);
         // Otra alta con el mismo numero pudo entrar despues del control de arriba: la PK la rechaza aca, antes
         // de registrar al responsable, y se responde 409 en vez de fallar al cerrar la transaccion
         if (!empresas.guardarNueva(empresa)) {
@@ -181,6 +202,7 @@ public class GestionEmpresasService {
         }
         LOG.info(() -> LogFuncionarios.evento("empresa.alta").correlationId(correlationId).usuario(ci)
                 .campo("nroEmpresa", nro).campo("habilitada", empresa.isHabilitada())
+                .campo("rubros", empresa.getRubros().stream().map(Rubro::getId).toList())
                 .campo("ciResponsable", (ciudadano == null ? "-" : ciudadano.getCi())).toString());
         return new OperacionRealizada("La empresa fue registrada.", detalle(empresa));
     }
@@ -214,6 +236,7 @@ public class GestionEmpresasService {
         if (Boolean.TRUE.equals(habilitada) && !empresa.isHabilitada() && empresa.getResponsable() == null) {
             errores.put("habilitada", SIN_RESPONSABLE_NO_SE_HABILITA);
         }
+        List<Rubro> rubrosElegidos = rubrosDelCatalogo(errores, cambios == null ? null : cambios.rubros());
         if (!errores.isEmpty()) {
             LOG.warning(() -> LogFuncionarios.aviso("empresa.modificacion.rechazada").correlationId(correlationId)
                     .usuario(ci).campo("nroEmpresa", nroEmpresa).campo("motivo", "datos_invalidos")
@@ -234,12 +257,18 @@ public class GestionEmpresasService {
         if (habilitada != null && habilitada != empresa.isHabilitada()) {
             modificados.add("habilitada");
         }
+        if (rubrosElegidos != null && !idsDe(rubrosElegidos).equals(idsDe(empresa.getRubros()))) {
+            modificados.add("rubros");
+        }
         // Entidad administrada: los cambios se guardan al cerrar la transaccion
         empresa.setNombrePublico(nombre);
         empresa.setRazonSocial(razon);
         empresa.setDireccion(direccion);
         if (habilitada != null) {
             empresa.setHabilitada(habilitada);
+        }
+        if (modificados.contains("rubros")) {
+            empresa.setRubros(rubrosElegidos);
         }
         empresas.sincronizar(); // flush: la respuesta lleva la version nueva
         LOG.info(() -> LogFuncionarios.evento("empresa.modificada").correlationId(correlationId).usuario(ci)
@@ -357,7 +386,37 @@ public class GestionEmpresasService {
                     c == null || c.getEstado() == null ? null : c.getEstado().name());
         }
         return new EmpresaDetalle(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.getDireccion(),
-                e.isHabilitada(), responsable, e.getVersion());
+                e.isHabilitada(), responsable, e.getRubros().stream().map(GestionEmpresasService::vista).toList(),
+                e.getVersion());
+    }
+
+    private static RubroVista vista(Rubro r) {
+        return new RubroVista(r.getId(), r.getNombre());
+    }
+
+    private static Set<Long> idsDe(List<Rubro> lista) {
+        Set<Long> ids = new LinkedHashSet<>();
+        lista.forEach(r -> ids.add(r.getId()));
+        return ids;
+    }
+
+    // Los rubros elegidos, del catalogo precargado. null si no vino la lista (en la modificacion: se conservan
+    // los actuales). Los ids repetidos cuentan una vez; si alguno no esta en el catalogo, error en "rubros".
+    private List<Rubro> rubrosDelCatalogo(Map<String, String> errores, List<Long> ids) {
+        if (ids == null) {
+            return null;
+        }
+        Set<Long> pedidos = new LinkedHashSet<>(ids);
+        if (pedidos.contains(null)) {
+            errores.put("rubros", "Elegí los rubros de la lista.");
+            return null;
+        }
+        List<Rubro> encontrados = rubros.buscarPorIds(pedidos);
+        if (encontrados.size() != pedidos.size()) {
+            errores.put("rubros", "Alguno de los rubros elegidos no existe.");
+            return null;
+        }
+        return encontrados;
     }
 
     private static void validarTextos(Map<String, String> errores, String nombre, String razon, String direccion) {

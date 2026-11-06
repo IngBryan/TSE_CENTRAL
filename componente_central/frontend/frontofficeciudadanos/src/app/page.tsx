@@ -42,7 +42,7 @@ const PUBLICOS = [
   {
     href: "/estadisticas",
     titulo: "Estadísticas del transporte de carga",
-    texto: "Empresas y vehículos habilitados, viajes, carga por rubro e infracciones confirmadas.",
+    texto: "Empresas y vehículos habilitados, viajes, carga por rubro y por tipo de carga, e infracciones confirmadas.",
   },
 ];
 

@@ -5,7 +5,15 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
-import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
+import {
+  obtenerRubros,
+  obtenerTiposCarga,
+  type ChoferResumen,
+  type Guia,
+  type Rubro,
+  type TipoCarga,
+  type VehiculoResumen,
+} from "../actions";
 import { ModificarGuia } from "./modificar-guia";
 
 type EventoViaje = {
@@ -73,6 +81,9 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   const sesion = await getSesion();
   if (!sesion) redirect("/");
   const { id } = await params;
+  // Los catalogos de tipos de carga y rubros, por si se edita la guia; el catch evita un rechazo sin atender
+  const pedidoTiposCarga = obtenerTiposCarga().catch((): TipoCarga[] => []);
+  const pedidoRubros = obtenerRubros().catch((): Rubro[] => []);
 
   let datos: DetalleGuia | null = null;
   let error: string | null = null;
@@ -98,6 +109,8 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
     : [];
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" });
   const conflictos = datos?.eventos.filter((e) => e.resultado === "CONFLICTO").length ?? 0;
+  const tiposCarga = await pedidoTiposCarga;
+  const rubros = await pedidoRubros;
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -137,7 +150,14 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             </section>
 
             {datos.guia.estado === "ASIGNADA" && (
-              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} />
+              <ModificarGuia
+                guia={datos.guia}
+                vehiculos={datos.vehiculos}
+                choferes={datos.choferes}
+                tiposCarga={tiposCarga}
+                rubros={rubros}
+                hoy={hoy}
+              />
             )}
 
             <section className="flex flex-col gap-3">

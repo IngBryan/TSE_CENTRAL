@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { botonPrimario, botonSecundario } from "@/components/encabezado";
 import type { EmpresaDetalle } from "@/lib/empresas";
-import { modificarEmpresa, type ResultadoUsuarios } from "../actions";
+import { modificarEmpresa, type ResultadoRubros, type ResultadoUsuarios } from "../actions";
 import { AsociarResponsable } from "./asociar-responsable";
 import { ModificarEmpresa } from "./modificar-empresa";
 
@@ -15,11 +15,14 @@ type Panel = "modificar" | "asociar" | null;
 export function AccionesEmpresa({
   empresa,
   disponibles,
+  rubros,
   creada,
 }: {
   empresa: EmpresaDetalle;
   // Solo si la empresa no tiene responsable: la primera tanda de usuarios que se pueden asociar
   disponibles: ResultadoUsuarios | null;
+  // Catalogo de rubros, para modificar los de la empresa
+  rubros: ResultadoRubros;
   // Viene del alta (?creada=1). Es el mensaje inicial: la siguiente accion lo reemplaza, aunque la URL lo
   // siga teniendo
   creada: boolean;
@@ -67,6 +70,7 @@ export function AccionesEmpresa({
     return (
       <ModificarEmpresa
         empresa={empresa}
+        rubros={rubros}
         onCerrar={() => setPanel(null)}
         onModificada={(mensaje) => {
           setExito(mensaje);

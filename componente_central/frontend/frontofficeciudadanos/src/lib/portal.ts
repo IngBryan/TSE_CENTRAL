@@ -18,6 +18,8 @@ export type ValidacionEmpresa = {
   nombrePublico: string;
   razonSocial: string;
   habilitada: boolean;
+  // Rubros de la empresa (catalogo precargado), ordenados
+  rubros: string[];
   vehiculo: ValidacionVehiculo | null;
   consultadoEl: string;
 };
@@ -40,7 +42,11 @@ export type Estadisticas = {
   viajes: Valor;
   kgTransportados: Valor;
   viajesPorMes: FilaPublica[];
+  // Por rubro del cliente de la guia y por tipo de carga (catalogos precargados)
   cargaPorRubro: FilaPublica[];
+  cargaPorTipoCarga: FilaPublica[];
+  // Empresas habilitadas por rubro de la empresa, hoy: una empresa con varios rubros cuenta en cada uno
+  empresasPorRubro: FilaPublica[];
   infraccionesConfirmadasPorTipo: FilaPublica[];
   infraccionesCada100Viajes: Indicador;
   casosResueltos: Valor;
@@ -62,6 +68,8 @@ export const decimal = (n: number | null | undefined) =>
 export const TABLAS = {
   meses: "viajesPorMes",
   rubros: "cargaPorRubro",
+  "tipos-carga": "cargaPorTipoCarga",
+  "empresas-rubro": "empresasPorRubro",
   infracciones: "infraccionesConfirmadasPorTipo",
 } as const;
 export type Tabla = keyof typeof TABLAS;

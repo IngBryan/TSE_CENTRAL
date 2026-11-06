@@ -8,7 +8,7 @@ import { BackendNoDisponible, llamarBackend, type RespuestaBackend } from "@/lib
 import type { ErrorBackend } from "@/lib/casos";
 import { ESTADOS_VALIDACION, type EmpresaDetalle } from "@/lib/empresas";
 import { esFiltro, type FiscalizacionEmpresa } from "@/lib/vehiculos";
-import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "../actions";
+import { buscarUsuariosDisponibles, obtenerRubros, type ResultadoRubros, type ResultadoUsuarios } from "../actions";
 import { AccionesEmpresa } from "./acciones-empresa";
 import { VehiculosEmpresa } from "./vehiculos-empresa";
 import { registrarLog } from "@/lib/log";
@@ -39,6 +39,11 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   // evita un rechazo sin atender si la pagina termina antes de esperarla.
   const pedidoDisponibles = buscarUsuariosDisponibles("").catch(
     (): ResultadoUsuarios => ({ ok: false, error: "No se pudieron obtener los usuarios registrados." }),
+  );
+
+  // El catalogo de rubros, para modificarlos; si falla, la pagina se muestra igual
+  const pedidoRubros = obtenerRubros().catch(
+    (): ResultadoRubros => ({ ok: false, error: "No se pudieron obtener los rubros." }),
   );
 
   const correlationId = randomUUID();
@@ -78,12 +83,17 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
   const r = empresa.responsable;
   const disponibles = r ? null : await pedidoDisponibles;
   const vehiculos = await pedidoVehiculos;
+  const rubros = await pedidoRubros;
   return (
     <Pagina sesion={sesion} nro={nro} empresa={empresa}>
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
         <p><span className={dato}>Nombre público:</span> {empresa.nombrePublico ?? "-"}</p>
         <p><span className={dato}>Razón social:</span> {empresa.razonSocial ?? "-"}</p>
         <p className="sm:col-span-2"><span className={dato}>Dirección:</span> {empresa.direccion ?? "-"}</p>
+        <p className="sm:col-span-2">
+          <span className={dato}>Rubros:</span>{" "}
+          {empresa.rubros?.length ? empresa.rubros.map((r) => r.nombre).join(", ") : "Sin rubros asignados"}
+        </p>
       </section>
 
       <section className={`flex flex-col gap-2 ${tarjeta}`}>
@@ -101,7 +111,7 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
         )}
       </section>
 
-      <AccionesEmpresa empresa={empresa} disponibles={disponibles} creada={creada} />
+      <AccionesEmpresa empresa={empresa} disponibles={disponibles} rubros={rubros} creada={creada} />
 
       <VehiculosEmpresa nro={nro} fiscalizacion={vehiculos.fiscalizacion} error={vehiculos.error} filtro={filtro} />
     </Pagina>
