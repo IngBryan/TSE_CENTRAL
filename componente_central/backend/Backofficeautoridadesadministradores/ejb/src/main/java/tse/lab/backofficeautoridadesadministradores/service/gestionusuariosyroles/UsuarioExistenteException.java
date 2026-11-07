@@ -3,7 +3,8 @@ package tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyrol
 import jakarta.ejb.ApplicationException;
 
 /**
- * La cédula ya tiene un usuario del tipo que se quiere dar de alta.
+ * La cédula ya es funcionario, administrador o autoridad: una persona tiene
+ * un solo rol interno.
  */
 @ApplicationException(rollback = true)
 public class UsuarioExistenteException extends RuntimeException {

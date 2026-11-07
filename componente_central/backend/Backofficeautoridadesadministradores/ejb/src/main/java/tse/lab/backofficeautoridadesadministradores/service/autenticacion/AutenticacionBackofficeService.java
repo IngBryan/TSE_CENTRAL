@@ -66,7 +66,7 @@ public class AutenticacionBackofficeService {
         if (ci == null || ci.isBlank()) {
             return Optional.empty();
         }
-        return rolDe(usuarios.buscarPorCi(ci));
+        return Optional.ofNullable(usuarios.buscarRol(ci));
     }
 
     private static Optional<String> rolDe(UsuarioBackoffice usuario) {

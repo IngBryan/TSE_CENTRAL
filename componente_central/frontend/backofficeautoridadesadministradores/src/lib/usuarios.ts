@@ -82,7 +82,8 @@ export type FiltrosUsuarios = {
 };
 
 export function esRolUsuario(valor: unknown): valor is RolUsuario {
-  return typeof valor === "string" && valor in NOMBRE_ROL;
+  // hasOwn y no `in`: `in` también acepta "toString", "constructor", etc.
+  return typeof valor === "string" && Object.hasOwn(NOMBRE_ROL, valor);
 }
 
 export const NOMBRE_ROL: Record<RolUsuario, string> = {

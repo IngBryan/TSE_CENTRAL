@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -17,6 +18,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.RolUsuario;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioExistenteException;
 import tse.lab.model.Administrador;
 import tse.lab.model.Autoridad;
 import tse.lab.model.Chofer;
@@ -178,6 +180,23 @@ class UsuarioDAOTest {
         assertEquals("hash", usuario.getContrasena());
         assertEquals(RolUsuario.AUTORIDAD, usuarios.rolBackoffice(ADMINISTRADOR));
         assertEquals(List.of(), usuarios.listarCedulas(RolUsuario.ADMINISTRADOR, null, 0, 10));
+    }
+
+    // Simula dos altas simultáneas: la base rechaza la segunda por clave duplicada
+    @Test
+    void unAltaDuplicadaEsUsuarioExistente() {
+        em.getTransaction().begin();
+        em.clear();
+
+        assertThrows(UsuarioExistenteException.class,
+                () -> usuarios.guardar(new Funcionario(FUNCIONARIO, "otra@mtop.gub.uy")));
+        em.getTransaction().rollback();
+        em.clear();
+
+        em.getTransaction().begin();
+        assertThrows(UsuarioExistenteException.class,
+                () -> usuarios.guardar(new Administrador(ADMINISTRADOR, "hash")));
+        em.getTransaction().rollback();
     }
 
     @Test

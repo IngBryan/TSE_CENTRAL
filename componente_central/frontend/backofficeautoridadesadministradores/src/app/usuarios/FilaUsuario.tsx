@@ -188,7 +188,10 @@ function FormularioCambioRol({
     (tipo) => !(internos.length === 1 && internos[0] === tipo)
   );
 
-  const [rol, setRol] = useState<TipoAltaUsuario>(opciones[0]);
+  const [rolElegido, setRol] = useState<TipoAltaUsuario>(opciones[0]);
+  // Tras un cambio exitoso la fila se revalida y el rol recién asignado deja
+  // de ser una opción: se pasa a la primera, igual que el select
+  const rol = opciones.includes(rolElegido) ? rolElegido : opciones[0];
   const [contrasena, setContrasena] = useState("");
   const [confirmacion, setConfirmacion] = useState("");
   const [email, setEmail] = useState("");

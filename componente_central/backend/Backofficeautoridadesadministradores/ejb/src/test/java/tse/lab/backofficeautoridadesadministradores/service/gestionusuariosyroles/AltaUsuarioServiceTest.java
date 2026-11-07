@@ -37,8 +37,12 @@ class AltaUsuarioServiceTest {
         final List<Object> guardados = new ArrayList<>();
 
         @Override
-        public boolean existeUsuarioBackoffice(String ci) {
-            return guardados.stream().anyMatch(u -> u instanceof UsuarioBackoffice b && b.getCi().equals(ci));
+        public RolUsuario rolBackoffice(String ci) {
+            return guardados.stream()
+                    .filter(u -> u instanceof UsuarioBackoffice b && b.getCi().equals(ci))
+                    .map(u -> u instanceof Administrador ? RolUsuario.ADMINISTRADOR : RolUsuario.AUTORIDAD)
+                    .findFirst()
+                    .orElse(null);
         }
 
         @Override
@@ -109,14 +113,23 @@ class AltaUsuarioServiceTest {
     }
 
     @Test
-    void unFuncionarioNoSeRepitePeroPuedeSerAdministrador() {
+    void unFuncionarioNoSeRepiteNiPuedeSerTambienAdministrador() {
         servicio.crear("99999999", "FUNCIONARIO", "1234567", null, "ana@mtop.gub.uy");
 
         assertThrows(UsuarioExistenteException.class,
                 () -> servicio.crear("99999999", "FUNCIONARIO", "1234567", null, "otra@mtop.gub.uy"));
+        assertThrows(UsuarioExistenteException.class,
+                () -> servicio.crear("99999999", "ADMINISTRADOR", "1234567", CONTRASENA, null));
+        assertEquals(1, usuarios.guardados.size());
+    }
 
+    @Test
+    void unAdministradorNoPuedeSerTambienFuncionario() {
         servicio.crear("99999999", "ADMINISTRADOR", "1234567", CONTRASENA, null);
-        assertEquals(2, usuarios.guardados.size());
+
+        assertThrows(UsuarioExistenteException.class,
+                () -> servicio.crear("99999999", "FUNCIONARIO", "1234567", null, "ana@mtop.gub.uy"));
+        assertEquals(1, usuarios.guardados.size());
     }
 
     @Test

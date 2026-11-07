@@ -1,15 +1,19 @@
 package tse.lab.backofficeautoridadesadministradores.data;
 
+import java.sql.SQLException;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 import jakarta.ejb.Stateless;
+import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.PersistenceException;
 import jakarta.persistence.Query;
 
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.RolUsuario;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioExistenteException;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Funcionario;
 
@@ -153,10 +157,37 @@ public class UsuarioDAO {
         return em.find(Funcionario.class, ci);
     }
 
-    // Administrador, Autoridad o Funcionario
+    /**
+     * Guarda un Administrador, Autoridad o Funcionario nuevo.
+     *
+     * @throws UsuarioExistenteException si la cédula ya está en la tabla: otra
+     *         alta de la misma cédula se confirmó entre el chequeo del servicio
+     *         y este insert
+     */
     public void guardar(Object usuario) {
-        em.persist(usuario);
-        em.flush();
+        try {
+            em.persist(usuario);
+            em.flush();
+        } catch (EntityExistsException e) {
+            throw new UsuarioExistenteException(USUARIO_EXISTENTE);
+        } catch (PersistenceException e) {
+            if (esClaveDuplicada(e)) {
+                throw new UsuarioExistenteException(USUARIO_EXISTENTE);
+            }
+            throw e;
+        }
+    }
+
+    private static final String USUARIO_EXISTENTE = "La cédula ya tiene un usuario interno";
+
+    // 23505: unique_violation del estándar SQL; lo usan PostgreSQL y H2
+    private static boolean esClaveDuplicada(Throwable e) {
+        for (Throwable causa = e; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Tablas propias de cada subtipo (herencia JOINED): la fila base, con la contrasena, esta en usuarios_backoffice

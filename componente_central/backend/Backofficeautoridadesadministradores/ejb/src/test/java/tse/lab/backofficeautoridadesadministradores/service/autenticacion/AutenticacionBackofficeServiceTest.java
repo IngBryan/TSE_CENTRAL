@@ -35,6 +35,15 @@ class AutenticacionBackofficeServiceTest {
         public UsuarioBackoffice buscarPorCi(String ci) {
             return datos.get(ci);
         }
+
+        @Override
+        public String buscarRol(String ci) {
+            UsuarioBackoffice u = datos.get(ci);
+            if (u instanceof Administrador) {
+                return "ADMINISTRADOR";
+            }
+            return u instanceof Autoridad ? "AUTORIDAD" : null;
+        }
     }
 
     @BeforeAll

@@ -42,7 +42,8 @@ public class AltaUsuarioService {
      * @param contrasena obligatoria para administrador y autoridad
      * @param email obligatorio para funcionario
      * @throws DatosUsuarioInvalidosException si algún dato no es válido
-     * @throws UsuarioExistenteException si la cédula ya tiene ese usuario
+     * @throws UsuarioExistenteException si la cédula ya es funcionario,
+     *         administrador o autoridad
      */
     public UsuarioCreado crear(
             String ciAdministrador,
@@ -54,18 +55,22 @@ public class AltaUsuarioService {
         RolUsuario rol = ValidacionUsuario.rolInterno(tipo);
         String cedula = ValidacionUsuario.cedula(ci);
 
+        String correo = null;
+        if (rol == RolUsuario.FUNCIONARIO) {
+            correo = ValidacionUsuario.email(email);
+        } else {
+            ValidacionUsuario.contrasena(contrasena);
+        }
+
+        Funcionario funcionario = usuarios.buscarFuncionario(cedula);
+        sinRolInterno(cedula, rol, funcionario);
+
         switch (rol) {
-            case ADMINISTRADOR -> {
-                ValidacionUsuario.contrasena(contrasena);
-                noExisteEnBackoffice(cedula);
-                usuarios.guardar(new Administrador(cedula, Contrasenas.generarHash(contrasena)));
-            }
-            case AUTORIDAD -> {
-                ValidacionUsuario.contrasena(contrasena);
-                noExisteEnBackoffice(cedula);
-                usuarios.guardar(new Autoridad(cedula, Contrasenas.generarHash(contrasena)));
-            }
-            case FUNCIONARIO -> crearFuncionario(cedula, ValidacionUsuario.email(email));
+            case ADMINISTRADOR -> usuarios.guardar(
+                    new Administrador(cedula, Contrasenas.generarHash(contrasena)));
+            case AUTORIDAD -> usuarios.guardar(
+                    new Autoridad(cedula, Contrasenas.generarHash(contrasena)));
+            case FUNCIONARIO -> crearFuncionario(cedula, correo, funcionario);
             default -> throw new IllegalStateException("Tipo no admitido: " + rol);
         }
 
@@ -78,26 +83,30 @@ public class AltaUsuarioService {
         return new UsuarioCreado(cedula, rol);
     }
 
-    private void crearFuncionario(String cedula, String email) {
-        Funcionario existente = usuarios.buscarFuncionario(cedula);
-
+    // existente: un funcionario inactivo, que se reactiva, o null
+    private void crearFuncionario(String cedula, String email, Funcionario existente) {
         if (existente == null) {
             usuarios.guardar(new Funcionario(cedula, email));
             return;
-        }
-        if (existente.isActivo()) {
-            throw new UsuarioExistenteException("La cédula " + cedula + " ya es funcionario");
         }
         existente.setActivo(true);
         existente.setEmail(email);
     }
 
-    // Administradores y autoridades comparten la tabla usuarios_backoffice (la cédula es la clave):
-    // una persona no puede ser las dos cosas
-    private void noExisteEnBackoffice(String cedula) {
-        if (usuarios.existeUsuarioBackoffice(cedula)) {
-            throw new UsuarioExistenteException(
-                    "La cédula " + cedula + " ya es administrador o autoridad");
+    // Una persona tiene un solo rol interno (como en CambioRolService): si ya
+    // tiene uno, para darle otro está el cambio de rol
+    private void sinRolInterno(String cedula, RolUsuario nuevo, Funcionario funcionario) {
+        RolUsuario actual = usuarios.rolBackoffice(cedula);
+        if (actual == null && funcionario != null && funcionario.isActivo()) {
+            actual = RolUsuario.FUNCIONARIO;
         }
+        if (actual == null) {
+            return;
+        }
+
+        String mensaje = "La cédula " + cedula + " ya es " + actual.name().toLowerCase();
+        throw new UsuarioExistenteException(actual == nuevo
+                ? mensaje
+                : mensaje + "; para darle otro rol usá el cambio de rol");
     }
 }

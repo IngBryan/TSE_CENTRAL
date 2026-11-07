@@ -44,7 +44,11 @@ function urlPagina(pagina: number, filtros: Filtros): string {
   return `/usuarios?${parametros}`;
 }
 
-// Un valor que no sea un entero positivo muestra la primera página
+// El backend lee la página como int de Java: un número mayor le da error
+const PAGINA_MAXIMA = 2_147_483_647;
+
+// Un valor que no sea un entero positivo que el backend acepte muestra la
+// primera página
 function numeroDePagina(valor: Parametro): number {
   const texto = primero(valor);
 
@@ -52,7 +56,7 @@ function numeroDePagina(valor: Parametro): number {
 
   const numero = Number(texto);
 
-  return Number.isSafeInteger(numero) && numero >= 1 ? numero : 1;
+  return numero >= 1 && numero <= PAGINA_MAXIMA ? numero : 1;
 }
 
 function nombreCompleto(usuario: DatosUsuario): string {
