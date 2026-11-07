@@ -31,10 +31,15 @@ import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoTrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.RemoteWeighingDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.PendingWeighingsDetection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationDetector;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.routes.RemoteRutasAutorizadasSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.RemoteIntervalosGuiasGpsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveGpsRegistry;
 import tse.lab.fiscalizacionautomatica.ruleengine.nodes.ActiveNodesClient;
@@ -95,6 +100,7 @@ public class Main {
         String user = System.getenv("EJB_USER");
         String password = System.getenv("EJB_PASSWORD");
 
+        boolean desvioHabilitado = Boolean.parseBoolean(env("ROUTE_DEVIATION_ENABLED", "false"));
         CountDownLatch stopRequested = new CountDownLatch(1);
         CountDownLatch stopped = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -108,7 +114,11 @@ public class Main {
                 NodeCommunications gpsCommunications = new NodeCommunications(nodes::reportGpsCommunications,
                         Clock.systemUTC());
                 VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
-                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
+                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
+                RemoteIntervalosGuiasGpsSource intervalos =
+                        new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password);
+                RemoteRutasAutorizadasSource rutas = desvioHabilitado
+                        ? new RemoteRutasAutorizadasSource(wildFlyUrl(), user, password) : null) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             if (!waitForMongo(database, stopRequested) || !waitForActiveGps(activeGps, stopRequested)) {
                 return; // stopped while waiting
@@ -119,7 +129,14 @@ public class Main {
             MongoTrackingEventDAO dao = new MongoTrackingEventDAO(database, Clock.systemUTC());
             dao.createIndexes();
             ConnectionFactory factory = createRabbitConnectionFactory();
-            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(createDetector(facts), dao,
+            List<SituationRule> reglas = new java.util.ArrayList<>(List.of(
+                    new TripWithoutGuideRule(), new OverloadRule()));
+            // La regla puede evaluarse en pruebas; en producción se habilita una vez
+            // integrado el agrupamiento y las evidencias de 4B/4C.
+            if (desvioHabilitado) {
+                reglas.add(new RouteDeviationRule(intervalos, rutas, dao));
+            }
+            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(new SituationDetector(facts, reglas, new ContextoEventoSource(intervalos)), dao,
                     new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
                     Connection connection = connectToRabbit(factory, stopRequested)) {
                 if (connection == null) {
@@ -220,9 +237,11 @@ public class Main {
         String user = System.getenv("EJB_USER");
         String password = System.getenv("EJB_PASSWORD");
         try (MongoClient mongo = createMongoClient();
-                RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
-                VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
-                RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password)) {
+        RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
+        VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
+        RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
+        RemoteIntervalosGuiasGpsSource intervalos =
+                new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             ScalesApiClient api = new ScalesApiClient(url, balanzas.clientId(),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
@@ -238,7 +257,7 @@ public class Main {
             reportScaleCommunications(nodes, result);
 
             // Also the ones left pending by previous runs
-            int notEvaluated = new PendingWeighingsDetection(createDetector(facts), weighingDAO,
+            int notEvaluated = new PendingWeighingsDetection(createDetector(facts, new ContextoEventoSource(intervalos)), weighingDAO,
                     new CaseAssigner(cases)).detectPending();
             if (notEvaluated > 0) {
                 LogFiscalizacion.error(LogFiscalizacion.evento("pesajes.no_evaluados").campo("cantidad", notEvaluated));
@@ -275,6 +294,10 @@ public class Main {
     /** The situations that are detected; adding a situation means adding its rule here. */
     private static SituationDetector createDetector(VehicleFactsSource facts) {
         return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()));
+    }
+
+    private static SituationDetector createDetector(VehicleFactsSource facts, ContextoEventoSource contexto) {
+        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule()), contexto);
     }
 
     /**

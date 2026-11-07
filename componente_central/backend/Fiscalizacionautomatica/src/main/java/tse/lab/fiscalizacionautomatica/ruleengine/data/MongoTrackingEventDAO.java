@@ -87,6 +87,20 @@ public class MongoTrackingEventDAO implements TrackingEventDAO {
     }
 
     @Override
+    public List<TrackingEvent> findByLicensePlateBetween(String matricula, Instant desde, Instant hasta, int limit) {
+        if (matricula == null || matricula.isBlank() || desde == null || hasta == null
+                || !desde.isBefore(hasta) || limit < 1) {
+            throw new IllegalArgumentException("Matrícula, rango y límite GPS inválidos");
+        }
+        return collection.find(Filters.and(Filters.eq("licensePlate", matricula),
+                        Filters.gte("timestamp", Date.from(desde)), Filters.lt("timestamp", Date.from(hasta))))
+                .sort(Sorts.ascending("timestamp"))
+                .limit(limit)
+                .map(MongoTrackingEventDAO::fromDocument)
+                .into(new ArrayList<>());
+    }
+
+    @Override
     public void markDetected(TrackingEvent event) {
         Bson pending = Filters.and(Filters.eq("licensePlate", event.licensePlate()),
                 Filters.eq("timestamp", Date.from(event.timestamp())), Filters.eq("detected", false));

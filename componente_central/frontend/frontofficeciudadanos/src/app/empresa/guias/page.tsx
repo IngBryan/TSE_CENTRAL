@@ -6,6 +6,7 @@ import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { obtenerCatalogos, type Guia } from "./actions";
 import { NuevaGuia } from "./nueva-guia";
+import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
 
 function formatoFecha(iso: string) {
   const [a, m, d] = iso.split("-");
@@ -33,6 +34,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   const pedidoCatalogos = obtenerCatalogos();
   let guias: Guia[] | null = null;
   let error: string | null = null;
+  let localidades: LocalidadVista[] = [];
   try {
     const res = await llamarBackend<Guia[] & { detalle?: string }>("/empresa/guias", {
       correlationId: randomUUID(),
@@ -44,6 +46,14 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
+  }
+  try {
+    const res = await llamarBackend<LocalidadVista[]>("/localidades", {
+      correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
+    });
+    if (res.status === 200 && Array.isArray(res.data)) localidades = res.data;
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
   }
   const { tiposCarga, rubros } = await pedidoCatalogos;
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
@@ -75,7 +85,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
           </p>
         ) : (
           <>
-            <NuevaGuia hoy={hoy} tiposCarga={tiposCarga} rubros={rubros} />
+            <NuevaGuia hoy={hoy} tiposCarga={tiposCarga} rubros={rubros} localidades={localidades} />
 
             {guias && guias.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
@@ -108,7 +118,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
                           {g.tipoCarga && <span className="block text-xs text-zinc-500">{g.tipoCarga}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          {g.origen} → {g.destino}
+                          {mostrarLocalidad(g.origen, g.origenDepartamento)} → {mostrarLocalidad(g.destino, g.destinoDepartamento)}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{g.pesoCargaKg.toLocaleString("es-UY")} kg</td>
                         <td className="px-4 py-3">

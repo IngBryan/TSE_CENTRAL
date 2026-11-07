@@ -7,6 +7,9 @@
         <class>tse.lab.model.Rubro</class>
         <class>tse.lab.model.TipoCarga</class>
         <class>tse.lab.model.Guia</class>
+        <class>tse.lab.model.Localidad</class>
+        <class>tse.lab.model.RutaReferencia</class>
+        <class>tse.lab.model.GuiaRutaAutorizada</class>
         <class>tse.lab.model.Vehiculo</class>
         <class>tse.lab.model.Chofer</class>
         <class>tse.lab.model.Responsable</class>

@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
+import { SelectorLocalidad } from "@/components/selector-localidad";
+import type { LocalidadVista } from "@/lib/localidades";
 import { crearGuia, type EstadoNuevaGuia, type Rubro, type TipoCarga } from "./actions";
 import { OpcionesCatalogo } from "./opciones-catalogo";
 
@@ -11,16 +13,30 @@ const CAMPOS = [
   { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "select", vacio: "Elegí un tipo de carga", plural: "tipos de carga" },
   { nombre: "pesoCargaKg", etiqueta: "Carga (kg)", tipo: "number" },
   { nombre: "fecha", etiqueta: "Fecha del viaje", tipo: "date" },
-  { nombre: "origen", etiqueta: "Origen", tipo: "text" },
-  { nombre: "destino", etiqueta: "Destino", tipo: "text" },
 ] as const;
 
-export function NuevaGuia({ hoy, tiposCarga, rubros }: { hoy: string; tiposCarga: TipoCarga[]; rubros: Rubro[] }) {
+export function NuevaGuia({
+  hoy,
+  tiposCarga,
+  rubros,
+  localidades,
+}: {
+  hoy: string;
+  tiposCarga: TipoCarga[];
+  rubros: Rubro[];
+  localidades: LocalidadVista[];
+}) {
   const opciones = { rubroCliente: rubros, tipoCarga: tiposCarga };
   const [abierto, setAbierto] = useState(false);
+  const [origenId, setOrigenId] = useState<number | null>(null);
+  const [destinoId, setDestinoId] = useState<number | null>(null);
   const [estado, accion, guardando] = useActionState<EstadoNuevaGuia, FormData>(async (previo, datos) => {
     const r = await crearGuia(previo, datos);
-    if (r.ok) setAbierto(false);
+    if (r.ok) {
+      setAbierto(false);
+      setOrigenId(null);
+      setDestinoId(null);
+    }
     return r;
   }, {});
 
@@ -32,9 +48,12 @@ export function NuevaGuia({ hoy, tiposCarga, rubros }: { hoy: string; tiposCarga
             Guardamos la guía {estado.ok}. Ahora la podés asignar a un vehículo y un chofer.
           </p>
         )}
-        <button type="button" onClick={() => setAbierto(true)} className={`${botonGubUy} self-start`}>
+        <button type="button" onClick={() => setAbierto(true)} disabled={localidades.length === 0} className={`${botonGubUy} self-start`}>
           Nueva guía
         </button>
+        {localidades.length === 0 && <p role="alert" className="text-sm text-red-700">
+          No se pudo obtener el catálogo de localidades. Recargá la página para crear una guía.
+        </p>}
       </div>
     );
   }
@@ -94,9 +113,18 @@ export function NuevaGuia({ hoy, tiposCarga, rubros }: { hoy: string; tiposCarga
             </label>
           );
         })}
+        <SelectorLocalidad nombre="origenId" etiqueta="Origen" localidades={localidades}
+          valor={origenId ?? ""} onChange={setOrigenId}
+          error={estado.campos?.origenId || estado.campos?.origen} />
+        <SelectorLocalidad nombre="destinoId" etiqueta="Destino" localidades={localidades}
+          valor={destinoId ?? ""} onChange={setDestinoId}
+          error={estado.campos?.destinoId || estado.campos?.destino} />
       </div>
+      {origenId !== null && origenId === destinoId && <p role="alert" className="text-sm text-red-700">
+        Seleccioná localidades diferentes para origen y destino.
+      </p>}
       <div className="flex gap-3">
-        <button type="submit" disabled={guardando} className={botonGubUy}>
+        <button type="submit" disabled={guardando || localidades.length === 0 || (origenId !== null && origenId === destinoId)} className={botonGubUy}>
           {guardando ? "Guardando…" : "Guardar guía"}
         </button>
         <button type="button" onClick={() => setAbierto(false)} disabled={guardando} className={botonSecundario}>

@@ -1,29 +1,31 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
 import java.io.IOException;
-import java.util.List;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
 
-/** Operations on the fiscalization cases (see {@link RemoteCaseStore}). They don't decide anything. */
+/** Operación atómica e idempotente por (contexto, tipo, evento) en PostgreSQL. */
 public interface CaseStore {
+    /** Registra el evento en el caso abierto adecuado; lo crea si todavía no existe. */
+    DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException;
 
-    /** @return open cases (DETECTADA or NOTIFICADA) of the vehicle */
-    List<DatosCaso> openCases(String licensePlate) throws IOException;
+    /** Registra atómicamente caso, clave de GPS y prueba geométrica; nunca omitir la prueba. */
+    default DatosCaso registrarDesvio(String idGuia, TrackingEvent evento, PruebaDesvio prueba)
+            throws IOException {
+        throw new IOException("El repositorio no implementa evidencias geométricas");
+    }
 
-    /** @return the case that already has the event as evidence; null if none */
-    DatosCaso caseOf(VehicleEvent event) throws IOException;
+    /** Puede devolver null si todavía falta confirmar movimiento con una segunda muestra GPS. */
+    default DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) throws IOException {
+        throw new IOException("Repositorio sin seguimiento de circulaciones");
+    }
 
-    /**
-     * Creates a case DETECTADA with the event as evidence. Fails if the vehicle already has an open case of
-     * that type (e.g. created at the same time by another pod).
-     *
-     * @param guideId null if the case has no guide
-     */
-    DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException;
-
-    void addEvidence(long caseId, VehicleEvent event) throws IOException;
+    default void cerrarCirculacionPorGuia(String matricula, java.time.Instant fecha) throws IOException {
+        // Implementaciones locales de pruebas pueden no gestionar circulaciones.
+    }
 
     /** Notifies the case to the company: DETECTADA to NOTIFICADA. */
     DatosCaso notify(long caseId, String correlationId) throws IOException;

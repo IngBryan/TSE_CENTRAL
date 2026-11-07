@@ -87,6 +87,44 @@ export type EvidenciaVista = {
   vehiculo: VehiculoVista | null;
   pesajes: PesajeVista[];
   eventosTracking: EventoTrackingVista[];
+  pruebasDesvio?: PruebaDesvioVista[];
+};
+
+// Instantánea persistida de la evaluación geométrica al confirmar un desvío.
+export type PruebaDesvioVista = {
+  fechaHora: string;
+  fechaPareja: string;
+  latConfirmante: number;
+  lonConfirmante: number;
+  latPareja: number;
+  lonPareja: number;
+  distanciaConfirmanteMetros: number;
+  distanciaParejaMetros: number;
+  umbralMetros: number;
+  ventanaMaximaSegundos: number;
+  hashesRutas: string[];
+};
+
+export type CirculacionVista = {
+  id: number;
+  idCaso: number;
+  matricula: string;
+  estado: "PENDIENTE_MOVIMIENTO" | "ACTIVA" | "FINALIZADA";
+  inicio: string;
+  fin: string | null;
+  ultimaMedicion: string | null;
+  motivoFin: string | null;
+  cantidadClavesGps: number;
+  finalInferido: boolean;
+};
+
+export type PaginaGpsCaso = {
+  idCaso: number;
+  totalClaves: number;
+  indiceDesde: number;
+  siguienteIndice: number | null;
+  sinRecuperar: number;
+  posiciones: import("@/lib/seguimiento").PuntoGpsSeguimiento[];
 };
 
 // Un evento de tracking se identifica por el vehiculo y el momento

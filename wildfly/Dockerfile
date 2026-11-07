@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp -q -f Modelo/pom.xml clean install -Dmaven.test.skip=true; \
     mvn -B -ntp -q -f AdaptadorPdi/pom.xml clean install -Dmaven.test.skip=true; \
     for project in Frontofficeciudadanos Frontofficefuncionarios Backofficeautoridadesadministradores; do \
-      mvn -B -ntp -q -f "$project/pom.xml" clean package -Dmaven.test.skip=true; \
+      mvn -B -ntp -q -f "$project/pom.xml" clean install -Dmaven.test.skip=true; \
     done; \
     mkdir /out; \
     cp Frontofficeciudadanos/ear/target/*.ear Frontofficefuncionarios/ear/target/*.ear \

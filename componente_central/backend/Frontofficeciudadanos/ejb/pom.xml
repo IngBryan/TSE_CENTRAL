@@ -143,6 +143,13 @@
                             para clientes fuera de WildFly (Fiscalizacionautomatica) -->
                         <generateClient>true</generateClient>
                         <clientIncludes>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/rutas/RutasAutorizadasRemote.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/rutas/DatosRutaAutorizada.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/IntervalosGuiasGpsRemote.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/IntervaloGuiaGps.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/AsociacionTemporalGuia.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/AsociacionTemporalGuia$Estado.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/AsociacionTemporalGuia$Resultado.class</clientInclude>
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCurso.class</clientInclude>
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/ViajesEnCursoRemote.class</clientInclude>
                             <clientInclude>tse/lab/frontofficeciudadanos/service/gestiondeguiasyviajes/DatosViaje.class</clientInclude>

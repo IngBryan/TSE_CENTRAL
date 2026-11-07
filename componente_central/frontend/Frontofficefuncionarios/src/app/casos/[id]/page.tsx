@@ -18,9 +18,11 @@ import {
   type ErrorBackend,
   type EstadoCaso,
   type EvidenciaVista,
+  type CirculacionVista,
 } from "@/lib/casos";
 import { ResolverCaso } from "./resolver-caso";
 import { registrarLog } from "@/lib/log";
+import { EvidenciasEnVivo } from "./evidencias-en-vivo";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
@@ -45,6 +47,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
   let detalle: RespuestaBackend<CasoDetalle & ErrorBackend>;
   let evidencia: RespuestaBackend<EvidenciaVista & ErrorBackend> | null;
   let descargo: RespuestaBackend<DescargoVista & ErrorBackend> | null;
+  let circulacion: RespuestaBackend<CirculacionVista & ErrorBackend> | null = null;
   try {
     // En paralelo (p95 < 500 ms). Si el detalle falla, las otras dos fallan por lo mismo y no se muestran.
     // Evidencia y descargo no cortan la pagina si el backend se cae a mitad: se informa en su seccion.
@@ -74,6 +77,14 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
   }
 
   const caso = detalle.data;
+  if (caso.tipoCaso === "VIAJE_SIN_GUIA") {
+    try {
+      circulacion = await llamarBackend<CirculacionVista & ErrorBackend>(`/casos/${id}/circulacion`, opciones);
+    } catch (e) {
+      if (!(e instanceof BackendNoDisponible)) throw e;
+      // Sin MongoDB/servicio de circulación, el resto del expediente sigue visible.
+    }
+  }
   const ev = evidencia?.status === 200 ? evidencia.data : null;
   const desc = descargo?.status === 200 ? descargo.data : null;
   const sinDescargo = descargo?.status === 404 && descargo.data?.error === "SIN_DESCARGO";
@@ -233,24 +244,14 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
               )}
             </div>
 
-            {ev.eventosTracking.length > 0 && (
-              <div className={tarjeta}>
-                <h3 className="mb-2 font-medium text-black dark:text-zinc-50">Eventos de tracking asociados</h3>
-                <ul className="flex flex-wrap gap-2">
-                  {ev.eventosTracking.map((t) => (
-                    <li
-                      key={`${t.matricula}|${t.fechaHora}`}
-                      className="rounded bg-zinc-100 px-2 py-1 font-mono text-xs dark:bg-zinc-900"
-                    >
-                      {t.matricula} · {t.fechaHora}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </>
         )}
       </section>
+
+      <EvidenciasEnVivo id={caso.id} tipo={caso.tipoCaso} guiaId={caso.guia?.id ?? null} fechaDeteccion={caso.fechaDeteccion}
+        estadoCaso={caso.estado} eventosIniciales={ev?.eventosTracking ?? []}
+        pruebasIniciales={ev?.pruebasDesvio ?? []}
+        circulacion={circulacion?.status === 200 ? circulacion.data : null} />
 
       <section className="flex flex-col gap-3">
         <h2 className={titulo}>Descargo de la empresa</h2>

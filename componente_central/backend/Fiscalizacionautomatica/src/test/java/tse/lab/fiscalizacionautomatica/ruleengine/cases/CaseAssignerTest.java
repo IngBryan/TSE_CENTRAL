@@ -1,207 +1,241 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Detection;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
-import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFacts;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
-import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
-import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
 
 class CaseAssignerTest {
-
-    private static final Instant T1 = Instant.parse("2026-10-17T13:00:00Z");
-    private static final Instant T2 = Instant.parse("2026-10-17T13:00:10Z");
-    private static final Instant T3 = Instant.parse("2026-10-17T13:00:20Z");
-    private static final DatosVehiculo VEHICLE = new DatosVehiculo("SBC1234", 1L, 8500, 25000);
-    private static final VehicleFacts WITHOUT_TRIP = new VehicleFacts(VEHICLE, List.of());
-
-    /** In memory, with the same guarantees as the database. */
-    static class FakeCaseStore implements CaseStore {
-
-        record StoredCase(long id, String type, String guideId, List<VehicleEvent> evidence, String[] state) {
-        }
-
-        final List<StoredCase> cases = new ArrayList<>();
-        final Map<VehicleEvent, Long> caseOfEvent = new HashMap<>();
-        boolean down;
+    static class FakeStore implements CaseStore {
+        record Caso(long id, TipoCasoAutomatico tipo, String guia, List<VehicleEvent> evidencias, String[] estado) { }
+        final List<Caso> casos = new ArrayList<>();
+        final List<String> correlacionesNotificadas = new ArrayList<>();
+        TipoCasoAutomatico fallarTipo;
 
         @Override
-        public List<DatosCaso> openCases(String licensePlate) throws IOException {
-            failIfDown();
-            return cases.stream()
-                    .filter(c -> c.state()[0].equals("DETECTADA") || c.state()[0].equals("NOTIFICADA"))
-                    .map(FakeCaseStore::data)
-                    .toList();
-        }
-
-        @Override
-        public DatosCaso caseOf(VehicleEvent event) throws IOException {
-            failIfDown();
-            Long id = caseOfEvent.get(event);
-            return id == null ? null : data(find(id));
-        }
-
-        @Override
-        public DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException {
-            failIfDown();
-            StoredCase created = new StoredCase(cases.size() + 1L, caseType.name(), guideId, new ArrayList<>(),
-                    new String[] { "DETECTADA" });
-            cases.add(created);
-            addEvidence(created.id(), event);
-            return data(created);
-        }
-
-        @Override
-        public void addEvidence(long caseId, VehicleEvent event) throws IOException {
-            failIfDown();
-            find(caseId).evidence().add(event);
-            caseOfEvent.put(event, caseId);
-        }
-
-        @Override
-        public DatosCaso notify(long caseId, String correlationId) throws IOException {
-            failIfDown();
-            StoredCase stored = find(caseId);
-            if (stored.state()[0].equals("DETECTADA")) {
-                stored.state()[0] = "NOTIFICADA";
+        public DatosCaso registrar(TipoCasoAutomatico tipo, String guia, VehicleEvent evento) throws IOException {
+            if (tipo == fallarTipo) throw new IOException("Falló segundo caso");
+            Caso caso = casos.stream().filter(c -> c.tipo() == tipo && java.util.Objects.equals(c.guia(), guia)
+                    && c.evidencias().contains(evento)).findFirst().orElse(null);
+            if (caso != null) return data(caso); // reentrega, también tras el cierre
+            caso = casos.stream().filter(c -> c.tipo() == tipo && java.util.Objects.equals(c.guia(), guia)
+                    && (c.estado()[0].equals("DETECTADA") || c.estado()[0].equals("NOTIFICADA")))
+                    .findFirst().orElse(null);
+            if (caso == null) {
+                caso = new Caso(casos.size() + 1L, tipo, guia, new ArrayList<>(), new String[]{"DETECTADA"});
+                casos.add(caso);
             }
-            return data(stored);
+            if (!caso.evidencias().contains(evento)) caso.evidencias().add(evento);
+            return data(caso);
         }
-
-        StoredCase find(long id) {
-            return cases.get((int) id - 1);
+        @Override
+        public DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) throws IOException {
+            // Fake conserva el contrato antiguo para probar el routing; el ciclo de vida
+            // y la confirmación de movimiento se prueban en CasosAutomaticosServiceTest.
+            return registrar(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, evento);
         }
-
-        private void failIfDown() throws IOException {
-            if (down) {
-                throw new IOException("WildFly down");
-            }
+        @Override
+        public DatosCaso registrarDesvio(String guia, TrackingEvent evento, PruebaDesvio prueba) throws IOException {
+            if (prueba == null) throw new IOException("Prueba faltante");
+            return registrar(TipoCasoAutomatico.DESVIO_RUTA, guia, evento);
         }
-
-        private static DatosCaso data(StoredCase c) {
-            return new DatosCaso(c.id(), c.type(), c.state()[0]);
+        @Override
+        public DatosCaso notify(long id, String correlationId) {
+            correlacionesNotificadas.add(correlationId);
+            Caso c = casos.get((int)id - 1);
+            c.estado()[0] = "NOTIFICADA";
+            return data(c);
         }
+        private static DatosCaso data(Caso c) { return new DatosCaso(c.id(), c.tipo().name(), c.estado()[0]); }
     }
 
-    private final FakeCaseStore store = new FakeCaseStore();
-    private final CaseAssigner assigner = new CaseAssigner(store);
-
-    private static TrackingEvent tracking(Instant timestamp) {
-        return new TrackingEvent("msg", 7, 1, "SBC1234", -34.9, -56.1, timestamp);
+    private final FakeStore store = new FakeStore();
+    private final CaseAssigner asignador = new CaseAssigner(store);
+    private static TrackingEvent gps(int segundos) {
+        return new TrackingEvent("msg", 7, 1, "SBC1234", -34.9, -56.1,
+                Instant.parse("2026-10-17T13:00:00Z").plusSeconds(segundos));
     }
-
-    private static Detection detection(VehicleEvent event, VehicleFacts facts, Situation... situations) {
-        return new Detection(event, facts, List.of(situations));
+    private static Detection conGuia(VehicleEvent e, String guia, Situation... tipos) {
+        if (List.of(tipos).contains(Situation.ROUTE_DEVIATION)) {
+            TrackingEvent gps = (TrackingEvent) e;
+            PruebaDesvio prueba = new PruebaDesvio(gps, gps((int) (gps.timestamp().getEpochSecond()
+                    - gps(0).timestamp().getEpochSecond()) - 10), 2300, 2500, 2000, 30, List.of("sha-a"));
+            return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.asociado(guia), prueba);
+        }
+        return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.asociado(guia));
+    }
+    private static Detection sinGuia(VehicleEvent e, Situation... tipos) {
+        return new Detection(e, null, List.of(tipos), ResultadoAsociacionGpsGuia.sinGuia());
     }
 
     @Test
-    void createsTheCaseAndNotifiesIt() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assertEquals(1, store.cases.size());
-        FakeCaseStore.StoredCase created = store.cases.get(0);
-        assertEquals("VIAJE_SIN_GUIA", created.type());
-        assertEquals("NOTIFICADA", created.state()[0]);
-        assertEquals(null, created.guideId());
-        assertEquals(List.of(tracking(T1)), created.evidence());
-    }
-
-    @Test
-    void anotherEventOfTheSameSituationIsAddedToTheOpenCase() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assigner.accept(detection(tracking(T2), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assertEquals(1, store.cases.size());
-        assertEquals(List.of(tracking(T1), tracking(T2)), store.cases.get(0).evidence());
-    }
-
-    @Test
-    void aCaseInDescargoIsNotOpenAnymoreSoANewOneIsCreated() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-        store.cases.get(0).state()[0] = "EN_DESCARGO";
-
-        assigner.accept(detection(tracking(T2), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assertEquals(2, store.cases.size());
-    }
-
-    @Test
-    void withTheHighestSituationOpenTheNextOneIsCreatedAndThenEventsGoToTheHighest() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assigner.accept(detection(tracking(T2), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE,
+    void eventoPuedeRespaldarDistintasInfracciones() {
+        asignador.accept(sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE,
                 Situation.VEHICLE_WITHOUT_VALID_PERMIT));
-        assertEquals(2, store.cases.size());
-        assertEquals("VEHICULO_SIN_HABILITACION", store.cases.get(1).type());
-
-        assigner.accept(detection(tracking(T3), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE,
-                Situation.VEHICLE_WITHOUT_VALID_PERMIT));
-        assertEquals(2, store.cases.size());
-        assertEquals(List.of(tracking(T1), tracking(T3)), store.cases.get(0).evidence());
+        assertEquals(2, store.casos.size());
+        assertEquals(List.of(gps(0)), store.casos.get(0).evidencias());
+        assertEquals(List.of(gps(0)), store.casos.get(1).evidencias());
+        assertEquals("NOTIFICADA", store.casos.get(1).estado()[0]);
+        assertEquals(List.of(gps(0).correlationId(), gps(0).correlationId()), store.correlacionesNotificadas);
     }
 
     @Test
-    void anEventThatIsAlreadyEvidenceIsNotAssignedAgain() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE,
-                Situation.VEHICLE_WITHOUT_VALID_PERMIT));
-
-        assertEquals(1, store.cases.size());
-        assertEquals(1, store.cases.get(0).evidence().size());
+    void reentregaNoDuplicaNingunaEvidencia() {
+        var d = sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE, Situation.VEHICLE_WITHOUT_VALID_PERMIT);
+        asignador.accept(d);
+        asignador.accept(d);
+        assertEquals(2, store.casos.size());
+        assertTrue(store.casos.stream().allMatch(c -> c.evidencias().size() == 1));
     }
 
     @Test
-    void anOverloadCaseHasTheGuideOfTheActiveTrip() {
-        DatosViaje trip = new DatosViaje("GV-FISC001", "SBC1234", 1L, "EN_CURSO", LocalDate.of(2026, 10, 17), T1,
-                "Mercedes", "Nueva Palmira", 20_000);
-
-        assigner.accept(detection(new Weighing(3, 4, "SBC1234", T1, 40_000), new VehicleFacts(VEHICLE, List.of(trip)),
-                Situation.OVERLOAD));
-
-        assertEquals("EXCESO_CARGA", store.cases.get(0).type());
-        assertEquals("GV-FISC001", store.cases.get(0).guideId());
+    void distintasGuiasMismoCamionNoCompartenCasoAbierto() {
+        asignador.accept(conGuia(gps(0), "G-A", Situation.ROUTE_DEVIATION));
+        asignador.accept(conGuia(gps(10), "G-B", Situation.ROUTE_DEVIATION));
+        asignador.accept(conGuia(gps(20), "G-A", Situation.ROUTE_DEVIATION));
+        assertEquals(2, store.casos.size());
+        assertEquals(List.of(gps(0), gps(20)), store.casos.get(0).evidencias());
+        assertEquals("G-B", store.casos.get(1).guia());
     }
 
     @Test
-    void aCaseLeftDetectedIsNotifiedWithItsNextEvent() {
-        assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-        store.cases.get(0).state()[0] = "DETECTADA"; // as if the notification had failed
-
-        assigner.accept(detection(tracking(T2), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE));
-
-        assertEquals("NOTIFICADA", store.cases.get(0).state()[0]);
+    void fakeDeAsignacionConservaCasoAbiertoSinSepararCirculaciones() {
+        asignador.accept(sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE));
+        asignador.accept(sinGuia(gps(86400), Situation.TRIP_WITHOUT_GUIDE));
+        assertEquals(1, store.casos.size());
+        assertEquals(2, store.casos.get(0).evidencias().size());
     }
 
     @Test
-    void anEventWithoutSituationsDoesNothing() {
-        assigner.accept(detection(tracking(T1), null));
-
-        assertEquals(0, store.cases.size());
+    void eventoReprocesadoTrasCerrarCasoNoAbreOtro() {
+        var d1 = sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE);
+        asignador.accept(d1);
+        store.casos.get(0).estado()[0] = "EN_DESCARGO";
+        asignador.accept(d1); // redelivery del mismo GPS
+        assertEquals(1, store.casos.size());
+        asignador.accept(sinGuia(gps(10), Situation.TRIP_WITHOUT_GUIDE));
+        assertEquals(2, store.casos.size()); // evidencia nueva después del cierre
     }
 
     @Test
-    void aFailedCallThrowsSoTheEventStaysPending() {
-        store.down = true;
+    void reintentoTrasFalloParcialCompletaSituacionPendiente() {
+        var d = sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE, Situation.VEHICLE_WITHOUT_VALID_PERMIT);
+        store.fallarTipo = TipoCasoAutomatico.VEHICULO_SIN_HABILITACION;
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(d));
+        assertEquals(1, store.casos.size());
+        store.fallarTipo = null;
+        asignador.accept(d);
+        assertEquals(2, store.casos.size());
+        assertEquals(1, store.casos.get(0).evidencias().size());
+    }
 
+    @Test
+    void noAsignaConContextoInciertoNiInexistente() {
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(
+                new Detection(gps(0), null, List.of(Situation.TRIP_WITHOUT_GUIDE))));
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(new Detection(gps(0), null,
+                List.of(Situation.ROUTE_DEVIATION), ResultadoAsociacionGpsGuia.ambiguo())));
+        assertEquals(0, store.casos.size());
+    }
+
+    @Test
+    void noGeneraDesvioSinGuia() {
         assertThrows(UncheckedIOException.class,
-                () -> assigner.accept(detection(tracking(T1), WITHOUT_TRIP, Situation.TRIP_WITHOUT_GUIDE)));
+                () -> asignador.accept(sinGuia(gps(0), Situation.ROUTE_DEVIATION)));
+    }
+
+    @Test
+    void anAssociatedGpsClosesTheCirculationEvenWithoutSituations() {
+        List<String> cerradas = new ArrayList<>();
+        FakeStore conCierre = new FakeStore() {
+            @Override
+            public void cerrarCirculacionPorGuia(String matricula, Instant fecha) {
+                cerradas.add(matricula);
+            }
+        };
+
+        new CaseAssigner(conCierre).accept(conGuia(gps(0), "G1"));
+
+        assertEquals(List.of("SBC1234"), cerradas);
+        assertTrue(conCierre.casos.isEmpty());
+    }
+
+    @Test
+    void anEventWithoutSituationsNorGuideDoesNothing() {
+        asignador.accept(sinGuia(gps(0)));
+        asignador.accept(conGuia(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390), "G1"));
+
+        assertTrue(store.casos.isEmpty());
+    }
+
+    @Test
+    void aTripWithoutGuideContradictsAnAssociatedGuide() {
+        assertThrows(UncheckedIOException.class,
+                () -> asignador.accept(conGuia(gps(0), "G1", Situation.TRIP_WITHOUT_GUIDE)));
+    }
+
+    @Test
+    void aWeighingOpensNoCirculation() {
+        asignador.accept(sinGuia(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390),
+                Situation.TRIP_WITHOUT_GUIDE));
+
+        assertTrue(store.casos.isEmpty());
+    }
+
+    @Test
+    void aDeviationNeedsItsGeometricProof() {
+        Detection sinPrueba = new Detection(gps(0), null, List.of(Situation.ROUTE_DEVIATION),
+                ResultadoAsociacionGpsGuia.asociado("G1"));
+        Detection pesaje = new Detection(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390), null,
+                List.of(Situation.ROUTE_DEVIATION), ResultadoAsociacionGpsGuia.asociado("G1"));
+
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(sinPrueba));
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(pesaje));
+    }
+
+    @Test
+    void aPendingCirculationNotifiesNothing() {
+        FakeStore pendiente = new FakeStore() {
+            @Override
+            public DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) {
+                return null;
+            }
+        };
+
+        new CaseAssigner(pendiente).accept(sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE));
+
+        assertTrue(pendiente.correlacionesNotificadas.isEmpty());
+    }
+
+    @Test
+    void aBasicStoreRejectsWhatItDoesNotImplement() {
+        CaseStore basico = new CaseStore() {
+            @Override
+            public DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) {
+                return null;
+            }
+
+            @Override
+            public DatosCaso notify(long caseId, String correlationId) {
+                return null;
+            }
+        };
+
+        assertThrows(IOException.class, () -> basico.registrarDesvio("G1", gps(0), null));
+        assertThrows(IOException.class, () -> basico.registrarCirculacionSinGuia(gps(0)));
+        assertDoesNotThrow(() -> basico.cerrarCirculacionPorGuia("SBC1234", Instant.now()));
     }
 }

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
+import { SelectorLocalidad } from "@/components/selector-localidad";
+import { localidadDeGuia, type LocalidadVista } from "@/lib/localidades";
 import {
   cancelarGuia,
   editarGuia,
@@ -33,6 +35,7 @@ export function ModificarGuia({
   tiposCarga,
   rubros,
   hoy,
+  localidades,
 }: {
   guia: Guia;
   vehiculos: VehiculoResumen[];
@@ -40,6 +43,7 @@ export function ModificarGuia({
   tiposCarga: TipoCarga[];
   rubros: Rubro[];
   hoy: string;
+  localidades: LocalidadVista[];
 }) {
   // Opciones de los campos que se eligen de un catalogo
   const opciones: Partial<Record<string, { id: number; nombre: string }[]>> = {
@@ -58,8 +62,8 @@ export function ModificarGuia({
     tipoCarga: guia.tipoCarga ?? "",
     pesoCargaKg: String(guia.pesoCargaKg),
     fecha: guia.fecha,
-    origen: guia.origen,
-    destino: guia.destino,
+    origenId: localidadDeGuia(localidades, guia.origenId, guia.origen)?.id ?? null,
+    destinoId: localidadDeGuia(localidades, guia.destinoId, guia.destino)?.id ?? null,
   });
   const [matricula, setMatricula] = useState(guia.vehiculo?.matricula ?? "");
   const [idChofer, setIdChofer] = useState<number | null>(guia.chofer?.id ?? null);
@@ -135,9 +139,7 @@ export function ModificarGuia({
               ["tipoCarga", "Tipo de carga", "select"],
               ["pesoCargaKg", "Carga (kg)", "number"],
               ["fecha", "Fecha del viaje", "date"],
-              ["origen", "Origen", "text"],
-              ["destino", "Destino", "text"],
-            ] as const
+                    ] as const
           ).map(([n, texto, tipo]) => (
             <label key={n} className={etiqueta}>
               {texto}
@@ -166,6 +168,18 @@ export function ModificarGuia({
               {errorCampo(n)}
             </label>
           ))}
+          <SelectorLocalidad nombre="origenId" etiqueta="Origen" localidades={localidades}
+            valor={datos.origenId} onChange={id => setDatos({ ...datos, origenId: id })}
+            error={campos.origenId || campos.origen} />
+          <SelectorLocalidad nombre="destinoId" etiqueta="Destino" localidades={localidades}
+            valor={datos.destinoId} onChange={id => setDatos({ ...datos, destinoId: id })}
+            error={campos.destinoId || campos.destino} />
+          {(datos.origenId === null || datos.destinoId === null) && (
+            <p className="sm:col-span-2 text-sm text-amber-800" role="status">
+              Esta guía puede ser anterior al catálogo o tener localidades ambiguas. Elegí su origen y destino.
+              Valores anteriores: {guia.origen} → {guia.destino}.
+            </p>
+          )}
         </div>
       )}
 
@@ -214,7 +228,8 @@ export function ModificarGuia({
         <div className="flex gap-3">
           <button
             type="button"
-            disabled={pendiente || (modo === "cancelar" && motivo.trim() === "")}
+            disabled={pendiente || (modo === "cancelar" && motivo.trim() === "") ||
+              (modo === "editar" && (datos.origenId === null || datos.destinoId === null || datos.origenId === datos.destinoId))}
             onClick={() => setConfirmar(true)}
             className={botonGubUy}
           >

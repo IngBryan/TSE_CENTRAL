@@ -24,6 +24,8 @@ import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.Reasignacion;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.frontofficeciudadanos.service.rutas.RutasGuiaService;
+import tse.lab.frontofficeciudadanos.service.rutas.RutasException;
 
 // Gestion de Viajes de Carga y CU-07 Asignar vehiculo y chofer a guia de viaje. Quien llama se
 // identifica con X-Usuario-Ci (ver ChoferesResource para el criterio de confianza).
@@ -32,11 +34,16 @@ import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 @Produces(MediaType.APPLICATION_JSON)
 public class GuiasResource {
 
-    public record AsignacionRequest(String matricula, Long idChofer) {
+    public record RutasRequest(Long origenId, Long destinoId, String previsualizacionId) {
+    }
+
+    public record AsignacionRequest(String matricula, Long idChofer, RutasRequest rutas) {
     }
 
     @EJB
     private GuiasService guias;
+    @EJB
+    private RutasGuiaService rutas;
 
     @GET
     public Response listar(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @Context HttpServletRequest req) {
@@ -78,6 +85,11 @@ public class GuiasResource {
     @Path("/{id}/asignacion")
     public Response asignar(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @PathParam("id") String id,
             AsignacionRequest body, @Context HttpServletRequest req) {
+        if (body != null && body.rutas() != null) {
+            RutasRequest seleccion = body.rutas();
+            return ejecutar(() -> rutas.asignarViaje(usuario, id, body.matricula(), body.idChofer(),
+                    seleccion.origenId(), seleccion.destinoId(), seleccion.previsualizacionId(), correlationId(req)));
+        }
         return ejecutar(() -> guias.asignar(usuario, id, body == null ? null : body.matricula(),
                 body == null ? null : body.idChofer(), correlationId(req)));
     }
@@ -152,6 +164,9 @@ public class GuiasResource {
         } catch (ConflictoException e) {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("error", e.getCodigo(), "detalle", e.getMessage())).build();
+        } catch (RutasException e) {
+            return Response.status(e.status())
+                    .entity(Map.of("error", e.codigo(), "detalle", e.getMessage())).build();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

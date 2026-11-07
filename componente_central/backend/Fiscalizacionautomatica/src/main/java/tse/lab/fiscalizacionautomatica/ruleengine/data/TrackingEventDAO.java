@@ -24,6 +24,12 @@ public interface TrackingEventDAO {
         return events.stream().map(this::save).toList();
     }
 
+    /**
+     * GPS por matrícula y tiempo de medición (no receivedAt), ordenados de más antiguo
+     * a más nuevo. [desde, hasta); limit debe ser positivo. No asigna la Guía.
+     */
+    List<TrackingEvent> findByLicensePlateBetween(String matricula, Instant desde, Instant hasta, int limit);
+
     /** Marks the event as evaluated by the detection. */
     void markDetected(TrackingEvent event);
 

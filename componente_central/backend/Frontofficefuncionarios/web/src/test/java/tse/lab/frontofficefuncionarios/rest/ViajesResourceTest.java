@@ -19,6 +19,8 @@ import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MonitoreoViajesService;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.SeguimientoGpsService;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.SeguimientoNoDisponibleException;
 
 // CU Monitorear viajes y pesajes: cada endpoint delega en el servicio con el correlation id del filtro, y
 // las excepciones de negocio se traducen a codigos HTTP.
@@ -30,12 +32,16 @@ class ViajesResourceTest {
     private final ViajesResource recurso = new ViajesResource();
     private final MonitoreoViajesService viajes = mock(MonitoreoViajesService.class);
     private final HttpServletRequest req = mock(HttpServletRequest.class);
+    private final SeguimientoGpsService seguimiento = mock(SeguimientoGpsService.class);
 
     @BeforeEach
     void setUp() throws Exception {
         Field campo = ViajesResource.class.getDeclaredField("viajes");
         campo.setAccessible(true);
         campo.set(recurso, viajes);
+        Field gps = ViajesResource.class.getDeclaredField("seguimiento");
+        gps.setAccessible(true);
+        gps.set(recurso, seguimiento);
         when(req.getAttribute(ApiKeyFilter.CORRELATION_ID)).thenReturn(CORRELATION);
     }
 
@@ -87,5 +93,19 @@ class ViajesResourceTest {
         assertEquals(404, noEncontrado.getStatus());
         assertEquals("VIAJE_NO_ENCONTRADO", ((Map<?, ?>) noEncontrado.getEntity()).get("error"));
         assertEquals(403, recurso.detalle("1", "GV-1", req).getStatus());
+    }
+    @Test
+    void gpsYRutasDeleganConIdentidadYControlanIndisponibilidad() throws Exception {
+        assertEquals(200, recurso.historialGps(CI, "GV-1", "2026-10-20T10:00:00Z",
+                "2026-10-20T11:00:00Z", "100", req).getStatus());
+        assertEquals(200, recurso.ultimaGps(CI, "GV-1", req).getStatus());
+        assertEquals(200, recurso.rutasAutorizadas(CI, "GV-1", req).getStatus());
+        verify(seguimiento).historial(CI, "GV-1", "2026-10-20T10:00:00Z",
+                "2026-10-20T11:00:00Z", "100", CORRELATION);
+        verify(seguimiento).ultima(CI, "GV-1", CORRELATION);
+        verify(seguimiento).rutas(CI, "GV-1", CORRELATION);
+        when(seguimiento.ultima(CI, "GV-1", CORRELATION))
+                .thenThrow(new SeguimientoNoDisponibleException("Mongo no disponible"));
+        assertEquals(503, recurso.ultimaGps(CI, "GV-1", req).getStatus());
     }
 }

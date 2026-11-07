@@ -2,25 +2,22 @@ package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import java.util.List;
 
-// Operaciones de la vista remota (CasosAutomaticosRemote). Son operaciones simples sobre los casos: que caso
-// crear o a cual sumar un evento lo decide la fiscalizacion automatica (jerarquia de situaciones).
+/** Contrato de Gestión de Casos para Fiscalización y consultas administrativas. */
 public interface CasosAutomaticos {
-
-    // Casos abiertos (DETECTADA o NOTIFICADA) del vehiculo
     List<DatosCaso> casosAbiertos(String matricula);
 
-    // El caso que ya tiene ese evento como evidencia; null si ninguno
-    DatosCaso casoDelEvento(EventoFiscalizado evento);
+    /** Transacción idempotente: buscar o crear caso según guía/tipo, y vincular evento una vez. */
+    DatosCaso registrarEvidencia(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento);
 
-    // Crea un caso DETECTADA con el evento como evidencia y lo registra en la auditoria (usuario SISTEMA).
-    // idGuia: null si el caso no tiene guia (Viaje sin guia). Falla si falta el tipo, si el vehiculo o la guia
-    // no existen, o si el vehiculo ya tiene un caso abierto de ese tipo (indice unico parcial de la base).
-    DatosCaso crearCaso(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento);
+    /** La prueba y la clave GPS se persisten en la misma transacción que el expediente. */
+    DatosCaso registrarDesvio(String idGuia, EventoFiscalizado evento, PruebaDesvioRemota prueba);
 
-    // Suma el evento como evidencia del caso
-    void agregarEvidencia(long idCaso, EventoFiscalizado evento);
+    /** Devuelve null mientras falta confirmar movimiento; crea caso al confirmar desplazamiento. */
+    DatosCaso registrarCirculacionSinGuia(PosicionSinGuiaRemota gps);
 
-    // Notifica el caso a la empresa: pasa de DETECTADA a NOTIFICADA (auditoria con usuario SISTEMA).
-    // No hace nada si el caso ya no esta DETECTADA.
+    /** Cierra la circulación activa si comenzó una Guía sin superponer mediciones históricas. */
+    void cerrarCirculacionPorGuia(String matricula, java.time.Instant fechaInicioGuia);
+
+    /** Notifica solo si sigue DETECTADA, conservando la correlación del evento. */
     DatosCaso notificarCaso(long idCaso, String correlationId);
 }

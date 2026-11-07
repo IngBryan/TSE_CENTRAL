@@ -1,73 +1,80 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import jakarta.ejb.EJBException;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.List;
 import javax.naming.Context;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
+import java.util.List;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
-import tse.lab.frontofficefuncionarios.service.gestioncasos.CasosAutomaticosRemote;
-import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
-import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
-import tse.lab.frontofficefuncionarios.service.gestioncasos.EventoFiscalizado;
-import tse.lab.frontofficefuncionarios.service.gestioncasos.OrigenEvento;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.*;
 
 class RemoteCaseStoreTest {
-
     private static final Instant NOW = Instant.parse("2026-10-17T13:00:00Z");
     private static final TrackingEvent EVENT = new TrackingEvent("msg-1", 7, 1, "SBC1234", -34.9, -56.1, NOW);
     private static final EventoFiscalizado EVENTO = new EventoFiscalizado("SBC1234", NOW, OrigenEvento.TRACKING);
     private static final DatosCaso CASE = new DatosCaso(4L, "VIAJE_SIN_GUIA", "DETECTADA");
-
     private final Context context = mock(Context.class);
     private final CasosAutomaticosRemote remote = mock(CasosAutomaticosRemote.class);
     private final RemoteCaseStore store = new RemoteCaseStore(context, remote);
 
-    @Test
-    void aTrackingEventGoesAsTrackingAndAWeighingAsPesaje() {
+    @Test void convierteAmbosTiposDeEvento() {
         assertEquals(EVENTO, RemoteCaseStore.toEventoFiscalizado(EVENT));
+        assertEquals(EVENT.correlationId(), RemoteCaseStore.toEventoFiscalizado(EVENT).getCorrelationId());
         assertEquals(new EventoFiscalizado("SBC1234", NOW, OrigenEvento.PESAJE),
                 RemoteCaseStore.toEventoFiscalizado(new Weighing(3, 4, "SBC1234", NOW, 18_390)));
     }
-
-    @Test
-    void everyOperationGoesToTheEjb() throws IOException {
-        when(remote.casosAbiertos("SBC1234")).thenReturn(List.of(CASE));
-        when(remote.casoDelEvento(EVENTO)).thenReturn(CASE);
-        when(remote.crearCaso(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENTO)).thenReturn(CASE);
-        DatosCaso notified = new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA");
-        when(remote.notificarCaso(4L, "c-1")).thenReturn(notified);
-
-        assertEquals(List.of(CASE), store.openCases("SBC1234"));
-        assertEquals(CASE, store.caseOf(EVENT));
-        assertEquals(CASE, store.create(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENT));
-        store.addEvidence(4L, EVENT);
-        assertEquals(notified, store.notify(4L, "c-1"));
-
-        verify(remote).agregarEvidencia(4L, EVENTO);
+    @Test void registraYNotificaMedianteEjb() throws IOException {
+        when(remote.registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENTO))
+                .thenReturn(CASE);
+        assertEquals(CASE, store.registrar(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENT));
+        verify(remote).registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, EVENTO);
+        when(remote.registrarCirculacionSinGuia(any(PosicionSinGuiaRemota.class))).thenReturn(CASE);
+        assertEquals(CASE, store.registrarCirculacionSinGuia(EVENT));
+        var captor = org.mockito.ArgumentCaptor.forClass(PosicionSinGuiaRemota.class);
+        verify(remote).registrarCirculacionSinGuia(captor.capture());
+        assertEquals(NOW, captor.getValue().getFechaHora());
+        assertEquals(-34.9, captor.getValue().getLatitud());
+        when(remote.notificarCaso(4L, "c-1")).thenReturn(new DatosCaso(4L, "VIAJE_SIN_GUIA", "NOTIFICADA"));
+        assertEquals("NOTIFICADA", store.notify(4L, "c-1").getEstado());
+        verify(remote).notificarCaso(4L, "c-1");
     }
-
-    @Test
-    void aFailedRemoteCallIsAnIOException() {
-        // e.g. the partial unique index rejected a duplicate open case
-        when(remote.crearCaso(any(), any(), any())).thenThrow(new EJBException("uk_caso_abierto"));
-
-        assertThrows(IOException.class, () -> store.create(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, EVENT));
+    @Test void transmitePruebaGeometricaConElEventoAlEjb() throws IOException {
+        TrackingEvent otra = new TrackingEvent("msg-2", 8, 1, "SBC1234", -34.91, -56.12,
+                NOW.plusSeconds(10));
+        PruebaDesvio prueba = new PruebaDesvio(EVENT, otra, 2500, 2600, 2000, 30,
+                List.of("sha-a", "sha-b"));
+        when(remote.registrarDesvio(eq("GV-1"), eq(EVENTO), any(PruebaDesvioRemota.class)))
+                .thenReturn(CASE);
+        store.registrarDesvio("GV-1", EVENT, prueba);
+        var captor = org.mockito.ArgumentCaptor.forClass(PruebaDesvioRemota.class);
+        verify(remote).registrarDesvio(eq("GV-1"), eq(EVENTO), captor.capture());
+        assertEquals(NOW.plusSeconds(10), captor.getValue().getInstantePareja());
+        assertEquals(List.of("sha-a", "sha-b"), captor.getValue().getHashesRutas());
     }
-
-    @Test
-    void closingClosesTheContext() throws Exception {
+    @Test void errorEJBPermiteReintento() {
+        when(remote.registrarCirculacionSinGuia(any(PosicionSinGuiaRemota.class)))
+                .thenThrow(new EJBException("backend temporalmente no disponible"));
+        assertThrows(IOException.class, () -> store.registrarCirculacionSinGuia(EVENT));
+    }
+    @Test void closeLiberaContexto() throws Exception {
         store.close();
-
         verify(context).close();
+    }
+
+    @Test void noRegistraDesvioConPruebaDeOtroGps() {
+        TrackingEvent otra = new TrackingEvent("msg-2", 8, 1, "SBC1234", -34.91, -56.12, NOW.plusSeconds(10));
+        PruebaDesvio ajena = new PruebaDesvio(otra, EVENT, 2500, 2600, 2000, 30, List.of("sha-a"));
+        assertThrows(IOException.class, () -> store.registrarDesvio("GV-1", EVENT, null));
+        assertThrows(IOException.class, () -> store.registrarDesvio("GV-1", EVENT, ajena));
+    }
+    @Test void cierraLaCirculacionMedianteEjb() throws IOException {
+        store.cerrarCirculacionPorGuia("SBC1234", NOW);
+        verify(remote).cerrarCirculacionPorGuia("SBC1234", NOW);
     }
 }
