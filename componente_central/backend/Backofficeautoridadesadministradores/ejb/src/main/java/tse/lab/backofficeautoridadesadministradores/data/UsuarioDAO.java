@@ -23,7 +23,8 @@ import tse.lab.model.Funcionario;
 @Stateless
 public class UsuarioDAO {
 
-    // UNION (no UNION ALL): una cédula con varios roles cuenta una sola vez. Un ciudadano sin rol no entra.
+    // UNION (no UNION ALL): una cédula con varios roles cuenta una sola vez. Un
+    // ciudadano sin rol no entra.
     // usuarios_backoffice es la tabla base de administradores y autoridades.
     private static final String CEDULAS_USUARIOS = """
             SELECT ci FROM funcionarios
@@ -32,7 +33,8 @@ public class UsuarioDAO {
             UNION SELECT ci FROM usuarios_backoffice
             """;
 
-    // Con filtro de rol se pagina solo sobre su tabla. Un chofer de varias empresas tiene varias filas.
+    // Con filtro de rol se pagina solo sobre su tabla. Un chofer de varias empresas
+    // tiene varias filas.
     private static final Map<RolUsuario, String> CEDULAS_POR_ROL = new EnumMap<>(Map.of(
             RolUsuario.FUNCIONARIO, "SELECT ci FROM funcionarios",
             RolUsuario.RESPONSABLE, "SELECT ci FROM responsables",
@@ -40,14 +42,13 @@ public class UsuarioDAO {
             RolUsuario.ADMINISTRADOR, "SELECT ci FROM administradores",
             RolUsuario.AUTORIDAD, "SELECT ci FROM autoridades"));
 
-    @PersistenceContext(
-        unitName = "backofficeautoridadesadministradoresPersistenceUnit"
-    )
+    @PersistenceContext(unitName = "backofficeautoridadesadministradoresPersistenceUnit")
     private EntityManager em;
 
     /**
-     * @param rol solo los usuarios con este rol; null para todos
-     * @param prefijoCi solo las cédulas que empiezan así (solo dígitos); null para todas
+     * @param rol       solo los usuarios con este rol; null para todos
+     * @param prefijoCi solo las cédulas que empiezan así (solo dígitos); null para
+     *                  todas
      */
     public long contarUsuarios(RolUsuario rol, String prefijoCi) {
         return ((Number) consulta("COUNT(*)", rol, prefijoCi, "")
@@ -85,19 +86,17 @@ public class UsuarioDAO {
     public List<Ciudadano> buscarCiudadanos(List<String> cedulas) {
         return em.createQuery(
                 "SELECT c FROM Ciudadano c WHERE c.ci IN :cedulas",
-                Ciudadano.class
-        )
-        .setParameter("cedulas", cedulas)
-        .getResultList();
+                Ciudadano.class)
+                .setParameter("cedulas", cedulas)
+                .getResultList();
     }
 
     public List<Funcionario> buscarFuncionarios(List<String> cedulas) {
         return em.createQuery(
                 "SELECT f FROM Funcionario f WHERE f.ci IN :cedulas",
-                Funcionario.class
-        )
-        .setParameter("cedulas", cedulas)
-        .getResultList();
+                Funcionario.class)
+                .setParameter("cedulas", cedulas)
+                .getResultList();
     }
 
     public List<String> filtrarResponsables(List<String> cedulas) {
@@ -115,6 +114,27 @@ public class UsuarioDAO {
 
     public List<String> filtrarAutoridades(List<String> cedulas) {
         return filtrar("SELECT a.ci FROM Autoridad a WHERE a.ci IN :cedulas", cedulas);
+    }
+
+    // Cuenta en vez de buscar la entidad: no trae el hash de la contraseña
+    public boolean existeUsuarioBackoffice(String ci) {
+        return existe("SELECT COUNT(u) FROM UsuarioBackoffice u WHERE u.ci = :ci", ci);
+    }
+
+    public boolean existeFuncionario(String ci) {
+        return existe("SELECT COUNT(f) FROM Funcionario f WHERE f.ci = :ci", ci);
+    }
+
+    // Administrador, Autoridad o Funcionario
+    public void guardar(Object usuario) {
+        em.persist(usuario);
+        em.flush();
+    }
+
+    private boolean existe(String consulta, String ci) {
+        return em.createQuery(consulta, Long.class)
+                .setParameter("ci", ci)
+                .getSingleResult() > 0;
     }
 
     private List<String> filtrar(String consulta, List<String> cedulas) {

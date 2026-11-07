@@ -1,6 +1,8 @@
 package tse.lab.backofficeautoridadesadministradores.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -129,5 +131,28 @@ class UsuarioDAOTest {
     @Test
     void unChoferDeVariasEmpresasApareceUnaSolaVez() {
         assertEquals(List.of(CHOFER), usuarios.filtrarChoferes(USUARIOS));
+    }
+
+    @Test
+    void sabeSiLaCedulaYaEsUsuarioDeBackofficeOFuncionario() {
+        assertTrue(usuarios.existeUsuarioBackoffice(ADMINISTRADOR));
+        assertTrue(usuarios.existeUsuarioBackoffice(AUTORIDAD));
+        assertFalse(usuarios.existeUsuarioBackoffice(FUNCIONARIO));
+        assertTrue(usuarios.existeFuncionario(FUNCIONARIO));
+        assertFalse(usuarios.existeFuncionario(ADMINISTRADOR));
+    }
+
+    @Test
+    void guardaUnUsuarioNuevoYApareceEnElListado() {
+        em.getTransaction().begin();
+        usuarios.guardar(new Autoridad(CIUDADANO_SIN_ROL, "hash"));
+        usuarios.guardar(new Funcionario("77777777", "nuevo@mtop.gub.uy"));
+        em.getTransaction().commit();
+
+        assertTrue(usuarios.existeUsuarioBackoffice(CIUDADANO_SIN_ROL));
+        assertTrue(usuarios.existeFuncionario("77777777"));
+        assertEquals(7, usuarios.contarUsuarios(null, null));
+        assertEquals(List.of(AUTORIDAD, CIUDADANO_SIN_ROL),
+                usuarios.listarCedulas(RolUsuario.AUTORIDAD, null, 0, 10));
     }
 }

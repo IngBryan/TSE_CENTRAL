@@ -14,6 +14,7 @@ import {
   type FiltrosUsuarios as Filtros,
 } from "@/lib/usuarios";
 import FiltrosUsuarios from "./FiltrosUsuarios";
+import PanelAltaUsuario from "./PanelAltaUsuario";
 
 const TAMANIO_PAGINA = 20;
 
@@ -130,6 +131,8 @@ export default async function UsuariosPage({
       </header>
 
       <NavegacionBackoffice actual="/usuarios" />
+
+      <PanelAltaUsuario />
 
       <FiltrosUsuarios filtros={filtros} />
 

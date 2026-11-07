@@ -23,6 +23,32 @@ export type PaginaUsuarios = {
   totalPaginas: number;
 };
 
+// Los que se crean desde el backoffice. Choferes y responsables tienen su propio alta (CU-02 y la gestion
+// de empresas del frontoffice de funcionarios)
+export type TipoAltaUsuario = "ADMINISTRADOR" | "AUTORIDAD" | "FUNCIONARIO";
+
+export const TIPOS_ALTA: TipoAltaUsuario[] = ["ADMINISTRADOR", "AUTORIDAD", "FUNCIONARIO"];
+
+// Las mismas reglas que valida el backend (AltaUsuarioService)
+export const LARGO_MINIMO_CONTRASENA = 12;
+export const LARGO_MAXIMO_CONTRASENA = 128;
+
+export function usaContrasena(tipo: TipoAltaUsuario): boolean {
+  return tipo !== "FUNCIONARIO";
+}
+
+export type AltaUsuario = {
+  tipo: TipoAltaUsuario;
+  ci: string;
+  contrasena?: string;
+  email?: string;
+};
+
+export type EstadoAltaUsuario = {
+  estado: "inicial" | "exito" | "error";
+  mensaje: string;
+};
+
 export type FiltrosUsuarios = {
   rol: RolUsuario | null;
   ci: string;

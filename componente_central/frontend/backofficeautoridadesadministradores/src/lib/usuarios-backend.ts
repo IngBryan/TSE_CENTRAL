@@ -1,5 +1,9 @@
 
-import type { FiltrosUsuarios, PaginaUsuarios } from "./usuarios";
+import type {
+  AltaUsuario,
+  FiltrosUsuarios,
+  PaginaUsuarios,
+} from "./usuarios";
 import {
   fetchBackend,
   idSesion,
@@ -100,6 +104,83 @@ export async function listarUsuarios(
     }
 
     return { ok: true, pagina: datos as PaginaUsuarios };
+  } catch {
+    return {
+      ok: false,
+      mensaje: "No se pudo establecer conexión con el backend.",
+    };
+  }
+}
+
+type ResultadoAlta =
+  | { ok: true }
+  | { ok: false; mensaje: string };
+
+/**
+ * Da de alta un administrador, una autoridad o un funcionario
+ * mediante la API REST. Se ejecuta en el servidor de Next.js: la
+ * contraseña nunca pasa por otro lado que no sea el backend.
+ */
+export async function crearUsuario(
+  datos: AltaUsuario
+): Promise<ResultadoAlta> {
+  const sesion = await idSesion();
+
+  if (!sesion) {
+    return { ok: false, mensaje: SESION_VENCIDA };
+  }
+
+  try {
+    const respuesta = await fetchBackend(urlBackend("usuarios"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: wildFlyAuthorization(sesion),
+      },
+      body: JSON.stringify(datos),
+      cache: "no-store",
+    });
+
+    if (respuesta.ok) {
+      return { ok: true };
+    }
+
+    if (respuesta.status === 401) {
+      return { ok: false, mensaje: SESION_VENCIDA };
+    }
+
+    if (respuesta.status === 403) {
+      return {
+        ok: false,
+        mensaje: "No tenés permisos para crear usuarios.",
+      };
+    }
+
+    if (respuesta.status === 400 || respuesta.status === 409) {
+      try {
+        const error: unknown = await respuesta.json();
+
+        if (
+          error !== null &&
+          typeof error === "object" &&
+          "detalle" in error &&
+          typeof error.detalle === "string"
+        ) {
+          return { ok: false, mensaje: error.detalle };
+        }
+      } catch {
+        // Se utilizará el mensaje genérico.
+      }
+    }
+
+    return {
+      ok: false,
+      mensaje:
+        respuesta.status === 409
+          ? "El usuario ya existe."
+          : "No se pudo crear el usuario.",
+    };
   } catch {
     return {
       ok: false,

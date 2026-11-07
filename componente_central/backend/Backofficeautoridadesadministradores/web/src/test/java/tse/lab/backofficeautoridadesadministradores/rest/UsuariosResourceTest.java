@@ -16,7 +16,12 @@ import org.junit.jupiter.api.Test;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
+import tse.lab.backofficeautoridadesadministradores.rest.UsuariosResource.AltaUsuarioRequest;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService.UsuarioCreado;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuario;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioExistenteException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.GestionUsuariosService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.PaginaInvalidaException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.PaginaUsuarios;
@@ -24,18 +29,91 @@ import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyrole
 
 class UsuariosResourceTest {
 
+    private static final AltaUsuarioRequest ALTA_ADMINISTRADOR =
+            new AltaUsuarioRequest("ADMINISTRADOR", "1234567", "Clave-segura-2026", null);
+
     private UsuariosResource recurso;
     private GestionUsuariosService servicio;
+    private AltaUsuarioService alta;
     private SecurityContext seguridad;
 
     @BeforeEach
     void preparar() throws Exception {
         recurso = new UsuariosResource();
         servicio = mock(GestionUsuariosService.class);
+        alta = mock(AltaUsuarioService.class);
         seguridad = mock(SecurityContext.class);
 
         inyectar("servicio", servicio);
+        inyectar("alta", alta);
         inyectar("seguridad", seguridad);
+    }
+
+    private Map<?, ?> cuerpo(Response respuesta) {
+        return (Map<?, ?>) respuesta.getEntity();
+    }
+
+    @Test
+    void unAdministradorCreaUnUsuario() {
+        UsuarioCreado creado = new UsuarioCreado("1234567", RolUsuario.ADMINISTRADOR);
+        autenticarAdministrador();
+        when(alta.crear("99999999", "ADMINISTRADOR", "1234567", "Clave-segura-2026", null))
+                .thenReturn(creado);
+
+        Response respuesta = recurso.crear(ALTA_ADMINISTRADOR);
+
+        assertEquals(201, respuesta.getStatus());
+        assertSame(creado, respuesta.getEntity());
+    }
+
+    @Test
+    void altaConDatosInvalidosDevuelve400() {
+        autenticarAdministrador();
+        when(alta.crear("99999999", "ADMINISTRADOR", "1234567", "Clave-segura-2026", null))
+                .thenThrow(new DatosUsuarioInvalidosException("La contraseña es corta"));
+
+        Response respuesta = recurso.crear(ALTA_ADMINISTRADOR);
+
+        assertEquals(400, respuesta.getStatus());
+        assertEquals("datos_invalidos", cuerpo(respuesta).get("error"));
+        assertEquals("La contraseña es corta", cuerpo(respuesta).get("detalle"));
+    }
+
+    @Test
+    void altaSinCuerpoDevuelve400() {
+        autenticarAdministrador();
+
+        Response respuesta = recurso.crear(null);
+
+        assertEquals(400, respuesta.getStatus());
+        verifyNoInteractions(alta);
+    }
+
+    @Test
+    void altaDeUnUsuarioExistenteDevuelve409() {
+        autenticarAdministrador();
+        when(alta.crear("99999999", "ADMINISTRADOR", "1234567", "Clave-segura-2026", null))
+                .thenThrow(new UsuarioExistenteException("Ya existe"));
+
+        Response respuesta = recurso.crear(ALTA_ADMINISTRADOR);
+
+        assertEquals(409, respuesta.getStatus());
+        assertEquals("usuario_existente", cuerpo(respuesta).get("error"));
+    }
+
+    @Test
+    void unaAutoridadNoPuedeCrearUsuarios() {
+        when(seguridad.getUserPrincipal()).thenReturn(() -> "88888888");
+        when(seguridad.isUserInRole("AUTORIDAD")).thenReturn(true);
+
+        assertEquals(403, recurso.crear(ALTA_ADMINISTRADOR).getStatus());
+        verifyNoInteractions(alta);
+    }
+
+    @Test
+    void sinAutenticarNoSeCreanUsuarios() {
+        assertEquals(401, recurso.crear(ALTA_ADMINISTRADOR).getStatus());
+        verifyNoInteractions(alta);
     }
 
     private void inyectar(String campo, Object valor) throws Exception {
