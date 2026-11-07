@@ -38,7 +38,7 @@ public final class RouteDeviationRule implements SituationRule {
     private final RutasAutorizadasSource rutas;
     private final TrackingEventDAO posiciones;
     private final double umbralMetros;
-    private final Duration ventana;
+    private final Duration ventanaConfirmacion;
 
     public RouteDeviationRule(IntervalosGuiasGpsSource intervalos, RutasAutorizadasSource rutas,
             TrackingEventDAO posiciones) {
@@ -55,7 +55,7 @@ public final class RouteDeviationRule implements SituationRule {
             throw new IllegalArgumentException("Umbral y ventana inválidos");
         }
         this.umbralMetros = umbralMetros;
-        this.ventana = ventana;
+        this.ventanaConfirmacion = ventana;
     }
 
     @Override
@@ -77,9 +77,9 @@ public final class RouteDeviationRule implements SituationRule {
         if (!(event instanceof TrackingEvent gps)) {
             return Optional.empty(); // Los pesajes nunca son evidencia espacial de desvío.
         }
-        Instant desde = gps.timestamp().minus(ventana);
+        Instant desde = gps.timestamp().minus(ventanaConfirmacion);
         // [desde,hasta) incluye la muestra exactamente en timestamp+ventana.
-        Instant hasta = gps.timestamp().plus(ventana).plusMillis(1);
+        Instant hasta = gps.timestamp().plus(ventanaConfirmacion).plusMillis(1);
         List<IntervaloGuiaGps> ventanas = intervalos.buscar(gps.licensePlate(), desde, hasta);
         var asociacion = AsociadorGpsGuia.resolver(gps, ventanas);
         if (asociacion.estado() != ResultadoAsociacionGpsGuia.Estado.ASOCIADO) {
@@ -135,13 +135,13 @@ public final class RouteDeviationRule implements SituationRule {
         }
         return Optional.of(new PruebaDesvio(gps, pareja, distanciaPrincipal,
                 corredor.distanciaMinimaMetros(pareja.latitude(), pareja.longitude()),
-                umbralMetros, ventana.toSeconds(), List.copyOf(hashes)));
+                umbralMetros, ventanaConfirmacion.toSeconds(), List.copyOf(hashes)));
     }
 
     private boolean confirmarPar(TrackingEvent actual, TrackingEvent otra, String idGuia,
             List<IntervaloGuiaGps> ventanas, CorredorRutas corredor) {
         Duration diferencia = Duration.between(actual.timestamp(), otra.timestamp()).abs();
-        return !diferencia.isZero() && diferencia.compareTo(ventana) <= 0
+        return !diferencia.isZero() && diferencia.compareTo(ventanaConfirmacion) <= 0
                 && AsociadorGpsGuia.resolver(otra, ventanas).correspondeA(idGuia)
                 && corredor.distanciaMinimaMetros(otra.latitude(), otra.longitude()) > umbralMetros;
     }

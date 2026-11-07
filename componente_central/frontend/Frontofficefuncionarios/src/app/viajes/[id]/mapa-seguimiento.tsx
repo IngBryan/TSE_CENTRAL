@@ -87,9 +87,9 @@ export default function MapaSeguimiento({
     if (!listo || !actual) return;
     const gps = coleccionTrayectoria(mostrarRecorrido ? posiciones : []);
     const ultimo = coleccionPosicion(ultima);
-    (actual.getSource("trayectoria-gps") as GeoJSONSource).setData(gps);
-    (actual.getSource("ultima-gps") as GeoJSONSource).setData(ultimo);
-    (actual.getSource("primera-gps") as GeoJSONSource).setData(
+    void (actual.getSource("trayectoria-gps") as GeoJSONSource).setData(gps);
+    void (actual.getSource("ultima-gps") as GeoJSONSource).setData(ultimo);
+    void (actual.getSource("primera-gps") as GeoJSONSource).setData(
       coleccionPosicion(mostrarRecorrido && posiciones.length ? posiciones[0] : null));
     if (!primeraVista.current) {
       const bounds = new LngLatBounds();

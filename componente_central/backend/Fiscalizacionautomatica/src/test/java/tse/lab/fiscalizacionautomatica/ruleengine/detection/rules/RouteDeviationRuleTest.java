@@ -1,15 +1,24 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.detection.rules;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryTrackingEventDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.TrackingEventDAO;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFacts;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
@@ -186,5 +195,61 @@ class RouteDeviationRuleTest {
         regla = nuevaRegla();
         gps(0, -56.0); // dentro del rectángulo, lejos de cualquier segmento de la ruta
         assertTrue(regla.appliesTo(gps(10, -56.0), HECHOS));
+    }
+
+    @Test
+    void itIsARouteDeviation() {
+        assertEquals(tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation.ROUTE_DEVIATION, regla.situation());
+    }
+
+    private RouteDeviationRule conLimites(double umbral, Duration ventana) {
+        return new RouteDeviationRule((m, d, h) -> candidatos, id -> autorizadas, dao, umbral, ventana);
+    }
+
+    @Test
+    void aThresholdAndAWindowAreRequired() {
+        Duration ventana = Duration.ofSeconds(30);
+
+        assertThrows(IllegalArgumentException.class, () -> conLimites(Double.NaN, ventana));
+        assertThrows(IllegalArgumentException.class, () -> conLimites(0, ventana));
+        assertThrows(IllegalArgumentException.class, () -> conLimites(2000, null));
+        assertThrows(IllegalArgumentException.class, () -> conLimites(2000, Duration.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> conLimites(2000, Duration.ofSeconds(-1)));
+    }
+
+    @Test
+    void withoutAnswerOnTheRoutesThereIsNoDeviation() throws IOException {
+        autorizadas = null;
+        gps(0, -55.95);
+
+        assertFalse(regla.appliesTo(gps(10, -55.95), HECHOS));
+    }
+
+    @Test
+    void aTruncatedQueryDoesNotConfirm() throws IOException {
+        TrackingEvent fuera = gps(0, -55.95);
+        TrackingEventDAO lleno = mock(TrackingEventDAO.class);
+        when(lleno.findByLicensePlateBetween(eq(MATRICULA), any(), any(), anyInt()))
+                .thenReturn(Collections.nCopies(1_000, fuera));
+        RouteDeviationRule truncada = new RouteDeviationRule((m, d, h) -> candidatos, id -> autorizadas, lleno);
+
+        assertFalse(truncada.appliesTo(fuera, HECHOS));
+    }
+
+    @Test
+    void aRouteWithoutHashCannotBeEvidence() {
+        autorizadas = List.of(new DatosRutaAutorizada(1L, 1, " ", 1000, RUTA_A));
+        gps(0, -55.95);
+        TrackingEvent fuera = gps(10, -55.95);
+
+        assertThrows(IOException.class, () -> regla.appliesTo(fuera, HECHOS));
+    }
+
+    @Test
+    void theNextPositionCanConfirmToo() throws IOException {
+        TrackingEvent primero = gps(0, -55.95);
+        TrackingEvent siguiente = gps(10, -55.95);
+
+        assertEquals(siguiente, regla.evaluar(primero, HECHOS).orElseThrow().pareja());
     }
 }

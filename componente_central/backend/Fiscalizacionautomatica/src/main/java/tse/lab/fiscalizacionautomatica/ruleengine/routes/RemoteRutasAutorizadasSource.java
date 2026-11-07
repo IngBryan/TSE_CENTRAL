@@ -22,6 +22,12 @@ public final class RemoteRutasAutorizadasSource implements RutasAutorizadasSourc
         }
     }
 
+    /** With the remote proxy already looked up (tests). */
+    RemoteRutasAutorizadasSource(Context context, RutasAutorizadasRemote remote) {
+        this.context = context;
+        this.remote = remote;
+    }
+
     @Override
     public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) throws IOException {
         try {

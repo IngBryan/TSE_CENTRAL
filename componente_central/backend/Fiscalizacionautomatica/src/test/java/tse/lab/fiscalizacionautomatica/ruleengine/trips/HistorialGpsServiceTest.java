@@ -55,4 +55,29 @@ class HistorialGpsServiceTest {
         assertThrows(IllegalArgumentException.class, () -> servicio.obtenerPorGuia("G1", "SBC1234", T,
                 T.plusSeconds(20), 5_001));
     }
+
+    @Test
+    void anInvalidQueryIsRejected() {
+        HistorialGpsService s = new HistorialGpsService(dao, (matricula, desde, hasta) -> List.of());
+        Instant fin = T.plusSeconds(20);
+
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia(null, "SBC1234", T, fin, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia(" ", "SBC1234", T, fin, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", null, T, fin, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", " ", T, fin, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", "SBC1234", null, fin, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", "SBC1234", T, null, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", "SBC1234", fin, T, 20));
+        assertThrows(IllegalArgumentException.class, () -> s.obtenerPorGuia("G1", "SBC1234", T, fin, 0));
+    }
+
+    @Test
+    void aGuideOutsideTheRangeHasNoPositions() throws IOException {
+        save(15);
+        IntervalosGuiasGpsSource fuente = (matricula, desde, hasta) -> List.of(
+                new IntervaloGuiaGps("G2", matricula, "EN_CURSO", T, T, null));
+
+        assertEquals(List.of(), new HistorialGpsService(dao, fuente)
+                .obtenerPorGuia("G1", "SBC1234", T, T.plusSeconds(20), 20));
+    }
 }

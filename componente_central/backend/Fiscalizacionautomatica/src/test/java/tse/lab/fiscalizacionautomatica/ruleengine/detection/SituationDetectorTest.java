@@ -11,12 +11,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import tse.lab.fiscalizacionautomatica.ruleengine.data.InMemoryTrackingEventDAO;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
+import tse.lab.fiscalizacionautomatica.ruleengine.trips.ContextoEventoSource;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
+import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.IntervaloGuiaGps;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
+import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
 
 class SituationDetectorTest {
 
@@ -140,4 +146,66 @@ class SituationDetectorTest {
         assertThrows(IOException.class, () -> detectorHistorico.detect(tracking("SBC1234")));
     }
 
+    private static IntervaloGuiaGps enCurso() {
+        return new IntervaloGuiaGps("G1", "SBC1234", "EN_CURSO", NOW.minusSeconds(3600), NOW.minusSeconds(3000), null);
+    }
+
+    private SituationDetector conIntervalos(List<IntervaloGuiaGps> intervalos, SituationRule... reglas) {
+        return new SituationDetector(facts, List.of(reglas), new ContextoEventoSource((m, d, h) -> intervalos));
+    }
+
+    @Test
+    void gpsWithoutGuideInTheHistoryIsATripWithoutGuide() throws IOException {
+        central.put("SBC1234", withTrip("SBC1234", "EN_CURSO"));
+
+        Detection detected = conIntervalos(List.of(), new TripWithoutGuideRule()).detect(tracking("SBC1234"));
+
+        assertEquals(List.of(Situation.TRIP_WITHOUT_GUIDE), detected.situations());
+    }
+
+    @Test
+    void aWeighingWithoutGuideInTheHistoryIsNotATripWithoutGuide() throws IOException {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+
+        Detection detected = conIntervalos(List.of(), new TripWithoutGuideRule())
+                .detect(new Weighing(3, 4, "SBC1234", NOW, 18_390));
+
+        assertEquals(List.of(), detected.situations());
+    }
+
+    @Test
+    void overloadNeedsAGuideAtTheTimeOfTheWeighing() throws IOException {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+        Weighing exceso = new Weighing(3, 4, "SBC1234", NOW, 99_000);
+
+        assertEquals(List.of(Situation.OVERLOAD),
+                conIntervalos(List.of(enCurso()), new OverloadRule()).detect(exceso).situations());
+        assertEquals(List.of(), conIntervalos(List.of(), new OverloadRule()).detect(exceso).situations());
+    }
+
+    @Test
+    void anAmbiguousAssociationIsRetried() {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+        IntervaloGuiaGps otra = new IntervaloGuiaGps("G2", "SBC1234", "EN_CURSO", NOW.minusSeconds(3600),
+                NOW.minusSeconds(3000), null);
+
+        assertThrows(IOException.class, () -> conIntervalos(List.of(enCurso(), otra), new TripWithoutGuideRule())
+                .detect(tracking("SBC1234")));
+    }
+
+    @Test
+    void aConfirmedDeviationKeepsItsProof() throws IOException {
+        central.put("SBC1234", withoutTrips("SBC1234"));
+        InMemoryTrackingEventDAO dao = new InMemoryTrackingEventDAO();
+        dao.save(new TrackingEvent("msg-0", 6, 1, "SBC1234", -34.25, -55.95, NOW.minusSeconds(10)));
+        DatosRutaAutorizada ruta = new DatosRutaAutorizada(1L, 1, "sha", 1000,
+                "{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
+        RouteDeviationRule regla = new RouteDeviationRule((m, d, h) -> List.of(enCurso()), id -> List.of(ruta), dao);
+        TrackingEvent fuera = new TrackingEvent("msg-1", 7, 1, "SBC1234", -34.25, -55.951, NOW);
+
+        Detection detected = conIntervalos(List.of(enCurso()), regla).detect(fuera);
+
+        assertEquals(List.of(Situation.ROUTE_DEVIATION), detected.situations());
+        assertEquals(fuera, detected.pruebaDesvio().confirmante());
+    }
 }

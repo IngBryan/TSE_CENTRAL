@@ -8,6 +8,8 @@ import java.lang.reflect.Field;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.RutaReferenciaDAO;
+import tse.lab.model.Guia;
+import tse.lab.model.GuiaRutaAutorizada;
 import tse.lab.model.RutaReferencia;
 
 /** La evidencia se recupera por SHA, no por enlaces de guia que pueden cambiar. */
@@ -41,5 +43,43 @@ class RutasAutorizadasServiceTest {
         assertTrue(servicio(dao).obtenerPorHuellas(List.of(hash)).isEmpty());
         assertTrue(servicio(dao).obtenerPorHuellas(List.of("hash-invalido")).isEmpty());
         verify(dao, never()).buscarPorGuia(anyString());
+    }
+
+    @Test
+    void returnsTheRoutesOfAGuide() throws Exception {
+        RutaReferencia ruta = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}", 5000);
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        when(dao.buscarPorGuia("G1")).thenReturn(List.of(new GuiaRutaAutorizada(new Guia(), ruta, 2)));
+
+        DatosRutaAutorizada datos = servicio(dao).obtenerPorGuia("G1").get(0);
+
+        assertEquals(2, datos.getAlternativa());
+        assertEquals(ruta.getSha256GeoJson(), datos.getSha256());
+        assertEquals(5000, datos.getDistanciaMetros());
+        assertEquals(ruta.getGeometriaGeoJson(), datos.getGeometriaGeoJson());
+        assertEquals(ruta.getId(), datos.getIdRuta());
+    }
+
+    @Test
+    void withoutGuideOrHashesThereIsNothingToLookFor() throws Exception {
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+
+        assertTrue(servicio(dao).obtenerPorGuia(null).isEmpty());
+        assertTrue(servicio(dao).obtenerPorGuia(" ").isEmpty());
+        assertTrue(servicio(dao).obtenerPorHuellas(null).isEmpty());
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of()).isEmpty());
+        verify(dao, never()).buscarPorHuellas(anyList());
+    }
+
+    @Test
+    void aTamperedRowIsNotShownAsAVerifiedRoute() throws Exception {
+        String hash = "b".repeat(64);
+        RutaReferencia adulterada = mock(RutaReferencia.class);
+        when(adulterada.getSha256GeoJson()).thenReturn(hash);
+        when(adulterada.getGeometriaGeoJson()).thenReturn("otra geometria");
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        when(dao.buscarPorHuellas(List.of(hash))).thenReturn(List.of(adulterada));
+
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of(hash, hash)).isEmpty());
     }
 }
