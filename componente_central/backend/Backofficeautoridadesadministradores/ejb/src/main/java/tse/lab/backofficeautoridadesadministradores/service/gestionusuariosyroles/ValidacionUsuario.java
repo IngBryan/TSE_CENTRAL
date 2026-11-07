@@ -34,8 +34,12 @@ final class ValidacionUsuario {
     }
 
     // Quita puntos, guiones y espacios: 5.407.438-0 es 54074380
+    static String sinSeparadores(String valor) {
+        return valor == null ? "" : valor.replaceAll("[.\\-\\s]", "");
+    }
+
     static String cedula(String valor) {
-        String digitos = valor == null ? "" : valor.replaceAll("[.\\-\\s]", "");
+        String digitos = sinSeparadores(valor);
         if (!CEDULA.matcher(digitos).matches()) {
             throw new DatosUsuarioInvalidosException("La cédula tiene que tener de 6 a 8 dígitos");
         }

@@ -62,6 +62,10 @@ public class AltaUsuarioService {
             ValidacionUsuario.contrasena(contrasena);
         }
 
+        // Mismo bloqueo que el cambio de rol y la baja: serializa estas operaciones, y dos altas de la misma
+        // cédula con roles distintos no pueden pasar las dos el chequeo de un solo rol interno
+        usuarios.bloquearAdministradores();
+
         Funcionario funcionario = usuarios.buscarFuncionario(cedula);
         sinRolInterno(cedula, rol, funcionario);
 

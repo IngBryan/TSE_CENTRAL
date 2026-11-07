@@ -130,12 +130,12 @@ public class GestionUsuariosService {
         }
     }
 
-    // null si no vino. Quita puntos, guiones y espacios: 5.407.438-0 busca 54074380
+    // null si no vino. 5.407.438-0 busca 54074380
     private static String prefijoCi(String valor) {
         if (valor == null || valor.isBlank()) {
             return null;
         }
-        String digitos = valor.replaceAll("[.\\-\\s]", "");
+        String digitos = ValidacionUsuario.sinSeparadores(valor);
         if (!CI_PARCIAL.matcher(digitos).matches()) {
             throw new PaginaInvalidaException(
                     "La cédula tiene que tener solo dígitos, hasta " + LARGO_MAXIMO_CI);

@@ -155,6 +155,18 @@ class UsuariosResourceTest {
     }
 
     @Test
+    void cambioDeRolAUnaCedulaDadaDeAltaALaVezDevuelve409() {
+        autenticarAdministrador();
+        when(cambioRol.cambiar("99999999", "1234567", "AUTORIDAD", null, null))
+                .thenThrow(new UsuarioExistenteException("Ya existe"));
+
+        Response respuesta = recurso.cambiarRol("1234567", A_AUTORIDAD);
+
+        assertEquals(409, respuesta.getStatus());
+        assertEquals("usuario_existente", cuerpo(respuesta).get("error"));
+    }
+
+    @Test
     void cambioDeRolSinCuerpoDevuelve400() {
         autenticarAdministrador();
 

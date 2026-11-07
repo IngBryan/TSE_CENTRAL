@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.inject.Inject;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
@@ -38,21 +39,21 @@ public class IngresoFuncionarioService {
             String nombres, String apellidos) {
     }
 
-    private final FuncionarioDAO funcionarios;
-
-    private final ClientePdi clientePdi;
+    // Inyeccion por campo: el contenedor EJB crea el bean con el constructor sin argumentos
+    @EJB
+    private FuncionarioDAO funcionarios;
 
     @Inject
-    public IngresoFuncionarioService(FuncionarioDAO funcionarios, ClientePdi clientePdi) {
-        this.funcionarios = funcionarios;
-        this.clientePdi = clientePdi;
+    private ClientePdi clientePdi;
+
+    public IngresoFuncionarioService() {
+        // Lo usa el contenedor
     }
 
-    // La especificacion EJB exige un constructor publico sin argumentos (lo usa el
-    // contenedor para el proxy); las instancias que atienden pedidos se crean con
-    // el constructor @Inject
-    public IngresoFuncionarioService() {
-        this(null, null);
+    // Para los tests
+    IngresoFuncionarioService(FuncionarioDAO funcionarios, ClientePdi clientePdi) {
+        this.funcionarios = funcionarios;
+        this.clientePdi = clientePdi;
     }
 
     public ResultadoIngreso ingresarConGubUy(String cedula, String email, String correlationId) {

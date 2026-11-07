@@ -1,6 +1,7 @@
 package tse.lab.backofficeautoridadesadministradores.rest;
 
 import java.util.Map;
+import java.util.function.Function;
 
 import jakarta.ejb.EJB;
 import jakarta.ws.rs.Consumes;
@@ -18,7 +19,6 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService;
-import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService.UsuarioCreado;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaNoPermitidaException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaUsuarioService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
@@ -61,24 +61,7 @@ public class UsuariosResource {
     @DELETE
     @Path("/{ci}")
     public Response eliminar(@PathParam("ci") String ci) {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
-
-        if (acceso != null) {
-            return acceso;
-        }
-
-        try {
-            return Response.ok(baja.eliminar(seguridad.getUserPrincipal().getName(), ci)).build();
-
-        } catch (DatosUsuarioInvalidosException e) {
-            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
-
-        } catch (UsuarioNoEncontradoException e) {
-            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
-
-        } catch (BajaNoPermitidaException e) {
-            return error(Response.Status.CONFLICT, "baja_no_permitida", e.getMessage());
-        }
+        return comoAdministrador(administrador -> Response.ok(baja.eliminar(administrador, ci)).build());
     }
 
     // contrasena: administrador y autoridad; email: funcionario
@@ -100,39 +83,16 @@ public class UsuariosResource {
      * Reemplaza el rol de un funcionario, administrador o autoridad por
      * otro de esos tres. Responde 200, 400 si los datos no son válidos, 404
      * si la cédula no tiene ninguno de esos roles o 409 si ya tiene el rol
-     * pedido o es el propio administrador.
+     * pedido, es el propio administrador o la cédula se dio de alta a la vez.
      */
     @PUT
     @Path("/{ci}/rol")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response cambiarRol(@PathParam("ci") String ci, CambioRolRequest datos) {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
-
-        if (acceso != null) {
-            return acceso;
-        }
-
-        if (datos == null) {
-            return error(Response.Status.BAD_REQUEST, "datos_invalidos", "El cuerpo es obligatorio");
-        }
-
-        try {
-            return Response.ok(cambioRol.cambiar(
-                    seguridad.getUserPrincipal().getName(),
-                    ci,
-                    datos.rol(),
-                    datos.contrasena(),
-                    datos.email())).build();
-
-        } catch (DatosUsuarioInvalidosException e) {
-            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
-
-        } catch (UsuarioNoEncontradoException e) {
-            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
-
-        } catch (CambioRolNoPermitidoException e) {
-            return error(Response.Status.CONFLICT, "cambio_no_permitido", e.getMessage());
-        }
+        return comoAdministrador(administrador -> datos == null
+                ? sinCuerpo()
+                : Response.ok(cambioRol.cambiar(
+                        administrador, ci, datos.rol(), datos.contrasena(), datos.email())).build());
     }
 
     /**
@@ -147,18 +107,7 @@ public class UsuariosResource {
             @QueryParam("rol") String rol,
             @QueryParam("ci") String ci) {
 
-        Response acceso = AccesoAdministrador.verificar(seguridad);
-
-        if (acceso != null) {
-            return acceso;
-        }
-
-        try {
-            return Response.ok(servicio.listar(pagina, tamanio, rol, ci)).build();
-
-        } catch (PaginaInvalidaException e) {
-            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
-        }
+        return comoAdministrador(administrador -> Response.ok(servicio.listar(pagina, tamanio, rol, ci)).build());
     }
 
     /**
@@ -169,32 +118,43 @@ public class UsuariosResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response crear(AltaUsuarioRequest datos) {
+        return comoAdministrador(administrador -> datos == null
+                ? sinCuerpo()
+                : Response.status(Response.Status.CREATED)
+                        .entity(alta.crear(administrador, datos.tipo(), datos.ci(), datos.contrasena(), datos.email()))
+                        .build());
+    }
+
+    // Verifica el rol y traduce las excepciones de los servicios a su estado HTTP, para todas las operaciones
+    private Response comoAdministrador(Function<String, Response> operacion) {
         Response acceso = AccesoAdministrador.verificar(seguridad);
 
         if (acceso != null) {
             return acceso;
         }
 
-        if (datos == null) {
-            return error(Response.Status.BAD_REQUEST, "datos_invalidos", "El cuerpo es obligatorio");
-        }
-
         try {
-            UsuarioCreado creado = alta.crear(
-                    seguridad.getUserPrincipal().getName(),
-                    datos.tipo(),
-                    datos.ci(),
-                    datos.contrasena(),
-                    datos.email());
+            return operacion.apply(seguridad.getUserPrincipal().getName());
 
-            return Response.status(Response.Status.CREATED).entity(creado).build();
-
-        } catch (DatosUsuarioInvalidosException e) {
+        } catch (DatosUsuarioInvalidosException | PaginaInvalidaException e) {
             return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
+
+        } catch (UsuarioNoEncontradoException e) {
+            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
 
         } catch (UsuarioExistenteException e) {
             return error(Response.Status.CONFLICT, "usuario_existente", e.getMessage());
+
+        } catch (CambioRolNoPermitidoException e) {
+            return error(Response.Status.CONFLICT, "cambio_no_permitido", e.getMessage());
+
+        } catch (BajaNoPermitidaException e) {
+            return error(Response.Status.CONFLICT, "baja_no_permitida", e.getMessage());
         }
+    }
+
+    private static Response sinCuerpo() {
+        return error(Response.Status.BAD_REQUEST, "datos_invalidos", "El cuerpo es obligatorio");
     }
 
     private static Response error(Response.Status estado, String codigo, String detalle) {

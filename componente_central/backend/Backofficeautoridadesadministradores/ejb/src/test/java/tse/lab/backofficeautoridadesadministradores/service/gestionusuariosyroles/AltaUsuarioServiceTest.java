@@ -35,6 +35,13 @@ class AltaUsuarioServiceTest {
     static class UsuarioDAOFalso extends UsuarioDAO {
 
         final List<Object> guardados = new ArrayList<>();
+        int bloqueos;
+
+        @Override
+        public List<String> bloquearAdministradores() {
+            bloqueos++;
+            return List.of();
+        }
 
         @Override
         public RolUsuario rolBackoffice(String ci) {
@@ -84,6 +91,7 @@ class AltaUsuarioServiceTest {
         assertEquals("12345678", administrador.getCi());
         assertNotEquals(CONTRASENA, administrador.getContrasena());
         assertTrue(Contrasenas.verificar(CONTRASENA, administrador.getContrasena()));
+        assertEquals(1, usuarios.bloqueos);
     }
 
     @Test
