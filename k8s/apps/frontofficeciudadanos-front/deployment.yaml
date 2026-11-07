@@ -56,13 +56,13 @@ spec:
                   key: movil-token-secret
           readinessProbe:
             httpGet:
-              path: /ciudadanos
+              path: /ciudadanos/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /ciudadanos
+              path: /ciudadanos/health
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
