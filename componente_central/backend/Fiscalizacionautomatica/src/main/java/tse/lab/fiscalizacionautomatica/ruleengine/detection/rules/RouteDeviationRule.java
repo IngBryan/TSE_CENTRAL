@@ -63,6 +63,12 @@ public final class RouteDeviationRule implements SituationRule {
         return Situation.ROUTE_DEVIATION;
     }
 
+    public Optional<PruebaDesvio> evaluar(VehicleEvent event, VehicleFacts facts,
+            tse.lab.reglas.ConfiguracionReglas configuracion) throws IOException {
+        return new RouteDeviationRule(intervalos, rutas, posiciones, configuracion.getDistanciaDesvioMetros(),
+                Duration.ofSeconds(configuracion.getVentanaDesvioSegundos())).evaluar(event, facts);
+    }
+
     /** Evidencia reproducible del par utilizado y de las rutas consultadas. */
     public record PruebaDesvio(TrackingEvent confirmante, TrackingEvent pareja,
             double distanciaConfirmanteMetros, double distanciaParejaMetros,

@@ -101,6 +101,18 @@ public class MongoTrackingEventDAO implements TrackingEventDAO {
     }
 
     @Override
+    public long fijarRevisionReglas(TrackingEvent event, long revision) {
+        Bson identidad=Filters.and(Filters.eq("licensePlate", event.licensePlate()),
+                Filters.eq("timestamp", Date.from(event.timestamp())));
+        collection.updateOne(Filters.and(identidad, Filters.exists("revisionReglas", false)),
+                Updates.set("revisionReglas", revision));
+        Document guardado=collection.find(identidad).projection(new Document("revisionReglas",1)).first();
+        if (guardado==null || !(guardado.get("revisionReglas") instanceof Number n))
+            throw new IllegalStateException("Evento sin revisión de reglas persistida");
+        return n.longValue();
+    }
+
+    @Override
     public void markDetected(TrackingEvent event) {
         Bson pending = Filters.and(Filters.eq("licensePlate", event.licensePlate()),
                 Filters.eq("timestamp", Date.from(event.timestamp())), Filters.eq("detected", false));

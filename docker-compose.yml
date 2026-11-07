@@ -245,7 +245,6 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - ROUTE_DEVIATION_ENABLED=${ROUTE_DEVIATION_ENABLED:-false}
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_USER=${RABBITMQ_USER}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}

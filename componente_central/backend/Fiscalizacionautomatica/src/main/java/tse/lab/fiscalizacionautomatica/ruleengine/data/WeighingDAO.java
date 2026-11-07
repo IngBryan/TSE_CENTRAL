@@ -18,5 +18,7 @@ public interface WeighingDAO {
     /** @return weighings still pending detection, oldest first */
     List<Weighing> findPending(int limit) throws IOException;
 
+    default long fijarRevisionReglas(Weighing weighing, long revision) throws IOException { return revision; }
+
     void markDetected(Weighing weighing) throws IOException;
 }

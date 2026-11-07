@@ -50,6 +50,12 @@ public class RemoteWeighingDAO implements WeighingDAO, AutoCloseable {
     }
 
     @Override
+    public long fijarRevisionReglas(Weighing w, long revision) throws IOException {
+        try { return weighings.fijarRevisionReglas(w.licensePlate(), w.timestamp(), revision); }
+        catch (RuntimeException e) { throw failed(e); }
+    }
+
+    @Override
     public void markDetected(Weighing weighing) throws IOException {
         try {
             weighings.marcarDetectado(weighing.licensePlate(), weighing.timestamp());

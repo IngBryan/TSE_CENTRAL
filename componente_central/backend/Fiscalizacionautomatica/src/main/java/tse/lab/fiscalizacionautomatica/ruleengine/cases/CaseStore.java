@@ -19,6 +19,15 @@ public interface CaseStore {
     /** Registra el evento en el caso abierto adecuado; lo crea si todavía no existe. */
     DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException;
 
+    default DatosCaso registrarConReglas(TipoCasoAutomatico tipo, String guia, VehicleEvent evento,
+            tse.lab.reglas.ConfiguracionReglas config, long pesoBaseKg) throws IOException {
+        return registrar(tipo, guia, evento);
+    }
+    default DatosCaso registrarDesvioConReglas(String guia, TrackingEvent evento, PruebaDesvio prueba,
+            tse.lab.reglas.ConfiguracionReglas config) throws IOException {
+        return registrarDesvio(guia, evento, prueba);
+    }
+
     /** Registra atómicamente caso, clave de GPS y prueba geométrica; nunca omitir la prueba. */
     default DatosCaso registrarDesvio(String idGuia, TrackingEvent evento, PruebaDesvio prueba)
             throws IOException {

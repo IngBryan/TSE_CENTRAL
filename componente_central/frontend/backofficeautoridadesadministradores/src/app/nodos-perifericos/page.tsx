@@ -1,4 +1,5 @@
 
+import Link from "next/link";
 import { listarNodos } from "@/lib/nodos-perifericos-backend";
 import PanelAltaNodo from "./PanelAltaNodo";
 import { redirect } from "next/navigation";
@@ -32,6 +33,10 @@ export default async function GestionNodosPerifericosPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-6 py-10">
+      <nav aria-label="Administración" className="flex gap-5 text-sm">
+        <Link className="font-semibold" href="/nodos-perifericos" aria-current="page">Nodos periféricos</Link>
+        <Link className="underline" href="/reglas-fiscalizacion">Reglas de fiscalización</Link>
+      </nav>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">

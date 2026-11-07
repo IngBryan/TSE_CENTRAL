@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CARGA.UY — Backoffice",
-  description: "Gestión de nodos periféricos de CARGA.UY",
+  description: "Administración de nodos y reglas de fiscalización de CARGA.UY",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

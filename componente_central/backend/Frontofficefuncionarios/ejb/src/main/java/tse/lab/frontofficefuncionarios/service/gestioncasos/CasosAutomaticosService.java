@@ -102,6 +102,8 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         if (tipoCaso == TipoCasoAutomatico.VIAJE_SIN_GUIA && idGuia != null) {
             throw new IllegalArgumentException("Viaje sin Guía no debe asociarse a una Guía");
         }
+        if (evento.getRevisionReglas()!=null && evento.getRevisionReglas()<1)
+            throw new IllegalArgumentException("Revisión de reglas inválida");
         Vehiculo vehiculo = casos.buscarVehiculo(evento.getMatricula());
         if (vehiculo == null) {
             throw new IllegalArgumentException("El vehículo no existe: " + evento.getMatricula());
@@ -119,17 +121,19 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         CasoFiscalizacion asociado = casos.buscarConEvidencia(evento.getMatricula(), idGuia,
                 tipoCaso.name(), clave(evento), evento.getOrigen() == OrigenEvento.TRACKING);
         if (asociado != null) {
-            if (prueba != null || habilitacion != null) {
+            if (prueba != null || habilitacion != null || evento.getRevisionReglas()!=null) {
                 asociado = casos.buscarPorIdParaActualizar(asociado.getId());
                 if (prueba != null) agregarPruebaSiFalta(asociado, evento, prueba);
                 if (habilitacion != null) agregarHabilitacionSiFalta(asociado, habilitacion);
             }
+            agregarReglasSiFalta(asociado, evento);
             return datos(asociado);
         }
         CasoFiscalizacion caso = casos.buscarAbierto(evento.getMatricula(), idGuia, tipoCaso.name());
         if (caso == null) {
             caso = new CasoFiscalizacion(tipoCaso.getDescripcion(), tipoCaso.name(), vehiculo, guia);
             asociarSiFalta(caso, evento);
+            agregarReglasSiFalta(caso, evento);
             if (prueba != null) agregarPruebaSiFalta(caso, evento, prueba);
             if (habilitacion != null) agregarHabilitacionSiFalta(caso, habilitacion);
             casos.guardar(caso);
@@ -144,6 +148,7 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         } else {
             caso = casos.buscarPorIdParaActualizar(caso.getId());
             asociarSiFalta(caso, evento);
+            agregarReglasSiFalta(caso, evento);
             if (prueba != null) agregarPruebaSiFalta(caso, evento, prueba);
             if (habilitacion != null) agregarHabilitacionSiFalta(caso, habilitacion);
             Long id = caso.getId();
@@ -152,6 +157,14 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                     .campo("matricula", evento.getMatricula()).campo("fechaHora", evento.getFechaHora()).toString());
         }
         return datos(caso);
+    }
+
+    private static void agregarReglasSiFalta(CasoFiscalizacion caso, EventoFiscalizado e) {
+        if (e.getRevisionReglas()==null) return; // compatibilidad con expedientes anteriores
+        boolean existe=caso.getEvidenciasReglas().stream().anyMatch(r ->
+                r.corresponde(e.getMatricula(), e.getFechaHora(), e.getOrigen().name()));
+        if (!existe) caso.getEvidenciasReglas().add(new tse.lab.model.EvidenciaReglas(
+                e.getMatricula(), e.getFechaHora(), e.getOrigen().name(), e.getRevisionReglas(), e.getPesoBaseKg()));
     }
 
     private static void agregarHabilitacionSiFalta(CasoFiscalizacion caso,

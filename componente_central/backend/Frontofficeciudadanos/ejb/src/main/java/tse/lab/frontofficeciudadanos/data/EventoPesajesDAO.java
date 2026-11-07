@@ -17,6 +17,12 @@ public class EventoPesajesDAO {
         return em.find(EventoPesajes.class, clave);
     }
 
+    public EventoPesajes buscarParaActualizar(ClaveEvento clave) {
+        EventoPesajes p=em.find(EventoPesajes.class, clave);
+        if (p!=null) em.refresh(p, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        return p;
+    }
+
     public void guardar(EventoPesajes pesaje) {
         em.persist(pesaje);
     }

@@ -13,6 +13,16 @@
     <description>This is the EJB POM file</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.rabbitmq</groupId><artifactId>amqp-client</artifactId><version>5.36.0</version>
+            <exclusions><exclusion><groupId>io.netty</groupId><artifactId>*</artifactId></exclusion></exclusions>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.json</groupId><artifactId>jakarta.json-api</artifactId><scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId><artifactId>jakarta.annotation-api</artifactId><scope>provided</scope>
+        </dependency>
 
         <!-- Entidades JPA compartidas (componente_central/backend/Modelo). Va en el lib/ del EAR.
             Hay que instalarlo antes: mvn -f ../Modelo/pom.xml install -->
@@ -109,6 +119,7 @@
                             y sus DTOs, para clientes fuera de WildFly (Fiscalizacionautomatica) -->
                         <generateClient>true</generateClient>
                         <clientIncludes>
+                            <clientInclude>tse/lab/backofficeautoridadesadministradores/service/reglas/ConfiguracionReglasRemote.class</clientInclude>
                             <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/NodosActivos.class</clientInclude>
                             <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/NodosActivosRemote.class</clientInclude>
                             <clientInclude>tse/lab/backofficeautoridadesadministradores/service/gestionnodosperifericos/DatosNodo.class</clientInclude>

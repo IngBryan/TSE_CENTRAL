@@ -55,6 +55,25 @@ class SituationDetectorTest {
     }
 
     @Test
+    void unaEvaluacionConservaSuSnapshotAunqueCambieLaConfiguracionMientrasConsultaHechos() throws IOException {
+        var inicial=tse.lab.reglas.ConfiguracionReglas.inicial();
+        var nueva=new tse.lab.reglas.ConfiguracionReglas(2,new java.math.BigDecimal("20"),0,2000,30,
+                "2026-11-07T00:00:00Z","admin","x",true);
+        var estado=new tse.lab.fiscalizacionautomatica.ruleengine.config.EstadoReglas(n -> inicial);
+        estado.aplicar(inicial);
+        SituationDetector configurable=new SituationDetector(m -> {
+            estado.aplicar(nueva);
+            return Optional.of(withTrip(m,"EN_CURSO"));
+        }, List.of(new tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule()),null,estado);
+        var evento=new Weighing(1,1,"STU5678",NOW,34000);
+        Detection primera=configurable.detect(evento);
+        assertEquals(1,primera.configuracion().getRevision());
+        assertEquals(List.of(Situation.OVERLOAD),primera.situations());
+        assertEquals(List.of(),configurable.detect(evento).situations());
+        assertEquals(List.of(Situation.OVERLOAD),configurable.detect(evento,1).situations());
+    }
+
+    @Test
     void trackingEventOfAVehicleWithoutTripsIsATripWithoutGuide() throws IOException {
         central.put("SBC1234", withoutTrips("SBC1234"));
 
