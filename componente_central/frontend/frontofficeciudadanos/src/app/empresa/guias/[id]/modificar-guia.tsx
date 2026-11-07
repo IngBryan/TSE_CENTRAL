@@ -166,6 +166,12 @@ export function ModificarGuia({
                 />
               )}
               {errorCampo(n)}
+              {tipo === "select" && !opciones[n]?.length && !campos[n] && (
+                <span className="text-xs font-normal text-red-700 dark:text-red-300">
+                  No se pudieron obtener los {n === "rubroCliente" ? "rubros" : "tipos de carga"}. Probá de nuevo en unos
+                  minutos.
+                </span>
+              )}
             </label>
           ))}
           <SelectorLocalidad nombre="origenId" etiqueta="Origen" localidades={localidades}

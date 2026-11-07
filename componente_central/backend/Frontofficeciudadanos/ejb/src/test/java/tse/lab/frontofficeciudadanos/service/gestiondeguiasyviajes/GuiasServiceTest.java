@@ -571,6 +571,41 @@ class GuiasServiceTest {
         });
     }
 
+    @Test
+    void elCatalogoSeBuscaSinDistinguirTildes() throws Exception {
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("FORESTÁL", "Rollizós", 18000L, MANANA, "Rivera", "Montevideo", null, null), "t"));
+
+        assertEquals("Forestal", g.rubroCliente());
+        assertEquals("Rollizos", g.tipoCarga());
+    }
+
+    @Test
+    void unaGuiaAnteriorAlCatalogoSeEditaSinCambiarSuRubroNiSuTipo() throws Exception {
+        GuiaVista g = asignada();
+        enTx(() -> em.createQuery("UPDATE Guia g SET g.rubroCliente = 'Agro viejo', g.tipoCarga = 'Bolsas' WHERE g.id = :id")
+                .setParameter("id", g.id()).executeUpdate());
+        em.clear();
+
+        GuiaVista editada = enTx(() -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Agro viejo", "Bolsas", 21000L, MANANA, "Rivera", "Montevideo", null, null,
+                        g.version()), "t"));
+
+        assertEquals("Agro viejo", editada.rubroCliente());
+        assertEquals(21000L, editada.pesoCargaKg());
+    }
+
+    @Test
+    void alEditarNoSePuedeCambiarAUnValorFueraDelCatalogo() throws Exception {
+        GuiaVista g = asignada();
+
+        DatosInvalidosException e = falla(DatosInvalidosException.class, () -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Otro", "Rollizos", 21000L, MANANA, "Rivera", "Montevideo", null, null,
+                        g.version()), "t"));
+
+        assertEquals(Map.of("rubroCliente", "Elegí un rubro de la lista."), e.getErrores());
+    }
+
     private GuiaVista nuevaGuia() throws Exception {
         return enTx(() -> servicio.crear(RESPONSABLE, new NuevaGuia("Forestal", "Rollizos", 20000L, MANANA, "Rivera", "Montevideo", null, null), "t"));
     }

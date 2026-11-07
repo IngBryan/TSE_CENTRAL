@@ -61,12 +61,11 @@ async function catalogo(ruta: string): Promise<ItemCatalogo[]> {
 }
 
 // Catalogos precargados: el tipo de carga y el rubro del cliente de la guia se eligen de estas listas.
-// Se piden en paralelo; nunca rechaza (si algo falla, la lista queda vacia).
+// Se piden en paralelo. Si el backend no esta disponible, la lista queda vacia.
 export async function obtenerCatalogos(): Promise<{ tiposCarga: TipoCarga[]; rubros: Rubro[] }> {
-  const vacio = (): ItemCatalogo[] => [];
   const [tiposCarga, rubros] = await Promise.all([
-    catalogo("/empresa/guias/tipos-carga").catch(vacio),
-    catalogo("/empresa/guias/rubros").catch(vacio),
+    catalogo("/empresa/guias/tipos-carga"),
+    catalogo("/empresa/guias/rubros"),
   ]);
   return { tiposCarga, rubros };
 }

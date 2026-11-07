@@ -17,10 +17,4 @@ public class RubroDAO {
     public List<Rubro> listar() {
         return em.createQuery("SELECT r FROM Rubro r ORDER BY r.nombre", Rubro.class).getResultList();
     }
-
-    // El del catalogo con ese nombre, sin distinguir mayusculas; null si no esta
-    public Rubro buscarPorNombre(String nombre) {
-        return em.createQuery("SELECT r FROM Rubro r WHERE LOWER(r.nombre) = LOWER(:nombre)", Rubro.class)
-                .setParameter("nombre", nombre).getResultStream().findFirst().orElse(null);
-    }
 }

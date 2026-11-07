@@ -8,12 +8,15 @@ import java.time.Month;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
@@ -216,21 +219,6 @@ public class PortalPublicoService {
         List<Fila> cargaPorTipo = porCatalogo(tiposCarga.listar().stream().map(TipoCarga::getNombre).toList(),
                 portal.viajesPorEmpresaYTipoCarga(desde, hasta), "Otros tipos de carga");
 
-        // Empresas habilitadas por rubro de la empresa (situacion actual: no depende del anio)
-        Map<String, Fila> empresasRubro = new LinkedHashMap<>();
-        nombresRubros.forEach(n -> empresasRubro.put(clave(n), new Fila(clave(n), n, new HashSet<>(), 0, 0)));
-        for (Object[] r : portal.rubrosDeEmpresasHabilitadas()) {
-            Fila f = empresasRubro.get(clave((String) r[0]));
-            if (f != null) {
-                Set<Long> empresasFila = new HashSet<>(f.empresas());
-                empresasFila.add((Long) r[1]);
-                empresasRubro.put(f.clave(), new Fila(f.clave(), f.etiqueta(), empresasFila, empresasFila.size(), 0));
-            }
-        }
-        List<Fila> empresasPorRubro = new ArrayList<>(empresasRubro.values());
-        empresasPorRubro.sort((a, b) -> b.cantidad() != a.cantidad() ? Long.compare(b.cantidad(), a.cantidad())
-                : a.etiqueta().compareTo(b.etiqueta()));
-
         // Infracciones confirmadas por tipo
         Map<String, Fila> porTipo = new LinkedHashMap<>();
         Instant inicio = desde.atStartOfDay(ZONA).toInstant();
@@ -276,9 +264,9 @@ public class PortalPublicoService {
                 viajesPublicables ? new Valor(viajes, false) : new Valor(null, true),
                 viajesPublicables ? new Valor(kg, false) : new Valor(null, true),
                 Agregacion.proteger(new ArrayList<>(porMes.values()), umbral),
-                Agregacion.proteger(cargaPorRubro, umbral),
-                Agregacion.proteger(cargaPorTipo, umbral),
-                Agregacion.proteger(empresasPorRubro, umbral),
+                ordenadas(Agregacion.proteger(cargaPorRubro, umbral), FilaPublica::kg),
+                ordenadas(Agregacion.proteger(cargaPorTipo, umbral), FilaPublica::kg),
+                ordenadas(Agregacion.protegerPorFila(empresasPorRubro(nombresRubros), umbral), FilaPublica::cantidad),
                 Agregacion.proteger(new ArrayList<>(porTipo.values()), umbral),
                 tasa,
                 resueltosPublicables ? new Valor(resueltos, false) : new Valor(null, true),
@@ -295,8 +283,8 @@ public class PortalPublicoService {
     }
 
     // Viajes y kg por valor de un catalogo ([nroEmpresa, valor, viajes, kg]): una fila por cada valor del
-    // catalogo, aunque no tenga viajes (en 0), ordenadas por kg. Lo que no esta en el catalogo (o vacio) va a la
-    // fila OTROS, al final, solo si hay.
+    // catalogo, aunque no tenga viajes (en 0). Lo que no esta en el catalogo (o vacio) va a la fila OTROS, solo si
+    // hay. El orden lo pone ordenadas, despues de proteger.
     private static List<Fila> porCatalogo(List<String> catalogo, List<Object[]> datos, String etiquetaOtros) {
         Map<String, Fila> porClave = new LinkedHashMap<>();
         catalogo.forEach(n -> porClave.put(clave(n), new Fila(clave(n), n, new HashSet<>(), 0, 0)));
@@ -311,11 +299,42 @@ public class PortalPublicoService {
             }
         }
         List<Fila> filas = new ArrayList<>(porClave.values());
-        filas.sort((a, b) -> b.kg() != a.kg() ? Long.compare(b.kg(), a.kg()) : a.etiqueta().compareTo(b.etiqueta()));
         if (otros.cantidad() > 0) {
             filas.add(otros);
         }
         return filas;
+    }
+
+    // Empresas habilitadas de cada rubro del catalogo (situacion actual: no depende del anio)
+    private List<Fila> empresasPorRubro(List<String> catalogo) {
+        Map<String, Set<Long>> porRubro = new HashMap<>();
+        for (Object[] r : portal.rubrosDeEmpresasHabilitadas()) {
+            porRubro.computeIfAbsent(clave((String) r[0]), k -> new HashSet<>()).add((Long) r[1]);
+        }
+        return catalogo.stream().map(n -> {
+            Set<Long> empresasFila = porRubro.getOrDefault(clave(n), Set.of());
+            return new Fila(clave(n), n, empresasFila, empresasFila.size(), 0);
+        }).toList();
+    }
+
+    // De mayor a menor, pero las reservadas van aparte y por nombre: si quedaran en su lugar, las filas vecinas
+    // dirian entre que valores esta lo que se reservo. Despues las filas en 0 y al final OTROS.
+    private static List<FilaPublica> ordenadas(List<FilaPublica> filas, Function<FilaPublica, Long> valor) {
+        return filas.stream()
+                .sorted(Comparator.comparingInt(PortalPublicoService::grupo)
+                        .thenComparingLong(f -> f.reservado() ? 0 : -valor.apply(f))
+                        .thenComparing(FilaPublica::etiqueta))
+                .toList();
+    }
+
+    private static int grupo(FilaPublica f) {
+        if (OTROS.equals(f.clave())) {
+            return 3;
+        }
+        if (f.reservado()) {
+            return 1;
+        }
+        return f.cantidad() > 0 ? 0 : 2;
     }
 
     private static Fila sumar(Fila f, Long nroEmpresa, long cantidad, long kg) {

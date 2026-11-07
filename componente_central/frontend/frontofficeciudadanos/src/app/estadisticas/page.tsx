@@ -136,7 +136,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         primera="Rubro de la empresa"
         etiqueta={(f) => f.etiqueta}
         columnas={[{ titulo: "Empresas", valor: (f) => numero(f.cantidad) }]}
-        vacio="No hay rubros cargados."
+        vacio="Ninguna empresa habilitada tiene rubros asignados."
         nota="Una empresa que trabaja en varios rubros cuenta en cada uno, por eso la suma puede superar el total de empresas habilitadas."
       />
       <Tabla
@@ -229,18 +229,20 @@ function Tabla({
   nota?: string;
 }) {
   const maximo = Math.max(0, ...filas.map((f) => (f.reservado ? 0 : (barra(f) ?? 0))));
+  // Las tablas por catalogo traen todas sus filas: sin datos en ninguna, se muestra el mensaje `vacio`
+  const sinDatos = vacio !== undefined && filas.every((f) => !f.reservado && !f.cantidad);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className={titulo}>{texto}</h2>
-        {filas.length > 0 && (
+        {filas.length > 0 && !sinDatos && (
           <a href={`/estadisticas/csv?tabla=${tabla}`} className="text-sm text-[#0068b3] hover:underline">
             Descargar CSV
           </a>
         )}
       </div>
       {nota && <p className="-mt-1 text-sm text-zinc-600 dark:text-zinc-400">{nota}</p>}
-      {filas.length === 0 ? (
+      {sinDatos ? (
         <p className="text-zinc-600 dark:text-zinc-400">{vacio}</p>
       ) : (
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">

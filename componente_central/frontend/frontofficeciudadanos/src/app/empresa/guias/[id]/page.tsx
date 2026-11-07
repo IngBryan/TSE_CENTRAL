@@ -75,14 +75,13 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   const sesion = await getSesion();
   if (!sesion) redirect("/");
   const { id } = await params;
-  // Los catalogos de tipos de carga y rubros, por si se edita la guia
-  const pedidoCatalogos = obtenerCatalogos();
 
   let datos: DetalleGuia | null = null;
   let error: string | null = null;
   let rutasAutorizadas: RutaAsignada[] = [];
   let errorRutas = false;
   let localidades: LocalidadVista[] = [];
+  let catalogos: Awaited<ReturnType<typeof obtenerCatalogos>> = { tiposCarga: [], rubros: [] };
   try {
     const res = await llamarBackend<DetalleGuia & { detalle?: string }>(
       `/empresa/guias/${encodeURIComponent(id)}/eventos`,
@@ -111,6 +110,8 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
     }
   }
   if (datos?.guia.estado === "ASIGNADA") {
+    // Solo una guia ASIGNADA se edita: es la que necesita los catalogos y las localidades
+    catalogos = await obtenerCatalogos();
     try {
       const res = await llamarBackend<LocalidadVista[]>("/localidades", {
         correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
@@ -129,7 +130,6 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
     : [];
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" });
   const conflictos = datos?.eventos.filter((e) => e.resultado === "CONFLICTO").length ?? 0;
-  const { tiposCarga, rubros } = await pedidoCatalogos;
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -202,8 +202,8 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
                 guia={datos.guia}
                 vehiculos={datos.vehiculos}
                 choferes={datos.choferes}
-                tiposCarga={tiposCarga}
-                rubros={rubros}
+                tiposCarga={catalogos.tiposCarga}
+                rubros={catalogos.rubros}
                 hoy={hoy}
                 localidades={localidades}
               />

@@ -28,7 +28,16 @@ public final class Agregacion {
     }
 
     static List<FilaPublica> proteger(List<Fila> filas, int umbral) {
-        Set<Fila> reservadas = reservadas(filas, umbral);
+        return publicar(filas, reservadas(filas, umbral));
+    }
+
+    // Para tablas cuyas filas se superponen (una empresa cuenta en varias) y no suman ningun total: no hay nada
+    // que deducir restando, asi que no hace falta la supresion complementaria. El umbral sigue valiendo por fila.
+    static List<FilaPublica> protegerPorFila(List<Fila> filas, int umbral) {
+        return publicar(filas, bajoElUmbral(filas, umbral));
+    }
+
+    private static List<FilaPublica> publicar(List<Fila> filas, Set<Fila> reservadas) {
         return filas.stream()
                 .map(f -> reservadas.contains(f)
                         ? new FilaPublica(f.clave(), f.etiqueta(), null, null, true)
@@ -36,13 +45,18 @@ public final class Agregacion {
                 .toList();
     }
 
-    private static Set<Fila> reservadas(List<Fila> filas, int umbral) {
+    private static Set<Fila> bajoElUmbral(List<Fila> filas, int umbral) {
         Set<Fila> reservadas = new HashSet<>();
         for (Fila f : filas) {
             if (f.cantidad() > 0 && f.empresas().size() < umbral) {
                 reservadas.add(f);
             }
         }
+        return reservadas;
+    }
+
+    private static Set<Fila> reservadas(List<Fila> filas, int umbral) {
+        Set<Fila> reservadas = bajoElUmbral(filas, umbral);
         List<Fila> visibles = new ArrayList<>(filas.stream()
                 .filter(f -> f.cantidad() > 0 && !reservadas.contains(f))
                 .sorted(Comparator.comparingLong(Fila::cantidad).thenComparingInt(f -> f.empresas().size()))

@@ -155,9 +155,9 @@ public class GuiasService {
     public GuiaVista crear(String ciResponsable, NuevaGuia datos, String correlationId)
             throws NoAutorizadoException, DatosInvalidosException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
-        DatosValidos d = datos == null ? validar(null, null, null, null, null, null, null, null)
+        DatosValidos d = datos == null ? validar(null, null, null, null, null, null, null, null, null)
                 : validar(datos.rubroCliente(), datos.tipoCarga(), datos.pesoCargaKg(), datos.fecha(), datos.origen(),
-                        datos.destino(), datos.origenId(), datos.destinoId());
+                        datos.destino(), datos.origenId(), datos.destinoId(), null);
 
         Guia guia = new Guia(nuevoId(), d.rubro(), d.carga(), d.fecha(), d.origen(), d.destino(), empresa);
         guia.setOrigenLocalidad(d.localidadOrigen());
@@ -232,7 +232,7 @@ public class GuiasService {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
         Guia guia = guiaModificable(empresa, idGuia, datos == null ? null : datos.version());
         DatosValidos d = validar(datos.rubroCliente(), datos.tipoCarga(), datos.pesoCargaKg(), datos.fecha(),
-                datos.origen(), datos.destino(), datos.origenId(), datos.destinoId());
+                datos.origen(), datos.destino(), datos.origenId(), datos.destinoId(), guia);
 
         List<String> cambios = new ArrayList<>();
         cambio(cambios, "rubro", guia.getRubroCliente(), d.rubro());
@@ -486,28 +486,20 @@ public class GuiasService {
 
     // Reglas de alta/edicion: rubro del cliente y tipo de carga obligatorios y de sus catalogos precargados (se
     // guardan con el nombre del catalogo), carga entre 1 y MAX_CARGA_KG, fecha >= hoy, origen y destino
-    // obligatorios y distintos. Los IDs de localidad se resuelven en el backend.
+    // obligatorios y distintos. Los IDs de localidad se resuelven en el backend. actual: la guia que se edita (null
+    // en el alta); si conserva un valor de antes de los catalogos, se sigue aceptando.
     private DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
-            String origenTexto, String destinoTexto, Long origenId, Long destinoId) throws DatosInvalidosException {
+            String origenTexto, String destinoTexto, Long origenId, Long destinoId, Guia actual)
+            throws DatosInvalidosException {
         Map<String, String> errores = new LinkedHashMap<>();
-        String rubro = texto(errores, "rubroCliente", "El rubro del cliente", rubroCliente, MAX_TEXTO);
-        String tipoCarga = texto(errores, "tipoCarga", "El tipo de carga", tipoCargaTexto, MAX_TEXTO);
-        if (rubro != null) {
-            Rubro delCatalogo = rubros.buscarPorNombre(rubro);
-            if (delCatalogo == null) {
-                errores.put("rubroCliente", "Elegí un rubro de la lista.");
-            } else {
-                rubro = delCatalogo.getNombre();
-            }
-        }
-        if (tipoCarga != null) {
-            TipoCarga delCatalogo = tiposCarga.buscarPorNombre(tipoCarga);
-            if (delCatalogo == null) {
-                errores.put("tipoCarga", "Elegí un tipo de carga de la lista.");
-            } else {
-                tipoCarga = delCatalogo.getNombre();
-            }
-        }
+        String rubro = delCatalogo(errores, "rubroCliente", "Elegí un rubro de la lista.",
+                texto(errores, "rubroCliente", "El rubro del cliente", rubroCliente, MAX_TEXTO),
+                actual == null ? null : actual.getRubroCliente(),
+                rubros.listar().stream().map(Rubro::getNombre).toList());
+        String tipoCarga = delCatalogo(errores, "tipoCarga", "Elegí un tipo de carga de la lista.",
+                texto(errores, "tipoCarga", "El tipo de carga", tipoCargaTexto, MAX_TEXTO),
+                actual == null ? null : actual.getTipoCarga(),
+                tiposCarga.listar().stream().map(TipoCarga::getNombre).toList());
         Localidad origen = resolverLocalidad(errores, "origen", origenTexto, origenId);
         Localidad destino = resolverLocalidad(errores, "destino", destinoTexto, destinoId);
         if (origen != null && destino != null && Objects.equals(origen.getId(), destino.getId())) {
@@ -536,6 +528,19 @@ public class GuiasService {
         if (!errores.isEmpty()) throw new DatosInvalidosException(errores);
         return new DatosValidos(rubro, tipoCarga, pesoCargaKg, fecha, origen.getNombre(), destino.getNombre(),
                 origen, destino);
+    }
+
+    // El nombre del catalogo para ese valor, sin distinguir mayusculas ni tildes (como el portal publico)
+    private static String delCatalogo(Map<String, String> errores, String campo, String mensaje, String valor,
+            String actual, List<String> catalogo) {
+        if (valor == null || valor.equals(actual)) {
+            return valor;
+        }
+        String buscado = normalizar(valor);
+        return catalogo.stream().filter(n -> normalizar(n).equals(buscado)).findFirst().orElseGet(() -> {
+            errores.put(campo, mensaje);
+            return valor;
+        });
     }
 
     private static String texto(Map<String, String> errores, String campo, String nombre, String valor, int max) {

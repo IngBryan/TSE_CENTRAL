@@ -199,7 +199,7 @@ class PortalPublicoServiceTest {
     }
 
     @Test
-    void unRubroConMenosDeTresEmpresasSeReservaConSupresionComplementaria() throws Exception {
+    void unRubroConMenosDeTresEmpresasSeReservaSinArrastrarALosDemas() throws Exception {
         em.getTransaction().begin();
         em.find(Empresa.class, 1L).setRubros(List.of(em.find(Rubro.class, 1L), em.find(Rubro.class, 3L)));
         em.getTransaction().commit();
@@ -207,12 +207,31 @@ class PortalPublicoServiceTest {
 
         Estadisticas e = servicio.estadisticas(HOY.getYear(), "t");
 
-        // "Forestal" solo lo tiene la empresa 1: se reserva y con ella "Agropecuario", la mas chica visible
-        FilaPublica forestal = e.empresasPorRubro().stream().filter(f -> f.etiqueta().equals("Forestal"))
-                .findFirst().orElseThrow();
-        assertTrue(forestal.reservado());
-        assertNull(forestal.cantidad());
-        assertTrue(e.empresasPorRubro().get(0).reservado());
+        // "Forestal" solo lo tiene la empresa 1: se reserva. Las filas se superponen y no suman un total, asi que
+        // "Agropecuario" sigue publicada
+        assertEquals(List.of("Agropecuario", "Forestal", "Construccion"),
+                e.empresasPorRubro().stream().map(FilaPublica::etiqueta).toList());
+        assertEquals(java.util.Arrays.asList(3L, null, 0L),
+                e.empresasPorRubro().stream().map(FilaPublica::cantidad).toList());
+        assertTrue(e.empresasPorRubro().get(1).reservado());
+    }
+
+    @Test
+    void lasFilasReservadasNoMuestranSuPosicionPorKg() throws Exception {
+        em.getTransaction().begin();
+        for (long nro = 1; nro <= 3; nro++) {
+            viaje(em.find(Empresa.class, nro), em.find(Vehiculo.class, "SAA000" + nro), "Forestal", "Arena", 5000);
+        }
+        em.getTransaction().commit();
+        em.clear();
+
+        Estadisticas e = servicio.estadisticas(HOY.getYear(), "t");
+
+        // Por kg seria Agropecuario, Forestal, Construccion. Construccion es de una empresa y Forestal se reserva con
+        // ella: van despues de lo visible y por nombre
+        assertEquals(List.of("Agropecuario", "Construccion", "Forestal"),
+                e.cargaPorRubro().stream().map(FilaPublica::etiqueta).toList());
+        assertEquals(List.of(false, true, true), e.cargaPorRubro().stream().map(FilaPublica::reservado).toList());
     }
 
     @Test

@@ -30,8 +30,6 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   if (!sesion) redirect("/");
   const params = await searchParams;
 
-  // Los catalogos de tipos de carga y rubros, para el formulario de nueva guia (en paralelo con el listado)
-  const pedidoCatalogos = obtenerCatalogos();
   let guias: Guia[] | null = null;
   let error: string | null = null;
   let localidades: LocalidadVista[] = [];
@@ -55,7 +53,8 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
   }
-  const { tiposCarga, rubros } = await pedidoCatalogos;
+  // Los catalogos de tipos de carga y rubros, para el formulario de nueva guia
+  const { tiposCarga, rubros } = await obtenerCatalogos();
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" }); // yyyy-mm-dd
 

@@ -17,10 +17,4 @@ public class TipoCargaDAO {
     public List<TipoCarga> listar() {
         return em.createQuery("SELECT t FROM TipoCarga t ORDER BY t.nombre", TipoCarga.class).getResultList();
     }
-
-    // El del catalogo con ese nombre, sin distinguir mayusculas; null si no esta
-    public TipoCarga buscarPorNombre(String nombre) {
-        return em.createQuery("SELECT t FROM TipoCarga t WHERE LOWER(t.nombre) = LOWER(:nombre)", TipoCarga.class)
-                .setParameter("nombre", nombre).getResultStream().findFirst().orElse(null);
-    }
 }

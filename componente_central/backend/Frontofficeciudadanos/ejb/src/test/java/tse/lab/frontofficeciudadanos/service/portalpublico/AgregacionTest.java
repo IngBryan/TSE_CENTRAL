@@ -72,4 +72,13 @@ class AgregacionTest {
         assertFalse(Agregacion.publicable(Set.of(1L, 2L), 7, 3));
         assertTrue(Agregacion.publicable(Set.of(), 0, 3));
     }
+
+    @Test
+    void porFilaSoloSeReservaLoQueNoJuntaElUmbral() {
+        List<FilaPublica> r = Agregacion.protegerPorFila(
+                List.of(fila("a", 3, 1L, 2L, 3L), fila("b", 1, 1L), fila("c", 0)), 3);
+
+        assertEquals(List.of(false, true, false), reservadas(r));
+        assertEquals(3, r.get(0).cantidad());
+    }
 }
