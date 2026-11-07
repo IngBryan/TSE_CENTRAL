@@ -256,6 +256,8 @@ class AltaChoferServiceTest {
         assertEquals(id, chofer("56087406").getId());
         assertEquals(EstadoChofer.HABILITADO, chofer("56087406").getEstado());
         assertEquals(1, servicio.listar(RESPONSABLE, "t").size());
+        // y vuelve a tener el rol de chofer de la empresa (el login movil lo deja entrar)
+        assertEquals(1, roles().rolesDe("56087406").size());
     }
 
     @Test
