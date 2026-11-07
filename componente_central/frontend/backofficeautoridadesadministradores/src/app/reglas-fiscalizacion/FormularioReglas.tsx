@@ -56,9 +56,7 @@ export default function FormularioReglas({ configuracion }: { configuracion: Con
         <label htmlFor="fundamento" className="block text-sm font-medium">Fundamento del cambio
           <textarea id="fundamento" className={input} name="fundamento" required maxLength={500} rows={3}
             placeholder="Explicá el motivo del ajuste" />
-          <span className="mt-1 block text-xs text-muted-foreground">Hasta 500 caracteres. Se conserva en el historial.</span>
         </label>
-        <p className="text-sm text-muted-foreground">Los cambios se aplican a nuevas evaluaciones. Los reintentos conservan su revisión original.</p>
         <button type="submit" className="rounded-md bg-primary px-5 py-2 font-medium text-primary-foreground disabled:opacity-60">
           {pendiente ? "Guardando…" : "Guardar configuración"}
         </button>

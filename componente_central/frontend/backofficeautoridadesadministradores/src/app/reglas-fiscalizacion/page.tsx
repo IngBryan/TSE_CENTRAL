@@ -29,7 +29,6 @@ export default async function ReglasFiscalizacionPage() {
       <div className="rounded-lg bg-muted p-4 text-sm">
         <p className="font-medium">Revisión {resultado.configuracion.revision} · {resultado.configuracion.publicada ? "Publicada" : "Distribución pendiente"}</p>
         <p className="mt-1">Actualizada el {fecha(resultado.configuracion.fechaActualizacion)} por {resultado.configuracion.usuario}.</p>
-        <p className="mt-1 text-muted-foreground">La publicación se realiza automáticamente. Cada instancia incorpora los cambios sin reiniciarse.</p>
       </div>
       <FormularioReglas configuracion={resultado.configuracion} />
     </>}
