@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import tse.lab.model.Empresa;
+import tse.lab.model.Rubro;
 
 // Perfil de la Empresa: el responsable consulta y actualiza los datos de su empresa (nombre publico,
 // razon social y direccion principal). El numero de empresa se muestra pero no se modifica: es la
@@ -25,11 +26,13 @@ public class PerfilEmpresaService {
     @EJB
     private AutorizacionResponsable autorizacion;
 
+    // rubros: los nombres de los rubros de la empresa, ordenados. Los asigna el funcionario del MTOP: el
+    // responsable los ve pero no los modifica (no estan en CambiosEmpresa).
     public record DatosEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
-            boolean habilitada) {
+            boolean habilitada, List<String> rubros) {
         static DatosEmpresa de(Empresa e) {
             return new DatosEmpresa(e.getNroEmpresa(), e.getNombrePublico(), e.getRazonSocial(), e.getDireccion(),
-                    e.isHabilitada());
+                    e.isHabilitada(), e.getRubros().stream().map(Rubro::getNombre).toList());
         }
     }
 

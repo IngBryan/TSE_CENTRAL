@@ -4,16 +4,29 @@ import { useActionState, useState } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { SelectorLocalidad } from "@/components/selector-localidad";
 import type { LocalidadVista } from "@/lib/localidades";
-import { crearGuia, type EstadoNuevaGuia } from "./actions";
+import { crearGuia, type EstadoNuevaGuia, type Rubro, type TipoCarga } from "./actions";
+import { OpcionesCatalogo } from "./opciones-catalogo";
 
+// rubroCliente y tipoCarga son listas: los catalogos precargados de rubros y de tipos de carga
 const CAMPOS = [
-  { nombre: "rubroCliente", etiqueta: "Rubro del cliente", tipo: "text", ayuda: "Por ejemplo: agropecuario, forestal, construcción." },
-  { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "text", ayuda: "Por ejemplo: granos a granel, rollizos, contenedor." },
+  { nombre: "rubroCliente", etiqueta: "Rubro del cliente", tipo: "select", vacio: "Elegí un rubro", plural: "rubros" },
+  { nombre: "tipoCarga", etiqueta: "Tipo de carga", tipo: "select", vacio: "Elegí un tipo de carga", plural: "tipos de carga" },
   { nombre: "pesoCargaKg", etiqueta: "Carga (kg)", tipo: "number" },
   { nombre: "fecha", etiqueta: "Fecha del viaje", tipo: "date" },
 ] as const;
 
-export function NuevaGuia({ hoy, localidades }: { hoy: string; localidades: LocalidadVista[] }) {
+export function NuevaGuia({
+  hoy,
+  tiposCarga,
+  rubros,
+  localidades,
+}: {
+  hoy: string;
+  tiposCarga: TipoCarga[];
+  rubros: Rubro[];
+  localidades: LocalidadVista[];
+}) {
+  const opciones = { rubroCliente: rubros, tipoCarga: tiposCarga };
   const [abierto, setAbierto] = useState(false);
   const [origenId, setOrigenId] = useState<number | null>(null);
   const [destinoId, setDestinoId] = useState<number | null>(null);
@@ -57,27 +70,45 @@ export function NuevaGuia({ hoy, localidades }: { hoy: string; localidades: Loca
         {CAMPOS.map((c) => {
           const error = estado.campos?.[c.nombre];
           return (
-            <label
-              key={c.nombre}
-              className={`flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300 ${c.nombre === "rubroCliente" ? "sm:col-span-2" : ""}`}
-            >
+            <label key={c.nombre} className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {c.etiqueta}
-              <input
-                name={c.nombre}
-                type={c.tipo}
-                defaultValue={estado.valores?.[c.nombre] ?? ""}
-                required
-                min={c.tipo === "number" ? 1 : c.tipo === "date" ? hoy : undefined}
-                step={c.tipo === "number" ? 1 : undefined}
-                aria-invalid={error ? true : undefined}
-                className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
-                  error ? "border-red-500" : "border-black/15 dark:border-white/20"
-                }`}
-              />
+              {c.tipo === "select" ? (
+                <select
+                  name={c.nombre}
+                  // key: al volver con un error se re-monta con el valor elegido
+                  key={estado.valores?.[c.nombre] ?? ""}
+                  defaultValue={estado.valores?.[c.nombre] ?? ""}
+                  required
+                  aria-invalid={error ? true : undefined}
+                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:bg-zinc-950 dark:text-zinc-50 ${
+                    error ? "border-red-500" : "border-black/15 dark:border-white/20"
+                  }`}
+                >
+                  <OpcionesCatalogo items={opciones[c.nombre]} vacio={c.vacio} />
+                </select>
+              ) : (
+                <input
+                  name={c.nombre}
+                  type={c.tipo}
+                  defaultValue={estado.valores?.[c.nombre] ?? ""}
+                  required
+                  min={c.tipo === "number" ? 1 : c.tipo === "date" ? hoy : undefined}
+                  step={c.tipo === "number" ? 1 : undefined}
+                  aria-invalid={error ? true : undefined}
+                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
+                    error ? "border-red-500" : "border-black/15 dark:border-white/20"
+                  }`}
+                />
+              )}
               {error ? (
                 <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>
               ) : (
-                "ayuda" in c && <span className="text-xs font-normal text-zinc-500">{c.ayuda}</span>
+                c.tipo === "select" &&
+                opciones[c.nombre].length === 0 && (
+                  <span className="text-xs font-normal text-red-700 dark:text-red-300">
+                    No se pudieron obtener los {c.plural}. Probá de nuevo en unos minutos.
+                  </span>
+                )
               )}
             </label>
           );

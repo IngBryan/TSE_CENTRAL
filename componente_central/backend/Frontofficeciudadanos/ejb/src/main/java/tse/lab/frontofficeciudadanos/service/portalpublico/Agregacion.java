@@ -16,7 +16,7 @@ import java.util.Set;
 // Sin estado: se prueba sin levantar nada.
 public final class Agregacion {
 
-    // clave: lo que identifica la fila (mes, rubro, tipo de infraccion); empresas: las que aportan datos
+    // clave: lo que identifica la fila (mes, rubro, tipo de carga, tipo de infraccion); empresas: las que aportan datos
     public record Fila(String clave, String etiqueta, Set<Long> empresas, long cantidad, long kg) {
     }
 
@@ -28,7 +28,16 @@ public final class Agregacion {
     }
 
     static List<FilaPublica> proteger(List<Fila> filas, int umbral) {
-        Set<Fila> reservadas = reservadas(filas, umbral);
+        return publicar(filas, reservadas(filas, umbral));
+    }
+
+    // Para tablas cuyas filas se superponen (una empresa cuenta en varias) y no suman ningun total: no hay nada
+    // que deducir restando, asi que no hace falta la supresion complementaria. El umbral sigue valiendo por fila.
+    static List<FilaPublica> protegerPorFila(List<Fila> filas, int umbral) {
+        return publicar(filas, bajoElUmbral(filas, umbral));
+    }
+
+    private static List<FilaPublica> publicar(List<Fila> filas, Set<Fila> reservadas) {
         return filas.stream()
                 .map(f -> reservadas.contains(f)
                         ? new FilaPublica(f.clave(), f.etiqueta(), null, null, true)
@@ -36,33 +45,18 @@ public final class Agregacion {
                 .toList();
     }
 
-    // Para filas cuya etiqueta puede identificar a una empresa (el rubro lo escribe cada empresa): las
-    // reservadas no se muestran una por una, sino sumadas en una sola fila al final (clave, etiqueta). Esa
-    // fila se publica si junta `umbral` empresas (lo que pasa siempre que alcanzo la supresion complementaria:
-    // de todos modos se deduce como total menos lo visible); si no, queda reservada.
-    static List<FilaPublica> protegerAgrupando(List<Fila> filas, int umbral, String clave, String etiqueta) {
-        Set<Fila> reservadas = reservadas(filas, umbral);
-        List<FilaPublica> publicas = new ArrayList<>(filas.stream()
-                .filter(f -> !reservadas.contains(f))
-                .map(f -> new FilaPublica(f.clave(), f.etiqueta(), f.cantidad(), f.kg(), false))
-                .toList());
-        if (!reservadas.isEmpty()) {
-            long cantidad = reservadas.stream().mapToLong(Fila::cantidad).sum();
-            long kg = reservadas.stream().mapToLong(Fila::kg).sum();
-            publicas.add(empresas(reservadas).size() >= umbral
-                    ? new FilaPublica(clave, etiqueta, cantidad, kg, false)
-                    : new FilaPublica(clave, etiqueta, null, null, true));
-        }
-        return publicas;
-    }
-
-    private static Set<Fila> reservadas(List<Fila> filas, int umbral) {
+    private static Set<Fila> bajoElUmbral(List<Fila> filas, int umbral) {
         Set<Fila> reservadas = new HashSet<>();
         for (Fila f : filas) {
             if (f.cantidad() > 0 && f.empresas().size() < umbral) {
                 reservadas.add(f);
             }
         }
+        return reservadas;
+    }
+
+    private static Set<Fila> reservadas(List<Fila> filas, int umbral) {
+        Set<Fila> reservadas = bajoElUmbral(filas, umbral);
         List<Fila> visibles = new ArrayList<>(filas.stream()
                 .filter(f -> f.cantidad() > 0 && !reservadas.contains(f))
                 .sorted(Comparator.comparingLong(Fila::cantidad).thenComparingInt(f -> f.empresas().size()))

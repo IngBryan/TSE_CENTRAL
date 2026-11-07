@@ -33,6 +33,7 @@ import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
 import tse.lab.frontofficefuncionarios.data.ITVDAO;
 import tse.lab.frontofficefuncionarios.data.PermisoCirculacionDAO;
 import tse.lab.frontofficefuncionarios.data.ResponsableDAO;
+import tse.lab.frontofficefuncionarios.data.RubroDAO;
 import tse.lab.frontofficefuncionarios.data.VehiculoDAO;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
 import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
@@ -47,6 +48,7 @@ import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresas
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.EmpresaDetalle;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.EmpresaResumen;
 import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.OperacionRealizada;
+import tse.lab.frontofficefuncionarios.service.gestiondeempresas.GestionEmpresasService.RubroVista;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
@@ -54,6 +56,7 @@ import tse.lab.model.Funcionario;
 import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
 import tse.lab.model.Vehiculo;
 
 // CU Gestionar empresas de transporte contra H2 con los DAOs reales.
@@ -81,6 +84,7 @@ class GestionEmpresasServiceTest {
         set(servicio, "empresas", conEm(new EmpresaDAO()));
         set(servicio, "ciudadanos", conEm(new CiudadanoDAO()));
         set(servicio, "responsables", conEm(new ResponsableDAO()));
+        set(servicio, "rubros", conEm(new RubroDAO()));
         FiscalizacionHabilitacionesService habilitaciones = new FiscalizacionHabilitacionesService();
         set(habilitaciones, "autorizacion", autorizacion);
         set(habilitaciones, "vehiculos", conEm(new VehiculoDAO()));
@@ -103,6 +107,9 @@ class GestionEmpresasServiceTest {
 
         em.getTransaction().begin();
         em.persist(new Funcionario(FUNCIONARIO, "funcionario@mtop.gub.uy"));
+        em.persist(new Rubro(1L, "Agropecuario"));
+        em.persist(new Rubro(2L, "Forestal"));
+        em.persist(new Rubro(3L, "Construccion"));
         em.persist(conResponsable);
         em.persist(sinResponsable);
         em.persist(responsable);
@@ -124,8 +131,8 @@ class GestionEmpresasServiceTest {
 
     @Test
     void quienNoEsFuncionarioNoAccedeANingunaOperacionNiModificaNada() {
-        AltaEmpresa alta = new AltaEmpresa(9L, "X", "X", "X", null, null);
-        CambiosEmpresa cambios = new CambiosEmpresa("Otro", "Otra", "Otra", false, 0L);
+        AltaEmpresa alta = new AltaEmpresa(9L, "X", "X", "X", null, null, null);
+        CambiosEmpresa cambios = new CambiosEmpresa("Otro", "Otra", "Otra", false, null, 0L);
         for (String ci : new String[] { NO_FUNCIONARIO, null, " " }) {
             assertThrows(NoAutorizadoException.class, () -> servicio.listar(ci, "t"));
             assertThrows(NoAutorizadoException.class, () -> servicio.detalle(ci, 1L, "t"));
@@ -225,10 +232,10 @@ class GestionEmpresasServiceTest {
     @Test
     void altaRegistraLaEmpresaNoHabilitadaPorDefecto() throws Exception {
         OperacionRealizada r = enTx(() -> servicio.alta(FUNCIONARIO,
-                new AltaEmpresa(3L, "  Carga   Sur ", "Carga Sur S.A.", "Salto", null, null), "t"));
+                new AltaEmpresa(3L, "  Carga   Sur ", "Carga Sur S.A.", "Salto", null, null, null), "t"));
 
         assertEquals("La empresa fue registrada.", r.mensaje());
-        assertEquals(new EmpresaDetalle(3L, "Carga Sur", "Carga Sur S.A.", "Salto", false, null, 0L), r.empresa());
+        assertEquals(new EmpresaDetalle(3L, "Carga Sur", "Carga Sur S.A.", "Salto", false, null, List.of(), 0L), r.empresa());
         em.clear();
         Empresa guardada = em.find(Empresa.class, 3L);
         assertNotNull(guardada);
@@ -238,7 +245,7 @@ class GestionEmpresasServiceTest {
 
     @Test
     void altaConResponsablePuedeDejarLaEmpresaHabilitada() throws Exception {
-        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, CIUDADANO), "t"));
+        enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, CIUDADANO, null), "t"));
 
         em.clear();
         assertTrue(em.find(Empresa.class, 3L).isHabilitada());
@@ -247,7 +254,7 @@ class GestionEmpresasServiceTest {
     @Test
     void altaHabilitadaSinResponsableEs400YNoRegistra() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
-                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, " "), "t")));
+                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", true, " ", null), "t")));
 
         assertEquals(List.of("habilitada"), List.copyOf(e.getErrores().keySet()));
         em.clear();
@@ -257,7 +264,7 @@ class GestionEmpresasServiceTest {
     @Test
     void altaConDatosInvalidosDevuelveTodosLosErroresYNoRegistra() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> enTx(
-                () -> servicio.alta(FUNCIONARIO, new AltaEmpresa(0L, " ", null, "x".repeat(201), null, "12a"), "t")));
+                () -> servicio.alta(FUNCIONARIO, new AltaEmpresa(0L, " ", null, "x".repeat(201), null, "12a", null), "t")));
 
         assertEquals(List.of("nroEmpresa", "nombrePublico", "razonSocial", "direccion", "ciResponsable"),
                 List.copyOf(e.getErrores().keySet()));
@@ -269,7 +276,7 @@ class GestionEmpresasServiceTest {
     @Test
     void altaConUnNumeroYaRegistradoEs409YNoModificaLaExistente() {
         ConflictoException e = assertThrows(ConflictoException.class,
-                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(1L, "Otra", "Otra", "Otra", null, null), "t")));
+                () -> enTx(() -> servicio.alta(FUNCIONARIO, new AltaEmpresa(1L, "Otra", "Otra", "Otra", null, null, null), "t")));
 
         assertEquals("EMPRESA_EXISTENTE", e.getCodigo());
         em.clear();
@@ -289,7 +296,7 @@ class GestionEmpresasServiceTest {
         set(servicio, "empresas", conEm(sinVerLaOtra));
 
         ConflictoException e = assertThrows(ConflictoException.class, () -> enTx(() -> servicio.alta(FUNCIONARIO,
-                new AltaEmpresa(1L, "Otra", "Otra", "Otra", true, CIUDADANO), "t")));
+                new AltaEmpresa(1L, "Otra", "Otra", "Otra", true, CIUDADANO, null), "t")));
 
         assertEquals("EMPRESA_EXISTENTE", e.getCodigo());
         em.clear();
@@ -300,7 +307,7 @@ class GestionEmpresasServiceTest {
     @Test
     void altaConResponsableRegistraLaEmpresaYSuResponsableJuntos() throws Exception {
         OperacionRealizada r = enTx(() -> servicio.alta(FUNCIONARIO,
-                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", true, " " + CIUDADANO + " "), "t"));
+                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", true, " " + CIUDADANO + " ", null), "t"));
 
         assertEquals(CIUDADANO, r.empresa().responsable().ci());
         em.clear();
@@ -317,7 +324,7 @@ class GestionEmpresasServiceTest {
 
     private void assertAltaRechazada(Class<? extends Exception> tipo, String codigo, String ciResponsable) {
         Exception e = assertThrows(tipo, () -> enTx(() -> servicio.alta(FUNCIONARIO,
-                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", null, ciResponsable), "t")));
+                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", null, ciResponsable, null), "t")));
         assertEquals(codigo, e instanceof ConflictoException c ? c.getCodigo()
                 : ((RecursoNoEncontradoException) e).getCodigo());
         em.clear();
@@ -348,7 +355,7 @@ class GestionEmpresasServiceTest {
     @Test
     void modificaLosDatosYConservaHabilitadaSiNoViene() throws Exception {
         OperacionRealizada r = enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
-                new CambiosEmpresa("TDE", "TDE Sociedad Anónima", "Ruta 8 km 29", null, 0L), "t"));
+                new CambiosEmpresa("TDE", "TDE Sociedad Anónima", "Ruta 8 km 29", null, null, 0L), "t"));
 
         assertEquals("La empresa fue modificada.", r.mensaje());
         em.clear();
@@ -362,19 +369,82 @@ class GestionEmpresasServiceTest {
 
     @Test
     void modificarPuedeDeshabilitarYHabilitarUnaEmpresaConResponsable() throws Exception {
-        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", false, 0L), "t"));
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", false, null, 0L), "t"));
         em.clear();
         assertFalse(em.find(Empresa.class, 1L).isHabilitada());
 
-        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", true, 1L), "t"));
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", true, null, 1L), "t"));
         em.clear();
         assertTrue(em.find(Empresa.class, 1L).isHabilitada());
+    }
+
+    // ===== Rubros de la empresa (catalogo precargado) =====
+
+    @Test
+    void elCatalogoDeRubrosVieneOrdenadoPorNombreYSoloParaFuncionarios() throws Exception {
+        assertEquals(List.of(new RubroVista(1L, "Agropecuario"), new RubroVista(3L, "Construccion"),
+                new RubroVista(2L, "Forestal")), servicio.rubros(FUNCIONARIO, "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.rubros(NO_FUNCIONARIO, "t"));
+    }
+
+    @Test
+    void altaConVariosRubrosLosGuardaSinRepetir() throws Exception {
+        OperacionRealizada r = enTx(() -> servicio.alta(FUNCIONARIO,
+                new AltaEmpresa(3L, "Carga Sur", "Carga Sur S.A.", "Salto", null, null, List.of(2L, 1L, 2L)), "t"));
+
+        assertEquals(List.of(new RubroVista(1L, "Agropecuario"), new RubroVista(2L, "Forestal")),
+                r.empresa().rubros());
+        em.clear();
+        assertEquals(List.of("Agropecuario", "Forestal"),
+                em.find(Empresa.class, 3L).getRubros().stream().map(Rubro::getNombre).toList());
+        assertEquals(r.empresa().rubros(), servicio.detalle(FUNCIONARIO, 3L, "t").rubros());
+    }
+
+    @Test
+    void altaConUnRubroQueNoEstaEnElCatalogoNoRegistraNada() {
+        for (List<Long> rubros : List.of(List.of(1L, 99L), java.util.Arrays.asList(1L, null))) {
+            DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> enTx(() -> servicio
+                    .alta(FUNCIONARIO, new AltaEmpresa(3L, "A", "B", "C", null, null, rubros), "t")));
+            assertTrue(e.getErrores().containsKey("rubros"));
+        }
+        em.clear();
+        assertNull(em.find(Empresa.class, 3L));
+    }
+
+    @Test
+    void modificarCambiaLosRubrosYSiNoVienenLosConserva() throws Exception {
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
+                new CambiosEmpresa("TDE", "TDE S.A.", "Pando", null, List.of(3L, 1L), 0L), "t"));
+        em.clear();
+        assertEquals(List.of(1L, 3L), servicio.detalle(FUNCIONARIO, 1L, "t").rubros().stream()
+                .map(RubroVista::id).toList());
+
+        Long version = servicio.detalle(FUNCIONARIO, 1L, "t").version();
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
+                new CambiosEmpresa("Otro", "TDE S.A.", "Pando", null, null, version), "t"));
+        em.clear();
+        assertEquals(2, servicio.detalle(FUNCIONARIO, 1L, "t").rubros().size());
+
+        Long version2 = servicio.detalle(FUNCIONARIO, 1L, "t").version();
+        enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
+                new CambiosEmpresa("Otro", "TDE S.A.", "Pando", null, List.of(), version2), "t"));
+        em.clear();
+        assertTrue(servicio.detalle(FUNCIONARIO, 1L, "t").rubros().isEmpty());
+    }
+
+    @Test
+    void modificarConUnRubroInexistenteNoCambiaNada() {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> enTx(() -> servicio
+                .modificar(FUNCIONARIO, 1L, new CambiosEmpresa("Otro", "B", "C", null, List.of(99L), 0L), "t")));
+        assertTrue(e.getErrores().containsKey("rubros"));
+        em.clear();
+        assertEquals("Transportes del Este", em.find(Empresa.class, 1L).getNombrePublico());
     }
 
     @Test
     void noSeHabilitaUnaEmpresaSinResponsable() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
-                () -> enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("A", "B", "C", true, 0L), "t")));
+                () -> enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("A", "B", "C", true, null, 0L), "t")));
 
         assertEquals(List.of("habilitada"), List.copyOf(e.getErrores().keySet()));
         em.clear();
@@ -391,7 +461,7 @@ class GestionEmpresasServiceTest {
         em.getTransaction().commit();
         em.clear();
 
-        enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("Otro", "B", "C", true, 1L), "t"));
+        enTx(() -> servicio.modificar(FUNCIONARIO, 2L, new CambiosEmpresa("Otro", "B", "C", true, null, 1L), "t"));
         em.clear();
         assertEquals("Otro", em.find(Empresa.class, 2L).getNombrePublico());
     }
@@ -399,7 +469,7 @@ class GestionEmpresasServiceTest {
     @Test
     void modificarConDatosInvalidosNoCambiaNada() {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> enTx(() -> servicio
-                .modificar(FUNCIONARIO, 1L, new CambiosEmpresa("", "x".repeat(101), "Pando", false, 0L), "t")));
+                .modificar(FUNCIONARIO, 1L, new CambiosEmpresa("", "x".repeat(101), "Pando", false, null, 0L), "t")));
 
         assertEquals(List.of("nombrePublico", "razonSocial"), List.copyOf(e.getErrores().keySet()));
         em.clear();
@@ -411,7 +481,7 @@ class GestionEmpresasServiceTest {
     @Test
     void modificarUnaEmpresaInexistenteEs404() {
         RecursoNoEncontradoException e = assertThrows(RecursoNoEncontradoException.class, () -> enTx(
-                () -> servicio.modificar(FUNCIONARIO, 99L, new CambiosEmpresa("A", "B", "C", null, 0L), "t")));
+                () -> servicio.modificar(FUNCIONARIO, 99L, new CambiosEmpresa("A", "B", "C", null, null, 0L), "t")));
 
         assertEquals("EMPRESA_NO_ENCONTRADA", e.getCodigo());
     }
@@ -419,7 +489,7 @@ class GestionEmpresasServiceTest {
     @Test
     void modificarDevuelveLaVersionNueva() throws Exception {
         OperacionRealizada r = enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
-                new CambiosEmpresa("TDE", "TDE S.A.", "Pando", null, 0L), "t"));
+                new CambiosEmpresa("TDE", "TDE S.A.", "Pando", null, null, 0L), "t"));
 
         assertEquals(1L, r.empresa().version());
         assertEquals(1L, servicio.detalle(FUNCIONARIO, 1L, "t").version());
@@ -429,10 +499,10 @@ class GestionEmpresasServiceTest {
     void modificarConUnaVersionViejaEs409YNoPisaLoQueCambioOtro() throws Exception {
         // A y B abrieron el formulario con la version 0; A guarda primero la direccion nueva
         enTx(() -> servicio.modificar(FUNCIONARIO, 1L,
-                new CambiosEmpresa("Transportes del Este", "TDE S.A.", "Ruta 8 km 29", null, 0L), "t"));
+                new CambiosEmpresa("Transportes del Este", "TDE S.A.", "Ruta 8 km 29", null, null, 0L), "t"));
 
         ConflictoException e = assertThrows(ConflictoException.class, () -> enTx(() -> servicio.modificar(FUNCIONARIO,
-                1L, new CambiosEmpresa("Otro nombre", "TDE S.A.", "Pando", null, 0L), "t")));
+                1L, new CambiosEmpresa("Otro nombre", "TDE S.A.", "Pando", null, null, 0L), "t")));
 
         assertEquals("EMPRESA_DESACTUALIZADA", e.getCodigo());
         em.clear();
@@ -444,7 +514,7 @@ class GestionEmpresasServiceTest {
     @Test
     void modificarSinVersionEs409() {
         ConflictoException e = assertThrows(ConflictoException.class, () -> enTx(
-                () -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", null, null), "t")));
+                () -> servicio.modificar(FUNCIONARIO, 1L, new CambiosEmpresa("A", "B", "C", null, null, null), "t")));
 
         assertEquals("EMPRESA_DESACTUALIZADA", e.getCodigo());
         em.clear();

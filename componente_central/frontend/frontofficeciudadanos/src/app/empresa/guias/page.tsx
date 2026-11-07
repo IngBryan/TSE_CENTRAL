@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Encabezado, botonSecundario } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
-import type { Guia } from "./actions";
+import { obtenerCatalogos, type Guia } from "./actions";
 import { NuevaGuia } from "./nueva-guia";
 import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
 
@@ -53,6 +53,8 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
   }
+  // Los catalogos de tipos de carga y rubros, para el formulario de nueva guia
+  const { tiposCarga, rubros } = await obtenerCatalogos();
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" }); // yyyy-mm-dd
 
@@ -82,7 +84,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
           </p>
         ) : (
           <>
-            <NuevaGuia hoy={hoy} localidades={localidades} />
+            <NuevaGuia hoy={hoy} tiposCarga={tiposCarga} rubros={rubros} localidades={localidades} />
 
             {guias && guias.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">

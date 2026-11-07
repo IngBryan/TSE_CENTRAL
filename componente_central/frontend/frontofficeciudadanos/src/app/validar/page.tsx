@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { Encabezado, botonGubUy } from "@/components/encabezado";
+import { Etiquetas } from "@/components/etiquetas";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { fecha, fechaHora } from "@/lib/infracciones";
@@ -158,6 +159,10 @@ function Resultado({ v }: { v: ValidacionEmpresa }) {
             ? `Está habilitada por el MTOP para el transporte de carga.${v.vehiculo ? "" : " Para saber si un vehículo suyo puede circular, ingresá también su matrícula."}`
             : "No está habilitada por el MTOP para el transporte de carga."}
         </p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-zinc-500">Rubros:</span>
+          <Etiquetas valores={v.rubros} vacio="sin rubros registrados" />
+        </div>
       </div>
       {v.vehiculo && <Vehiculo v={v.vehiculo} empresa={v.nombrePublico} />}
       <p className="text-xs text-zinc-500">Consulta realizada: {fechaHora(v.consultadoEl)}</p>
