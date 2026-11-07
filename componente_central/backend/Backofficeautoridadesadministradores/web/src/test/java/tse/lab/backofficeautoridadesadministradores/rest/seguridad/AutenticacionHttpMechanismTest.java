@@ -219,37 +219,11 @@ class AutenticacionHttpMechanismTest {
         String token = BackofficeToken.issue(
                 new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
         requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.of("ADMINISTRADOR"));
         when(contexto.notifyContainerAboutLogin("99999999", Set.of("ADMINISTRADOR")))
                 .thenReturn(AuthenticationStatus.SUCCESS);
 
         assertEquals(AuthenticationStatus.SUCCESS, mecanismo.validateRequest(solicitud, respuesta, contexto));
-        verify(servicio, never()).autenticar(anyString(), anyString());
-    }
-
-    @Test
-    void theRoleComesFromTheDatabaseNotFromTheToken() throws Exception {
-        // An administrator changed the role to AUTORIDAD after the login
-        String token = BackofficeToken.issue(
-                new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
-        requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.of("AUTORIDAD"));
-        when(contexto.notifyContainerAboutLogin("99999999", Set.of("AUTORIDAD")))
-                .thenReturn(AuthenticationStatus.SUCCESS);
-
-        assertEquals(AuthenticationStatus.SUCCESS, mecanismo.validateRequest(solicitud, respuesta, contexto));
-        verify(contexto, never()).notifyContainerAboutLogin("99999999", Set.of("ADMINISTRADOR"));
-    }
-
-    @Test
-    void aValidTokenOfAUserThatIsNoLongerInTheBackofficeGoesOnUnauthenticated() throws Exception {
-        String token = BackofficeToken.issue(
-                new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
-        requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.empty());
-
-        assertEquals(AuthenticationStatus.NOT_DONE, mecanismo.validateRequest(solicitud, respuesta, contexto));
-        verify(contexto, never()).notifyContainerAboutLogin(anyString(), anySet());
+        verifyNoInteractions(servicio);
     }
 
     @Test

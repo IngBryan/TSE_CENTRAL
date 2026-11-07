@@ -65,19 +65,14 @@ public class AutenticacionHttpMechanism
                 Set.of(usuario.rol()));
     }
 
-    /**
-     * Without a valid token the request goes on unauthenticated: the resources answer 401. The role comes from the
-     * database, not from the token: an administrator may have changed it (or removed the user) after the login, and
-     * the change applies from the next request on instead of when the token expires.
-     */
+    /** Without a valid token the request goes on unauthenticated: the resources answer 401. */
     private AuthenticationStatus fromToken(HttpServletRequest request, HttpMessageContext contexto) {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith(BEARER)) {
             return contexto.doNothing();
         }
         return BackofficeToken.verify(header.substring(BEARER.length()), tokenSecret, Instant.now())
-                .flatMap(identity -> servicio.rolActual(identity.ci())
-                        .map(rol -> contexto.notifyContainerAboutLogin(identity.ci(), Set.of(rol))))
+                .map(identity -> contexto.notifyContainerAboutLogin(identity.ci(), Set.of(identity.rol())))
                 .orElseGet(contexto::doNothing);
     }
 }

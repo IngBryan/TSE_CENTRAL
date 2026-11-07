@@ -49,7 +49,7 @@ public class NodosPerifericosResource {
      */
     @GET
     public Response listar() {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
+        Response acceso = verificarAcceso();
 
         if (acceso != null) {
             return acceso;
@@ -63,7 +63,7 @@ public class NodosPerifericosResource {
      */
     @POST
     public Response registrar(AltaNodoRequest datos) {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
+        Response acceso = verificarAcceso();
 
         if (acceso != null) {
             return acceso;
@@ -103,5 +103,28 @@ public class NodosPerifericosResource {
                             "detalle", e.getMessage()))
                     .build();
         }
+    }
+
+    /**
+     * Verifica que exista una identidad autenticada
+     * con el rol ADMINISTRADOR.
+     *
+     */
+    private Response verificarAcceso() {
+        if (seguridad == null
+                || seguridad.getUserPrincipal() == null) {
+
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Map.of("error", "no_autenticado"))
+                    .build();
+        }
+
+        if (!seguridad.isUserInRole("ADMINISTRADOR")) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", "no_autorizado"))
+                    .build();
+        }
+
+        return null;
     }
 }

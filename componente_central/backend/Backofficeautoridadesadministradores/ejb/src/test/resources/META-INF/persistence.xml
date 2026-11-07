@@ -25,9 +25,6 @@
         <class>tse.lab.model.Funcionario</class>
         <class>tse.lab.model.RegistroAuditoriaCaso</class>
         <class>tse.lab.model.NodoTracking</class>
-        <class>tse.lab.model.UsuarioBackoffice</class>
-        <class>tse.lab.model.Administrador</class>
-        <class>tse.lab.model.Autoridad</class>
         <properties>
             <property name="jakarta.persistence.validation.mode" value="NONE"/>
             <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>

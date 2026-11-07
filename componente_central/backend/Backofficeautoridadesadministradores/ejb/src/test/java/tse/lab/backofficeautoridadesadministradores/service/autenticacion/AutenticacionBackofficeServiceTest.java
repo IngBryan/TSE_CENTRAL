@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,17 +103,5 @@ class AutenticacionBackofficeServiceTest {
 
         assertTrue(servicio.autenticar(
                 "  ", CLAVE).isEmpty());
-    }
-
-    @Test
-    void elRolActualEsElDeLaBase() {
-        dao.datos.put("12345678", new Administrador("12345678", hash));
-        dao.datos.put("87654321", new Autoridad("87654321", hash));
-
-        assertEquals(Optional.of("ADMINISTRADOR"), servicio.rolActual("12345678"));
-        assertEquals(Optional.of("AUTORIDAD"), servicio.rolActual("87654321"));
-        assertEquals(Optional.empty(), servicio.rolActual("99999999"));
-        assertEquals(Optional.empty(), servicio.rolActual(null));
-        assertEquals(Optional.empty(), servicio.rolActual(" "));
     }
 }

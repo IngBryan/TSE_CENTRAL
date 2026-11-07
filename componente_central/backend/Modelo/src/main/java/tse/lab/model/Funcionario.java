@@ -1,6 +1,5 @@
 package tse.lab.model;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
@@ -18,12 +17,6 @@ public class Funcionario implements Serializable {
     private String ci;
 
     private String email;
-
-    // Un funcionario al que se le quita el rol no se borra: sus fundamentos de resolucion lo referencian y son
-    // parte de la auditoria. Queda inactivo: no puede ingresar ni operar. El default es para los INSERT que no
-    // lo mencionan (datos-prueba.sql)
-    @Column(nullable = false, columnDefinition = "boolean default true")
-    private boolean activo = true;
 
     @OneToMany(mappedBy = "funcionario")
     private List<FundamentoResolucion> fundamentosResolucion = new ArrayList<>();
@@ -50,14 +43,6 @@ public class Funcionario implements Serializable {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public boolean isActivo() {
-        return activo;
-    }
-
-    public void setActivo(boolean activo) {
-        this.activo = activo;
     }
 
     public List<FundamentoResolucion> getFundamentosResolucion() {

@@ -22,8 +22,7 @@ public class AutorizacionFuncionario {
 
     public Funcionario funcionario(String ci, String correlationId) throws NoAutorizadoException {
         Funcionario funcionario = ci == null || ci.isBlank() ? null : funcionarios.buscarPorCi(ci.trim());
-        // Un funcionario inactivo (se le quito el rol) ya no opera, aunque tenga una sesion abierta
-        if (funcionario == null || !funcionario.isActivo()) {
+        if (funcionario == null) {
             LOG.warning(() -> LogFuncionarios.aviso("funcionario.no_autorizado").correlationId(correlationId)
                     .usuario(ci).campo("detalle", "\"no es funcionario\"").toString());
             throw new NoAutorizadoException("no es funcionario del MTOP");

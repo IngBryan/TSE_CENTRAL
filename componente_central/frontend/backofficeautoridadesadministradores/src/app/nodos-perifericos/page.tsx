@@ -4,7 +4,6 @@ import PanelAltaNodo from "./PanelAltaNodo";
 import { redirect } from "next/navigation";
 import { consultarIdentidad } from "@/lib/backoffice-sesion";
 import { cerrarSesionAction } from "@/app/login/actions";
-import NavegacionBackoffice from "@/components/NavegacionBackoffice";
 
 function formatearFecha(valor: string | null): string {
   if (!valor) return "Sin comunicaciones";
@@ -57,9 +56,7 @@ export default async function GestionNodosPerifericosPage() {
           </button>
         </form>
       </header>
-
-      <NavegacionBackoffice actual="/nodos-perifericos" />
-
+      
       <PanelAltaNodo />
 
       {!resultado.ok ? (

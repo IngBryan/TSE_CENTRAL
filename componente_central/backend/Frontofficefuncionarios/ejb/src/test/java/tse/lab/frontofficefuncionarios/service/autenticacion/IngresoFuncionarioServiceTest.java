@@ -98,19 +98,6 @@ class IngresoFuncionarioServiceTest {
     }
 
     @Test
-    void unFuncionarioInactivoNoEntraNiSeConsultaLaPdi() {
-        em.getTransaction().begin();
-        em.find(Funcionario.class, FUNCIONARIO).setActivo(false);
-        em.getTransaction().commit();
-
-        ResultadoIngreso r = servicio.ingresarParaTesting(FUNCIONARIO, "t");
-
-        assertEquals(Resultado.NO_ES_FUNCIONARIO, r.resultado());
-        assertFalse(r.sesionPermitida());
-        assertEquals(0, pdi.consultas);
-    }
-
-    @Test
     void siDnicNoLoEncuentraNoEntra() {
         pdi.persona = null;
 
