@@ -2,13 +2,13 @@
 
 import { useActionState, useState, type ChangeEvent } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { cambiarRolAction, eliminarUsuarioAction } from "./actions";
-import {
-  CampoEmail,
-  CamposContrasena,
-  MensajeEstado,
-  estilosCampo,
-} from "./CamposUsuario";
+import { CampoEmail, CamposContrasena, MensajeEstado } from "./CamposUsuario";
 import {
   NOMBRE_ROL,
   TIPOS_ALTA,
@@ -44,50 +44,49 @@ export default function FilaUsuario({ usuario, nombre, esPropio }: Props) {
 
   return (
     <>
-      <tr className="border-t">
-        <td className="p-3 font-mono">{usuario.ci}</td>
-        <td className="p-3">{nombre}</td>
-        <td className="p-3">{usuario.email ?? "—"}</td>
-        <td className="p-3">
+      <TableRow>
+        <TableCell className="px-3 font-mono">{usuario.ci}</TableCell>
+        <TableCell className="px-3 font-medium">{nombre}</TableCell>
+        <TableCell className="px-3 text-muted-foreground">{usuario.email ?? "—"}</TableCell>
+        <TableCell className="px-3">
           <ul className="flex flex-wrap gap-1.5">
             {usuario.roles.map((rol) => (
-              <li
-                key={rol}
-                className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
-              >
-                {NOMBRE_ROL[rol] ?? rol}
+              <li key={rol}>
+                <Badge variant="secondary">{NOMBRE_ROL[rol] ?? rol}</Badge>
               </li>
             ))}
           </ul>
-        </td>
-        <td className="p-3">
+        </TableCell>
+        <TableCell className="px-3">
           {puedeCambiar && (
             <div className="flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => alternar("rol")}
                 aria-expanded={panel === "rol"}
-                className="whitespace-nowrap rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
               >
                 {panel === "rol" ? "Cancelar" : "Cambiar rol"}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 onClick={() => alternar("eliminar")}
                 aria-expanded={panel === "eliminar"}
-                className="whitespace-nowrap rounded-md border border-destructive/40 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
               >
                 {panel === "eliminar" ? "Cancelar" : "Eliminar"}
-              </button>
+              </Button>
             </div>
           )}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
 
       {puedeCambiar && panel !== null && (
-        <tr className="bg-muted/40">
-          <td colSpan={COLUMNAS} className="p-4">
+        <TableRow className="bg-muted/40 hover:bg-muted/40">
+          <TableCell colSpan={COLUMNAS} className="p-4 whitespace-normal">
             {panel === "rol" ? (
               <FormularioCambioRol ci={usuario.ci} internos={internos} />
             ) : (
@@ -98,8 +97,8 @@ export default function FilaUsuario({ usuario, nombre, esPropio }: Props) {
                 onCancelar={() => setPanel(null)}
               />
             )}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -151,21 +150,17 @@ function ConfirmacionBaja({
       </ul>
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="submit"
           disabled={pendiente}
-          className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="h-9 bg-destructive text-white hover:bg-destructive/90"
         >
           {pendiente ? "Eliminando..." : "Sí, eliminar"}
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          onClick={onCancelar}
-          className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
-        >
+        <Button type="button" variant="outline" className="h-9" onClick={onCancelar}>
           Cancelar
-        </button>
+        </Button>
       </div>
 
       {estado.estado === "error" && (
@@ -219,23 +214,24 @@ function FormularioCambioRol({
   return (
     <form action={accion} className="grid gap-4 sm:grid-cols-3">
       <div className="space-y-2">
-        <label htmlFor={`rol-${ci}`} className="text-sm font-medium">
-          Rol nuevo
-        </label>
+        <Label htmlFor={`rol-${ci}`}>Rol nuevo</Label>
 
-        <select
-          id={`rol-${ci}`}
+        {/* The name makes the select submit with the form */}
+        <Select
           name="rol"
+          items={Object.fromEntries(opciones.map((tipo) => [tipo, NOMBRE_ROL[tipo]]))}
           value={rol}
-          onChange={(e) => setRol(e.target.value as TipoAltaUsuario)}
-          className={estilosCampo}
+          onValueChange={(valor) => valor && setRol(valor as TipoAltaUsuario)}
         >
-          {opciones.map((tipo) => (
-            <option key={tipo} value={tipo}>
-              {NOMBRE_ROL[tipo]}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id={`rol-${ci}`} className="w-full bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {opciones.map((tipo) => (
+              <SelectItem key={tipo} value={tipo}>{NOMBRE_ROL[tipo]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {pideContrasena && (
@@ -268,13 +264,9 @@ function FormularioCambioRol({
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={pendiente}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pendiente} className="h-9">
           {pendiente ? "Guardando..." : "Cambiar rol"}
-        </button>
+        </Button>
 
         <MensajeEstado estado={estado} />
       </div>

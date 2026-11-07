@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { ChangeEvent, ReactNode } from "react";
 
 import {
@@ -7,10 +9,8 @@ import {
   type EstadoAltaUsuario,
 } from "@/lib/usuarios";
 
-// Campos compartidos por el alta y el cambio de rol
+// Campos compartidos por el alta y el cambio de rol (Input y Label de shadcn)
 
-export const estilosCampo =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 type AlCambiar = (e: ChangeEvent<HTMLInputElement>) => void;
 
@@ -35,11 +35,11 @@ function CampoContrasena({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <label htmlFor={id} className="text-sm font-medium">
+      <Label htmlFor={id}>
         {etiqueta}
-      </label>
+      </Label>
 
-      <input
+      <Input
         id={id}
         name={name}
         type="password"
@@ -49,7 +49,6 @@ function CampoContrasena({
         required
         value={value}
         onChange={onChange}
-        className={estilosCampo}
       />
 
       {children}
@@ -108,11 +107,11 @@ export function CampoEmail({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <label htmlFor={id} className="text-sm font-medium">
+      <Label htmlFor={id}>
         Email
-      </label>
+      </Label>
 
-      <input
+      <Input
         id={id}
         name="email"
         type="email"
@@ -122,7 +121,6 @@ export function CampoEmail({
         required
         value={value}
         onChange={onChange}
-        className={estilosCampo}
       />
     </div>
   );
@@ -145,7 +143,7 @@ export function MensajeEstado({
     <p
       role={esError ? "alert" : "status"}
       className={`text-sm ${
-        esError ? "text-destructive" : "text-green-700 dark:text-green-400"
+        esError ? "text-destructive" : "text-emerald-700"
       } ${className}`}
     >
       {estado.mensaje}

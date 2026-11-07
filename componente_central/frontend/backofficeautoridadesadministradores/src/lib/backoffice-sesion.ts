@@ -1,15 +1,17 @@
 
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { registrarLog, segundosDesde } from "./log";
+import { esRol, inicioPorRol, RUTA_CERRAR_SESION, type Rol } from "./rutas";
+import { NOMBRE_COOKIE_SESION } from "./token";
 
-export const NOMBRE_COOKIE_SESION = "tse_backoffice_sesion";
-export const RUTA_COOKIE_SESION = "/backoffice";
+export { NOMBRE_COOKIE_SESION, RUTA_COOKIE_SESION } from "./token";
 
 export type IdentidadBackoffice = {
   ci: string;
-  rol: "ADMINISTRADOR" | "AUTORIDAD";
+  rol: Rol;
 };
 
 export function urlBackend(ruta: string): string {
@@ -103,8 +105,7 @@ export async function consultarIdentidad():
       !("ci" in datos) ||
       typeof datos.ci !== "string" ||
       !("rol" in datos) ||
-      (datos.rol !== "ADMINISTRADOR" &&
-        datos.rol !== "AUTORIDAD")
+      !esRol(datos.rol)
     ) {
       return null;
     }
@@ -113,4 +114,19 @@ export async function consultarIdentidad():
   } catch {
     return null;
   }
+}
+
+// proxy.ts only reads the token; this asks WildFly, so a forged or revoked token never renders a page
+export async function requerirRol(...roles: Rol[]): Promise<IdentidadBackoffice> {
+  const identidad = await consultarIdentidad();
+
+  if (!identidad) {
+    redirect(RUTA_CERRAR_SESION);
+  }
+
+  if (!roles.includes(identidad.rol)) {
+    redirect(inicioPorRol(identidad.rol));
+  }
+
+  return identidad;
 }
