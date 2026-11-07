@@ -51,18 +51,31 @@ public class AutenticacionBackofficeService {
             return Optional.empty();
         }
 
-        String rol;
+        return rolDe(usuario)
+                .map(rol -> new IdentidadBackoffice(usuario.getCi(), rol));
+    }
 
-        if (usuario instanceof Administrador) {
-            rol = "ADMINISTRADOR";
-        } else if (usuario instanceof Autoridad) {
-            rol = "AUTORIDAD";
-        } else {
+    /**
+     * El rol vigente de un usuario ya autenticado por su token. Un
+     * administrador puede haberle cambiado el rol (o quitado) después de
+     * emitido el token: este es el que vale.
+     *
+     * @return ADMINISTRADOR, AUTORIDAD o vacío si ya no es usuario del backoffice
+     */
+    public Optional<String> rolActual(String ci) {
+        if (ci == null || ci.isBlank()) {
             return Optional.empty();
         }
+        return rolDe(usuarios.buscarPorCi(ci));
+    }
 
-        return Optional.of(
-                new IdentidadBackoffice(
-                        usuario.getCi(), rol));
+    private static Optional<String> rolDe(UsuarioBackoffice usuario) {
+        if (usuario instanceof Administrador) {
+            return Optional.of("ADMINISTRADOR");
+        }
+        if (usuario instanceof Autoridad) {
+            return Optional.of("AUTORIDAD");
+        }
+        return Optional.empty();
     }
 }

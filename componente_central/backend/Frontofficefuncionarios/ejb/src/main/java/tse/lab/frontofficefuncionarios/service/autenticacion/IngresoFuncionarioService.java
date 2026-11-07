@@ -56,7 +56,8 @@ public class IngresoFuncionarioService {
 
     private ResultadoIngreso ingresar(String cedula, String email, String correlationId, String via) {
         Funcionario funcionario = funcionarios.buscarPorCi(cedula);
-        if (funcionario == null) {
+        // Inactivo: un administrador le quito el rol (backoffice); se conserva solo por su historial
+        if (funcionario == null || !funcionario.isActivo()) {
             return log(via, correlationId, new ResultadoIngreso(Resultado.NO_ES_FUNCIONARIO, false, cedula, email,
                     null, null));
         }
