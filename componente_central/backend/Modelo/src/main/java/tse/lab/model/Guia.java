@@ -2,7 +2,10 @@ package tse.lab.model;
 
 import java.io.Serializable;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,6 +16,13 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 @Entity
 @Table(name = "guias")
@@ -27,8 +37,16 @@ public class Guia implements Serializable {
     private String tipoCarga;
     private long pesoCargaKg; /* lo dejo como peso en vez de volumen */
     private LocalDate fecha;
+    // Se conservan los nombres para la API movil, los listados y las guias anteriores al catalogo.
+    // Las referencias son opcionales: los registros historicos pueden seguir sin catalogarse.
     private String origen;
     private String destino;
+    @ManyToOne
+    @JoinColumn(name = "id_localidad_origen")
+    private Localidad origenLocalidad;
+    @ManyToOne
+    @JoinColumn(name = "id_localidad_destino")
+    private Localidad destinoLocalidad;
     @ManyToOne
     @JoinColumn(name = "nro_empresa")
     private Empresa empresa;
@@ -44,6 +62,12 @@ public class Guia implements Serializable {
     // Bloqueo optimista: dos asignaciones simultaneas de la misma guia no pueden ganar las dos
     @Version
     private Long version;
+
+    // Asociaciones propias de la Guia; las geometrías son compartidas entre viajes.
+    // No se propaga un borrado a RutaReferencia.
+    @OneToMany(mappedBy = "guia", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("numeroAlternativa ASC")
+    private List<GuiaRutaAutorizada> rutasAutorizadas = new ArrayList<>();
 
     public Guia() {
     }
@@ -94,6 +118,9 @@ public class Guia implements Serializable {
         return destino;
     }
 
+    public Localidad getOrigenLocalidad() { return origenLocalidad; }
+    public Localidad getDestinoLocalidad() { return destinoLocalidad; }
+
     public Empresa getEmpresa() {
         return empresa;
     }
@@ -123,11 +150,50 @@ public class Guia implements Serializable {
     }
 
     public void setOrigen(String origen) {
+        if (!Objects.equals(this.origen, origen)) {
+            invalidarRutasSiCambioLocalidad();
+            this.origenLocalidad = null;
+        }
         this.origen = origen;
     }
 
     public void setDestino(String destino) {
+        if (!Objects.equals(this.destino, destino)) {
+            invalidarRutasSiCambioLocalidad();
+            this.destinoLocalidad = null;
+        }
         this.destino = destino;
+    }
+
+    /** Asocia la localidad inequívoca y sincroniza el texto requerido por contratos anteriores. */
+    public void setOrigenLocalidad(Localidad localidad) {
+        Objects.requireNonNull(localidad, "origenLocalidad");
+        if ((this.origenLocalidad != null && !Objects.equals(this.origenLocalidad.getId(), localidad.getId()))
+                || !Objects.equals(origen, localidad.getNombre())) {
+            invalidarRutasSiCambioLocalidad();
+        }
+        this.origenLocalidad = localidad;
+        this.origen = localidad.getNombre();
+    }
+
+    public void setDestinoLocalidad(Localidad localidad) {
+        Objects.requireNonNull(localidad, "destinoLocalidad");
+        if ((this.destinoLocalidad != null && !Objects.equals(this.destinoLocalidad.getId(), localidad.getId()))
+                || !Objects.equals(destino, localidad.getNombre())) {
+            invalidarRutasSiCambioLocalidad();
+        }
+        this.destinoLocalidad = localidad;
+        this.destino = localidad.getNombre();
+    }
+
+    private void invalidarRutasSiCambioLocalidad() {
+        if (!rutasAutorizadas.isEmpty()) {
+            if (estado != EstadoGuia.SIN_ASIGNAR && estado != EstadoGuia.ASIGNADA) {
+                throw new IllegalStateException("No puede cambiarse el recorrido de un viaje iniciado o cerrado");
+            }
+            // Las asociaciones desaparecen; las geometrías compartidas NO se borran.
+            rutasAutorizadas.clear();
+        }
     }
 
     public void setVehiculo(Vehiculo vehiculo) {
@@ -157,6 +223,45 @@ public class Guia implements Serializable {
         this.chofer = chofer;
         this.estado = EstadoGuia.ASIGNADA;
         this.fechaAsignacion = Instant.now();
+    }
+
+    public List<GuiaRutaAutorizada> getRutasAutorizadas() {
+        return List.copyOf(rutasAutorizadas);
+    }
+
+    /**
+     * Asocia un conjunto de 1 a 3 geometrías preexistentes con esta Guia.
+     * Se permite reemplazarlo solo antes de iniciar el viaje.
+     * La obtencion de geometrías OSRM y su persistencia corresponden a la tarea 2.
+     */
+    public void reemplazarRutasAutorizadas(List<RutaReferencia> referencias) {
+        if (estado != EstadoGuia.SIN_ASIGNAR && estado != EstadoGuia.ASIGNADA) {
+            throw new IllegalStateException("No pueden modificarse rutas de un viaje iniciado o cerrado");
+        }
+        if (referencias == null || referencias.isEmpty() || referencias.size() > 3) {
+            throw new IllegalArgumentException("Se requieren entre una y tres rutas autorizadas");
+        }
+        Set<String> hashes = new HashSet<>();
+        for (RutaReferencia ruta : referencias) {
+            if (ruta == null || !hashes.add(ruta.getSha256GeoJson())) {
+                throw new IllegalArgumentException("No se admiten rutas nulas o duplicadas");
+            }
+        }
+        Map<String, GuiaRutaAutorizada> anteriores = new HashMap<>();
+        for (GuiaRutaAutorizada asociacion : rutasAutorizadas) {
+            anteriores.put(asociacion.getRutaReferencia().getSha256GeoJson(), asociacion);
+        }
+        rutasAutorizadas.removeIf(a -> !hashes.contains(a.getRutaReferencia().getSha256GeoJson()));
+        for (int i = 0; i < referencias.size(); i++) {
+            RutaReferencia ruta = referencias.get(i);
+            GuiaRutaAutorizada existente = anteriores.get(ruta.getSha256GeoJson());
+            if (existente == null) {
+                rutasAutorizadas.add(new GuiaRutaAutorizada(this, ruta, i + 1));
+            } else {
+                existente.reordenar(i + 1);
+            }
+        }
+        rutasAutorizadas.sort((a, b) -> Integer.compare(a.getNumeroAlternativa(), b.getNumeroAlternativa()));
     }
 
     public Long getVersion() {

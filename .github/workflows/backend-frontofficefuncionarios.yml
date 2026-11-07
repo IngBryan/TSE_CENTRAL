@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - componente_central/backend/Frontofficefuncionarios/**
+      # Remote EJB contract (ejb-client of Frontofficeciudadanos)
+      - componente_central/backend/Frontofficeciudadanos/pom.xml
+      - componente_central/backend/Frontofficeciudadanos/ejb/**
       - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-frontofficefuncionarios.yml
       - .github/workflows/_build-backend.yml
@@ -15,6 +18,9 @@ on:
       - dev
     paths:
       - componente_central/backend/Frontofficefuncionarios/**
+      # Remote EJB contract (ejb-client of Frontofficeciudadanos)
+      - componente_central/backend/Frontofficeciudadanos/pom.xml
+      - componente_central/backend/Frontofficeciudadanos/ejb/**
       - componente_central/backend/Modelo/**
       - componente_central/backend/AdaptadorPdi/**
       - .github/workflows/backend-frontofficefuncionarios.yml
@@ -29,7 +35,7 @@ jobs:
       artifact-name: backend-frontofficefuncionarios
       artifact: ear/target/*.ear
       sonar-project-key: tse-central-backend-frontofficefuncionarios
-      install-first: componente_central/backend/Modelo componente_central/backend/AdaptadorPdi
+      install-first: componente_central/backend/Modelo componente_central/backend/AdaptadorPdi componente_central/backend/Frontofficeciudadanos
 
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

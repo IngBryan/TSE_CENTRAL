@@ -24,6 +24,22 @@ public class CasoFiscalizacionDAO {
 
     private static final String BANDEJA = "SELECT c FROM CasoFiscalizacion c";
     private static final String ORDEN = " ORDER BY c.fechaDeteccion DESC, c.id DESC";
+    private static final String CON_GUIA = "c.guia.id = :identidad";
+    private static final String SIN_GUIA = "c.guia IS NULL AND c.vehiculo.matricula = :identidad";
+    private static final String CASO_ABIERTO = "SELECT c FROM CasoFiscalizacion c WHERE ";
+    private static final String ABIERTO_DEL_TIPO = " AND c.tipoCaso = :tipo AND c.estado IN :abiertos";
+    private static final String ABIERTO_CON_GUIA = CASO_ABIERTO + CON_GUIA + ABIERTO_DEL_TIPO;
+    private static final String ABIERTO_SIN_GUIA = CASO_ABIERTO + SIN_GUIA + ABIERTO_DEL_TIPO;
+    private static final String CASO_CON_GPS =
+            "SELECT DISTINCT c FROM CasoFiscalizacion c JOIN c.clavesEventosTracking e WHERE ";
+    private static final String CASO_CON_PESAJE =
+            "SELECT DISTINCT c FROM CasoFiscalizacion c JOIN c.eventosPesajes e WHERE ";
+    private static final String EVENTO_DEL_TIPO =
+            " AND c.tipoCaso = :tipo AND e.matricula = :matricula AND e.fechaHora = :fechaHora";
+    private static final String GPS_CON_GUIA = CASO_CON_GPS + CON_GUIA + EVENTO_DEL_TIPO;
+    private static final String GPS_SIN_GUIA = CASO_CON_GPS + SIN_GUIA + EVENTO_DEL_TIPO;
+    private static final String PESAJE_CON_GUIA = CASO_CON_PESAJE + CON_GUIA + EVENTO_DEL_TIPO;
+    private static final String PESAJE_SIN_GUIA = CASO_CON_PESAJE + SIN_GUIA + EVENTO_DEL_TIPO;
 
     @PersistenceContext(unitName = "frontofficefuncionariosPersistenceUnit")
     private EntityManager em;
@@ -77,6 +93,8 @@ public class CasoFiscalizacionDAO {
         em.persist(caso);
     }
 
+    public void flush() { em.flush(); }
+
     public Vehiculo buscarVehiculo(String matricula) {
         return em.find(Vehiculo.class, matricula);
     }
@@ -103,26 +121,31 @@ public class CasoFiscalizacionDAO {
                 .getResultList();
     }
 
-    // El caso que ya tiene ese evento de tracking como evidencia; null si ninguno
-    public CasoFiscalizacion casoConEventoTracking(ClaveEvento clave) {
-        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.clavesEventosTracking t"
-                + " WHERE t.matricula = :matricula AND t.fechaHora = :fechaHora", CasoFiscalizacion.class)
-                .setParameter("matricula", clave.getMatricula())
-                .setParameter("fechaHora", clave.getFechaHora())
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
+    /** Solo un caso abierto por (Guía, tipo), o por (vehículo, tipo) si no hay Guía. */
+    public CasoFiscalizacion buscarAbierto(String matricula, String idGuia, String tipo) {
+        return em.createQuery(idGuia == null ? ABIERTO_SIN_GUIA : ABIERTO_CON_GUIA, CasoFiscalizacion.class)
+                .setParameter("identidad", idGuia == null ? matricula : idGuia)
+                .setParameter("tipo", tipo)
+                .setParameter("abiertos", EstadoCaso.ABIERTOS)
+                .getResultStream().findFirst().orElse(null);
     }
 
-    // El caso que ya tiene ese pesaje como evidencia; null si ninguno
-    public CasoFiscalizacion casoConPesaje(ClaveEvento clave) {
-        return em.createQuery("SELECT c FROM CasoFiscalizacion c JOIN c.eventosPesajes p"
-                + " WHERE p.matricula = :matricula AND p.fechaHora = :fechaHora", CasoFiscalizacion.class)
+    /** Idempotencia ante redelivery posterior al cierre: el evento ya probado no crea otro caso. */
+    public CasoFiscalizacion buscarConEvidencia(String matricula, String idGuia, String tipo,
+            ClaveEvento clave, boolean tracking) {
+        return em.createQuery(consultaConEvidencia(idGuia, tracking), CasoFiscalizacion.class)
+                .setParameter("identidad", idGuia == null ? matricula : idGuia)
+                .setParameter("tipo", tipo)
                 .setParameter("matricula", clave.getMatricula())
                 .setParameter("fechaHora", clave.getFechaHora())
-                .getResultStream()
-                .findFirst()
-                .orElse(null);
+                .getResultStream().findFirst().orElse(null);
+    }
+
+    private static String consultaConEvidencia(String idGuia, boolean tracking) {
+        if (tracking) {
+            return idGuia == null ? GPS_SIN_GUIA : GPS_CON_GUIA;
+        }
+        return idGuia == null ? PESAJE_SIN_GUIA : PESAJE_CON_GUIA;
     }
 
     public EventoPesajes buscarPesaje(ClaveEvento clave) {

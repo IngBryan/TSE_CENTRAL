@@ -1,18 +1,26 @@
 "use client";
 
+import { mostrarLocalidad } from "@/lib/localidades";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { asignarGuia, type ChoferResumen, type Guia, type VehiculoResumen } from "../../actions";
+import type { LocalidadVista } from "@/lib/localidades";
+import { SelectorRutas } from "../rutas/selector-rutas";
+import type { Previsualizacion } from "../rutas/tipos-rutas";
 
 const nombre = (c: ChoferResumen) => [c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || c.cedula;
 
-// CU-07 pasos 3 a 9: elegir vehiculo, elegir chofer, ver las selecciones y confirmar (o cancelar, 8a).
-export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehiculos: VehiculoResumen[]; choferes: ChoferResumen[] }) {
+// Elegir vehiculo, chofer y rutas; revisar el resumen y confirmar toda la asignacion.
+export function AsignarViaje({ guia, vehiculos, choferes, localidades }: {
+  guia: Guia; vehiculos: VehiculoResumen[]; choferes: ChoferResumen[]; localidades: LocalidadVista[];
+}) {
   const router = useRouter();
   const [matricula, setMatricula] = useState<string | null>(null);
   const [idChofer, setIdChofer] = useState<number | null>(null);
+  const [rutas, setRutas] = useState<Previsualizacion | null>(null);
   const [resumen, setResumen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
@@ -21,14 +29,17 @@ export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehicu
   const chofer = choferes.find((c) => c.id === idChofer);
 
   const confirmar = () => {
-    if (!vehiculo || !chofer) return;
+    if (!vehiculo || !chofer || !rutas) return;
     setError(null);
     iniciar(async () => {
-      const r = await asignarGuia(guia.id, vehiculo.matricula, chofer.id);
+      const r = await asignarGuia(guia.id, vehiculo.matricula, chofer.id, {
+        origenId: rutas.origenId, destinoId: rutas.destinoId, previsualizacionId: rutas.previsualizacionId,
+      });
       if (r.ok) {
         router.push(`/empresa/guias?asignada=${encodeURIComponent(guia.id)}`);
       } else {
         setError([r.error, ...Object.values(r.campos ?? {})].join(" "));
+        setRutas(null);
         setResumen(false);
       }
     });
@@ -40,14 +51,14 @@ export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehicu
     }`;
 
   // Paso 7: el sistema muestra las selecciones elegidas
-  if (resumen && vehiculo && chofer) {
+  if (resumen && vehiculo && chofer && rutas) {
     return (
       <div className="flex flex-col gap-5 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
         <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Confirmá la asignación</h2>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-zinc-700 dark:text-zinc-300">
           <dt className="font-medium">Guía</dt>
           <dd>
-            {guia.id} · {guia.origen} → {guia.destino}
+            {guia.id} · {mostrarLocalidad(guia.origen, guia.origenDepartamento)} → {mostrarLocalidad(guia.destino, guia.destinoDepartamento)}
           </dd>
           <dt className="font-medium">Vehículo</dt>
           <dd>
@@ -57,6 +68,15 @@ export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehicu
           <dd>
             {nombre(chofer)} (C.I. {chofer.cedula})
           </dd>
+          <dt className="font-medium">Rutas autorizadas</dt>
+          <dd className="space-y-1">
+            {rutas.rutas.map(ruta => (
+              <p key={ruta.alternativa}>
+                Alternativa {ruta.alternativa} · {(ruta.distanciaMetros / 1000).toLocaleString("es-UY", { maximumFractionDigits: 1 })} km
+                {" · "}{Math.round(ruta.duracionSegundos / 60)} min aprox.
+              </p>
+            ))}
+          </dd>
         </dl>
         {vehiculo.capacidadCargaKg < guia.pesoCargaKg && (
           <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -64,9 +84,15 @@ export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehicu
             {vehiculo.capacidadCargaKg.toLocaleString("es-UY")} kg).
           </p>
         )}
-        <div className="flex gap-3">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Al confirmar, se asignarán el vehículo, el chofer y las rutas autorizadas a esta guía.
+        </p>
+        <div className="flex flex-wrap gap-3">
           <button type="button" onClick={confirmar} disabled={pendiente} className={botonGubUy}>
             {pendiente ? "Asignando…" : "Confirmar asignación"}
+          </button>
+          <button type="button" onClick={() => setResumen(false)} disabled={pendiente} className={botonSecundario}>
+            Volver
           </button>
           {/* 8a: cancela y vuelve al listado de guias */}
           <Link href="/empresa/guias" className={botonSecundario}>
@@ -111,8 +137,16 @@ export function AsignarViaje({ guia, vehiculos, choferes }: { guia: Guia; vehicu
         ))}
       </fieldset>
 
+      <section className="flex flex-col gap-2" aria-labelledby="titulo-rutas-asignacion">
+        <h2 id="titulo-rutas-asignacion" className="text-lg font-semibold text-black dark:text-zinc-50">
+          3. Elegí las rutas autorizadas
+        </h2>
+        <SelectorRutas guia={guia} localidades={localidades} iniciales={[]}
+          seleccion={{ valor: rutas, onChange: setRutas }} />
+      </section>
+
       <div className="flex gap-3">
-        <button type="button" onClick={() => setResumen(true)} disabled={!vehiculo || !chofer} className={botonGubUy}>
+        <button type="button" onClick={() => setResumen(true)} disabled={!vehiculo || !chofer || !rutas?.rutas.length} className={botonGubUy}>
           Continuar
         </button>
         <Link href="/empresa/guias" className={botonSecundario}>

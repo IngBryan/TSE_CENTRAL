@@ -7,6 +7,8 @@ import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
 import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
 import { ModificarGuia } from "./modificar-guia";
+import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
+import type { RutaAsignada } from "./rutas/tipos-rutas";
 
 type EventoViaje = {
   idEvento: string;
@@ -76,6 +78,9 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
 
   let datos: DetalleGuia | null = null;
   let error: string | null = null;
+  let rutasAutorizadas: RutaAsignada[] = [];
+  let errorRutas = false;
+  let localidades: LocalidadVista[] = [];
   try {
     const res = await llamarBackend<DetalleGuia & { detalle?: string }>(
       `/empresa/guias/${encodeURIComponent(id)}/eventos`,
@@ -88,6 +93,30 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
+  }
+  // Las rutas son información complementaria: un fallo de consulta no oculta la guía.
+  if (datos) {
+    try {
+      const resultado = await llamarBackend<RutaAsignada[]>(
+        `/empresa/guias/${encodeURIComponent(id)}/rutas`,
+        { correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula },
+      );
+      if (resultado.status === 200 && Array.isArray(resultado.data)) rutasAutorizadas = resultado.data;
+      else errorRutas = true;
+    } catch (e) {
+      if (!(e instanceof BackendNoDisponible)) throw e;
+      errorRutas = true;
+    }
+  }
+  if (datos?.guia.estado === "ASIGNADA") {
+    try {
+      const res = await llamarBackend<LocalidadVista[]>("/localidades", {
+        correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
+      });
+      if (res.status === 200 && Array.isArray(res.data)) localidades = res.data;
+    } catch (e) {
+      if (!(e instanceof BackendNoDisponible)) throw e;
+    }
   }
   // Linea de tiempo: eventos del chofer (por la hora en que ocurrieron) y modificaciones de la empresa
   const linea = datos
@@ -122,7 +151,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             <section className="grid gap-x-6 gap-y-2 rounded-2xl bg-white p-6 text-sm shadow-sm sm:grid-cols-2 dark:bg-zinc-950">
               <p><span className="text-zinc-500">Estado:</span> {ESTADOS[datos.guia.estado] ?? datos.guia.estado}</p>
               <p><span className="text-zinc-500">Fecha:</span> {datos.guia.fecha.split("-").reverse().join("/")}</p>
-              <p><span className="text-zinc-500">Recorrido:</span> {datos.guia.origen} → {datos.guia.destino}</p>
+              <p><span className="text-zinc-500">Recorrido:</span> {mostrarLocalidad(datos.guia.origen, datos.guia.origenDepartamento)} → {mostrarLocalidad(datos.guia.destino, datos.guia.destinoDepartamento)}</p>
               <p>
                 <span className="text-zinc-500">Carga:</span> {datos.guia.pesoCargaKg.toLocaleString("es-UY")} kg
                 {datos.guia.tipoCarga ? ` · ${datos.guia.tipoCarga}` : ""}
@@ -136,8 +165,37 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
               </p>
             </section>
 
+            <section aria-labelledby="rutas-autorizadas-titulo" className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="rutas-autorizadas-titulo" className="text-lg font-semibold">Rutas autorizadas</h2>
+                <Link href={`/empresa/guias/${encodeURIComponent(id)}/rutas`}
+                  className="rounded-lg bg-[#0068b3] px-4 py-2 font-medium text-white hover:bg-[#005596]">
+                  {datos.guia.estado === "SIN_ASIGNAR" || datos.guia.estado === "ASIGNADA"
+                    ? "Consultar o autorizar rutas" : "Ver rutas en el mapa"}
+                </Link>
+              </div>
+              {errorRutas ? (
+                <p role="status" className="mt-3 text-amber-800 dark:text-amber-200">
+                  No pudimos consultar las rutas de esta guía. Podés volver a intentarlo desde la pantalla de rutas.
+                </p>
+              ) : rutasAutorizadas.length === 0 ? (
+                <p className="mt-3 text-zinc-600 dark:text-zinc-400">Esta guía todavía no tiene rutas autorizadas.</p>
+              ) : (
+                <ol className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[...rutasAutorizadas].sort((a, b) => a.alternativa - b.alternativa).map(r => (
+                    <li key={r.idRuta} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+                      <span className="font-medium">Alternativa {r.alternativa}</span>
+                      <span className="ml-2 text-zinc-600 dark:text-zinc-400">
+                        {(r.distanciaMetros / 1000).toLocaleString("es-UY", { maximumFractionDigits: 1 })} km
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
             {datos.guia.estado === "ASIGNADA" && (
-              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} />
+              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} localidades={localidades} />
             )}
 
             <section className="flex flex-col gap-3">

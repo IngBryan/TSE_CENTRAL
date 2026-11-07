@@ -65,24 +65,32 @@ public class CasoFiscalizacion implements Serializable {
     @OneToOne(mappedBy = "casoFiscalizacion")
     private Descargo descargo;
 
-    // Un evento es evidencia de un unico caso: (matricula, fecha_hora) es unico en las dos tablas
+    // Una evidencia puede respaldar varios casos; un vínculo (caso, evento) es único.
     @ManyToMany
     @JoinTable(name = "casos_eventos_pesajes",
             joinColumns = @JoinColumn(name = "id_caso"),
             inverseJoinColumns = {
                     @JoinColumn(name = "matricula", referencedColumnName = "matricula"),
                     @JoinColumn(name = "fecha_hora", referencedColumnName = "fecha_hora") },
-            uniqueConstraints = @UniqueConstraint(name = "uk_caso_pesaje", columnNames = { "matricula",
-                    "fecha_hora" }))
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_pesaje", columnNames = {
+                    "id_caso", "matricula", "fecha_hora" }))
     private List<EventoPesajes> eventosPesajes = new ArrayList<>();
 
     // Los eventos de tracking estan en MongoDB (EventoTracking): aca solo se guarda la clave
     // (matricula, fecha_hora) de cada uno
     @ElementCollection
     @CollectionTable(name = "casos_eventos_tracking", joinColumns = @JoinColumn(name = "id_caso"),
-            uniqueConstraints = @UniqueConstraint(name = "uk_caso_tracking", columnNames = { "matricula",
-                    "fecha_hora" }))
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_tracking", columnNames = {
+                    "id_caso", "matricula", "fecha_hora" }))
     private List<ClaveEvento> clavesEventosTracking = new ArrayList<>();
+
+    // Snapshot geométrico adicional solo para casos DESVIO_RUTA.
+    // La unicidad utiliza el evento confirmante dentro del caso; no duplica eventos Mongo.
+    @ElementCollection
+    @CollectionTable(name = "casos_evidencias_desvio", joinColumns = @JoinColumn(name = "id_caso"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_caso_prueba_desvio", columnNames = {
+                    "id_caso", "matricula", "fecha_hora" }))
+    private List<EvidenciaGeometricaDesvio> evidenciasDesvio = new ArrayList<>();
 
     public CasoFiscalizacion() {
     }
@@ -175,6 +183,10 @@ public class CasoFiscalizacion implements Serializable {
 
     public List<EventoPesajes> getEventosPesajes() {
         return eventosPesajes;
+    }
+
+    public List<EvidenciaGeometricaDesvio> getEvidenciasDesvio() {
+        return evidenciasDesvio;
     }
 
     public List<ClaveEvento> getClavesEventosTracking() {

@@ -1,0 +1,85 @@
+package tse.lab.frontofficeciudadanos.service.rutas;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import tse.lab.frontofficeciudadanos.data.RutaReferenciaDAO;
+import tse.lab.model.Guia;
+import tse.lab.model.GuiaRutaAutorizada;
+import tse.lab.model.RutaReferencia;
+
+/** La evidencia se recupera por SHA, no por enlaces de guia que pueden cambiar. */
+class RutasAutorizadasServiceTest {
+    private static RutasAutorizadasService servicio(RutaReferenciaDAO dao) throws Exception {
+        RutasAutorizadasService servicio = new RutasAutorizadasService();
+        Field f = RutasAutorizadasService.class.getDeclaredField("rutas");
+        f.setAccessible(true);
+        f.set(servicio, dao);
+        return servicio;
+    }
+
+    @Test
+    void recuperaReferenciasEnOrdenHistoricoSinConsultarGuia() throws Exception {
+        RutaReferencia a = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}", 5000);
+        RutaReferencia b = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[1,1],[2,2]]}", 6000);
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        List<String> hashes = List.of(b.getSha256GeoJson(), a.getSha256GeoJson());
+        when(dao.buscarPorHuellas(hashes)).thenReturn(List.of(a, b));
+        List<DatosRutaAutorizada> resultado = servicio(dao).obtenerPorHuellas(hashes);
+        assertEquals(hashes, resultado.stream().map(DatosRutaAutorizada::getSha256).toList());
+        assertEquals(List.of(1, 2), resultado.stream().map(DatosRutaAutorizada::getAlternativa).toList());
+        verify(dao, never()).buscarPorGuia(anyString());
+    }
+
+    @Test
+    void descartaRutaInexistenteYNoInventarGeometria() throws Exception {
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        String hash = "a".repeat(64);
+        when(dao.buscarPorHuellas(List.of(hash))).thenReturn(List.of());
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of(hash)).isEmpty());
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of("hash-invalido")).isEmpty());
+        verify(dao, never()).buscarPorGuia(anyString());
+    }
+
+    @Test
+    void returnsTheRoutesOfAGuide() throws Exception {
+        RutaReferencia ruta = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}", 5000);
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        when(dao.buscarPorGuia("G1")).thenReturn(List.of(new GuiaRutaAutorizada(new Guia(), ruta, 2)));
+
+        DatosRutaAutorizada datos = servicio(dao).obtenerPorGuia("G1").get(0);
+
+        assertEquals(2, datos.getAlternativa());
+        assertEquals(ruta.getSha256GeoJson(), datos.getSha256());
+        assertEquals(5000, datos.getDistanciaMetros());
+        assertEquals(ruta.getGeometriaGeoJson(), datos.getGeometriaGeoJson());
+        assertEquals(ruta.getId(), datos.getIdRuta());
+    }
+
+    @Test
+    void withoutGuideOrHashesThereIsNothingToLookFor() throws Exception {
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+
+        assertTrue(servicio(dao).obtenerPorGuia(null).isEmpty());
+        assertTrue(servicio(dao).obtenerPorGuia(" ").isEmpty());
+        assertTrue(servicio(dao).obtenerPorHuellas(null).isEmpty());
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of()).isEmpty());
+        verify(dao, never()).buscarPorHuellas(anyList());
+    }
+
+    @Test
+    void aTamperedRowIsNotShownAsAVerifiedRoute() throws Exception {
+        String hash = "b".repeat(64);
+        RutaReferencia adulterada = mock(RutaReferencia.class);
+        when(adulterada.getSha256GeoJson()).thenReturn(hash);
+        when(adulterada.getGeometriaGeoJson()).thenReturn("otra geometria");
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        when(dao.buscarPorHuellas(List.of(hash))).thenReturn(List.of(adulterada));
+
+        assertTrue(servicio(dao).obtenerPorHuellas(List.of(hash, hash)).isEmpty());
+    }
+}

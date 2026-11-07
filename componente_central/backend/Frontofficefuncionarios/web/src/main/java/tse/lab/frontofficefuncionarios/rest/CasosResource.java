@@ -20,6 +20,7 @@ import tse.lab.frontofficefuncionarios.service.DatosInvalidosException;
 import tse.lab.frontofficefuncionarios.service.NoAutorizadoException;
 import tse.lab.frontofficefuncionarios.service.RecursoNoEncontradoException;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService;
+import tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.SeguimientoNoDisponibleException;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.Resolucion;
 
 // CU Gestionar casos de fiscalizacion. Quien llama se identifica con X-Usuario-Ci: la cedula que el
@@ -59,6 +60,31 @@ public class CasosResource {
         return ejecutar(() -> casos.evidencia(usuario, id, correlationId(req)));
     }
 
+    /** Geometrías históricas verificadas contra las huellas archivadas en la prueba. */
+    @GET
+    @Path("/{id}/rutas-evidencia")
+    public Response rutasEvidencia(@HeaderParam(USUARIO_CI) String usuario, @PathParam("id") Long id,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> casos.rutasEvidencia(usuario, id, correlationId(req)));
+    }
+
+    /** Una circulación inferida, persistida y asociada unívocamente al expediente. */
+    @GET
+    @Path("/{id}/circulacion")
+    public Response circulacion(@HeaderParam(USUARIO_CI) String usuario, @PathParam("id") Long id,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> casos.circulacion(usuario, id, correlationId(req)));
+    }
+
+    /** Coordenadas de la evidencia GPS de una circulación sin Guía. Hasta 500 claves por página. */
+    @GET
+    @Path("/{id}/gps")
+    public Response gps(@HeaderParam(USUARIO_CI) String usuario, @PathParam("id") Long id,
+            @QueryParam("indice") String indice, @QueryParam("limite") String limite,
+            @Context HttpServletRequest req) {
+        return ejecutar(() -> casos.gpsCaso(usuario, id, indice, limite, correlationId(req)));
+    }
+
     // 404 SIN_DESCARGO si la empresa no presento descargo
     @GET
     @Path("/{id}/descargo")
@@ -96,6 +122,9 @@ public class CasosResource {
         } catch (ConflictoException e) {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("error", e.getCodigo(), "detalle", e.getMessage())).build();
+        } catch (SeguimientoNoDisponibleException e) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(Map.of("error", "seguimiento_no_disponible", "detalle", e.getMessage())).build();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

@@ -22,6 +22,8 @@ import tse.lab.model.Chofer;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.Guia;
+import tse.lab.model.Localidad;
+import tse.lab.model.RutaReferencia;
 import tse.lab.model.Responsable;
 import tse.lab.model.Vehiculo;
 
@@ -168,6 +170,41 @@ class DAOIntegrationTest {
         assertEquals(1, porEmpresa.size());
         assertEquals(1, sinVehiculo.size());
         assertSame(encontrada, porEmpresa.get(0));
+    }
+
+    @Test
+    void rutasSeGuardanUnaVezYSeCompartenEntreGuias() {
+        RutaReferenciaDAO rutas = new RutaReferenciaDAO();
+        injectEntityManager(rutas);
+        LocalidadDAO localidades = new LocalidadDAO();
+        injectEntityManager(localidades);
+        Empresa empresa = new Empresa(101L, "Empresa rutas", "Razon social", "Direccion", null);
+        Guia primera = new Guia("R-1", "Agro", 1000L, LocalDate.of(2026, 10, 31),
+                "Mercedes", "Nueva Palmira", empresa);
+        Guia segunda = new Guia("R-2", "Agro", 1000L, LocalDate.of(2026, 10, 31),
+                "Mercedes", "Nueva Palmira", empresa);
+        String geo = "{\"type\":\"LineString\",\"coordinates\":[[-58,-33],[-58.1,-33.1]]}";
+        RutaReferencia ruta = new RutaReferencia(geo, 13000);
+        primera.reemplazarRutasAutorizadas(List.of(ruta));
+        segunda.reemplazarRutasAutorizadas(List.of(ruta));
+
+        beginTransaction();
+        entityManager.persist(new Localidad(7L, "Mercedes", "Soriano", -33.25, -58.03));
+        entityManager.persist(empresa);
+        rutas.guardar(ruta);
+        entityManager.persist(primera);
+        entityManager.persist(segunda);
+        commitTransaction();
+        entityManager.clear();
+
+        beginTransaction();
+        assertEquals(1, localidades.listar().size());
+        assertNotNull(rutas.buscarPorHuella(RutaReferencia.calcularHuella(geo)));
+        assertEquals(1, rutas.buscarPorGuia("R-1").size());
+        assertEquals(1, rutas.buscarPorGuia("R-2").size());
+        assertEquals(rutas.buscarPorGuia("R-1").get(0).getRutaReferencia().getId(),
+                rutas.buscarPorGuia("R-2").get(0).getRutaReferencia().getId());
+        commitTransaction();
     }
 
     private void beginTransaction() {

@@ -17,6 +17,7 @@ import jakarta.ejb.Stateless;
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
 import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
+import tse.lab.frontofficeciudadanos.data.LocalidadDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
@@ -26,12 +27,14 @@ import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
+import tse.lab.frontofficeciudadanos.service.rutas.AsignacionRutasService;
 import tse.lab.model.Chofer;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoGuia;
 import tse.lab.model.EventoViaje;
 import tse.lab.model.Guia;
+import tse.lab.model.Localidad;
 import tse.lab.model.ModificacionGuia;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.TipoModificacionGuia;
@@ -46,7 +49,6 @@ public class GuiasService {
     private static final Logger LOG = Logger.getLogger(GuiasService.class.getName());
     private static final ZoneId ZONA = ZoneId.of("America/Montevideo");
     static final int MAX_TEXTO = 100;
-    static final int MAX_LUGAR = 150;
     static final long MAX_CARGA_KG = 100_000;
     static final int MAX_MOTIVO = 500;
 
@@ -54,6 +56,8 @@ public class GuiasService {
     private AutorizacionResponsable autorizacion;
     @EJB
     private GuiaDAO guias;
+    @EJB
+    private LocalidadDAO localidades;
     @EJB
     private VehiculoDAO vehiculos;
     @EJB
@@ -64,8 +68,12 @@ public class GuiasService {
     private EventoViajeDAO eventos;
     @EJB
     private ModificacionGuiaDAO modificaciones;
+    @EJB
+    private AsignacionRutasService asignacionRutas;
 
-    public record NuevaGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha, String origen, String destino) {
+    // Nuevas pantallas envian IDs. Se admiten nombres solo para clientes antiguos y si son univocos.
+    public record NuevaGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha,
+            String origen, String destino, Long origenId, Long destinoId) {
     }
 
     // Solo primer nombre y primer apellido del chofer (Ley 18.331)
@@ -77,12 +85,13 @@ public class GuiasService {
 
     // version: la de la entidad (@Version). El front la manda al modificar para detectar cambios concurrentes.
     public record GuiaVista(String id, String rubroCliente, String tipoCarga, long pesoCargaKg, String fecha, String origen,
-            String destino, String estado, VehiculoResumen vehiculo, ChoferResumen chofer, Long version) {
+            String destino, String estado, VehiculoResumen vehiculo, ChoferResumen chofer, Long version,
+            Long origenId, Long destinoId, String origenDepartamento, String destinoDepartamento) {
     }
 
-    // Modificacion de una guia ASIGNADA por el responsable. version: la que se estaba mirando al editar.
+    // Modificacion de una guia ASIGNADA por el responsable. version: control de concurrencia.
     public record EdicionGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha, String origen,
-            String destino, Long version) {
+            String destino, Long origenId, Long destinoId, Long version) {
     }
 
     public record Reasignacion(String matricula, Long idChofer, Long version) {
@@ -117,11 +126,13 @@ public class GuiasService {
     public GuiaVista crear(String ciResponsable, NuevaGuia datos, String correlationId)
             throws NoAutorizadoException, DatosInvalidosException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
-        DatosValidos d = datos == null ? validar(null, null, null, null, null, null)
+        DatosValidos d = datos == null ? validar(null, null, null, null, null, null, null, null)
                 : validar(datos.rubroCliente(), datos.tipoCarga(), datos.pesoCargaKg(), datos.fecha(), datos.origen(),
-                        datos.destino());
+                        datos.destino(), datos.origenId(), datos.destinoId());
 
         Guia guia = new Guia(nuevoId(), d.rubro(), d.carga(), d.fecha(), d.origen(), d.destino(), empresa);
+        guia.setOrigenLocalidad(d.localidadOrigen());
+        guia.setDestinoLocalidad(d.localidadDestino());
         guia.setTipoCarga(d.tipoCarga());
         guias.guardar(guia);
         LOG.info(() -> LogCiudadanos.evento("guia.creada").correlationId(correlationId).usuario(ciResponsable)
@@ -141,6 +152,14 @@ public class GuiasService {
                 .map(this::resumen)
                 .toList();
         return new OpcionesAsignacion(vista(guia), vs, cs);
+    }
+
+    // Una sola transaccion: si falla cualquier validacion, no quedan rutas ni recursos asignados.
+    public GuiaVista asignarConRutas(String ciResponsable, String idGuia, String matricula, Long idChofer,
+            Long origenId, Long destinoId, List<Long> idsRutas, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
+        asignacionRutas.asociar(ciResponsable, idGuia, origenId, destinoId, idsRutas, correlationId);
+        return asignar(ciResponsable, idGuia, matricula, idChofer, correlationId);
     }
 
     // CU-07 pasos 8 y 9: el responsable confirmo; se registra la asignacion y la guia pasa a ASIGNADA.
@@ -184,15 +203,17 @@ public class GuiasService {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
         Guia guia = guiaModificable(empresa, idGuia, datos == null ? null : datos.version());
         DatosValidos d = validar(datos.rubroCliente(), datos.tipoCarga(), datos.pesoCargaKg(), datos.fecha(),
-                datos.origen(), datos.destino());
+                datos.origen(), datos.destino(), datos.origenId(), datos.destinoId());
 
         List<String> cambios = new ArrayList<>();
         cambio(cambios, "rubro", guia.getRubroCliente(), d.rubro());
         cambio(cambios, "tipo de carga", guia.getTipoCarga(), d.tipoCarga());
         cambio(cambios, "carga (kg)", guia.getPesoCargaKg(), d.carga());
         cambio(cambios, "fecha", guia.getFecha(), d.fecha());
-        cambio(cambios, "origen", guia.getOrigen(), d.origen());
-        cambio(cambios, "destino", guia.getDestino(), d.destino());
+        cambio(cambios, "origen", referencia(guia.getOrigenLocalidad(), guia.getOrigen()),
+                referencia(d.localidadOrigen(), d.origen()));
+        cambio(cambios, "destino", referencia(guia.getDestinoLocalidad(), guia.getDestino()),
+                referencia(d.localidadDestino(), d.destino()));
         if (cambios.isEmpty()) {
             throw new DatosInvalidosException(Map.of("general", "No cambiaste ningún dato de la guía."));
         }
@@ -200,8 +221,8 @@ public class GuiasService {
         guia.setTipoCarga(d.tipoCarga());
         guia.setPesoCargaKg(d.carga());
         guia.setFecha(d.fecha());
-        guia.setOrigen(d.origen());
-        guia.setDestino(d.destino());
+        guia.setOrigenLocalidad(d.localidadOrigen());
+        guia.setDestinoLocalidad(d.localidadDestino());
         return registrarModificacion(guia, TipoModificacionGuia.EDICION, ciResponsable, cambios, null, correlationId);
     }
 
@@ -271,6 +292,10 @@ public class GuiasService {
                 .campo("version", anterior + "->" + guia.getVersion()).campo("cambios", "\"" + texto + "\"")
                 .toString());
         return vista(guia);
+    }
+
+    private static String referencia(Localidad localidad, String nombre) {
+        return localidad == null ? nombre + " (sin ID)" : nombre + " (#" + localidad.getId() + ")";
     }
 
     private static void cambio(List<String> cambios, String campo, Object antes, Object despues) {
@@ -369,7 +394,11 @@ public class GuiasService {
                 g.getFecha() == null ? null : g.getFecha().toString(), g.getOrigen(), g.getDestino(),
                 (g.getEstado() == null ? EstadoGuia.SIN_ASIGNAR : g.getEstado()).name(),
                 g.getVehiculo() == null ? null : resumen(g.getVehiculo()),
-                g.getChofer() == null ? null : resumen(g.getChofer()), g.getVersion());
+                g.getChofer() == null ? null : resumen(g.getChofer()), g.getVersion(),
+                g.getOrigenLocalidad() == null ? null : g.getOrigenLocalidad().getId(),
+                g.getDestinoLocalidad() == null ? null : g.getDestinoLocalidad().getId(),
+                g.getOrigenLocalidad() == null ? null : g.getOrigenLocalidad().getDepartamento(),
+                g.getDestinoLocalidad() == null ? null : g.getDestinoLocalidad().getDepartamento());
     }
 
     private static VehiculoResumen resumen(Vehiculo v) {
@@ -397,18 +426,50 @@ public class GuiasService {
     }
 
     private record DatosValidos(String rubro, String tipoCarga, long carga, LocalDate fecha, String origen,
-            String destino) {
+            String destino, Localidad localidadOrigen, Localidad localidadDestino) { }
+
+    // El ID es la autoridad. El texto se conserva como compatibilidad de los clientes antiguos,
+    // pero nunca puede ser una localidad inventada o ambigua.
+    private Localidad resolverLocalidad(Map<String, String> errores, String campo, String nombre, Long id) {
+        if (id != null) {
+            Localidad localidad = id > 0 ? localidades.buscarPorId(id) : null;
+            if (localidad == null) errores.put(campo + "Id", "Elegí una localidad válida del catálogo.");
+            else if (nombre != null && !nombre.isBlank() && !normalizar(nombre).equals(normalizar(localidad.getNombre()))) {
+                errores.put(campo, "El nombre no coincide con la localidad seleccionada.");
+            }
+            return localidad;
+        }
+        if (nombre == null || nombre.isBlank()) {
+            errores.put(campo + "Id", "Elegí una localidad del catálogo.");
+            return null;
+        }
+        Localidad localidad = localidades.buscarUnicaPorNombre(nombre);
+        if (localidad == null) {
+            errores.put(campo, "La localidad no existe o el nombre es ambiguo. Seleccionala por ID.");
+        }
+        return localidad;
     }
 
-    // Reglas de los datos de una guia (alta y edicion): rubro y tipo de carga obligatorios, carga entre 1 y
-    // MAX_CARGA_KG, fecha >= hoy, origen y destino obligatorios y distintos.
-    private static DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
-            String origenTexto, String destinoTexto) throws DatosInvalidosException {
+    private static String normalizar(String valor) {
+        return java.text.Normalizer.normalize(valor.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "").replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+    }
+
+    // Reglas de alta/edicion. Se validan los datos y se resuelven IDs en el backend.
+    private DatosValidos validar(String rubroCliente, String tipoCargaTexto, Long pesoCargaKg, String fechaTexto,
+            String origenTexto, String destinoTexto, Long origenId, Long destinoId) throws DatosInvalidosException {
         Map<String, String> errores = new LinkedHashMap<>();
         String rubro = texto(errores, "rubroCliente", "El rubro del cliente", rubroCliente, MAX_TEXTO);
         String tipoCarga = texto(errores, "tipoCarga", "El tipo de carga", tipoCargaTexto, MAX_TEXTO);
-        String origen = texto(errores, "origen", "El origen", origenTexto, MAX_LUGAR);
-        String destino = texto(errores, "destino", "El destino", destinoTexto, MAX_LUGAR);
+        Localidad origen = resolverLocalidad(errores, "origen", origenTexto, origenId);
+        Localidad destino = resolverLocalidad(errores, "destino", destinoTexto, destinoId);
+        if (origen != null && destino != null && Objects.equals(origen.getId(), destino.getId())) {
+            errores.put(destinoId == null ? "destino" : "destinoId",
+                    "El destino tiene que ser distinto del origen.");
+        } else if (origenId == null && destinoId == null && origenTexto != null && destinoTexto != null
+                && normalizar(origenTexto).equals(normalizar(destinoTexto))) {
+            errores.put("destino", "El destino tiene que ser distinto del origen.");
+        }
         if (pesoCargaKg == null || pesoCargaKg <= 0) {
             errores.put("pesoCargaKg", "La carga tiene que ser mayor que 0 kg.");
         } else if (pesoCargaKg > MAX_CARGA_KG) {
@@ -425,13 +486,9 @@ public class GuiasService {
         } else if (fecha.isBefore(LocalDate.now(ZONA))) {
             errores.put("fecha", "La fecha del viaje no puede ser anterior a hoy.");
         }
-        if (origen != null && destino != null && origen.equalsIgnoreCase(destino)) {
-            errores.put("destino", "El destino tiene que ser distinto del origen.");
-        }
-        if (!errores.isEmpty()) {
-            throw new DatosInvalidosException(errores);
-        }
-        return new DatosValidos(rubro, tipoCarga, pesoCargaKg, fecha, origen, destino);
+        if (!errores.isEmpty()) throw new DatosInvalidosException(errores);
+        return new DatosValidos(rubro, tipoCarga, pesoCargaKg, fecha, origen.getNombre(), destino.getNombre(),
+                origen, destino);
     }
 
     private static String texto(Map<String, String> errores, String campo, String nombre, String valor, int max) {

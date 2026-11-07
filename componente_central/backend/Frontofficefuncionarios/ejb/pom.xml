@@ -37,10 +37,30 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Contratos de rutas y ventanas temporales del EJB de Ciudadanos. -->
+        <dependency>
+            <groupId>tse.lab.frontofficeciudadanos</groupId>
+            <artifactId>frontofficeciudadanos-ejb</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <type>ejb-client</type>
+        </dependency>
+        <!-- Consulta solo lectura de Tracking en MongoDB; driver empaquetado en el EAR. -->
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-sync</artifactId>
+            <version>5.13.0</version>
+        </dependency>
+
         <!-- Test scope dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.20.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -127,6 +147,8 @@
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/EventoFiscalizado.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/OrigenEvento.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/DatosCaso.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/PruebaDesvioRemota.class</clientInclude>
+                            <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/PosicionSinGuiaRemota.class</clientInclude>
                             <clientInclude>tse/lab/frontofficefuncionarios/service/gestioncasos/TipoCasoAutomatico.class</clientInclude>
                         </clientIncludes>
                     </configuration>

@@ -5,6 +5,9 @@
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
         <class>tse.lab.model.Empresa</class>
         <class>tse.lab.model.Guia</class>
+        <class>tse.lab.model.Localidad</class>
+        <class>tse.lab.model.RutaReferencia</class>
+        <class>tse.lab.model.GuiaRutaAutorizada</class>
         <class>tse.lab.model.EventoViaje</class>
         <class>tse.lab.model.ModificacionGuia</class>
         <class>tse.lab.model.Vehiculo</class>
@@ -17,6 +20,7 @@
         <class>tse.lab.model.NodoBalanza</class>
         <class>tse.lab.model.EventoPesajes</class>
         <class>tse.lab.model.CasoFiscalizacion</class>
+        <class>tse.lab.model.CirculacionSinGuia</class>
         <class>tse.lab.model.Descargo</class>
         <class>tse.lab.model.FundamentoResolucion</class>
         <class>tse.lab.model.Funcionario</class>

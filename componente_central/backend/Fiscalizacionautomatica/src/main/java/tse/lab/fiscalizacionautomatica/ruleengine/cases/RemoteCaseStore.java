@@ -1,10 +1,12 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.cases;
 
 import java.io.IOException;
-import java.util.List;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.PruebaDesvioRemota;
+import tse.lab.frontofficefuncionarios.service.gestioncasos.PosicionSinGuiaRemota;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.fiscalizacionautomatica.ruleengine.remote.WildFlyContexts;
@@ -42,26 +44,33 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
-    public List<DatosCaso> openCases(String licensePlate) throws IOException {
-        return call(() -> cases.casosAbiertos(licensePlate));
+    public DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException {
+        return call(() -> cases.registrarEvidencia(tipo, idGuia, toEventoFiscalizado(evento)));
     }
 
     @Override
-    public DatosCaso caseOf(VehicleEvent event) throws IOException {
-        return call(() -> cases.casoDelEvento(toEventoFiscalizado(event)));
+    public DatosCaso registrarDesvio(String idGuia, TrackingEvent evento, PruebaDesvio prueba)
+            throws IOException {
+        if (prueba == null || !prueba.confirmante().equals(evento)) {
+            throw new IOException("La prueba no corresponde al GPS que se registra");
+        }
+        var pareja = prueba.pareja();
+        PruebaDesvioRemota remota = new PruebaDesvioRemota(pareja.timestamp(),
+                evento.latitude(), evento.longitude(), pareja.latitude(), pareja.longitude(),
+                prueba.distanciaConfirmanteMetros(), prueba.distanciaParejaMetros(),
+                prueba.umbralMetros(), prueba.ventanaMaximaSegundos(), prueba.hashesRutas());
+        return call(() -> cases.registrarDesvio(idGuia, toEventoFiscalizado(evento), remota));
     }
 
     @Override
-    public DatosCaso create(TipoCasoAutomatico caseType, String guideId, VehicleEvent event) throws IOException {
-        return call(() -> cases.crearCaso(caseType, guideId, toEventoFiscalizado(event)));
+    public DatosCaso registrarCirculacionSinGuia(TrackingEvent gps) throws IOException {
+        return call(() -> cases.registrarCirculacionSinGuia(new PosicionSinGuiaRemota(
+                gps.licensePlate(), gps.timestamp(), gps.latitude(), gps.longitude())));
     }
 
     @Override
-    public void addEvidence(long caseId, VehicleEvent event) throws IOException {
-        call(() -> {
-            cases.agregarEvidencia(caseId, toEventoFiscalizado(event));
-            return null;
-        });
+    public void cerrarCirculacionPorGuia(String matricula, java.time.Instant fecha) throws IOException {
+        call(() -> { cases.cerrarCirculacionPorGuia(matricula, fecha); return null; });
     }
 
     @Override

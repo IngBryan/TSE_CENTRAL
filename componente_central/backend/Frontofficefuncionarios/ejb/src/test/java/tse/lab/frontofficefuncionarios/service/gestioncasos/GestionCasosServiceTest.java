@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
 import tse.lab.frontofficefuncionarios.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
+import tse.lab.model.CirculacionSinGuia;
 import tse.lab.frontofficefuncionarios.data.FuncionarioDAO;
 import tse.lab.frontofficefuncionarios.service.autenticacion.AutorizacionFuncionario;
 import tse.lab.frontofficefuncionarios.service.ConflictoException;
@@ -39,10 +41,14 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.
 import tse.lab.frontofficefuncionarios.service.gestioncasos.GestionCasosService.ResolucionRegistrada;
 import tse.lab.model.AccionAuditoriaCaso;
 import tse.lab.model.CasoFiscalizacion;
+import tse.lab.model.ClaveEvento;
 import tse.lab.model.Descargo;
 import tse.lab.model.Empresa;
 import tse.lab.model.EstadoCaso;
 import tse.lab.model.EventoPesajes;
+import tse.lab.model.EvidenciaGeometricaDesvio;
+import tse.lab.frontofficeciudadanos.service.rutas.RutasAutorizadasRemote;
+import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
 import tse.lab.model.FundamentoResolucion;
 import tse.lab.model.Funcionario;
 import tse.lab.model.Guia;
@@ -76,6 +82,7 @@ class GestionCasosServiceTest {
         set(servicio, "autorizacion", autorizacion);
         set(servicio, "casos", conEm(new CasoFiscalizacionDAO()));
         set(servicio, "auditoria", conEm(NoOpTransactions.wired(new AuditoriaCasoDAO())));
+        set(servicio, "circulaciones", conEm(new CirculacionSinGuiaDAO()));
 
         Empresa empresa = new Empresa(1L, "Transportes del Este", "TDE S.A.", "Pando", null);
         Vehiculo vehiculo = new Vehiculo("SBA 1234", "Scania", "R 450", 9000, 26000, empresa);
@@ -125,6 +132,61 @@ class GestionCasosServiceTest {
     void tearDown() {
         em.close();
         emf.close();
+    }
+
+    @Test
+    void vistaCirculacionRequiereCasoSinGuiaYFuncionario() {
+        assertThrows(DatosInvalidosException.class,
+                () -> servicio.circulacion(FUNCIONARIO, detectado, "t"));
+        assertThrows(NoAutorizadoException.class,
+                () -> servicio.circulacion(NO_FUNCIONARIO, detectado, "t"));
+    }
+
+    @Test
+    void rutasHistoricasSoloParaFuncionarioYHuellasPersistidas() throws Exception {
+        var guia = em.find(Guia.class, "GV-1");
+        CasoFiscalizacion desvio = new CasoFiscalizacion("Desvío real", "DESVIO_RUTA", guia);
+        String sha = "a".repeat(64);
+        desvio.getEvidenciasDesvio().add(new EvidenciaGeometricaDesvio("SBA1234",
+                Instant.parse("2026-10-10T12:00:10Z"), Instant.parse("2026-10-10T12:00:00Z"),
+                -34.9, -56.1, -34.9, -56.2, 2400, 2300, 2000, 30, sha));
+        em.getTransaction().begin();
+        em.persist(desvio);
+        em.getTransaction().commit();
+        em.clear();
+
+        DatosRutaAutorizada dto = new DatosRutaAutorizada(11L, 1, sha, 1000,
+        "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}");
+
+        int[] consultasHistoricas = {0};
+
+        RutasAutorizadasRemote rutas = new RutasAutorizadasRemote() {
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) {
+                throw new AssertionError("Las evidencias no deben consultar rutas actuales");
+            }
+
+            @Override
+            public List<DatosRutaAutorizada> obtenerPorHuellas(List<String> huellas) {
+                assertEquals(List.of(sha), huellas);
+                consultasHistoricas[0]++;
+                return List.of(dto);
+            }
+        };
+
+        set(servicio, "rutasEvidencia", rutas);
+
+        assertEquals(List.of(dto),
+                servicio.rutasEvidencia(FUNCIONARIO, desvio.getId(), "t"));
+
+        assertThrows(NoAutorizadoException.class,
+                () -> servicio.rutasEvidencia(NO_FUNCIONARIO, desvio.getId(), "t"));
+
+        assertEquals(List.of(),
+                servicio.rutasEvidencia(FUNCIONARIO, detectado, "t"));
+
+        assertEquals(1, consultasHistoricas[0],
+                "Solo el caso de desvío consulta sus huellas");
     }
 
     // ===== FA1: usuario no autorizado =====
@@ -403,6 +465,51 @@ class GestionCasosServiceTest {
         assertTrue(causa(e, UnsupportedOperationException.class), e.toString());
         em.clear();
         assertEquals(1, auditoria(enDescargo).size());
+    }
+
+    @Test
+    void gpsCasoSoloMuestraEvidenciasVinculadasYPaginaSinDuplicar() throws Exception {
+        Instant a = Instant.parse("2026-10-31T10:00:00Z");
+        Instant b = a.plusSeconds(15);
+        Instant c = a.plusSeconds(30);
+        Long id = enTx(() -> {
+            CasoFiscalizacion caso = new CasoFiscalizacion("Circulación sin Guía", "VIAJE_SIN_GUIA",
+                    em.find(Vehiculo.class, "SBA 1234"), null);
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", a));
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", b));
+            caso.getClavesEventosTracking().add(new ClaveEvento("SBA 1234", c));
+            em.persist(caso);
+            return caso.getId();
+        });
+        // El lector devuelve duplicados y otra matrícula: la consulta debe filtrar ambas cosas.
+        set(servicio, "tracking", new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.MongoSeguimientoDAO() {
+            @Override
+            public List<tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento> buscarClaves(
+                    String matricula, List<Instant> instantes) {
+                return instantes.stream().filter(i -> !i.equals(b))
+                        .flatMap(i -> java.util.stream.Stream.of(
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "e1", 1, matricula, -34.9, -56.2, i),
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "e1-repetido", 1, matricula, -34.9, -56.2, i),
+                                new tse.lab.frontofficefuncionarios.service.monitoreoviajesypesajes.PuntoGpsSeguimiento(
+                                        "ajeno", 1, "OTRO", -34.9, -56.2, i)))
+                        .toList();
+            }
+        });
+        var primera = servicio.gpsCaso(FUNCIONARIO, id, "0", "2", "t");
+        assertEquals(3, primera.totalClaves());
+        assertEquals(2, primera.siguienteIndice());
+        assertEquals(1, primera.posiciones().size());
+        assertEquals(a, primera.posiciones().get(0).fechaHora());
+        assertEquals(1, primera.sinRecuperar());
+        var segunda = servicio.gpsCaso(FUNCIONARIO, id, "2", "2", "t");
+        assertNull(segunda.siguienteIndice());
+        assertEquals(1, segunda.posiciones().size());
+        assertEquals(c, segunda.posiciones().get(0).fechaHora());
+        assertThrows(NoAutorizadoException.class, () -> servicio.gpsCaso(NO_FUNCIONARIO, id, "0", "2", "t"));
+        assertThrows(DatosInvalidosException.class, () -> servicio.gpsCaso(FUNCIONARIO, id, "0", "501", "t"));
+        assertThrows(DatosInvalidosException.class, () -> servicio.gpsCaso(FUNCIONARIO, detectado, "0", "2", "t"));
     }
 
     // ===== helpers =====
