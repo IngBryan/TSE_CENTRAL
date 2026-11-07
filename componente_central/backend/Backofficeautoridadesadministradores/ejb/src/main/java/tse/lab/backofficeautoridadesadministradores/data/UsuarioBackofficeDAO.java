@@ -31,5 +31,26 @@ public class UsuarioBackofficeDAO {
     public UsuarioBackoffice buscarPorCi(String ci) {
         return em.find(UsuarioBackoffice.class, ci);
     }
+
+    /**
+     * El rol de un usuario, sin traer la entidad ni el hash de la contraseña:
+     * se consulta en cada pedido autenticado.
+     *
+     * @return "ADMINISTRADOR", "AUTORIDAD" o null si no es usuario del Backoffice
+     */
+    public String buscarRol(String ci) {
+        return em.createQuery("""
+                SELECT CASE
+                    WHEN TYPE(u) = Administrador THEN 'ADMINISTRADOR'
+                    WHEN TYPE(u) = Autoridad THEN 'AUTORIDAD'
+                END
+                FROM UsuarioBackoffice u
+                WHERE u.ci = :ci
+                """, String.class)
+                .setParameter("ci", ci)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
 }
 
