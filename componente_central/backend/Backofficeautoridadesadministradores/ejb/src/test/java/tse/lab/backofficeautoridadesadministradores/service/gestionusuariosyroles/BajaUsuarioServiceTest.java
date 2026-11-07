@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -35,6 +34,8 @@ class BajaUsuarioServiceTest {
         Field campo = BajaUsuarioService.class.getDeclaredField("usuarios");
         campo.setAccessible(true);
         campo.set(servicio, usuarios);
+
+        usuarios.backoffice.put(ADMIN_QUE_ELIMINA, new Administrador(ADMIN_QUE_ELIMINA, "hash"));
     }
 
     private Funcionario funcionario(boolean activo) {
@@ -86,11 +87,21 @@ class BajaUsuarioServiceTest {
 
     @Test
     void unAdministradorNoPuedeEliminarse() {
-        usuarios.backoffice.put(ADMIN_QUE_ELIMINA, new Administrador(ADMIN_QUE_ELIMINA, "hash"));
-
         assertThrows(BajaNoPermitidaException.class,
                 () -> servicio.eliminar(ADMIN_QUE_ELIMINA, "9.999.999-9"));
         assertNotNull(usuarios.backoffice.get(ADMIN_QUE_ELIMINA));
+    }
+
+    // Otro administrador lo eliminó mientras tanto: si dos se eliminan entre sí
+    // a la vez, el segundo no puede dejar el sistema sin administradores
+    @Test
+    void quienYaNoEsAdministradorNoPuedeEliminar() {
+        usuarios.backoffice.remove(ADMIN_QUE_ELIMINA);
+        usuarios.backoffice.put(CI, new Administrador(CI, "hash"));
+
+        assertThrows(BajaNoPermitidaException.class, () -> servicio.eliminar(ADMIN_QUE_ELIMINA, CI));
+
+        assertNotNull(usuarios.backoffice.get(CI));
     }
 
     @Test
@@ -106,6 +117,6 @@ class BajaUsuarioServiceTest {
     @Test
     void rechazaUnaCedulaInvalida() {
         assertThrows(DatosUsuarioInvalidosException.class, () -> servicio.eliminar(ADMIN_QUE_ELIMINA, "12"));
-        assertTrue(usuarios.backoffice.isEmpty());
+        assertNotNull(usuarios.backoffice.get(ADMIN_QUE_ELIMINA));
     }
 }

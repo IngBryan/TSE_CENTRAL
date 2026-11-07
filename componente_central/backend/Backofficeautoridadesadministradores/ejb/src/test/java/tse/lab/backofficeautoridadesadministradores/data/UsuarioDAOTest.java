@@ -181,6 +181,13 @@ class UsuarioDAOTest {
     }
 
     @Test
+    void bloqueaYDevuelveSoloLosAdministradores() {
+        em.getTransaction().begin();
+        assertEquals(List.of(ADMINISTRADOR), usuarios.bloquearAdministradores());
+        em.getTransaction().commit();
+    }
+
+    @Test
     void eliminaAlUsuarioDeBackofficeConSuContrasena() {
         em.getTransaction().begin();
         usuarios.eliminarUsuarioBackoffice(AUTORIDAD, RolUsuario.AUTORIDAD);

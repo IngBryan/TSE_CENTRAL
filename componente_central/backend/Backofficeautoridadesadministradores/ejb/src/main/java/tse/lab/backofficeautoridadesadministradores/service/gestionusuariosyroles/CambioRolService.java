@@ -14,24 +14,26 @@ import tse.lab.model.Administrador;
 import tse.lab.model.Autoridad;
 import tse.lab.model.Funcionario;
 
-/**
+/*
  * Cambio de rol entre funcionario, administrador y autoridad. El rol nuevo
- * reemplaza al anterior: la persona queda con uno solo de los tres.
+ * reemplaza a los anteriores: tras el cambio, la persona tiene uno solo.
  *
- * <ul>
- * <li>Administrador y autoridad comparten la contraseña: pasar de uno al
- * otro la conserva.</li>
- * <li>Pasar a administrador o autoridad sin serlo pide una contraseña
- * inicial; pasar a funcionario sin serlo pide el email.</li>
- * <li>Un funcionario que deja de serlo no se borra: queda inactivo, con su
- * historial (fundamentos de resolución). Si vuelve a ser funcionario se
- * reactiva.</li>
- * <li>Un administrador no puede cambiar su propio rol: así siempre queda al
- * menos un administrador.</li>
- * </ul>
+ * Entre administrador y autoridad se conserva la contraseña, porque se guarda
+ * en la entidad común UsuarioBackoffice. Si no era administrador ni autoridad
+ * y pasa a serlo, se pide una contraseña inicial; si no era funcionario y
+ * pasa a serlo, se pide el email.
  *
- * El cambio rige en el siguiente pedido: la autenticación del backoffice
- * verifica el rol en la base en cada pedido, no el del token.
+ * Un funcionario que deja de serlo se marca inactivo, sin borrarse, para
+ * conservar su historial (fundamentos de resolución). Si vuelve a ser
+ * funcionario, se reactiva.
+ *
+ * Un administrador no puede cambiar su propio rol, y antes del cambio se
+ * verifica, con las filas de administradores bloqueadas, que quien lo hace
+ * sigue siendo administrador. Así, aunque dos administradores se quiten el
+ * rol entre sí a la vez, siempre queda al menos uno.
+ *
+ * El cambio tiene efecto desde la próxima solicitud del usuario: la
+ * autenticación del backoffice toma el rol de la base, no del token.
  */
 @Stateless
 public class CambioRolService {
@@ -51,7 +53,8 @@ public class CambioRolService {
      * @param email obligatorio si pasa a funcionario sin serlo
      * @throws DatosUsuarioInvalidosException si algún dato no es válido
      * @throws UsuarioNoEncontradoException si no es funcionario, administrador ni autoridad
-     * @throws CambioRolNoPermitidoException si ya tiene ese rol o es el propio administrador
+     * @throws CambioRolNoPermitidoException si ya tiene ese rol, es el propio
+     *         administrador o quien lo hace ya no es administrador
      */
     public RolCambiado cambiar(
             String ciAdministrador,
@@ -65,6 +68,10 @@ public class CambioRolService {
 
         if (cedula.equals(ciAdministrador)) {
             throw new CambioRolNoPermitidoException("No podés cambiar tu propio rol");
+        }
+        // Otro administrador pudo haberle quitado el rol mientras tanto
+        if (!usuarios.bloquearAdministradores().contains(ciAdministrador)) {
+            throw new CambioRolNoPermitidoException("Tu usuario ya no es administrador");
         }
 
         RolUsuario rolBackoffice = usuarios.rolBackoffice(cedula);

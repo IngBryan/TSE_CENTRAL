@@ -11,23 +11,25 @@ import tse.lab.backofficeautoridadesadministradores.data.UsuarioDAO;
 import tse.lab.backofficeautoridadesadministradores.service.LogBackoffice;
 import tse.lab.model.Funcionario;
 
-/**
- * Baja de un funcionario, administrador o autoridad: se le quitan todos
- * esos roles.
+/*
+ * Baja de un usuario interno: se le quitan los roles de funcionario,
+ * administrador y autoridad que tenga. Los roles de chofer y responsable no
+ * se modifican, porque tienen su propio ciclo de vida.
  *
- * <ul>
- * <li>Administrador o autoridad: se borra, con su contraseña (nada lo
- * referencia).</li>
- * <li>Funcionario: no se borra, queda inactivo. Sus fundamentos de
- * resolución lo referencian y son parte de la auditoría; si se lo vuelve a
- * dar de alta se reactiva.</li>
- * <li>Los roles de chofer y responsable no se tocan: tienen su propio ciclo
- * de vida.</li>
- * <li>Un administrador no puede eliminarse a sí mismo.</li>
- * </ul>
+ * Si es administrador o autoridad, el registro se borra físicamente, hash de
+ * contraseña incluido, ya que ninguna entidad lo referencia. Si es
+ * funcionario, se marca inactivo en lugar de borrarse, porque sus fundamentos
+ * de resolución lo referencian y forman parte de la auditoría; si se le
+ * vuelve a dar de alta, se reactiva.
  *
- * Rige en el siguiente pedido: la autenticación del backoffice y la del
- * frontoffice de funcionarios verifican el usuario en la base.
+ * Un administrador no puede darse de baja a sí mismo, y antes de la baja se
+ * verifica, con las filas de administradores bloqueadas, que quien la hace
+ * sigue siendo administrador. Así, aunque dos administradores se eliminen
+ * entre sí a la vez, siempre queda al menos uno.
+ *
+ * La baja tiene efecto desde la próxima solicitud del usuario, aunque tenga
+ * un token vigente: la autenticación del backoffice y la del frontoffice de
+ * funcionarios consultan la base en cada solicitud.
  */
 @Stateless
 public class BajaUsuarioService {
@@ -43,13 +45,18 @@ public class BajaUsuarioService {
     /**
      * @throws DatosUsuarioInvalidosException si la cédula no es válida
      * @throws UsuarioNoEncontradoException si no es funcionario, administrador ni autoridad
-     * @throws BajaNoPermitidaException si es el propio administrador
+     * @throws BajaNoPermitidaException si es el propio administrador o quien
+     *         la hace ya no es administrador
      */
     public UsuarioEliminado eliminar(String ciAdministrador, String ci) {
         String cedula = ValidacionUsuario.cedula(ci);
 
         if (cedula.equals(ciAdministrador)) {
             throw new BajaNoPermitidaException("No podés eliminar tu propio usuario");
+        }
+        // Otro administrador pudo haberle quitado el rol mientras tanto
+        if (!usuarios.bloquearAdministradores().contains(ciAdministrador)) {
+            throw new BajaNoPermitidaException("Tu usuario ya no es administrador");
         }
 
         RolUsuario rolBackoffice = usuarios.rolBackoffice(cedula);

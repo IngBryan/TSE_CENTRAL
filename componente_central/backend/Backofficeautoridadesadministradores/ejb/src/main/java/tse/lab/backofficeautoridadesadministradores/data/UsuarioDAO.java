@@ -135,6 +135,19 @@ public class UsuarioDAO {
         return null;
     }
 
+    /**
+     * Cédulas de los administradores, con sus filas bloqueadas hasta el fin de
+     * la transacción. Serializa las bajas y cambios de rol: si dos corren a la
+     * vez, la segunda espera a que la primera confirme y ve su resultado. Se
+     * bloquea en orden de cédula para que dos transacciones no se traben entre
+     * sí.
+     */
+    public List<String> bloquearAdministradores() {
+        List<?> filas = em.createNativeQuery("SELECT ci FROM administradores ORDER BY ci FOR UPDATE")
+                .getResultList();
+        return filas.stream().map(Object::toString).toList();
+    }
+
     // Activo o inactivo; null si nunca fue funcionario
     public Funcionario buscarFuncionario(String ci) {
         return em.find(Funcionario.class, ci);

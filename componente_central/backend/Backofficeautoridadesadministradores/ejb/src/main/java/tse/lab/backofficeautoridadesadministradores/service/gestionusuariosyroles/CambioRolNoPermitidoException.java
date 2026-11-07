@@ -3,8 +3,9 @@ package tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyrol
 import jakarta.ejb.ApplicationException;
 
 /**
- * El cambio de rol no se puede hacer: la persona ya tiene ese rol, o el
- * administrador intenta cambiar el suyo.
+ * El cambio de rol no se puede hacer: la persona ya tiene ese rol, el
+ * administrador intenta cambiar el suyo, o quien lo hace ya no es
+ * administrador.
  */
 @ApplicationException(rollback = true)
 public class CambioRolNoPermitidoException extends RuntimeException {

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,15 @@ class CambioRolServiceTest {
         }
 
         @Override
+        public List<String> bloquearAdministradores() {
+            return backoffice.values().stream()
+                    .filter(Administrador.class::isInstance)
+                    .map(UsuarioBackoffice::getCi)
+                    .sorted()
+                    .toList();
+        }
+
+        @Override
         public Funcionario buscarFuncionario(String ci) {
             return funcionarios.get(ci);
         }
@@ -85,6 +95,8 @@ class CambioRolServiceTest {
         Field campo = CambioRolService.class.getDeclaredField("usuarios");
         campo.setAccessible(true);
         campo.set(servicio, usuarios);
+
+        usuarios.backoffice.put(ADMIN_QUE_CAMBIA, new Administrador(ADMIN_QUE_CAMBIA, "hash"));
     }
 
     private RolCambiado cambiar(String rol, String contrasena, String email) {
@@ -135,7 +147,7 @@ class CambioRolServiceTest {
         assertThrows(DatosUsuarioInvalidosException.class, () -> cambiar("AUTORIDAD", null, null));
 
         assertTrue(f.isActivo());
-        assertTrue(usuarios.backoffice.isEmpty());
+        assertNull(usuarios.backoffice.get(CI));
     }
 
     @Test
@@ -203,11 +215,21 @@ class CambioRolServiceTest {
 
     @Test
     void unAdministradorNoPuedeCambiarSuPropioRol() {
-        usuarios.backoffice.put(ADMIN_QUE_CAMBIA, new Administrador(ADMIN_QUE_CAMBIA, "hash"));
-
         assertThrows(CambioRolNoPermitidoException.class,
                 () -> servicio.cambiar(ADMIN_QUE_CAMBIA, "9.999.999-9", "AUTORIDAD", null, null));
         assertInstanceOf(Administrador.class, usuarios.backoffice.get(ADMIN_QUE_CAMBIA));
+    }
+
+    // Otro administrador le quitó el rol mientras tanto: si dos se cambian el rol
+    // entre sí a la vez, el segundo no puede dejar el sistema sin administradores
+    @Test
+    void quienYaNoEsAdministradorNoPuedeCambiarRoles() {
+        usuarios.backoffice.put(ADMIN_QUE_CAMBIA, new Autoridad(ADMIN_QUE_CAMBIA, "hash"));
+        usuarios.backoffice.put(CI, new Administrador(CI, "hash"));
+
+        assertThrows(CambioRolNoPermitidoException.class, () -> cambiar("AUTORIDAD", null, null));
+
+        assertInstanceOf(Administrador.class, usuarios.backoffice.get(CI));
     }
 
     @Test
