@@ -1,5 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { fecha, fechaHora } from "@/lib/casos";
 import type { PruebaHabilitacion, EstadoDocumentoHabilitacion } from "@/lib/habilitacion";
+
+const TAMANIO_PAGINA = 5;
 
 const ESTADOS: Record<EstadoDocumentoHabilitacion, string> = {
   VIGENTE: "Vigente",
@@ -9,6 +14,12 @@ const ESTADOS: Record<EstadoDocumentoHabilitacion, string> = {
 };
 
 export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion[] }) {
+  const [pagina, setPagina] = useState(1);
+  const totalPaginas = Math.max(1, Math.ceil(pruebas.length / TAMANIO_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaActual - 1) * TAMANIO_PAGINA;
+  const visibles = pruebas.slice(inicio, inicio + TAMANIO_PAGINA);
+
   return (
     <div className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
       <h3 className="font-medium text-black dark:text-zinc-50">Permiso de circulación e ITV</h3>
@@ -18,8 +29,8 @@ export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion
       {pruebas.length === 0 ? (
         <p className="mt-3 text-zinc-600 dark:text-zinc-400">Este caso no tiene una evaluación documental registrada.</p>
       ) : <div className="mt-4 flex flex-col gap-4">
-        {pruebas.map((p) => (
-          <div key={`${p.origen}-${p.fechaHora}`} className="border-t border-black/10 pt-4 dark:border-white/10">
+        {visibles.map((p, indice) => (
+          <div key={`${inicio + indice}-${p.origen}-${p.fechaHora}`} className="border-t border-black/10 pt-4 dark:border-white/10">
             <p className="mb-3 font-medium">{fechaHora(p.fechaHora)} · {p.origen === "PESAJE" ? "Pesaje" : "GPS"}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Documento titulo="Permiso nacional de circulación" estado={p.estadoPermiso}
@@ -30,6 +41,15 @@ export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion
           </div>
         ))}
       </div>}
+      {pruebas.length > 0 && <nav className="mt-4 flex flex-wrap items-center justify-between gap-2" aria-label="Paginación de evidencia de habilitación">
+        <span className="text-xs text-zinc-500">{inicio + 1}–{inicio + visibles.length} de {pruebas.length} · Página {paginaActual} de {totalPaginas}</span>
+        <div className="flex gap-2">
+          <button type="button" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)}
+            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-900">Anterior</button>
+          <button type="button" disabled={paginaActual === totalPaginas} onClick={() => setPagina(paginaActual + 1)}
+            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-900">Siguiente</button>
+        </div>
+      </nav>}
     </div>
   );
 }

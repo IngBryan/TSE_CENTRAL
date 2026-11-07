@@ -254,10 +254,10 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
         )}
       </section>
 
-      <EvidenciasEnVivo id={caso.id} tipo={caso.tipoCaso} guiaId={caso.guia?.id ?? null} fechaDeteccion={caso.fechaDeteccion}
+      {caso.tipoCaso !== "VEHICULO_SIN_HABILITACION" && <EvidenciasEnVivo id={caso.id} tipo={caso.tipoCaso} guiaId={caso.guia?.id ?? null} fechaDeteccion={caso.fechaDeteccion}
         estadoCaso={caso.estado} eventosIniciales={ev?.eventosTracking ?? []}
         pruebasIniciales={ev?.pruebasDesvio ?? []}
-        circulacion={circulacion?.status === 200 ? circulacion.data : null} />
+        circulacion={circulacion?.status === 200 ? circulacion.data : null} />}
 
       <section className="flex flex-col gap-3">
         <h2 className={titulo}>Descargo de la empresa</h2>

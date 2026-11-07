@@ -15,7 +15,7 @@ const normalizar = (datos: Snapshot): Snapshot => ({
 });
 const hashSnapshot = (datos: Snapshot) => JSON.stringify(datos);
 
-/** Una sola consulta periódica alimenta ambas tablas, sin recargar el expediente ni
+/** Una sola consulta periódica actualiza los eventos y el mapa, sin recargar el expediente ni
  * alterar la paginación, la confirmación seleccionada o las acciones administrativas. */
 export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso, circulacion, eventosIniciales, pruebasIniciales }: {
   id: number;
@@ -66,7 +66,7 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
           datosActuales.current = siguiente;
           setDatos(siguiente);
           if (cantidadNueva > 0) setNuevos(n => n + cantidadNueva);
-          // La trayectoria se consulta menos frecuentemente que las tablas y solo si llegó información.
+          // La trayectoria se consulta menos frecuentemente que los eventos y solo si llegó información.
           if (esGeografico && cantidadNueva > 0 && Date.now() - ultimaActualizacionMapa.current >= MAPA_INTERVALO_MS) {
             ultimaActualizacionMapa.current = Date.now();
             setRevisionMapa(n => n + 1);
@@ -107,7 +107,7 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
       {error && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
         No se pudieron consultar novedades ({error}). Se conservan los registros cargados y se reintentará automáticamente.
       </p>}
-      <EventosTrackingPaginados eventos={datos.eventosTracking} />
+      {tipo !== "DESVIO_RUTA" && tipo !== "DESVIO_DE_RUTA" && <EventosTrackingPaginados eventos={datos.eventosTracking} />}
     </section>
     {esGeografico && <GeografiaCaso id={id} tipo={tipo} guiaId={guiaId} fechaDeteccion={fechaDeteccion}
       pruebas={datos.pruebasDesvio} circulacion={circulacion} revisionDatos={revisionMapa}
