@@ -121,4 +121,91 @@ class SeguimientoGpsServiceTest {
     void ultimaNoInventadaSiNoHayPosiciones() throws Exception {
         assertNull(service.ultima("12345678", "G1", "t").posicion());
     }
+
+    private void historialInvalido(String desde, String hasta, String limite) {
+        assertThrows(DatosInvalidosException.class,
+                () -> service.historial("12345678", "G1", desde, hasta, limite, "t"));
+    }
+
+    @Test
+    void anInvalidRangeOrLimitIsRejected() {
+        String desde = T.toString();
+        String hasta = T.plusSeconds(60).toString();
+
+        historialInvalido(null, hasta, "5");
+        historialInvalido(" ", hasta, "5");
+        historialInvalido(desde, desde, "5");
+        historialInvalido(hasta, desde, "5");
+        historialInvalido(desde, hasta, "0");
+        historialInvalido(desde, hasta, "abc");
+    }
+
+    @Test
+    void withoutLimitItUsesTheDefaultOne() throws Exception {
+        var pagina = service.historial("12345678", "G1", T.minusSeconds(5).toString(), T.plusSeconds(100).toString(),
+                " ", "t");
+
+        assertEquals(3, pagina.posiciones().size());
+        assertNull(pagina.siguienteDesde());
+    }
+
+    @Test
+    void theLastPositionIsTheNewestOfTheTrip() throws Exception {
+        PuntoGpsSeguimiento otroViaje = new PuntoGpsSeguimiento("evt", 1, "SBC1234", -34.5, -56.2, T.minusSeconds(120));
+        set("tracking", new MongoSeguimientoDAO() {
+            @Override public List<PuntoGpsSeguimiento> recientes(String matricula, Instant desde, Instant hasta,
+                    int limite) {
+                return List.of(otroViaje, p(0));
+            }
+        });
+
+        assertEquals(p(0), service.ultima("12345678", "G1", "t").posicion());
+    }
+
+    @Test
+    void aRoutesFailureIsReportedAsUnavailable() throws Exception {
+        set("rutas", new RutasAutorizadasRemote() {
+            @Override public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) {
+                throw new IllegalStateException("EJB down");
+            }
+
+            @Override public List<DatosRutaAutorizada> obtenerPorHuellas(List<String> huellas) {
+                return List.of();
+            }
+        });
+
+        assertThrows(SeguimientoNoDisponibleException.class, () -> service.rutas("12345678", "G1", "t"));
+    }
+
+    @Test
+    void anIntervalsFailureIsReportedAsUnavailable() throws Exception {
+        set("intervalos", (IntervalosGuiasGpsRemote) (matricula, desde, hasta) -> {
+            throw new IllegalStateException("EJB down");
+        });
+
+        assertThrows(SeguimientoNoDisponibleException.class, () -> service.ultima("12345678", "G1", "t"));
+    }
+
+    @Test
+    void aTripWithoutVehicleOrDriverIsNotVisible() {
+        var chofer = guia.getChofer();
+        guia.setChofer(null);
+        assertThrows(RecursoNoEncontradoException.class, () -> service.rutas("12345678", "G1", "t"));
+
+        guia.setChofer(chofer);
+        guia.setVehiculo(null);
+        assertThrows(RecursoNoEncontradoException.class, () -> service.rutas("12345678", "G1", "t"));
+        assertThrows(RecursoNoEncontradoException.class, () -> service.rutas("12345678", null, "t"));
+    }
+
+    @Test
+    void anUnassignedGuideIsNotATrip() {
+        var vehiculo = guia.getVehiculo();
+        var chofer = guia.getChofer();
+        guia = new Guia("G1", "Carga", 1000, LocalDate.of(2026, 10, 20), "A", "B", new Empresa());
+        guia.setVehiculo(vehiculo);
+        guia.setChofer(chofer);
+
+        assertThrows(RecursoNoEncontradoException.class, () -> service.rutas("12345678", "G1", "t"));
+    }
 }
