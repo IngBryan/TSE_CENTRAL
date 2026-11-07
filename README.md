@@ -906,6 +906,11 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
   fecha de nacimiento ni los demas datos que devuelve la PDI).
 - **Registro de consultas a la PDI:** cada consulta de una cedula queda en `consultas_persona` (quien
   consulto, que cedula, fecha y hora).
+- **Listado de usuarios del backoffice:** `GET /api/usuarios?pagina=1&tamanio=20` (solo `ADMINISTRADOR`) pagina por cedula a
+  funcionarios, responsables, choferes, administradores y autoridades, una fila por persona con sus roles, nombres,
+  apellidos y email. Filtros opcionales: `rol` (FUNCIONARIO, RESPONSABLE, CHOFER, ADMINISTRADOR, AUTORIDAD) y `ci`
+  (comienzo de la cedula, acepta puntos y guion). Un ciudadano sin rol no aparece. No incluye fecha de nacimiento, `sub` de gub.uy ni contrasena. Quien lo
+  consulto queda en el log `http.request`.
 - **Sesiones:** la sesion del front va en una cookie cifrada. La API key del backend solo la tiene el
   servidor de Next y nunca llega al navegador; el backend confia en `X-Usuario-Ci` por eso (si la API se
   abriera a otros clientes habria que pasar un token firmado).
