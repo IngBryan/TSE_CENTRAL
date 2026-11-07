@@ -6,7 +6,9 @@ import jakarta.ejb.EJB;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
@@ -17,13 +19,16 @@ import jakarta.ws.rs.core.SecurityContext;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService.UsuarioCreado;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolNoPermitidoException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.GestionUsuariosService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.PaginaInvalidaException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioExistenteException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioNoEncontradoException;
 
 /**
- * API REST de los usuarios del sistema (listado y alta), solo para
- * administradores.
+ * API REST de los usuarios del sistema (listado, alta y cambio de rol),
+ * solo para administradores.
  */
 @Path("/usuarios")
 @Produces(MediaType.APPLICATION_JSON)
@@ -35,6 +40,9 @@ public class UsuariosResource {
     @EJB
     private AltaUsuarioService alta;
 
+    @EJB
+    private CambioRolService cambioRol;
+
     @Context
     private SecurityContext seguridad;
 
@@ -44,6 +52,52 @@ public class UsuariosResource {
             String ci,
             String contrasena,
             String email) {
+    }
+
+    // contrasena: si pasa a administrador o autoridad sin serlo; email: si pasa a funcionario sin serlo
+    public record CambioRolRequest(
+            String rol,
+            String contrasena,
+            String email) {
+    }
+
+    /**
+     * Reemplaza el rol de un funcionario, administrador o autoridad por
+     * otro de esos tres. Responde 200, 400 si los datos no son válidos, 404
+     * si la cédula no tiene ninguno de esos roles o 409 si ya tiene el rol
+     * pedido o es el propio administrador.
+     */
+    @PUT
+    @Path("/{ci}/rol")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response cambiarRol(@PathParam("ci") String ci, CambioRolRequest datos) {
+        Response acceso = AccesoAdministrador.verificar(seguridad);
+
+        if (acceso != null) {
+            return acceso;
+        }
+
+        if (datos == null) {
+            return error(Response.Status.BAD_REQUEST, "datos_invalidos", "El cuerpo es obligatorio");
+        }
+
+        try {
+            return Response.ok(cambioRol.cambiar(
+                    seguridad.getUserPrincipal().getName(),
+                    ci,
+                    datos.rol(),
+                    datos.contrasena(),
+                    datos.email())).build();
+
+        } catch (DatosUsuarioInvalidosException e) {
+            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
+
+        } catch (UsuarioNoEncontradoException e) {
+            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
+
+        } catch (CambioRolNoPermitidoException e) {
+            return error(Response.Status.CONFLICT, "cambio_no_permitido", e.getMessage());
+        }
     }
 
     /**

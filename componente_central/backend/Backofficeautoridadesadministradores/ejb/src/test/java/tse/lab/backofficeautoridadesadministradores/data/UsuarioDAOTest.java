@@ -2,6 +2,8 @@ package tse.lab.backofficeautoridadesadministradores.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -22,6 +24,7 @@ import tse.lab.model.Ciudadano;
 import tse.lab.model.Empresa;
 import tse.lab.model.Funcionario;
 import tse.lab.model.Responsable;
+import tse.lab.model.UsuarioBackoffice;
 
 // Consultas del listado de usuarios contra H2.
 class UsuarioDAOTest {
@@ -138,8 +141,8 @@ class UsuarioDAOTest {
         assertTrue(usuarios.existeUsuarioBackoffice(ADMINISTRADOR));
         assertTrue(usuarios.existeUsuarioBackoffice(AUTORIDAD));
         assertFalse(usuarios.existeUsuarioBackoffice(FUNCIONARIO));
-        assertTrue(usuarios.existeFuncionario(FUNCIONARIO));
-        assertFalse(usuarios.existeFuncionario(ADMINISTRADOR));
+        assertEquals(FUNCIONARIO, usuarios.buscarFuncionario(FUNCIONARIO).getCi());
+        assertNull(usuarios.buscarFuncionario(ADMINISTRADOR));
     }
 
     @Test
@@ -150,9 +153,55 @@ class UsuarioDAOTest {
         em.getTransaction().commit();
 
         assertTrue(usuarios.existeUsuarioBackoffice(CIUDADANO_SIN_ROL));
-        assertTrue(usuarios.existeFuncionario("77777777"));
+        assertTrue(usuarios.buscarFuncionario("77777777").isActivo());
         assertEquals(7, usuarios.contarUsuarios(null, null));
         assertEquals(List.of(AUTORIDAD, CIUDADANO_SIN_ROL),
                 usuarios.listarCedulas(RolUsuario.AUTORIDAD, null, 0, 10));
+    }
+
+    @Test
+    void sabeElRolDeBackofficeDeCadaCedula() {
+        assertEquals(RolUsuario.ADMINISTRADOR, usuarios.rolBackoffice(ADMINISTRADOR));
+        assertEquals(RolUsuario.AUTORIDAD, usuarios.rolBackoffice(AUTORIDAD));
+        assertNull(usuarios.rolBackoffice(FUNCIONARIO));
+    }
+
+    @Test
+    void cambiaDeAdministradorAAutoridadConservandoLaContrasena() {
+        em.getTransaction().begin();
+        usuarios.cambiarRolBackoffice(ADMINISTRADOR, RolUsuario.ADMINISTRADOR, RolUsuario.AUTORIDAD);
+        em.getTransaction().commit();
+        em.clear();
+
+        UsuarioBackoffice usuario = em.find(UsuarioBackoffice.class, ADMINISTRADOR);
+        assertInstanceOf(Autoridad.class, usuario);
+        assertEquals("hash", usuario.getContrasena());
+        assertEquals(RolUsuario.AUTORIDAD, usuarios.rolBackoffice(ADMINISTRADOR));
+        assertEquals(List.of(), usuarios.listarCedulas(RolUsuario.ADMINISTRADOR, null, 0, 10));
+    }
+
+    @Test
+    void eliminaAlUsuarioDeBackofficeConSuContrasena() {
+        em.getTransaction().begin();
+        usuarios.eliminarUsuarioBackoffice(AUTORIDAD, RolUsuario.AUTORIDAD);
+        em.getTransaction().commit();
+        em.clear();
+
+        assertNull(em.find(UsuarioBackoffice.class, AUTORIDAD));
+        assertFalse(usuarios.existeUsuarioBackoffice(AUTORIDAD));
+        assertEquals(4, usuarios.contarUsuarios(null, null));
+    }
+
+    @Test
+    void unFuncionarioInactivoNoApareceComoFuncionario() {
+        em.getTransaction().begin();
+        usuarios.buscarFuncionario(FUNCIONARIO).setActivo(false);
+        em.getTransaction().commit();
+
+        // CHOFER sigue siendo funcionario; FUNCIONARIO no tiene otro rol y sale del listado
+        assertEquals(List.of(CHOFER), usuarios.listarCedulas(RolUsuario.FUNCIONARIO, null, 0, 10));
+        assertEquals(4, usuarios.contarUsuarios(null, null));
+        assertEquals(List.of(), usuarios.buscarFuncionarios(List.of(FUNCIONARIO)));
+        assertFalse(usuarios.buscarFuncionario(FUNCIONARIO).isActivo());
     }
 }

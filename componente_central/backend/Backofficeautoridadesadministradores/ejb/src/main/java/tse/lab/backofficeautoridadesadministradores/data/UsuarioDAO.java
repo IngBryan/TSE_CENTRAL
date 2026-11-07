@@ -27,7 +27,7 @@ public class UsuarioDAO {
     // ciudadano sin rol no entra.
     // usuarios_backoffice es la tabla base de administradores y autoridades.
     private static final String CEDULAS_USUARIOS = """
-            SELECT ci FROM funcionarios
+            SELECT ci FROM funcionarios WHERE activo = TRUE
             UNION SELECT ci FROM responsables
             UNION SELECT ci FROM choferes
             UNION SELECT ci FROM usuarios_backoffice
@@ -36,7 +36,7 @@ public class UsuarioDAO {
     // Con filtro de rol se pagina solo sobre su tabla. Un chofer de varias empresas
     // tiene varias filas.
     private static final Map<RolUsuario, String> CEDULAS_POR_ROL = new EnumMap<>(Map.of(
-            RolUsuario.FUNCIONARIO, "SELECT ci FROM funcionarios",
+            RolUsuario.FUNCIONARIO, "SELECT ci FROM funcionarios WHERE activo = TRUE",
             RolUsuario.RESPONSABLE, "SELECT ci FROM responsables",
             RolUsuario.CHOFER, "SELECT DISTINCT ci FROM choferes",
             RolUsuario.ADMINISTRADOR, "SELECT ci FROM administradores",
@@ -93,7 +93,7 @@ public class UsuarioDAO {
 
     public List<Funcionario> buscarFuncionarios(List<String> cedulas) {
         return em.createQuery(
-                "SELECT f FROM Funcionario f WHERE f.ci IN :cedulas",
+                "SELECT f FROM Funcionario f WHERE f.ci IN :cedulas AND f.activo = TRUE",
                 Funcionario.class)
                 .setParameter("cedulas", cedulas)
                 .getResultList();
@@ -121,14 +121,54 @@ public class UsuarioDAO {
         return existe("SELECT COUNT(u) FROM UsuarioBackoffice u WHERE u.ci = :ci", ci);
     }
 
-    public boolean existeFuncionario(String ci) {
-        return existe("SELECT COUNT(f) FROM Funcionario f WHERE f.ci = :ci", ci);
+    /**
+     * @return ADMINISTRADOR, AUTORIDAD o null si la cédula no es usuario del
+     *         backoffice. No trae el hash de la contraseña.
+     */
+    public RolUsuario rolBackoffice(String ci) {
+        if (existe("SELECT COUNT(a) FROM Administrador a WHERE a.ci = :ci", ci)) {
+            return RolUsuario.ADMINISTRADOR;
+        }
+        if (existe("SELECT COUNT(a) FROM Autoridad a WHERE a.ci = :ci", ci)) {
+            return RolUsuario.AUTORIDAD;
+        }
+        return null;
+    }
+
+    // Activo o inactivo; null si nunca fue funcionario
+    public Funcionario buscarFuncionario(String ci) {
+        return em.find(Funcionario.class, ci);
     }
 
     // Administrador, Autoridad o Funcionario
     public void guardar(Object usuario) {
         em.persist(usuario);
         em.flush();
+    }
+
+    // Tablas propias de cada subtipo (herencia JOINED): la fila base, con la contrasena, esta en usuarios_backoffice
+    private static final Map<RolUsuario, String> TABLA_BACKOFFICE = new EnumMap<>(Map.of(
+            RolUsuario.ADMINISTRADOR, "administradores",
+            RolUsuario.AUTORIDAD, "autoridades"));
+
+    /**
+     * Pasa un usuario del backoffice de administrador a autoridad o al revés,
+     * conservando su contraseña. JPA no permite cambiarle el tipo a una
+     * entidad: se mueve la fila entre las tablas de cada subtipo.
+     */
+    public void cambiarRolBackoffice(String ci, RolUsuario anterior, RolUsuario nuevo) {
+        ejecutar("DELETE FROM " + TABLA_BACKOFFICE.get(anterior) + " WHERE ci = ?1", ci);
+        ejecutar("INSERT INTO " + TABLA_BACKOFFICE.get(nuevo) + " (ci) VALUES (?1)", ci);
+    }
+
+    // Quita al administrador o autoridad, con su contrasena
+    public void eliminarUsuarioBackoffice(String ci, RolUsuario rol) {
+        ejecutar("DELETE FROM " + TABLA_BACKOFFICE.get(rol) + " WHERE ci = ?1", ci);
+        ejecutar("DELETE FROM usuarios_backoffice WHERE ci = ?1", ci);
+    }
+
+    private void ejecutar(String sql, String ci) {
+        em.createNativeQuery(sql).setParameter(1, ci).executeUpdate();
     }
 
     private boolean existe(String consulta, String ci) {

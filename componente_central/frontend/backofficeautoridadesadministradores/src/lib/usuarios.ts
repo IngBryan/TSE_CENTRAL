@@ -49,6 +49,33 @@ export type EstadoAltaUsuario = {
   mensaje: string;
 };
 
+// Cambio de rol (las mismas reglas que CambioRolService): el rol nuevo reemplaza a los anteriores
+export function rolesInternos(roles: RolUsuario[]): TipoAltaUsuario[] {
+  return TIPOS_ALTA.filter((tipo) => roles.includes(tipo));
+}
+
+// Pasar a administrador o autoridad sin serlo pide una contraseña inicial
+export function cambioPideContrasena(
+  internos: TipoAltaUsuario[],
+  nuevo: TipoAltaUsuario
+): boolean {
+  return usaContrasena(nuevo) && !internos.some(usaContrasena);
+}
+
+// Pasar a funcionario sin serlo pide el email
+export function cambioPideEmail(
+  internos: TipoAltaUsuario[],
+  nuevo: TipoAltaUsuario
+): boolean {
+  return nuevo === "FUNCIONARIO" && !internos.includes("FUNCIONARIO");
+}
+
+export type CambioRol = {
+  rol: TipoAltaUsuario;
+  contrasena?: string;
+  email?: string;
+};
+
 export type FiltrosUsuarios = {
   rol: RolUsuario | null;
   ci: string;

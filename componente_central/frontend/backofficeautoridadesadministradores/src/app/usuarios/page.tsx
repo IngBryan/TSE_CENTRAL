@@ -8,12 +8,12 @@ import NavegacionBackoffice from "@/components/NavegacionBackoffice";
 import { consultarIdentidad } from "@/lib/backoffice-sesion";
 import { listarUsuarios } from "@/lib/usuarios-backend";
 import {
-  NOMBRE_ROL,
   esRolUsuario,
   type DatosUsuario,
   type FiltrosUsuarios as Filtros,
 } from "@/lib/usuarios";
 import FiltrosUsuarios from "./FiltrosUsuarios";
+import FilaUsuario from "./FilaUsuario";
 import PanelAltaUsuario from "./PanelAltaUsuario";
 
 const TAMANIO_PAGINA = 20;
@@ -169,28 +169,20 @@ export default async function UsuariosPage({
                   <th className="p-3">Nombre</th>
                   <th className="p-3">Email</th>
                   <th className="p-3">Roles</th>
+                  <th className="p-3">
+                    <span className="sr-only">Acciones</span>
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {resultado.pagina.usuarios.map((usuario) => (
-                  <tr key={usuario.ci} className="border-t">
-                    <td className="p-3 font-mono">{usuario.ci}</td>
-                    <td className="p-3">{nombreCompleto(usuario)}</td>
-                    <td className="p-3">{usuario.email ?? "—"}</td>
-                    <td className="p-3">
-                      <ul className="flex flex-wrap gap-1.5">
-                        {usuario.roles.map((rol) => (
-                          <li
-                            key={rol}
-                            className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
-                          >
-                            {NOMBRE_ROL[rol] ?? rol}
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                  </tr>
+                  <FilaUsuario
+                    key={usuario.ci}
+                    usuario={usuario}
+                    nombre={nombreCompleto(usuario)}
+                    esPropio={usuario.ci === identidad.ci}
+                  />
                 ))}
               </tbody>
             </table>

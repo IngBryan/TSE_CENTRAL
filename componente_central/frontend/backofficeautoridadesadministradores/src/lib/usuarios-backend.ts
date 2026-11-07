@@ -1,6 +1,7 @@
 
 import type {
   AltaUsuario,
+  CambioRol,
   FiltrosUsuarios,
   PaginaUsuarios,
 } from "./usuarios";
@@ -181,6 +182,77 @@ export async function crearUsuario(
           ? "El usuario ya existe."
           : "No se pudo crear el usuario.",
     };
+  } catch {
+    return {
+      ok: false,
+      mensaje: "No se pudo establecer conexión con el backend.",
+    };
+  }
+}
+
+/**
+ * Reemplaza el rol de un funcionario, administrador o autoridad.
+ * Se ejecuta en el servidor de Next.js.
+ */
+export async function cambiarRol(
+  ci: string,
+  datos: CambioRol
+): Promise<ResultadoAlta> {
+  const sesion = await idSesion();
+
+  if (!sesion) {
+    return { ok: false, mensaje: SESION_VENCIDA };
+  }
+
+  try {
+    const respuesta = await fetchBackend(
+      urlBackend(`usuarios/${encodeURIComponent(ci)}/rol`),
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: wildFlyAuthorization(sesion),
+        },
+        body: JSON.stringify(datos),
+        cache: "no-store",
+      }
+    );
+
+    if (respuesta.ok) {
+      return { ok: true };
+    }
+
+    if (respuesta.status === 401) {
+      return { ok: false, mensaje: SESION_VENCIDA };
+    }
+
+    if (respuesta.status === 403) {
+      return {
+        ok: false,
+        mensaje: "No tenés permisos para cambiar roles.",
+      };
+    }
+
+    // 400 datos, 404 no es usuario interno, 409 ya tiene el rol o es el propio
+    if ([400, 404, 409].includes(respuesta.status)) {
+      try {
+        const error: unknown = await respuesta.json();
+
+        if (
+          error !== null &&
+          typeof error === "object" &&
+          "detalle" in error &&
+          typeof error.detalle === "string"
+        ) {
+          return { ok: false, mensaje: error.detalle };
+        }
+      } catch {
+        // Se utilizará el mensaje genérico.
+      }
+    }
+
+    return { ok: false, mensaje: "No se pudo cambiar el rol." };
   } catch {
     return {
       ok: false,

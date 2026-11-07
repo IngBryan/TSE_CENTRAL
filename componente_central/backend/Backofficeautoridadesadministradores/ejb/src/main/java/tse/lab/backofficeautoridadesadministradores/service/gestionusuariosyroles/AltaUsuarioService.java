@@ -1,8 +1,6 @@
 package tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles;
 
-import java.util.Locale;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
@@ -28,13 +26,6 @@ public class AltaUsuarioService {
 
     private static final Logger LOG = Logger.getLogger(AltaUsuarioService.class.getName());
 
-    static final int LARGO_MINIMO_CONTRASENA = 12;
-    static final int LARGO_MAXIMO_CONTRASENA = 128;
-    static final int LARGO_MAXIMO_EMAIL = 254;
-
-    private static final Pattern CEDULA = Pattern.compile("\\d{6,8}");
-    private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
-
     @EJB
     private UsuarioDAO usuarios;
 
@@ -43,7 +34,8 @@ public class AltaUsuarioService {
 
     /**
      * Da de alta un usuario. Valida todos los datos antes de calcular el
-     * hash de la contraseña, que es costoso.
+     * hash de la contraseña, que es costoso. Un funcionario inactivo (se le
+     * había quitado el rol) se reactiva con el email nuevo.
      *
      * @param ciAdministrador quién hace el alta, para el log
      * @param tipo ADMINISTRADOR, AUTORIDAD o FUNCIONARIO
@@ -59,31 +51,23 @@ public class AltaUsuarioService {
             String contrasena,
             String email) {
 
-        RolUsuario rol = tipo(tipo);
-        String cedula = cedula(ci);
+        RolUsuario rol = ValidacionUsuario.rolInterno(tipo);
+        String cedula = ValidacionUsuario.cedula(ci);
 
-        Object usuario = switch (rol) {
+        switch (rol) {
             case ADMINISTRADOR -> {
-                validarContrasena(contrasena);
+                ValidacionUsuario.contrasena(contrasena);
                 noExisteEnBackoffice(cedula);
-                yield new Administrador(cedula, Contrasenas.generarHash(contrasena));
+                usuarios.guardar(new Administrador(cedula, Contrasenas.generarHash(contrasena)));
             }
             case AUTORIDAD -> {
-                validarContrasena(contrasena);
+                ValidacionUsuario.contrasena(contrasena);
                 noExisteEnBackoffice(cedula);
-                yield new Autoridad(cedula, Contrasenas.generarHash(contrasena));
+                usuarios.guardar(new Autoridad(cedula, Contrasenas.generarHash(contrasena)));
             }
-            case FUNCIONARIO -> {
-                String correo = email(email);
-                if (usuarios.existeFuncionario(cedula)) {
-                    throw new UsuarioExistenteException("La cédula " + cedula + " ya es funcionario");
-                }
-                yield new Funcionario(cedula, correo);
-            }
+            case FUNCIONARIO -> crearFuncionario(cedula, ValidacionUsuario.email(email));
             default -> throw new IllegalStateException("Tipo no admitido: " + rol);
-        };
-
-        usuarios.guardar(usuario);
+        }
 
         LOG.info(() -> LogBackoffice.evento("usuario.alta")
                 .usuario(ciAdministrador)
@@ -94,41 +78,18 @@ public class AltaUsuarioService {
         return new UsuarioCreado(cedula, rol);
     }
 
-    private static RolUsuario tipo(String valor) {
-        String tipo = valor == null ? "" : valor.strip().toUpperCase(Locale.ROOT);
-        return switch (tipo) {
-            case "ADMINISTRADOR" -> RolUsuario.ADMINISTRADOR;
-            case "AUTORIDAD" -> RolUsuario.AUTORIDAD;
-            case "FUNCIONARIO" -> RolUsuario.FUNCIONARIO;
-            default -> throw new DatosUsuarioInvalidosException(
-                    "El tipo de usuario tiene que ser ADMINISTRADOR, AUTORIDAD o FUNCIONARIO");
-        };
-    }
+    private void crearFuncionario(String cedula, String email) {
+        Funcionario existente = usuarios.buscarFuncionario(cedula);
 
-    // Quita puntos, guiones y espacios: 5.407.438-0 es 54074380
-    private static String cedula(String valor) {
-        String digitos = valor == null ? "" : valor.replaceAll("[.\\-\\s]", "");
-        if (!CEDULA.matcher(digitos).matches()) {
-            throw new DatosUsuarioInvalidosException("La cédula tiene que tener de 6 a 8 dígitos");
+        if (existente == null) {
+            usuarios.guardar(new Funcionario(cedula, email));
+            return;
         }
-        return digitos;
-    }
-
-    // Sin strip: los espacios son parte de la contraseña
-    private static void validarContrasena(String valor) {
-        int largo = valor == null ? 0 : valor.codePointCount(0, valor.length());
-        if (largo < LARGO_MINIMO_CONTRASENA || largo > LARGO_MAXIMO_CONTRASENA) {
-            throw new DatosUsuarioInvalidosException("La contraseña tiene que tener entre "
-                    + LARGO_MINIMO_CONTRASENA + " y " + LARGO_MAXIMO_CONTRASENA + " caracteres");
+        if (existente.isActivo()) {
+            throw new UsuarioExistenteException("La cédula " + cedula + " ya es funcionario");
         }
-    }
-
-    private static String email(String valor) {
-        String email = valor == null ? "" : valor.strip();
-        if (email.length() > LARGO_MAXIMO_EMAIL || !EMAIL.matcher(email).matches()) {
-            throw new DatosUsuarioInvalidosException("El email no es válido");
-        }
-        return email;
+        existente.setActivo(true);
+        existente.setEmail(email);
     }
 
     // Administradores y autoridades comparten la tabla usuarios_backoffice (la cédula es la clave):

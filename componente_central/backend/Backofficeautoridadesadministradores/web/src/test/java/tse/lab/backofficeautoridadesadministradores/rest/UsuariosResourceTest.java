@@ -17,6 +17,11 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
 import tse.lab.backofficeautoridadesadministradores.rest.UsuariosResource.AltaUsuarioRequest;
+import tse.lab.backofficeautoridadesadministradores.rest.UsuariosResource.CambioRolRequest;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolNoPermitidoException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService.RolCambiado;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioNoEncontradoException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService.UsuarioCreado;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuario;
@@ -32,9 +37,12 @@ class UsuariosResourceTest {
     private static final AltaUsuarioRequest ALTA_ADMINISTRADOR =
             new AltaUsuarioRequest("ADMINISTRADOR", "1234567", "Clave-segura-2026", null);
 
+    private static final CambioRolRequest A_AUTORIDAD = new CambioRolRequest("AUTORIDAD", null, null);
+
     private UsuariosResource recurso;
     private GestionUsuariosService servicio;
     private AltaUsuarioService alta;
+    private CambioRolService cambioRol;
     private SecurityContext seguridad;
 
     @BeforeEach
@@ -42,15 +50,83 @@ class UsuariosResourceTest {
         recurso = new UsuariosResource();
         servicio = mock(GestionUsuariosService.class);
         alta = mock(AltaUsuarioService.class);
+        cambioRol = mock(CambioRolService.class);
         seguridad = mock(SecurityContext.class);
 
         inyectar("servicio", servicio);
         inyectar("alta", alta);
+        inyectar("cambioRol", cambioRol);
         inyectar("seguridad", seguridad);
     }
 
     private Map<?, ?> cuerpo(Response respuesta) {
         return (Map<?, ?>) respuesta.getEntity();
+    }
+
+    @Test
+    void unAdministradorCambiaElRol() {
+        RolCambiado cambiado = new RolCambiado("1234567", RolUsuario.AUTORIDAD);
+        autenticarAdministrador();
+        when(cambioRol.cambiar("99999999", "1234567", "AUTORIDAD", null, null)).thenReturn(cambiado);
+
+        Response respuesta = recurso.cambiarRol("1234567", A_AUTORIDAD);
+
+        assertEquals(200, respuesta.getStatus());
+        assertSame(cambiado, respuesta.getEntity());
+    }
+
+    @Test
+    void cambioDeRolConDatosInvalidosDevuelve400() {
+        autenticarAdministrador();
+        when(cambioRol.cambiar("99999999", "1234567", "AUTORIDAD", null, null))
+                .thenThrow(new DatosUsuarioInvalidosException("Falta la contraseña"));
+
+        Response respuesta = recurso.cambiarRol("1234567", A_AUTORIDAD);
+
+        assertEquals(400, respuesta.getStatus());
+        assertEquals("Falta la contraseña", cuerpo(respuesta).get("detalle"));
+    }
+
+    @Test
+    void cambioDeRolDeQuienNoEsUsuarioInternoDevuelve404() {
+        autenticarAdministrador();
+        when(cambioRol.cambiar("99999999", "1234567", "AUTORIDAD", null, null))
+                .thenThrow(new UsuarioNoEncontradoException("No es"));
+
+        Response respuesta = recurso.cambiarRol("1234567", A_AUTORIDAD);
+
+        assertEquals(404, respuesta.getStatus());
+        assertEquals("usuario_no_encontrado", cuerpo(respuesta).get("error"));
+    }
+
+    @Test
+    void cambioDeRolNoPermitidoDevuelve409() {
+        autenticarAdministrador();
+        when(cambioRol.cambiar("99999999", "1234567", "AUTORIDAD", null, null))
+                .thenThrow(new CambioRolNoPermitidoException("Ya tiene ese rol"));
+
+        Response respuesta = recurso.cambiarRol("1234567", A_AUTORIDAD);
+
+        assertEquals(409, respuesta.getStatus());
+        assertEquals("cambio_no_permitido", cuerpo(respuesta).get("error"));
+    }
+
+    @Test
+    void cambioDeRolSinCuerpoDevuelve400() {
+        autenticarAdministrador();
+
+        assertEquals(400, recurso.cambiarRol("1234567", null).getStatus());
+        verifyNoInteractions(cambioRol);
+    }
+
+    @Test
+    void unaAutoridadNoPuedeCambiarRoles() {
+        when(seguridad.getUserPrincipal()).thenReturn(() -> "88888888");
+        when(seguridad.isUserInRole("AUTORIDAD")).thenReturn(true);
+
+        assertEquals(403, recurso.cambiarRol("1234567", A_AUTORIDAD).getStatus());
+        assertEquals(401, new UsuariosResource().cambiarRol("1234567", A_AUTORIDAD).getStatus());
+        verifyNoInteractions(cambioRol);
     }
 
     @Test

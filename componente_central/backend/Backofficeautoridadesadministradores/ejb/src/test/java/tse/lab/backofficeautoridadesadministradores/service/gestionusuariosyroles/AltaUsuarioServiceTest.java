@@ -3,6 +3,7 @@ package tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyrol
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,8 +42,12 @@ class AltaUsuarioServiceTest {
         }
 
         @Override
-        public boolean existeFuncionario(String ci) {
-            return guardados.stream().anyMatch(u -> u instanceof Funcionario f && f.getCi().equals(ci));
+        public Funcionario buscarFuncionario(String ci) {
+            return guardados.stream()
+                    .filter(u -> u instanceof Funcionario f && f.getCi().equals(ci))
+                    .map(Funcionario.class::cast)
+                    .findFirst()
+                    .orElse(null);
         }
 
         @Override
@@ -114,6 +119,19 @@ class AltaUsuarioServiceTest {
         assertEquals(2, usuarios.guardados.size());
     }
 
+    @Test
+    void unFuncionarioInactivoSeReactivaConElEmailNuevo() {
+        Funcionario inactivo = new Funcionario("1234567", "viejo@mtop.gub.uy");
+        inactivo.setActivo(false);
+        usuarios.guardados.add(inactivo);
+
+        servicio.crear("99999999", "FUNCIONARIO", "1234567", null, "nuevo@mtop.gub.uy");
+
+        assertSame(inactivo, unicoGuardado());
+        assertTrue(inactivo.isActivo());
+        assertEquals("nuevo@mtop.gub.uy", inactivo.getEmail());
+    }
+
     @ParameterizedTest
     @CsvSource({
         // tipo, ci, contrasena, email
@@ -137,7 +155,7 @@ class AltaUsuarioServiceTest {
 
     @Test
     void rechazaUnaContrasenaDemasiadoLarga() {
-        String larga = "x".repeat(AltaUsuarioService.LARGO_MAXIMO_CONTRASENA + 1);
+        String larga = "x".repeat(ValidacionUsuario.LARGO_MAXIMO_CONTRASENA + 1);
 
         assertThrows(DatosUsuarioInvalidosException.class,
                 () -> servicio.crear("99999999", "ADMINISTRADOR", "1234567", larga, null));
@@ -145,7 +163,7 @@ class AltaUsuarioServiceTest {
 
     @Test
     void aceptaUnaContrasenaDelLargoMinimo() {
-        String justa = "x".repeat(AltaUsuarioService.LARGO_MINIMO_CONTRASENA);
+        String justa = "x".repeat(ValidacionUsuario.LARGO_MINIMO_CONTRASENA);
 
         servicio.crear("99999999", "ADMINISTRADOR", "1234567", justa, null);
 
