@@ -3,7 +3,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { cambiarRol, crearUsuario } from "@/lib/usuarios-backend";
+import {
+  cambiarRol,
+  crearUsuario,
+  eliminarUsuario,
+} from "@/lib/usuarios-backend";
 import {
   LARGO_MAXIMO_CONTRASENA,
   LARGO_MINIMO_CONTRASENA,
@@ -141,5 +145,28 @@ export async function cambiarRolAction(
   return {
     estado: "exito",
     mensaje: `Rol de ${ci} cambiado correctamente.`,
+  };
+}
+
+/**
+ * Elimina a la cédula ci (sus roles de funcionario, administrador o
+ * autoridad). Si sale bien la fila desaparece o pierde esos roles al
+ * revalidar el listado.
+ */
+export async function eliminarUsuarioAction(
+  ci: string,
+  _estadoAnterior: EstadoAltaUsuario
+): Promise<EstadoAltaUsuario> {
+  const resultado = await eliminarUsuario(ci);
+
+  if (!resultado.ok) {
+    return error(resultado.mensaje);
+  }
+
+  revalidatePath("/usuarios");
+
+  return {
+    estado: "exito",
+    mensaje: `Usuario ${ci} eliminado.`,
   };
 }

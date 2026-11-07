@@ -18,6 +18,9 @@ import jakarta.ws.rs.core.SecurityContext;
 
 import tse.lab.backofficeautoridadesadministradores.rest.UsuariosResource.AltaUsuarioRequest;
 import tse.lab.backofficeautoridadesadministradores.rest.UsuariosResource.CambioRolRequest;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaNoPermitidaException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaUsuarioService;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaUsuarioService.UsuarioEliminado;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolNoPermitidoException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService.RolCambiado;
@@ -43,6 +46,7 @@ class UsuariosResourceTest {
     private GestionUsuariosService servicio;
     private AltaUsuarioService alta;
     private CambioRolService cambioRol;
+    private BajaUsuarioService baja;
     private SecurityContext seguridad;
 
     @BeforeEach
@@ -51,16 +55,55 @@ class UsuariosResourceTest {
         servicio = mock(GestionUsuariosService.class);
         alta = mock(AltaUsuarioService.class);
         cambioRol = mock(CambioRolService.class);
+        baja = mock(BajaUsuarioService.class);
         seguridad = mock(SecurityContext.class);
 
         inyectar("servicio", servicio);
         inyectar("alta", alta);
         inyectar("cambioRol", cambioRol);
+        inyectar("baja", baja);
         inyectar("seguridad", seguridad);
     }
 
     private Map<?, ?> cuerpo(Response respuesta) {
         return (Map<?, ?>) respuesta.getEntity();
+    }
+
+    @Test
+    void unAdministradorEliminaUnUsuario() {
+        UsuarioEliminado eliminado = new UsuarioEliminado("1234567", List.of(RolUsuario.AUTORIDAD));
+        autenticarAdministrador();
+        when(baja.eliminar("99999999", "1234567")).thenReturn(eliminado);
+
+        Response respuesta = recurso.eliminar("1234567");
+
+        assertEquals(200, respuesta.getStatus());
+        assertSame(eliminado, respuesta.getEntity());
+    }
+
+    @Test
+    void lasFallasDeLaBajaSeTraducenASuEstado() {
+        autenticarAdministrador();
+        when(baja.eliminar("99999999", "12")).thenThrow(new DatosUsuarioInvalidosException("Cedula"));
+        when(baja.eliminar("99999999", "1111111")).thenThrow(new UsuarioNoEncontradoException("No es"));
+        when(baja.eliminar("99999999", "99999999")).thenThrow(new BajaNoPermitidaException("Propio"));
+
+        assertEquals(400, recurso.eliminar("12").getStatus());
+        assertEquals(404, recurso.eliminar("1111111").getStatus());
+
+        Response propio = recurso.eliminar("99999999");
+        assertEquals(409, propio.getStatus());
+        assertEquals("baja_no_permitida", cuerpo(propio).get("error"));
+    }
+
+    @Test
+    void soloUnAdministradorPuedeEliminar() {
+        when(seguridad.getUserPrincipal()).thenReturn(() -> "88888888");
+        when(seguridad.isUserInRole("AUTORIDAD")).thenReturn(true);
+
+        assertEquals(403, recurso.eliminar("1234567").getStatus());
+        assertEquals(401, new UsuariosResource().eliminar("1234567").getStatus());
+        verifyNoInteractions(baja);
     }
 
     @Test

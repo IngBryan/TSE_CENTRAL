@@ -914,7 +914,9 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
   (cedula y email). Choferes y responsables no: tienen su propio alta (CU-02 y la gestion de empresas).
   `PUT /api/usuarios/{ci}/rol` reemplaza el rol de un funcionario, administrador o autoridad por otro de esos tres (pide
   contrasena o email si el rol nuevo los necesita). Un funcionario que deja de serlo queda inactivo (`funcionarios.activo`):
-  conserva su historial pero no puede ingresar. El rol del backoffice se lee de la base en cada pedido, no del token. No incluye fecha de nacimiento, `sub` de gub.uy ni contrasena. Quien lo
+  conserva su historial pero no puede ingresar. El rol del backoffice se lee de la base en cada pedido, no del token.
+  `DELETE /api/usuarios/{ci}` le quita todos esos roles: borra al administrador o autoridad y deja inactivo al funcionario
+  (no toca sus roles de chofer o responsable). Un administrador no puede cambiar su rol ni eliminarse a si mismo. No incluye fecha de nacimiento, `sub` de gub.uy ni contrasena. Quien lo
   consulto queda en el log `http.request`.
 - **Sesiones:** la sesion del front va en una cookie cifrada. La API key del backend solo la tiene el
   servidor de Next y nunca llega al navegador; el backend confia en `X-Usuario-Ci` por eso (si la API se

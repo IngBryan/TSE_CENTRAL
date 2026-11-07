@@ -260,3 +260,69 @@ export async function cambiarRol(
     };
   }
 }
+
+/**
+ * Elimina a un funcionario, administrador o autoridad (un funcionario
+ * queda inactivo). Se ejecuta en el servidor de Next.js.
+ */
+export async function eliminarUsuario(ci: string): Promise<ResultadoAlta> {
+  const sesion = await idSesion();
+
+  if (!sesion) {
+    return { ok: false, mensaje: SESION_VENCIDA };
+  }
+
+  try {
+    const respuesta = await fetchBackend(
+      urlBackend(`usuarios/${encodeURIComponent(ci)}`),
+      {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          Authorization: wildFlyAuthorization(sesion),
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (respuesta.ok) {
+      return { ok: true };
+    }
+
+    if (respuesta.status === 401) {
+      return { ok: false, mensaje: SESION_VENCIDA };
+    }
+
+    if (respuesta.status === 403) {
+      return {
+        ok: false,
+        mensaje: "No tenés permisos para eliminar usuarios.",
+      };
+    }
+
+    // 400 cedula, 404 no es usuario interno, 409 es el propio administrador
+    if ([400, 404, 409].includes(respuesta.status)) {
+      try {
+        const error: unknown = await respuesta.json();
+
+        if (
+          error !== null &&
+          typeof error === "object" &&
+          "detalle" in error &&
+          typeof error.detalle === "string"
+        ) {
+          return { ok: false, mensaje: error.detalle };
+        }
+      } catch {
+        // Se utilizará el mensaje genérico.
+      }
+    }
+
+    return { ok: false, mensaje: "No se pudo eliminar el usuario." };
+  } catch {
+    return {
+      ok: false,
+      mensaje: "No se pudo establecer conexión con el backend.",
+    };
+  }
+}

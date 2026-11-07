@@ -4,6 +4,7 @@ import java.util.Map;
 
 import jakarta.ejb.EJB;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -18,6 +19,8 @@ import jakarta.ws.rs.core.SecurityContext;
 
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.AltaUsuarioService.UsuarioCreado;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaNoPermitidaException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.BajaUsuarioService;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolNoPermitidoException;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioRolService;
@@ -27,8 +30,8 @@ import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyrole
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioNoEncontradoException;
 
 /**
- * API REST de los usuarios del sistema (listado, alta y cambio de rol),
- * solo para administradores.
+ * API REST de los usuarios del sistema (listado, alta, cambio de rol y
+ * baja), solo para administradores.
  */
 @Path("/usuarios")
 @Produces(MediaType.APPLICATION_JSON)
@@ -43,8 +46,40 @@ public class UsuariosResource {
     @EJB
     private CambioRolService cambioRol;
 
+    @EJB
+    private BajaUsuarioService baja;
+
     @Context
     private SecurityContext seguridad;
+
+    /**
+     * Elimina a un funcionario, administrador o autoridad (todos esos roles).
+     * Un funcionario queda inactivo, con su historial. Responde 200, 400 si
+     * la cédula no es válida, 404 si no tiene ninguno de esos roles o 409 si
+     * es el propio administrador.
+     */
+    @DELETE
+    @Path("/{ci}")
+    public Response eliminar(@PathParam("ci") String ci) {
+        Response acceso = AccesoAdministrador.verificar(seguridad);
+
+        if (acceso != null) {
+            return acceso;
+        }
+
+        try {
+            return Response.ok(baja.eliminar(seguridad.getUserPrincipal().getName(), ci)).build();
+
+        } catch (DatosUsuarioInvalidosException e) {
+            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
+
+        } catch (UsuarioNoEncontradoException e) {
+            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
+
+        } catch (BajaNoPermitidaException e) {
+            return error(Response.Status.CONFLICT, "baja_no_permitida", e.getMessage());
+        }
+    }
 
     // contrasena: administrador y autoridad; email: funcionario
     public record AltaUsuarioRequest(

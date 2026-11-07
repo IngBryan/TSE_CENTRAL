@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type ChangeEvent } from "react";
 
-import { cambiarRolAction } from "./actions";
+import { cambiarRolAction, eliminarUsuarioAction } from "./actions";
 import {
   LARGO_MAXIMO_CONTRASENA,
   LARGO_MINIMO_CONTRASENA,
@@ -35,7 +35,11 @@ type Props = {
 export default function FilaUsuario({ usuario, nombre, esPropio }: Props) {
   const internos = rolesInternos(usuario.roles);
   const puedeCambiar = internos.length > 0 && !esPropio;
-  const [abierto, setAbierto] = useState(false);
+  // Qué panel está abierto debajo de la fila
+  const [panel, setPanel] = useState<"rol" | "eliminar" | null>(null);
+
+  const alternar = (cual: "rol" | "eliminar") =>
+    setPanel(panel === cual ? null : cual);
 
   return (
     <>
@@ -55,24 +59,44 @@ export default function FilaUsuario({ usuario, nombre, esPropio }: Props) {
             ))}
           </ul>
         </td>
-        <td className="p-3 text-right">
+        <td className="p-3">
           {puedeCambiar && (
-            <button
-              type="button"
-              onClick={() => setAbierto(!abierto)}
-              aria-expanded={abierto}
-              className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              {abierto ? "Cancelar" : "Cambiar rol"}
-            </button>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => alternar("rol")}
+                aria-expanded={panel === "rol"}
+                className="whitespace-nowrap rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+              >
+                {panel === "rol" ? "Cancelar" : "Cambiar rol"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => alternar("eliminar")}
+                aria-expanded={panel === "eliminar"}
+                className="whitespace-nowrap rounded-md border border-destructive/40 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+              >
+                {panel === "eliminar" ? "Cancelar" : "Eliminar"}
+              </button>
+            </div>
           )}
         </td>
       </tr>
 
-      {puedeCambiar && abierto && (
+      {puedeCambiar && panel !== null && (
         <tr className="bg-muted/40">
           <td colSpan={COLUMNAS} className="p-4">
-            <FormularioCambioRol ci={usuario.ci} internos={internos} />
+            {panel === "rol" ? (
+              <FormularioCambioRol ci={usuario.ci} internos={internos} />
+            ) : (
+              <ConfirmacionBaja
+                ci={usuario.ci}
+                internos={internos}
+                otrosRoles={usuario.roles.length > internos.length}
+                onCancelar={() => setPanel(null)}
+              />
+            )}
           </td>
         </tr>
       )}
@@ -81,6 +105,76 @@ export default function FilaUsuario({ usuario, nombre, esPropio }: Props) {
 }
 
 const estadoInicial: EstadoAltaUsuario = { estado: "inicial", mensaje: "" };
+
+function ConfirmacionBaja({
+  ci,
+  internos,
+  otrosRoles,
+  onCancelar,
+}: {
+  ci: string;
+  internos: TipoAltaUsuario[];
+  // Chofer o responsable: no se tocan
+  otrosRoles: boolean;
+  onCancelar: () => void;
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    (anterior: EstadoAltaUsuario) => eliminarUsuarioAction(ci, anterior),
+    estadoInicial
+  );
+
+  return (
+    <form action={accion} className="space-y-3">
+      <p className="text-sm">
+        ¿Eliminar a <span className="font-mono">{ci}</span>? Se le quita el
+        rol {internos.map((r) => NOMBRE_ROL[r]).join(" y ")}.
+      </p>
+
+      <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+        {internos.includes("FUNCIONARIO") && (
+          <li>
+            Como funcionario queda inactivo: conserva su historial de casos
+            pero ya no puede ingresar. Si se lo vuelve a dar de alta, se
+            reactiva.
+          </li>
+        )}
+        {internos.some((r) => r !== "FUNCIONARIO") && (
+          <li>
+            Se borra su usuario del backoffice, con su contraseña. Pierde el
+            acceso en su siguiente pedido.
+          </li>
+        )}
+        {otrosRoles && (
+          <li>Sus roles de chofer o responsable de empresa no cambian.</li>
+        )}
+      </ul>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={pendiente}
+          className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {pendiente ? "Eliminando..." : "Sí, eliminar"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
+        >
+          Cancelar
+        </button>
+      </div>
+
+      {estado.estado === "error" && (
+        <p role="alert" className="text-sm text-destructive">
+          {estado.mensaje}
+        </p>
+      )}
+    </form>
+  );
+}
 
 function FormularioCambioRol({
   ci,
