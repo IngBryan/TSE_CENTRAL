@@ -43,9 +43,7 @@ class IngresoFuncionarioServiceTest {
         FuncionarioDAO dao = new FuncionarioDAO();
         set(dao, "em", em);
         pdi = new PdiFalsa();
-        servicio = new IngresoFuncionarioService();
-        set(servicio, "funcionarios", dao);
-        set(servicio, "clientePdi", pdi);
+        servicio = new IngresoFuncionarioService(dao, pdi);
 
         em.getTransaction().begin();
         em.persist(new Funcionario(FUNCIONARIO, "viejo@mtop.gub.uy"));
