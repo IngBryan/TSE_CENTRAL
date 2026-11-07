@@ -4,8 +4,12 @@ import { useActionState, useState, type ChangeEvent } from "react";
 
 import { cambiarRolAction, eliminarUsuarioAction } from "./actions";
 import {
-  LARGO_MAXIMO_CONTRASENA,
-  LARGO_MINIMO_CONTRASENA,
+  CampoEmail,
+  CamposContrasena,
+  MensajeEstado,
+  estilosCampo,
+} from "./CamposUsuario";
+import {
   NOMBRE_ROL,
   TIPOS_ALTA,
   cambioPideContrasena,
@@ -17,9 +21,6 @@ import {
 } from "@/lib/usuarios";
 
 const COLUMNAS = 5;
-
-const estilosCampo =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 type Props = {
   usuario: DatosUsuario;
@@ -238,63 +239,22 @@ function FormularioCambioRol({
       </div>
 
       {pideContrasena && (
-        <>
-          <div className="space-y-2">
-            <label htmlFor={`contrasena-${ci}`} className="text-sm font-medium">
-              Contraseña inicial
-            </label>
-            <input
-              id={`contrasena-${ci}`}
-              name="contrasena"
-              type="password"
-              autoComplete="new-password"
-              minLength={LARGO_MINIMO_CONTRASENA}
-              maxLength={LARGO_MAXIMO_CONTRASENA}
-              required
-              value={contrasena}
-              onChange={valor(setContrasena)}
-              className={estilosCampo}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor={`confirmacion-${ci}`} className="text-sm font-medium">
-              Repetir contraseña
-            </label>
-            <input
-              id={`confirmacion-${ci}`}
-              name="confirmacion"
-              type="password"
-              autoComplete="new-password"
-              minLength={LARGO_MINIMO_CONTRASENA}
-              maxLength={LARGO_MAXIMO_CONTRASENA}
-              required
-              value={confirmacion}
-              onChange={valor(setConfirmacion)}
-              className={estilosCampo}
-            />
-          </div>
-        </>
+        <CamposContrasena
+          sufijoId={`-${ci}`}
+          contrasena={contrasena}
+          confirmacion={confirmacion}
+          onContrasena={valor(setContrasena)}
+          onConfirmacion={valor(setConfirmacion)}
+        />
       )}
 
       {pideEmail && (
-        <div className="space-y-2 sm:col-span-2">
-          <label htmlFor={`email-${ci}`} className="text-sm font-medium">
-            Email
-          </label>
-          <input
-            id={`email-${ci}`}
-            name="email"
-            type="email"
-            autoComplete="off"
-            maxLength={254}
-            placeholder="nombre@mtop.gub.uy"
-            required
-            value={email}
-            onChange={valor(setEmail)}
-            className={estilosCampo}
-          />
-        </div>
+        <CampoEmail
+          sufijoId={`-${ci}`}
+          className="sm:col-span-2"
+          value={email}
+          onChange={valor(setEmail)}
+        />
       )}
 
       <div className="space-y-3 sm:col-span-3">
@@ -316,18 +276,7 @@ function FormularioCambioRol({
           {pendiente ? "Guardando..." : "Cambiar rol"}
         </button>
 
-        {estado.estado !== "inicial" && (
-          <p
-            role={estado.estado === "error" ? "alert" : "status"}
-            className={`text-sm ${
-              estado.estado === "error"
-                ? "text-destructive"
-                : "text-green-700 dark:text-green-400"
-            }`}
-          >
-            {estado.mensaje}
-          </p>
-        )}
+        <MensajeEstado estado={estado} />
       </div>
     </form>
   );

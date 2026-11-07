@@ -32,6 +32,7 @@ export const TIPOS_ALTA: TipoAltaUsuario[] = ["ADMINISTRADOR", "AUTORIDAD", "FUN
 // Las mismas reglas que valida el backend (AltaUsuarioService)
 export const LARGO_MINIMO_CONTRASENA = 12;
 export const LARGO_MAXIMO_CONTRASENA = 128;
+export const LARGO_MAXIMO_EMAIL = 254;
 
 export function usaContrasena(tipo: TipoAltaUsuario): boolean {
   return tipo !== "FUNCIONARIO";

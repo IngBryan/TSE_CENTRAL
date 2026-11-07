@@ -4,7 +4,12 @@ import { useActionState, useState, type ChangeEvent } from "react";
 
 import { crearUsuarioAction } from "./actions";
 import {
-  LARGO_MAXIMO_CONTRASENA,
+  CampoEmail,
+  CamposContrasena,
+  MensajeEstado,
+  estilosCampo,
+} from "./CamposUsuario";
+import {
   LARGO_MINIMO_CONTRASENA,
   NOMBRE_ROL,
   TIPOS_ALTA,
@@ -42,9 +47,6 @@ const DESCRIPCION_TIPO: Record<TipoAltaUsuario, string> = {
   FUNCIONARIO:
     "Funcionario del MTOP: entra al frontoffice de funcionarios con gub.uy.",
 };
-
-const estilosCampo =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 /**
  * Alta de un usuario: primero se elige el tipo y el formulario pide los
@@ -138,69 +140,21 @@ export default function FormularioAltaUsuario() {
         </div>
 
         {conContrasena ? (
-          <>
-            <div className="space-y-2 sm:col-start-1">
-              <label htmlFor="contrasena" className="text-sm font-medium">
-                Contraseña inicial
-              </label>
-
-              <input
-                id="contrasena"
-                name="contrasena"
-                type="password"
-                autoComplete="new-password"
-                minLength={LARGO_MINIMO_CONTRASENA}
-                maxLength={LARGO_MAXIMO_CONTRASENA}
-                required
-                value={campos.contrasena}
-                onChange={cambiar("contrasena")}
-                className={estilosCampo}
-              />
-
+          <CamposContrasena
+            contrasena={campos.contrasena}
+            confirmacion={campos.confirmacion}
+            onContrasena={cambiar("contrasena")}
+            onConfirmacion={cambiar("confirmacion")}
+            claseContrasena="sm:col-start-1"
+            ayuda={
               <p className="text-xs text-muted-foreground">
                 Al menos {LARGO_MINIMO_CONTRASENA} caracteres. Comunicásela a
                 la persona por un medio seguro.
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="confirmacion" className="text-sm font-medium">
-                Repetir contraseña
-              </label>
-
-              <input
-                id="confirmacion"
-                name="confirmacion"
-                type="password"
-                autoComplete="new-password"
-                minLength={LARGO_MINIMO_CONTRASENA}
-                maxLength={LARGO_MAXIMO_CONTRASENA}
-                required
-                value={campos.confirmacion}
-                onChange={cambiar("confirmacion")}
-                className={estilosCampo}
-              />
-            </div>
-          </>
+            }
+          />
         ) : (
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="off"
-              maxLength={254}
-              placeholder="nombre@mtop.gub.uy"
-              required
-              value={campos.email}
-              onChange={cambiar("email")}
-              className={estilosCampo}
-            />
-          </div>
+          <CampoEmail value={campos.email} onChange={cambiar("email")} />
         )}
 
         <div className="sm:col-span-2">
@@ -214,18 +168,7 @@ export default function FormularioAltaUsuario() {
         </div>
       </form>
 
-      {estado.estado !== "inicial" && (
-        <p
-          role={estado.estado === "error" ? "alert" : "status"}
-          className={`mt-4 text-sm ${
-            estado.estado === "error"
-              ? "text-destructive"
-              : "text-green-700 dark:text-green-400"
-          }`}
-        >
-          {estado.mensaje}
-        </p>
-      )}
+      <MensajeEstado estado={estado} className="mt-4" />
     </section>
   );
 }

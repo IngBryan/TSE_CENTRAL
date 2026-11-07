@@ -10,6 +10,7 @@ import {
 } from "@/lib/usuarios-backend";
 import {
   LARGO_MAXIMO_CONTRASENA,
+  LARGO_MAXIMO_EMAIL,
   LARGO_MINIMO_CONTRASENA,
   TIPOS_ALTA,
   usaContrasena,
@@ -53,10 +54,25 @@ function leerContrasena(formData: FormData): { contrasena: string } | { error: s
   return { contrasena };
 }
 
+// Algo@dominio.algo, sin espacios y con una sola arroba (como ValidacionUsuario del backend). Sin regex: la
+// equivalente hace backtracking
+function esEmail(email: string): boolean {
+  const arroba = email.indexOf("@");
+
+  if (arroba <= 0 || arroba !== email.lastIndexOf("@") || /\s/.test(email)) {
+    return false;
+  }
+
+  const dominio = email.slice(arroba + 1);
+  const punto = dominio.indexOf(".", 1);
+
+  return punto > 0 && punto < dominio.length - 1;
+}
+
 function leerEmail(formData: FormData): { email: string } | { error: string } {
   const email = texto(formData, "email").trim();
 
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+  if (email.length > LARGO_MAXIMO_EMAIL || !esEmail(email)) {
     return { error: "Ingresá un email válido." };
   }
 
