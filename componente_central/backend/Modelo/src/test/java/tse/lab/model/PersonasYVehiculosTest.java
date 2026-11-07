@@ -83,6 +83,22 @@ class PersonasYVehiculosTest {
     }
 
     @Test
+    void unChoferDadoDeBajaSeReactivaConUnaNuevaFechaDeAlta() throws InterruptedException {
+        Chofer chofer = new Chofer(new Ciudadano("11111111", null, null), new Empresa());
+        Instant altaOriginal = chofer.getFechaAlta();
+        assertFalse(chofer.isDadoDeBaja());
+
+        chofer.setEstado(EstadoChofer.DADO_DE_BAJA);
+        assertTrue(chofer.isDadoDeBaja());
+
+        Thread.sleep(2);
+        chofer.reactivar(EstadoChofer.HABILITADO);
+        assertFalse(chofer.isDadoDeBaja());
+        assertEquals(EstadoChofer.HABILITADO, chofer.getEstado());
+        assertTrue(chofer.getFechaAlta().isAfter(altaOriginal));
+    }
+
+    @Test
     void elResponsableCambiaDeEmpresa() {
         Responsable responsable = new Responsable(new Ciudadano("22222222", "r@example.com", null), new Empresa());
         Empresa otra = new Empresa();
