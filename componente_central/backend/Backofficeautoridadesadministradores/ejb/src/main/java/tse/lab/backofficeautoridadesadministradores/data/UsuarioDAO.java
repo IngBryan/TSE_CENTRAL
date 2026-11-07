@@ -27,24 +27,25 @@ import tse.lab.model.Funcionario;
 @Stateless
 public class UsuarioDAO {
 
-    // UNION (no UNION ALL): una cédula con varios roles cuenta una sola vez. Un
-    // ciudadano sin rol no entra.
-    // usuarios_backoffice es la tabla base de administradores y autoridades.
-    private static final String CEDULAS_USUARIOS = """
-            SELECT ci FROM funcionarios WHERE activo = TRUE
-            UNION SELECT ci FROM responsables
-            UNION SELECT ci FROM choferes
-            UNION SELECT ci FROM usuarios_backoffice
+    // Cada cédula con cada uno de sus roles; un ciudadano sin rol no entra. Una
+    // cédula con varios roles (o un chofer de varias empresas) aparece varias
+    // veces: las consultas usan DISTINCT para contarla una sola vez.
+    // ?1: el rol, o '' para todos. ?2: prefijo de la cédula seguido de %.
+    // Consultas fijas, sin armar SQL: el filtro va siempre como parámetro.
+    private static final String ROLES_DE_USUARIOS = """
+            FROM (
+                SELECT ci, 'FUNCIONARIO' AS rol FROM funcionarios WHERE activo = TRUE
+                UNION ALL SELECT ci, 'RESPONSABLE' FROM responsables
+                UNION ALL SELECT ci, 'CHOFER' FROM choferes
+                UNION ALL SELECT ci, 'ADMINISTRADOR' FROM administradores
+                UNION ALL SELECT ci, 'AUTORIDAD' FROM autoridades
+            ) usuarios
+            WHERE (?1 = '' OR rol = ?1) AND ci LIKE ?2
             """;
 
-    // Con filtro de rol se pagina solo sobre su tabla. Un chofer de varias empresas
-    // tiene varias filas.
-    private static final Map<RolUsuario, String> CEDULAS_POR_ROL = new EnumMap<>(Map.of(
-            RolUsuario.FUNCIONARIO, "SELECT ci FROM funcionarios WHERE activo = TRUE",
-            RolUsuario.RESPONSABLE, "SELECT ci FROM responsables",
-            RolUsuario.CHOFER, "SELECT DISTINCT ci FROM choferes",
-            RolUsuario.ADMINISTRADOR, "SELECT ci FROM administradores",
-            RolUsuario.AUTORIDAD, "SELECT ci FROM autoridades"));
+    private static final String CONTAR_USUARIOS = "SELECT COUNT(DISTINCT ci) " + ROLES_DE_USUARIOS;
+
+    private static final String LISTAR_CEDULAS = "SELECT DISTINCT ci " + ROLES_DE_USUARIOS + " ORDER BY ci";
 
     @PersistenceContext(unitName = "backofficeautoridadesadministradoresPersistenceUnit")
     private EntityManager em;
@@ -55,7 +56,7 @@ public class UsuarioDAO {
      *                  todas
      */
     public long contarUsuarios(RolUsuario rol, String prefijoCi) {
-        return ((Number) consulta("COUNT(*)", rol, prefijoCi, "")
+        return ((Number) consulta(CONTAR_USUARIOS, rol, prefijoCi)
                 .getSingleResult()).longValue();
     }
 
@@ -63,7 +64,7 @@ public class UsuarioDAO {
      * Una página de cédulas, ordenadas, con los mismos filtros que contarUsuarios.
      */
     public List<String> listarCedulas(RolUsuario rol, String prefijoCi, int desde, int cantidad) {
-        return consulta("ci", rol, prefijoCi, " ORDER BY ci")
+        return consulta(LISTAR_CEDULAS, rol, prefijoCi)
                 .setFirstResult(desde)
                 .setMaxResults(cantidad)
                 .getResultList()
@@ -72,19 +73,11 @@ public class UsuarioDAO {
                 .toList();
     }
 
-    // El SQL solo se arma con constantes: la cédula va siempre como parámetro
-    private Query consulta(String columnas, RolUsuario rol, String prefijoCi, String orden) {
-        String origen = rol == null ? CEDULAS_USUARIOS : CEDULAS_POR_ROL.get(rol);
-        String filtro = prefijoCi == null ? "" : " WHERE ci LIKE ?1";
-
-        Query consulta = em.createNativeQuery(
-                "SELECT " + columnas + " FROM (" + origen + ") usuarios" + filtro + orden);
-
-        if (prefijoCi != null) {
-            consulta.setParameter(1, prefijoCi + "%");
-        }
-
-        return consulta;
+    // Sin filtro de rol ni de cédula, los parámetros no filtran: '' y '%'
+    private Query consulta(String sql, RolUsuario rol, String prefijoCi) {
+        return em.createNativeQuery(sql)
+                .setParameter(1, rol == null ? "" : rol.name())
+                .setParameter(2, (prefijoCi == null ? "" : prefijoCi) + "%");
     }
 
     public List<Ciudadano> buscarCiudadanos(List<String> cedulas) {
@@ -190,10 +183,15 @@ public class UsuarioDAO {
         return false;
     }
 
-    // Tablas propias de cada subtipo (herencia JOINED): la fila base, con la contrasena, esta en usuarios_backoffice
-    private static final Map<RolUsuario, String> TABLA_BACKOFFICE = new EnumMap<>(Map.of(
-            RolUsuario.ADMINISTRADOR, "administradores",
-            RolUsuario.AUTORIDAD, "autoridades"));
+    // Tablas propias de cada subtipo (herencia JOINED): la fila base, con la
+    // contrasena, esta en usuarios_backoffice. Una sentencia fija por tabla.
+    private static final Map<RolUsuario, String> QUITAR_DE_SUBTIPO = new EnumMap<>(Map.of(
+            RolUsuario.ADMINISTRADOR, "DELETE FROM administradores WHERE ci = ?1",
+            RolUsuario.AUTORIDAD, "DELETE FROM autoridades WHERE ci = ?1"));
+
+    private static final Map<RolUsuario, String> AGREGAR_A_SUBTIPO = new EnumMap<>(Map.of(
+            RolUsuario.ADMINISTRADOR, "INSERT INTO administradores (ci) VALUES (?1)",
+            RolUsuario.AUTORIDAD, "INSERT INTO autoridades (ci) VALUES (?1)"));
 
     /**
      * Pasa un usuario del backoffice de administrador a autoridad o al revés,
@@ -201,13 +199,13 @@ public class UsuarioDAO {
      * entidad: se mueve la fila entre las tablas de cada subtipo.
      */
     public void cambiarRolBackoffice(String ci, RolUsuario anterior, RolUsuario nuevo) {
-        ejecutar("DELETE FROM " + TABLA_BACKOFFICE.get(anterior) + " WHERE ci = ?1", ci);
-        ejecutar("INSERT INTO " + TABLA_BACKOFFICE.get(nuevo) + " (ci) VALUES (?1)", ci);
+        ejecutar(QUITAR_DE_SUBTIPO.get(anterior), ci);
+        ejecutar(AGREGAR_A_SUBTIPO.get(nuevo), ci);
     }
 
     // Quita al administrador o autoridad, con su contrasena
     public void eliminarUsuarioBackoffice(String ci, RolUsuario rol) {
-        ejecutar("DELETE FROM " + TABLA_BACKOFFICE.get(rol) + " WHERE ci = ?1", ci);
+        ejecutar(QUITAR_DE_SUBTIPO.get(rol), ci);
         ejecutar("DELETE FROM usuarios_backoffice WHERE ci = ?1", ci);
     }
 

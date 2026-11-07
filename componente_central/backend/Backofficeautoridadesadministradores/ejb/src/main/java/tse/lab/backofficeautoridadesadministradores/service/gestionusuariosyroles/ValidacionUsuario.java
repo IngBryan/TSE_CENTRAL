@@ -14,7 +14,6 @@ final class ValidacionUsuario {
     static final int LARGO_MAXIMO_EMAIL = 254;
 
     private static final Pattern CEDULA = Pattern.compile("\\d{6,8}");
-    private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
 
     private ValidacionUsuario() {
     }
@@ -54,9 +53,23 @@ final class ValidacionUsuario {
 
     static String email(String valor) {
         String email = valor == null ? "" : valor.strip();
-        if (email.length() > LARGO_MAXIMO_EMAIL || !EMAIL.matcher(email).matches()) {
+        if (email.length() > LARGO_MAXIMO_EMAIL || !esEmail(email)) {
             throw new DatosUsuarioInvalidosException("El email no es válido");
         }
         return email;
+    }
+
+    // Algo@dominio.algo, sin espacios y con una sola arroba. Se revisa a mano y
+    // no con una regex: la equivalente hace backtracking (tiempo super-lineal).
+    private static boolean esEmail(String email) {
+        int arroba = email.indexOf('@');
+        if (arroba <= 0 || arroba != email.lastIndexOf('@')
+                || email.chars().anyMatch(Character::isWhitespace)) {
+            return false;
+        }
+        // Un punto en el dominio con algo antes y algo después
+        String dominio = email.substring(arroba + 1);
+        int punto = dominio.indexOf('.', 1);
+        return punto > 0 && punto < dominio.length() - 1;
     }
 }
