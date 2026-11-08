@@ -14,6 +14,9 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
  */
 public class CompanyFacet extends Facet {
 
+    private static final String VALUES = "SELECT e.nroEmpresa, COALESCE(e.nombrePublico, e.razonSocial) FROM Empresa e "
+            + "ORDER BY COALESCE(e.nombrePublico, e.razonSocial)";
+
     public CompanyFacet() {
         super("company", "Empresa", Map.of(
                 Table.TRIP, link(List.of("LEFT JOIN {t}.empresa tripCompany"), "tripCompany"),
@@ -33,8 +36,7 @@ public class CompanyFacet extends Facet {
 
     @Override
     public List<FacetValue> values(EntityManager em) {
-        return em.createQuery("SELECT e.nroEmpresa, " + name("e") + " FROM Empresa e ORDER BY " + name("e"),
-                        Object[].class)
+        return em.createQuery(VALUES, Object[].class)
                 .getResultList().stream()
                 .map(row -> new FacetValue(row[0].toString(), (String) row[1]))
                 .toList();

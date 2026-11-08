@@ -172,7 +172,10 @@ export default function PanelFiltros({
     setKpis(nuevos);
     const pedido = ++ultimoPedido.current;
     setCargando(true);
-    const respuesta = await facetasPermitidas(nuevos.map((kpi) => kpi.id));
+    const respuesta = await facetasPermitidas(nuevos.map((kpi) => kpi.id)).catch(() => ({
+      ok: false as const,
+      mensaje: "No se pudieron cargar las agrupaciones y filtros.",
+    }));
     if (pedido !== ultimoPedido.current) return;
 
     setCargando(false);
@@ -189,17 +192,19 @@ export default function PanelFiltros({
   // Removing a KPI can bring back a filter whose values the page did not load
   function cargarCatalogos(ids: string[]) {
     for (const id of ids.filter((faceta) => !catalogos[faceta])) {
-      valoresDeFaceta(id).then((respuesta) =>
-        setCatalogos((actuales) => ({
-          ...actuales,
-          [id]: respuesta.ok ? { valores: respuesta.datos } : { valores: [], error: respuesta.mensaje },
-        }))
-      );
+      valoresDeFaceta(id)
+        .catch(() => ({ ok: false as const, mensaje: "No se pudieron cargar los valores del filtro." }))
+        .then((respuesta) =>
+          setCatalogos((actuales) => ({
+            ...actuales,
+            [id]: respuesta.ok ? { valores: respuesta.datos } : { valores: [], error: respuesta.mensaje },
+          }))
+        );
     }
   }
 
   function agregarKpi(id: IdKpi) {
-    cambiarKpis([...kpis, { id, medidas: ["current"] }]);
+    void cambiarKpis([...kpis, { id, medidas: ["current"] }]);
     setFilaAbierta(`kpi-${id}`);
   }
 
@@ -284,7 +289,7 @@ export default function PanelFiltros({
                 variant="ghost"
                 size="xs"
                 disabled={kpis.length === 1}
-                onClick={() => cambiarKpis(kpis.filter((k) => k.id !== kpi.id))}
+                onClick={() => void cambiarKpis(kpis.filter((k) => k.id !== kpi.id))}
                 className="-ml-2 text-muted-foreground hover:text-destructive"
               >
                 <Trash2 /> Quitar KPI

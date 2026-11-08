@@ -51,9 +51,10 @@ public class ReportService {
     private EntityManager em;
 
     // "Today" for the whole history, in Uruguay
-    private Clock clock = Clock.system(ZoneId.of("America/Montevideo"));
+    private final Clock clock;
 
     public ReportService() {
+        this.clock = Clock.system(ZoneId.of("America/Montevideo"));
     }
 
     ReportService(EntityManager em, Clock clock) {

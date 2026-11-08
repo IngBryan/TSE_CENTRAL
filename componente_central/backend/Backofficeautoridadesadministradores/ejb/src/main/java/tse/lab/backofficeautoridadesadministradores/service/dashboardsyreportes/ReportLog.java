@@ -40,7 +40,12 @@ public final class ReportLog {
         try {
             return calculation.get();
         } finally {
-            CONTEXT.set(previous);
+            // A pooled thread must not keep the report it ran: removed, unless a report runs inside another one
+            if (previous == null) {
+                CONTEXT.remove();
+            } else {
+                CONTEXT.set(previous);
+            }
         }
     }
 
