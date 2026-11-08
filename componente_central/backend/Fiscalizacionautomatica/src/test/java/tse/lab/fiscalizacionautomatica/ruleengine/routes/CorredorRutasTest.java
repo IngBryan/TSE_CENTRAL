@@ -35,4 +35,47 @@ class CorredorRutasTest {
     void validaGeometriaCorrupta() {
         assertThrows(IOException.class, () -> corredor("{\"type\":\"Point\",\"coordinates\":[-56,-34]}"));
     }
+
+    @Test
+    void anAuthorizedRouteIsRequired() {
+        assertThrows(IllegalArgumentException.class, () -> new CorredorRutas(null));
+        assertThrows(IllegalArgumentException.class, () -> new CorredorRutas(List.of()));
+    }
+
+    @Test
+    void aRouteWithoutGeometryFails() {
+        assertThrows(IOException.class, () -> new CorredorRutas(java.util.Collections.singletonList(null)));
+        assertThrows(IOException.class, () -> corredor(null));
+        assertThrows(IOException.class, () -> corredor("{"));
+    }
+
+    @Test
+    void invalidCoordinatesFail() {
+        for (String coordenadas : List.of("5", "[[0,0]]", "[1,[0,0]]", "[[0],[1,1]]", "[[\"a\",0],[1,1]]",
+                "[[0,\"a\"],[1,1]]", "[[181,0],[1,1]]", "[[-181,0],[1,1]]", "[[0,91],[1,1]]", "[[0,-91],[1,1]]",
+                "[[1,1],[1,1]]")) {
+            assertThrows(IOException.class,
+                    () -> corredor("{\"type\":\"LineString\",\"coordinates\":" + coordenadas + "}"), coordenadas);
+        }
+    }
+
+    @Test
+    void aGpsOutsideWgs84IsRejected() throws IOException {
+        var c = corredor("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
+
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(Double.NaN, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-91, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(91, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, -181));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, 181));
+    }
+
+    @Test
+    void theDistanceIsToTheNearestRoute() throws IOException {
+        var c = new CorredorRutas(List.of(ruta("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}"),
+                ruta("{\"type\":\"LineString\",\"coordinates\":[[-55,-34.5],[-55,-34]]}")));
+
+        assertEquals(0, c.distanciaMinimaMetros(-34.25, -55), 0.001);
+    }
 }

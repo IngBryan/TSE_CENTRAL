@@ -10,7 +10,7 @@ export type RespuestaBackend<T> = { status: number; data: T };
 
 export async function llamarBackend<T>(
   ruta: string,
-  opciones: { method?: "GET" | "POST" | "PUT"; body?: unknown; correlationId: string; usuarioCi?: string },
+  opciones: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; correlationId: string; usuarioCi?: string },
 ): Promise<RespuestaBackend<T>> {
   const cfg = getAuthConfig();
   const headers: Record<string, string> = {

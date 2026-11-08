@@ -107,11 +107,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         filas={d.viajesPorMes}
         primera="Mes"
         etiqueta={(f) => f.etiqueta.charAt(0).toUpperCase() + f.etiqueta.slice(1)}
-        columnas={[
-          { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
-          { titulo: "Carga", valor: (f) => toneladas(f.kg) },
-          { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
-        ]}
+        columnas={COLUMNAS_CARGA}
       />
       <Tabla
         titulo={`Carga transportada por rubro del cliente (${d.anio})`}
@@ -120,12 +116,28 @@ function Contenido({ d }: { d: Estadisticas }) {
         primera="Rubro"
         etiqueta={(f) => f.etiqueta}
         barra={(f) => f.kg}
-        columnas={[
-          { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
-          { titulo: "Carga", valor: (f) => toneladas(f.kg) },
-          { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
-        ]}
+        columnas={COLUMNAS_CARGA}
         vacio="No hay viajes finalizados en el año."
+      />
+      <Tabla
+        titulo={`Carga transportada por tipo de carga (${d.anio})`}
+        tabla="tipos-carga"
+        filas={d.cargaPorTipoCarga}
+        primera="Tipo de carga"
+        etiqueta={(f) => f.etiqueta}
+        barra={(f) => f.kg}
+        columnas={COLUMNAS_CARGA}
+        vacio="No hay viajes finalizados en el año."
+      />
+      <Tabla
+        titulo="Empresas habilitadas por rubro (hoy)"
+        tabla="empresas-rubro"
+        filas={d.empresasPorRubro}
+        primera="Rubro de la empresa"
+        etiqueta={(f) => f.etiqueta}
+        columnas={[{ titulo: "Empresas", valor: (f) => numero(f.cantidad) }]}
+        vacio="Ninguna empresa habilitada tiene rubros asignados."
+        nota="Una empresa que trabaja en varios rubros cuenta en cada uno, por eso la suma puede superar el total de empresas habilitadas."
       />
       <Tabla
         titulo={`Infracciones confirmadas por tipo (${d.anio})`}
@@ -148,19 +160,14 @@ function Contenido({ d }: { d: Estadisticas }) {
       <section className={`flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400 ${tarjeta}`}>
         <h2 className={titulo}>Cómo se protegen los datos</h2>
         <p>
-          Para cumplir con la Ley 18.331 de protección de datos personales, cada número se publica solo si reúne datos
-          de al menos <strong>{d.umbralEmpresas} empresas distintas</strong>. Con menos, una empresa podría deducir los
-          datos de otra restando los propios. Los valores que no alcanzan ese mínimo figuran como «{RESERVADO}», y
-          cuando hace falta se reserva también otro valor para que no se puedan calcular restando del total. Los
-          rubros reservados no se muestran por nombre, porque el nombre podría identificar a la empresa: van
-          sumados en «Otros rubros».
+          Para proteger los datos de las empresas (Ley 18.331), cada número se publica solo si reúne datos de al menos{" "}
+          <strong>{d.umbralEmpresas} empresas distintas</strong>. Si no, figura como «{RESERVADO}».
         </p>
         <p>
-          Se cuentan los viajes finalizados y solo las infracciones confirmadas por el MTOP. Los indicadores de
-          fiscalización toman los casos detectados en el año; el tiempo de resolución es la mediana (la mitad de los
-          casos se resolvió en menos tiempo), para que un caso que demoró mucho no distorsione el valor.
+          Se cuentan los viajes finalizados y las infracciones confirmadas por el MTOP. El tiempo de resolución es la
+          mediana de los casos del año.
         </p>
-        <p>Cada tabla se puede descargar en CSV (separado por punto y coma) para reutilizar los datos.</p>
+        <p>Cada tabla se puede descargar en CSV.</p>
         <p className="text-xs">Datos generados: {fechaHora(d.generadas)}</p>
       </section>
     </>
@@ -191,6 +198,13 @@ function Indicador({
 
 type Columna = { titulo: string; valor: (f: FilaPublica) => string };
 
+// Viajes, carga y promedio: las columnas de las tablas por mes, por rubro y por tipo de carga
+const COLUMNAS_CARGA: Columna[] = [
+  { titulo: "Viajes", valor: (f) => numero(f.cantidad) },
+  { titulo: "Carga", valor: (f) => toneladas(f.kg) },
+  { titulo: "Promedio por viaje", valor: (f) => (f.cantidad ? toneladas((f.kg ?? 0) / f.cantidad) : "-") },
+];
+
 // Tabla con una barra proporcional bajo cada etiqueta (por defecto, a la cantidad) y enlace al CSV
 function Tabla({
   titulo: texto,
@@ -201,6 +215,7 @@ function Tabla({
   columnas,
   barra = (f) => f.cantidad,
   vacio,
+  nota,
 }: {
   titulo: string;
   tabla: TablaCsv;
@@ -210,19 +225,24 @@ function Tabla({
   columnas: Columna[];
   barra?: (f: FilaPublica) => number | null;
   vacio?: string;
+  // Aclaracion bajo el titulo
+  nota?: string;
 }) {
   const maximo = Math.max(0, ...filas.map((f) => (f.reservado ? 0 : (barra(f) ?? 0))));
+  // Las tablas por catalogo traen todas sus filas: sin datos en ninguna, se muestra el mensaje `vacio`
+  const sinDatos = vacio !== undefined && filas.every((f) => !f.reservado && !f.cantidad);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className={titulo}>{texto}</h2>
-        {filas.length > 0 && (
+        {filas.length > 0 && !sinDatos && (
           <a href={`/estadisticas/csv?tabla=${tabla}`} className="text-sm text-[#0068b3] hover:underline">
             Descargar CSV
           </a>
         )}
       </div>
-      {filas.length === 0 ? (
+      {nota && <p className="-mt-1 text-sm text-zinc-600 dark:text-zinc-400">{nota}</p>}
+      {sinDatos ? (
         <p className="text-zinc-600 dark:text-zinc-400">{vacio}</p>
       ) : (
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">

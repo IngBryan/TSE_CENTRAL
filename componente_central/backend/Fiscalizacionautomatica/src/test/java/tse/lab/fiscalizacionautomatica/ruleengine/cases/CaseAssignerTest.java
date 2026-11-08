@@ -16,6 +16,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.Situation;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.fiscalizacionautomatica.ruleengine.model.VehicleEvent;
+import tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing;
 import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGuia;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
@@ -182,4 +183,87 @@ class CaseAssignerTest {
         assertEquals(List.of(evento),store.casos.getFirst().evidencias());
     }
 
+
+
+    @Test
+    void anAssociatedGpsClosesTheCirculationEvenWithoutSituations() {
+        List<String> cerradas = new ArrayList<>();
+        FakeStore conCierre = new FakeStore() {
+            @Override
+            public void cerrarCirculacionPorGuia(String matricula, Instant fecha) {
+                cerradas.add(matricula);
+            }
+        };
+
+        new CaseAssigner(conCierre).accept(conGuia(gps(0), "G1"));
+
+        assertEquals(List.of("SBC1234"), cerradas);
+        assertTrue(conCierre.casos.isEmpty());
+    }
+
+    @Test
+    void anEventWithoutSituationsNorGuideDoesNothing() {
+        asignador.accept(sinGuia(gps(0)));
+        asignador.accept(conGuia(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390), "G1"));
+
+        assertTrue(store.casos.isEmpty());
+    }
+
+    @Test
+    void aTripWithoutGuideContradictsAnAssociatedGuide() {
+        assertThrows(UncheckedIOException.class,
+                () -> asignador.accept(conGuia(gps(0), "G1", Situation.TRIP_WITHOUT_GUIDE)));
+    }
+
+    @Test
+    void aWeighingOpensNoCirculation() {
+        asignador.accept(sinGuia(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390),
+                Situation.TRIP_WITHOUT_GUIDE));
+
+        assertTrue(store.casos.isEmpty());
+    }
+
+    @Test
+    void aDeviationNeedsItsGeometricProof() {
+        Detection sinPrueba = new Detection(gps(0), null, List.of(Situation.ROUTE_DEVIATION),
+                ResultadoAsociacionGpsGuia.asociado("G1"));
+        Detection pesaje = new Detection(new Weighing(3, 4, "SBC1234", gps(0).timestamp(), 18_390), null,
+                List.of(Situation.ROUTE_DEVIATION), ResultadoAsociacionGpsGuia.asociado("G1"));
+
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(sinPrueba));
+        assertThrows(UncheckedIOException.class, () -> asignador.accept(pesaje));
+    }
+
+    @Test
+    void aPendingCirculationNotifiesNothing() {
+        FakeStore pendiente = new FakeStore() {
+            @Override
+            public DatosCaso registrarCirculacionSinGuia(TrackingEvent evento) {
+                return null;
+            }
+        };
+
+        new CaseAssigner(pendiente).accept(sinGuia(gps(0), Situation.TRIP_WITHOUT_GUIDE));
+
+        assertTrue(pendiente.correlacionesNotificadas.isEmpty());
+    }
+
+    @Test
+    void aBasicStoreRejectsWhatItDoesNotImplement() {
+        CaseStore basico = new CaseStore() {
+            @Override
+            public DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) {
+                return null;
+            }
+
+            @Override
+            public DatosCaso notify(long caseId, String correlationId) {
+                return null;
+            }
+        };
+
+        assertThrows(IOException.class, () -> basico.registrarDesvio("G1", gps(0), null));
+        assertThrows(IOException.class, () -> basico.registrarCirculacionSinGuia(gps(0)));
+        assertDoesNotThrow(() -> basico.cerrarCirculacionPorGuia("SBC1234", Instant.now()));
+    }
 }

@@ -84,7 +84,7 @@ function ContenidoMapa({ rutas, visible }: PropsMapa) {
         geometry: { type: "LineString" as const, coordinates: coords } }] : [];
     });
     const coleccion: FeatureCollection<LineString> = { type: "FeatureCollection", features: lineas };
-    (m.getSource("rutas-previa") as GeoJSONSource).setData(coleccion);
+    void (m.getSource("rutas-previa") as GeoJSONSource).setData(coleccion);
     const bounds = new LngLatBounds();
     const todos = lineas.flatMap(l => l.geometry.coordinates);
     todos.forEach(coord => bounds.extend([coord[0], coord[1]]));

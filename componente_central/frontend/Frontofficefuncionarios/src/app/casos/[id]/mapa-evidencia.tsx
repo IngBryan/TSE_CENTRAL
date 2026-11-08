@@ -87,9 +87,9 @@ export default function MapaEvidencia({
         geometry: { type: "Point", coordinates: p.coord },
       })),
     };
-    (m.getSource("rutas") as GeoJSONSource).setData(rutasFc);
-    (m.getSource("trayectoria") as GeoJSONSource).setData(gpsFc);
-    (m.getSource("confirmaciones") as GeoJSONSource).setData(marcas);
+    void (m.getSource("rutas") as GeoJSONSource).setData(rutasFc);
+    void (m.getSource("trayectoria") as GeoJSONSource).setData(gpsFc);
+    void (m.getSource("confirmaciones") as GeoJSONSource).setData(marcas);
     const todas: Coordenada[] = [
       ...rutasValidas.flatMap(f => f.geometry.coordinates as Coordenada[]),
       ...coordsGps,

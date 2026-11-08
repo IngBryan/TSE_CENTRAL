@@ -5,7 +5,6 @@ import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,8 +74,6 @@ public class Main {
                     + " lower the rate");
         }
 
-        Instant clocksStart = Instant.now().minusMillis(
-                Math.round(settings.profile().catchUpSeconds(settings.duration()) * 1000));
         System.out.printf("Estimated fleet: %d active of %d reporting every %s = %.1f events/s%n",
                 Math.round(vehicles * activeRatio), vehicles, interval, rate);
         System.out.printf("Simulated by %d vehicles reporting every %d ms, profile %s, for %s%n",
@@ -114,7 +111,7 @@ public class Main {
             List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < publishers; i++) {
                 Thread thread = new Thread(new Publisher(connections.get(i), settings, i, publishers, stats, stop,
-                        startNanos, clocksStart), "publisher-" + i);
+                        startNanos), "publisher-" + i);
                 thread.start();
                 threads.add(thread);
             }

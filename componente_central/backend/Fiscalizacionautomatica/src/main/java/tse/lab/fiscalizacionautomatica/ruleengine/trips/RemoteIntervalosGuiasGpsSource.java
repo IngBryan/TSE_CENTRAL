@@ -23,6 +23,12 @@ public final class RemoteIntervalosGuiasGpsSource implements IntervalosGuiasGpsS
         }
     }
 
+    /** With the remote proxy already looked up (tests). */
+    RemoteIntervalosGuiasGpsSource(Context context, IntervalosGuiasGpsRemote remote) {
+        this.context = context;
+        this.remote = remote;
+    }
+
     @Override
     public List<IntervaloGuiaGps> buscar(String matricula, Instant desde, Instant hasta) throws IOException {
         try {

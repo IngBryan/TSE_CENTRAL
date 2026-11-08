@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { ErrorBackend } from "@/lib/casos";
-import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, UsuarioDisponible } from "@/lib/empresas";
+import type { AltaEmpresa, CambiosEmpresa, OperacionRealizada, Rubro, UsuarioDisponible } from "@/lib/empresas";
 import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
@@ -21,6 +21,29 @@ export type ResultadoModificacion =
 export type ResultadoAlta = { ok: false; error: string; campos?: Record<string, string> };
 
 export type ResultadoUsuarios = { ok: true; usuarios: UsuarioDisponible[] } | { ok: false; error: string };
+
+export type ResultadoRubros = { ok: true; rubros: Rubro[] } | { ok: false; error: string };
+
+// Catalogo precargado de rubros, para elegir los de la empresa en el alta y la modificacion
+export async function obtenerRubros(): Promise<ResultadoRubros> {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false, error: SESION_VENCIDA };
+  try {
+    const res = await llamarBackend<Rubro[] & ErrorBackend>("/empresas/rubros", {
+      correlationId: randomUUID(),
+      usuarioCi: sesion.usuario.cedula,
+    });
+    if (res.status === 200 && Array.isArray(res.data)) return { ok: true, rubros: res.data };
+    if (res.status === 403) return { ok: false, error: "No estás registrado como funcionario del MTOP." };
+    return { ok: false, error: "No se pudieron obtener los rubros." };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    return { ok: false, error: NO_DISPONIBLE };
+  }
+}
+
+// Ids de rubros validos (enteros positivos)
+const sonIds = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => Number.isSafeInteger(n) && n > 0);
 
 // FA4, paso 2: usuarios registrados y validados que se pueden elegir como responsable. filtro es el
 // comienzo de la cedula (vacio: los primeros).
@@ -57,7 +80,8 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     typeof datos.razonSocial !== "string" ||
     typeof datos.direccion !== "string" ||
     typeof datos.habilitada !== "boolean" ||
-    (datos.ciResponsable !== null && typeof datos.ciResponsable !== "string")
+    (datos.ciResponsable !== null && typeof datos.ciResponsable !== "string") ||
+    !sonIds(datos.rubros)
   ) {
     return { ok: false, error: "No se pudo registrar la empresa." };
   }
@@ -68,6 +92,7 @@ export async function crearEmpresa(datos: AltaEmpresa): Promise<ResultadoAlta> {
     direccion: datos.direccion,
     habilitada: datos.habilitada,
     ciResponsable: datos.ciResponsable,
+    rubros: datos.rubros,
   };
   const correlationId = randomUUID();
   let res;
@@ -120,6 +145,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     typeof cambios.razonSocial !== "string" ||
     typeof cambios.direccion !== "string" ||
     typeof cambios.habilitada !== "boolean" ||
+    (cambios.rubros !== undefined && !sonIds(cambios.rubros)) ||
     !Number.isSafeInteger(cambios.version)
   ) {
     return { ok: false, error: "No se pudo modificar la empresa." };
@@ -129,6 +155,7 @@ export async function modificarEmpresa(nroEmpresa: number, cambios: CambiosEmpre
     razonSocial: cambios.razonSocial,
     direccion: cambios.direccion,
     habilitada: cambios.habilitada,
+    rubros: cambios.rubros,
     version: cambios.version,
   };
   const correlationId = randomUUID();

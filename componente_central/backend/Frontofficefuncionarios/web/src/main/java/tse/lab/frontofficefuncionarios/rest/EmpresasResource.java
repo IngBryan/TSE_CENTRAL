@@ -51,8 +51,17 @@ public class EmpresasResource {
         return ejecutar(() -> empresas.usuariosDisponibles(usuario, filtro, correlationId(req)));
     }
 
+    // Catalogo precargado de rubros [{"id": 1, "nombre": "Agropecuario"}, ...], para elegir los de la empresa.
+    // Ruta fija: JAX-RS la prefiere a /{nro}.
+    @GET
+    @Path("/rubros")
+    public Response rubros(@HeaderParam(USUARIO_CI) String usuario, @Context HttpServletRequest req) {
+        return ejecutar(() -> empresas.rubros(usuario, correlationId(req)));
+    }
+
     // Body {"nroEmpresa": 2, "nombrePublico": "...", "razonSocial": "...", "direccion": "...",
-    // "habilitada": false, "ciResponsable": "12345678"}; habilitada y ciResponsable son opcionales.
+    // "habilitada": false, "ciResponsable": "12345678", "rubros": [1, 3]}; habilitada, ciResponsable y rubros
+    // son opcionales. 400 con el campo "rubros" si alguno no esta en el catalogo.
     // 409 EMPRESA_EXISTENTE si el numero ya esta registrado; con ciResponsable, los mismos errores que la
     // asociacion (404 USUARIO_NO_ENCONTRADO, 409 USUARIO_NO_VALIDADO o RESPONSABLE_DE_OTRA_EMPRESA).
     @POST
@@ -67,8 +76,8 @@ public class EmpresasResource {
         return ejecutar(() -> empresas.detalle(usuario, nro, correlationId(req)));
     }
 
-    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true, "version": 3};
-    // habilitada es opcional. 409 EMPRESA_DESACTUALIZADA si version no es la actual de la empresa.
+    // Body {"nombrePublico": "...", "razonSocial": "...", "direccion": "...", "habilitada": true,
+    // "rubros": [1, 3], "version": 3}; habilitada y rubros son opcionales (si no vienen, se conservan). 409 EMPRESA_DESACTUALIZADA si version no es la actual de la empresa.
     @PUT
     @Path("/{nro}")
     public Response modificar(@HeaderParam(USUARIO_CI) String usuario, @PathParam("nro") Long nro,

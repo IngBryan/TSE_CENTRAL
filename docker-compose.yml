@@ -107,10 +107,14 @@ services:
     hostname: postgres
     container_name: postgres-server
     restart: unless-stopped
+    # Session time zone for CURRENT_TIMESTAMP/CURRENT_DATE; -c applies even with an existing volume
+    command: ["postgres", "-c", "timezone=America/Montevideo", "-c", "log_timezone=America/Montevideo"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=main_db
+      - TZ=America/Montevideo
+      - PGTZ=America/Montevideo
     ports:
       # Puerto en la maquina configurable: si ya hay un PostgreSQL local en el 5432, usar otro
       # (POSTGRES_PORT en .env). WildFly no lo usa: se conecta por la red interna (postgres:5432).

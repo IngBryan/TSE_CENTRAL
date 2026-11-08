@@ -47,8 +47,9 @@ y 500), `--duplicate-ratio` (0.02: el mismo mensaje publicado dos veces) y `--ou
 
 Cada 5 s imprime la tasa objetivo, la tasa real enviada y los eventos confirmados por RabbitMQ. Si la
 tasa enviada queda por debajo de la objetivo, el limite es el generador: subir `--publishers` o
-correrlo desde otra maquina. Las fechas de los eventos empiezan en el pasado lo necesario para que en
-picos y rampa ninguna quede en el futuro.
+correrlo desde otra maquina. Cada evento lleva la hora en que se envia (al menos 1 ms despues del
+anterior del mismo vehiculo), asi que la hora del servidor desde el que se corre tiene que estar
+sincronizada.
 
 ## Verificar que no hubo perdida
 

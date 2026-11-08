@@ -298,10 +298,12 @@ ve una cookie de sesion cifrada.
     - **Reasignar:** vehiculo de la empresa y chofer `HABILITADO` de la empresa (al menos uno distinto).
     - **Cancelar:** motivo obligatorio (hasta 500 caracteres). La guia pasa a `CANCELADA`.
   - **Endpoints** (con `X-Api-Key` y `X-Usuario-Ci`, como el resto):
-    `PUT /api/empresa/guias/{id}` `{ rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, version }`,
+    `PUT /api/empresa/guias/{id}` `{ rubroCliente, tipoCarga, pesoCargaKg, fecha, origenId, destinoId, version }`,
     `POST /api/empresa/guias/{id}/reasignacion` `{ matricula, idChofer, version }` y
     `POST /api/empresa/guias/{id}/cancelacion` `{ motivo, version }`. Responden la guia actualizada (con
-    su nueva `version`).
+    su nueva `version`). `GET /api/empresa/guias/rubros` y `GET /api/empresa/guias/tipos-carga` devuelven los
+    catalogos con los que se validan `rubroCliente` y `tipoCarga`: se aceptan sin distinguir mayusculas ni tildes y
+    se guardan con el nombre del catalogo. Al editar, una guia anterior a los catalogos puede conservar su valor.
   - **Concurrencia:** el body lleva la `version` de la guia que el responsable estaba mirando (`GuiaVista.version`,
     el `@Version` de `Guia`). La guia se bloquea (`PESSIMISTIC_WRITE`, el mismo bloqueo que usan los
     eventos del movil) y, si la version cambio (otra sesion la modifico o el chofer la inicio), responde
@@ -854,10 +856,13 @@ muestra el responsable ni los choferes, y una matricula de otra empresa solo dic
 revela de quien es).
 
 **Listados de Informacion Publica** (`/estadisticas`, del anio en curso): empresas y vehiculos habilitados (hoy),
-viajes y carga transportada en el anio, viajes por mes, carga por rubro del cliente e infracciones por
-tipo. Se cuentan los viajes `FINALIZADA` y solo las infracciones `CONFIRMADA` (las demas pueden terminar
-desestimadas). El rubro es texto libre en la guia: se agrupa sin distinguir mayusculas ni tildes, y los
-rubros reservados se muestran sumados en una fila *Otros rubros* (su nombre podria delatar a la empresa).
+viajes y carga transportada en el anio, viajes por mes, carga por rubro del cliente y por tipo de carga,
+empresas habilitadas por rubro (hoy) e infracciones por tipo. Se cuentan los viajes `FINALIZADA` y solo las infracciones `CONFIRMADA` (las demas pueden terminar
+desestimadas). Rubros y tipos de carga son catalogos precargados (`esquema-adicional.sql`, sin ABM): cada valor
+se muestra por nombre, incluso en 0, y lo que no esta en el catalogo (datos viejos) va junto en *Otros*, sin su
+nombre. Las filas reservadas van despues de las visibles y por nombre, para que el orden no revele su valor. En
+empresas por rubro, una empresa cuenta en cada rubro suyo: se aplica el umbral por fila, sin supresion
+complementaria, porque las filas no suman ningun total.
 
 Indicadores de fiscalizacion del anio (casos detectados en el anio):
 
@@ -869,9 +874,9 @@ Indicadores de fiscalizacion del anio (casos detectados en el anio):
 - **Tiempo de resolucion:** mediana de los dias entre la deteccion y el fundamento de resolucion. Mediana y
   no promedio, para que un caso trabado meses no la distorsione.
 - En las tablas de viajes, el promedio de carga por viaje; cada fila tiene una barra proporcional.
-- **Descarga en CSV** de cada tabla (`/estadisticas/csv?tabla=meses|rubros|infracciones`, ruta del
-  front): `;` como separador y BOM UTF-8 para Excel en es-UY; lo reservado sale como `Reservado`. El rubro lo
-  escriben las empresas, asi que si empieza como una formula (`=`, `+`, `-`, `@`) se le antepone `'`.
+- **Descarga en CSV** de cada tabla (`/estadisticas/csv?tabla=meses|rubros|tipos-carga|empresas-rubro|infracciones`, ruta del
+  front): `;` como separador y BOM UTF-8 para Excel en es-UY; lo reservado sale como `Reservado`. Si un valor
+  viejo empieza como una formula (`=`, `+`, `-`, `@`), se le antepone `'`.
 
 No se publican maximos ni minimos (el viaje mas pesado, la empresa con mas infracciones): siempre
 corresponden a una sola empresa.
@@ -886,8 +891,8 @@ Como se protegen los datos (umbral de agregacion y demas reglas): ver *Proteccio
 
 Datos de demo: las empresas 3 a 5 (`Fletes del Norte`, `Cargas del Sur`, `Transporte Oriental`), con un
 vehiculo habilitado y viajes finalizados cada una, y dos infracciones confirmadas. Con ellas el portal
-muestra numeros reales y, a la vez, valores reservados: *Construccion* es solo de la empresa 5 (y arrastra a
-*Forestal* por la supresion complementaria), asi que las dos aparecen sumadas en *Otros rubros*, y los meses
+muestra numeros reales y, a la vez, valores reservados: *Construcción* es solo de la empresa 5 (y arrastra a
+*Forestal* por la supresion complementaria), asi que las dos figuran como *Reservado*, y los meses
 con viajes de 2 empresas figuran como *Reservado*. Ver el escenario E12 de `README_ESCENARIOS.md`.
 
 ### Proteccion de datos personales (Ley 18.331)
@@ -911,10 +916,8 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
 - **Supresion complementaria:** si en una tabla queda reservada una sola fila y se publica el total, se
   deduce restando. Por eso se reservan ademas las filas visibles mas chicas hasta que el conjunto de las
   reservadas tambien junte 3 empresas (o se reserva todo). Una fila en 0 se publica: no identifica a nadie.
-- **Etiquetas que identifican:** el rubro del cliente lo escribe cada empresa a mano, y su nombre puede
-  delatarla aunque no se vean los numeros. Los rubros reservados no se listan por nombre: van sumados en
-  *Otros rubros*, que se publica si junta 3 empresas (si no, queda *Reservado*). Meses y tipos de infraccion
-  son etiquetas fijas.
+- **Etiquetas:** meses, rubros, tipos de carga y tipos de infraccion son valores fijos del sistema: su nombre no
+  identifica a nadie. Lo que no esta en un catalogo (texto libre viejo) no se muestra por nombre: va en *Otros*.
 - **Indicadores:** la tasa de infracciones exige el umbral en sus dos partes (viajes e infracciones); el %
   de desestimados y la mediana de dias de resolucion, en los casos resueltos.
 - **Sin extremos:** no se publican maximos ni minimos (el viaje mas pesado, la empresa con mas
@@ -945,6 +948,18 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
   fecha de nacimiento ni los demas datos que devuelve la PDI).
 - **Registro de consultas a la PDI:** cada consulta de una cedula queda en `consultas_persona` (quien
   consulto, que cedula, fecha y hora).
+- **Listado de usuarios del backoffice:** `GET /api/usuarios?pagina=1&tamanio=20` (solo `ADMINISTRADOR`) pagina por cedula a
+  funcionarios, responsables, choferes, administradores y autoridades, una fila por persona con sus roles, nombres,
+  apellidos y email. Filtros opcionales: `rol` (FUNCIONARIO, RESPONSABLE, CHOFER, ADMINISTRADOR, AUTORIDAD) y `ci`
+  (comienzo de la cedula, acepta puntos y guion). Un ciudadano sin rol no aparece. `POST /api/usuarios` da de alta
+  administradores y autoridades (cedula y contrasena inicial de 12 a 128 caracteres, guardada con PBKDF2) y funcionarios
+  (cedula y email). Choferes y responsables no: tienen su propio alta (CU-02 y la gestion de empresas).
+  `PUT /api/usuarios/{ci}/rol` reemplaza el rol de un funcionario, administrador o autoridad por otro de esos tres (pide
+  contrasena o email si el rol nuevo los necesita). Un funcionario que deja de serlo queda inactivo (`funcionarios.activo`):
+  conserva su historial pero no puede ingresar. El rol del backoffice se lee de la base en cada pedido, no del token.
+  `DELETE /api/usuarios/{ci}` le quita todos esos roles: borra al administrador o autoridad y deja inactivo al funcionario
+  (no toca sus roles de chofer o responsable). Un administrador no puede cambiar su rol ni eliminarse a si mismo. No incluye fecha de nacimiento, `sub` de gub.uy ni contrasena. Quien lo
+  consulto queda en el log `http.request`.
 - **Sesiones:** la sesion del front va en una cookie cifrada. La API key del backend solo la tiene el
   servidor de Next y nunca llega al navegador; el backend confia en `X-Usuario-Ci` por eso (si la API se
   abriera a otros clientes habria que pasar un token firmado).

@@ -23,6 +23,7 @@ import org.bson.Document;
 @Singleton
 @LocalBean
 public class MongoSeguimientoDAO implements TrackingSeguimientoSource {
+    // The container serializes the methods of this @Singleton (default @Lock(WRITE))
     private MongoClient client;
 
     private static String env(String clave, String defecto) {
@@ -30,33 +31,37 @@ public class MongoSeguimientoDAO implements TrackingSeguimientoSource {
         return valor == null || valor.isBlank() ? defecto : valor;
     }
 
-    private synchronized MongoCollection<Document> coleccion() {
+    private MongoCollection<Document> coleccion() {
         if (client == null) {
             String usuario = System.getenv("MONGO_USER");
             String password = System.getenv("MONGO_PASSWORD");
             if (usuario == null || usuario.isBlank() || password == null || password.isBlank()) {
                 throw new SeguimientoNoDisponibleException("MongoDB de seguimiento no configurado");
             }
-            try {
-                var settings = MongoClientSettings.builder()
-                        .applyToClusterSettings(cluster -> cluster
-                                .hosts(List.of(new ServerAddress(
-                                        env("MONGO_HOST", "localhost"),
-                                        Integer.parseInt(env("MONGO_PORT", "27017"))
-                                )))
-                                .serverSelectionTimeout(3, TimeUnit.SECONDS))
-                        .credential(MongoCredential.createCredential(
-                                usuario,
-                                env("MONGO_AUTH_DB", "admin"),
-                                password.toCharArray()))
-                        .build();
-
-                client = MongoClients.create(settings);
-            } catch (RuntimeException e) {
-                throw new SeguimientoNoDisponibleException("No se pudo configurar MongoDB", e);
-            }
+            client = crearCliente(usuario, password);
         }
         return client.getDatabase(env("MONGO_DB", "main_db")).getCollection("tracking");
+    }
+
+    static MongoClient crearCliente(String usuario, String password) {
+        try {
+            var settings = MongoClientSettings.builder()
+                    .applyToClusterSettings(cluster -> cluster
+                            .hosts(List.of(new ServerAddress(
+                                    env("MONGO_HOST", "localhost"),
+                                    Integer.parseInt(env("MONGO_PORT", "27017"))
+                            )))
+                            .serverSelectionTimeout(3, TimeUnit.SECONDS))
+                    .credential(MongoCredential.createCredential(
+                            usuario,
+                            env("MONGO_AUTH_DB", "admin"),
+                            password.toCharArray()))
+                    .build();
+
+            return MongoClients.create(settings);
+        } catch (RuntimeException e) {
+            throw new SeguimientoNoDisponibleException("No se pudo configurar MongoDB", e);
+        }
     }
 
     @Override
@@ -107,7 +112,7 @@ public class MongoSeguimientoDAO implements TrackingSeguimientoSource {
     }
 
     @PreDestroy
-    public synchronized void cerrar() {
+    public void cerrar() {
         if (client != null) { client.close(); client = null; }
     }
 }

@@ -44,14 +44,13 @@ final class Publisher implements Runnable {
 
     private static final class Vehicle {
         final int index;
-        long clockMicros;
-        final long tripStartMicros;
+        final long tripStartMillis;
+        long lastMillis;
         Event held;
 
-        Vehicle(int index, long clockMicros, long tripStartMicros) {
+        Vehicle(int index, long tripStartMillis) {
             this.index = index;
-            this.clockMicros = clockMicros;
-            this.tripStartMicros = tripStartMicros;
+            this.tripStartMillis = tripStartMillis;
         }
     }
 
@@ -79,7 +78,7 @@ final class Publisher implements Runnable {
     private final NavigableMap<Long, Boolean> unconfirmed = new ConcurrentSkipListMap<>();
 
     Publisher(Connection connection, Settings settings, int partition, int partitions, Stats stats,
-            AtomicBoolean stop, long startNanos, Instant clocksStart) {
+            AtomicBoolean stop, long startNanos) {
         this.connection = connection;
         this.settings = settings;
         this.partition = partition;
@@ -88,11 +87,10 @@ final class Publisher implements Runnable {
         this.stop = stop;
         this.startNanos = startNanos;
         this.random = new SplittableRandom(partition);
-        long start = clocksStart.toEpochMilli() * 1000;
+        long now = System.currentTimeMillis();
         for (int i = partition; i < Fleet.SIZE; i += partitions) {
-            // Spread the clocks within one spacing and the trips along the route, so vehicles don't move in step
-            long clock = start + random.nextLong(settings.spacingMicros());
-            vehicles.add(new Vehicle(i, clock, clock - random.nextLong(TRIP.toNanos() / 1000)));
+            // Spread the trips along the route, so vehicles don't move in step
+            vehicles.add(new Vehicle(i, now - random.nextLong(TRIP.toMillis())));
         }
     }
 
@@ -166,14 +164,16 @@ final class Publisher implements Runnable {
 
     private Event nextEvent(Vehicle vehicle) throws IOException {
         Route route = Fleet.route();
-        long tripMicros = TRIP.toNanos() / 1000;
+        // Dated when sent, and after the previous event of the vehicle: (plate, timestamp) tells them apart
+        long millis = Math.max(System.currentTimeMillis(), vehicle.lastMillis + 1);
+        vehicle.lastMillis = millis;
+        long tripMillis = TRIP.toMillis();
         // Goes to the destination and back
-        double lap = (double) ((vehicle.clockMicros - vehicle.tripStartMicros) % (2 * tripMicros)) / tripMicros;
+        double lap = (double) ((millis - vehicle.tripStartMillis) % (2 * tripMillis)) / tripMillis;
         double progress = lap <= 1 ? lap : 2 - lap;
         TrackingMessage message = new TrackingMessage(stats.nextEventId.getAndIncrement(), Fleet.gpsId(vehicle.index),
                 Fleet.plate(vehicle.index), route.latitude(progress), route.longitude(progress),
-                OffsetDateTime.ofInstant(Instant.ofEpochMilli(vehicle.clockMicros / 1000), URUGUAY).toString());
-        vehicle.clockMicros += settings.spacingMicros();
+                OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), URUGUAY).toString());
         return new Event(UUID.randomUUID().toString(), JSON.writeValueAsBytes(message));
     }
 
