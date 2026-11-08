@@ -133,6 +133,38 @@ class KpiTest {
                 Map.of(Facets.CARGO_TYPE, new Selection(List.of(SOJA), List.of()))));
     }
 
+    // A trip by the company it is made for, a case by the one that owns its vehicle; the third company is disabled
+    @Test
+    void groupsEveryKpiByCompany() {
+        Map<String, Double> unoYUno = Map.of("Empresa 1", 1.0, "Empresa 2", 1.0);
+        assertEquals(Map.of("Empresa 1", 2.0, "Empresa 2", 1.0), values(new TripsKpi(), Facets.COMPANY, Map.of()));
+        assertEquals(Map.of("Empresa 1", 2.0, "Empresa 2", 1.0),
+                values(new DetectedInfractionsKpi(), Facets.COMPANY, Map.of()));
+        assertEquals(unoYUno, values(new EnabledCompaniesKpi(), Facets.COMPANY, Map.of()));
+        assertEquals(unoYUno, values(new EnabledVehiclesKpi(), Facets.COMPANY, Map.of()));
+
+        Selection soloObras = new Selection(List.of("2"), List.of());
+        assertEquals(Map.of("2026", 1.0), values(new TripsKpi(), Facets.YEAR, Map.of(Facets.COMPANY, soloObras)));
+        assertEquals(Map.of("2026", 1.0),
+                values(new EnabledVehiclesKpi(), Facets.YEAR, Map.of(Facets.COMPANY, soloObras)));
+        assertEquals(List.of(new FacetValue("1", "Empresa 1"), new FacetValue("2", "Empresa 2"),
+                new FacetValue("3", "Empresa 3")), Facets.COMPANY.values(em));
+    }
+
+    // The cases of the test are all of overload; one of another kind reads as its code
+    @Test
+    void groupsCasesByTheKindOfInfraction() {
+        assertEquals(Map.of("Exceso de carga", 3.0), values(new DetectedInfractionsKpi(), Facets.CASE_TYPE, Map.of()));
+        assertEquals(List.of(new FacetValue("EXCESO_CARGA", "Exceso de carga")), Facets.CASE_TYPE.values(em));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TripsKpi().calculate(em, PERIOD, Facets.CASE_TYPE, Map.of()));
+
+        em.getTransaction().begin();
+        em.persist(new CasoFiscalizacion("Desvío", "DESVIO_RUTA", em.find(Vehiculo.class, "SAA1001"), null));
+        em.getTransaction().commit();
+        assertEquals(new FacetValue("DESVIO_RUTA", "Desvio ruta"), Facets.CASE_TYPE.values(em).get(0));
+    }
+
     @Test
     void listsTheValuesOfEachFacet() {
         assertEquals(List.of(new FacetValue("Montevideo", "Montevideo"), new FacetValue("Salto", "Salto")),

@@ -145,13 +145,17 @@ class ReportServiceTest {
         assertEquals(new KpiDefinition("viajes", "Viajes realizados"), kpis.get(0));
     }
 
-    // Companies have no department or cargo type; a rate takes what both of its KPIs take; several KPIs, what all take
+    // Companies have no department or cargo type, only cases have a kind of infraction; a rate takes what both of
+    // its KPIs take; several KPIs, what all take
     @Test
     void listsTheFacetsAllTheKpisTake() {
-        List<String> all = List.of("day", "week", "month", "year", "department", "cargoType", "category");
-        List<String> companies = List.of("day", "week", "month", "year", "category");
+        List<String> all = List.of("day", "week", "month", "year", "department", "cargoType", "category", "company");
+        List<String> companies = List.of("day", "week", "month", "year", "category", "company");
         assertEquals(all, facetIds("viajes"));
-        assertEquals(all, facetIds("tasa"));
+        List<String> cases = List.of("day", "week", "month", "year", "department", "cargoType", "category", "company",
+                "caseType");
+        assertEquals(cases, facetIds("tasa"));
+        assertEquals(cases, facetIds("infracciones", "casos_cerrados"));
         assertEquals(companies, facetIds("empresas"));
         assertEquals(companies, facetIds("viajes", "vehiculos"));
         assertEquals(companies, facetIds("toneladas", "tasa", "empresas"));

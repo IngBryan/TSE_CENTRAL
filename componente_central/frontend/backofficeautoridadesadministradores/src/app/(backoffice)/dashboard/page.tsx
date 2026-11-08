@@ -1,16 +1,8 @@
-import { BadgeCheck, Building2, Package, Route, ShieldAlert, Truck } from "lucide-react";
+import { BadgeCheck, Building2, Package, Route, ShieldAlert, Table2, Truck } from "lucide-react";
 
 import Kpi from "@/components/Kpi";
 import { requerirRol } from "@/lib/backoffice-sesion";
-import { valoresFaceta } from "@/lib/reportes-backend";
-import {
-  cargaPorRubro,
-  infraccionesPorTipo,
-  totalDetectadas,
-  totalToneladas,
-  totalViajes,
-  viajesPorPeriodo,
-} from "@/lib/kpi";
+import { kpiDashboard, tablaDashboard } from "@/lib/kpi";
 import {
   consultaFiltros,
   hoyEnUruguay,
@@ -20,16 +12,21 @@ import {
   rangoComparacion,
   rangoPeriodo,
   seleccionesDe,
-  tasaConfirmadas,
   textoRango,
   textoSeleccion,
   type FiltrosDashboard,
 } from "@/lib/reportes";
-import { dashboardConComparacion } from "@/lib/reportes-mock";
+import { cargarReporte, facetasDeKpis, listarKpis, valoresFaceta } from "@/lib/reportes-backend";
+import { esIdKpi, KPIS, type IdKpi } from "@/lib/reportes-kpis";
+import { pedidoReporte } from "@/lib/reportes-tabla";
 import BarraDashboard from "./BarraDashboard";
 
 // The facet of the backend the dashboard filters by
 const RUBRO = "category";
+// The facet the table of indicators groups by
+const EMPRESA = "company";
+// Grouped by company each company only counts itself: the backend allows it, but it says nothing in this table
+const FUERA_DE_LA_TABLA: string[] = ["empresas"];
 
 // This year against the same days of last year, unless the clock or the filters say otherwise
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
@@ -47,14 +44,66 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const hoy = hoyEnUruguay();
   const periodo = rangoPeriodo(filtros.periodo, filtros.rango, hoy) ?? { desde: hoy, hasta: hoy };
   const comparacion = rangoComparacion(filtros.comparar, periodo, filtros.rangoComparar);
-  // Test data until the backend has the reports
-  const { actual: datos, anterior } = dashboardConComparacion(periodo, comparacion, filtros);
-  const rubros = await valoresFaceta(RUBRO);
+  const compara = comparacion !== null;
+
+  // One call per KPI, each with its own grouping; the number cards only use the total, so any grouping does
+  const cargar = (id: IdKpi, agrupacion: string) =>
+    cargarReporte(
+      pedidoReporte(
+        { kpis: [{ id, medidas }], agrupacion },
+        periodo,
+        comparacion,
+        filtros
+      )
+    ).then((respuesta) => kpiDashboard(respuesta, id, compara));
+
+  const medidas = compara ? ["current" as const, "previous" as const] : ["current" as const];
+
+  // Every indicator the backend can group by company, side by side in one table: one call, since they share the
+  // grouping
+  async function porEmpresa() {
+    const kpis = await listarKpis();
+    if (!kpis.ok) return { ok: false as const, mensaje: kpis.mensaje };
+    const conocidos = kpis.datos.filter((kpi) => esIdKpi(kpi.id) && !FUERA_DE_LA_TABLA.includes(kpi.id));
+    const facetas = await Promise.all(conocidos.map((kpi) => facetasDeKpis([kpi.id])));
+    const compatibles = conocidos.filter((_, i) => {
+      const respuesta = facetas[i];
+      return respuesta.ok && respuesta.datos.some((faceta) => faceta.id === EMPRESA);
+    });
+
+    const columnas = compatibles.map((kpi) => ({
+      id: kpi.id,
+      titulo: kpi.name,
+      formato: KPIS[kpi.id as IdKpi].formato,
+      mejorSiBaja: KPIS[kpi.id as IdKpi].mejorSiBaja,
+    }));
+    if (compatibles.length === 0) return { ok: true as const, tabla: { encabezado: "Empresa", columnas, filas: [] } };
+    const reporte = { kpis: compatibles.map((kpi) => ({ id: kpi.id as IdKpi, medidas })), agrupacion: EMPRESA };
+    const respuesta = await cargarReporte(pedidoReporte(reporte, periodo, comparacion, filtros));
+    return tablaDashboard(respuesta, "Empresa", columnas, compara);
+  }
+
+  const [rubros, empresas, vehiculos, tasa, viajes, toneladas, infracciones, tabla] = await Promise.all([
+    valoresFaceta(RUBRO),
+    cargar("empresas", "year"),
+    cargar("vehiculos", "year"),
+    cargar("tasa", "year"),
+    cargar("viajes", "month"),
+    cargar("toneladas", "category"),
+    cargar("infracciones", "caseType"),
+    porEmpresa(),
+  ]);
   const valores = rubros.ok ? rubros.datos : [];
 
   const nombreRubro = (id: string) => valores.find((r) => r.id === id)?.name ?? id;
   const rubro = filtros.selecciones[RUBRO];
   const filtrosActivos = [rubro && `Rubro: ${textoSeleccion(rubro, nombreRubro)}`].filter(Boolean);
+
+  // What the card shows of each KPI, or why it could not be loaded
+  const datos = (kpi: typeof empresas) =>
+    kpi.ok
+      ? { valor: kpi.valor, comparativo: kpi.comparativo, agrupacion: kpi.grupos }
+      : { valor: null, error: kpi.mensaje };
 
   return (
     <div className="w-full min-w-0 space-y-6 px-6 py-8 lg:px-8">
@@ -81,55 +130,41 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Kpi titulo="Empresas habilitadas" icono={Building2} {...datos(empresas)} />
+        <Kpi titulo="Vehículos habilitados" icono={Truck} {...datos(vehiculos)} />
         <Kpi
-          titulo="Empresas habilitadas"
-          icono={Building2}
-          valor={datos.empresasHabilitadas}
-          comparativo={anterior?.empresasHabilitadas}
-        />
-        <Kpi
-          titulo="Vehículos habilitados"
-          icono={Truck}
-          valor={datos.vehiculosHabilitados}
-          comparativo={anterior?.vehiculosHabilitados}
-        />
-        <Kpi
-          titulo="Tasa de infracciones confirmadas sobre detectadas"
+          titulo="Tasa de casos cerrados sobre detectados"
           icono={BadgeCheck}
           formato="porcentaje"
-          valor={tasaConfirmadas(datos)}
-          comparativo={anterior ? tasaConfirmadas(anterior) : null}
+          {...datos(tasa)}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Kpi
-          tipo="columnas"
-          titulo="Viajes realizados por período"
-          icono={Route}
-          valor={totalViajes(datos)}
-          comparativo={anterior ? totalViajes(anterior) : null}
-          agrupacion={viajesPorPeriodo(datos, anterior)}
-        />
+        <Kpi tipo="columnas" titulo="Viajes realizados por mes" icono={Route} {...datos(viajes)} />
         <Kpi
           tipo="columnas"
           titulo="Volumen de carga transportado por rubro"
           icono={Package}
           formato="toneladas"
-          valor={totalToneladas(datos)}
-          comparativo={anterior ? totalToneladas(anterior) : null}
-          agrupacion={cargaPorRubro(datos, anterior)}
+          {...datos(toneladas)}
         />
         <Kpi
           tipo="columnas"
           titulo="Infracciones detectadas por tipo"
           icono={ShieldAlert}
           mejorSiBaja
-          valor={totalDetectadas(datos)}
-          comparativo={anterior ? totalDetectadas(anterior) : null}
-          agrupacion={infraccionesPorTipo(datos, anterior)}
+          {...datos(infracciones)}
         />
       </div>
+
+      <Kpi
+        tipo="tabla"
+        titulo="Indicadores por empresa"
+        icono={Table2}
+        valor={null}
+        {...(tabla.ok ? { tabla: tabla.tabla } : { error: tabla.mensaje })}
+      />
     </div>
   );
 }

@@ -6,7 +6,7 @@ export type KpiDisponible = { id: string; name: string };
 // time: only groups (the period is its filter). catalog: groups and filters
 export type FacetaDisponible = { id: string; name: string; kind: "time" | "catalog" };
 
-type Resultado<T> = { ok: true; datos: T } | { ok: false; mensaje: string };
+export type Resultado<T> = { ok: true; datos: T } | { ok: false; mensaje: string };
 
 const SESION_VENCIDA = "La sesión venció. Vuelve a iniciar sesión.";
 

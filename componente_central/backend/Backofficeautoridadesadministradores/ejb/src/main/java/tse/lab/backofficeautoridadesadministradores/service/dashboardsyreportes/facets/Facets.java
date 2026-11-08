@@ -17,9 +17,12 @@ public final class Facets {
     public static final DepartmentFacet DEPARTMENT = new DepartmentFacet();
     public static final CargoTypeFacet CARGO_TYPE = new CargoTypeFacet();
     public static final CategoryFacet CATEGORY = new CategoryFacet();
+    public static final CompanyFacet COMPANY = new CompanyFacet();
+    public static final CaseTypeFacet CASE_TYPE = new CaseTypeFacet();
 
     // In the order a report offers them
-    public static final List<Facet> ALL = List.of(DAY, WEEK, MONTH, YEAR, DEPARTMENT, CARGO_TYPE, CATEGORY);
+    public static final List<Facet> ALL = List.of(DAY, WEEK, MONTH, YEAR, DEPARTMENT, CARGO_TYPE, CATEGORY, COMPANY,
+            CASE_TYPE);
 
     private static final Map<String, Facet> BY_ID = ALL.stream()
             .collect(Collectors.toUnmodifiableMap(Facet::id, Function.identity()));
@@ -27,7 +30,7 @@ public final class Facets {
     private Facets() {
     }
 
-    // The facet with that id, or null: "month", "department", "cargoType", "category"
+    // The facet with that id, or null: "month", "department", "cargoType", "category", "company", "caseType"
     public static Facet byId(String id) {
         return id == null ? null : BY_ID.get(id);
     }

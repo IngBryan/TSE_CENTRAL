@@ -1,12 +1,3 @@
-// Contract of GET reportes/dashboard in the backoffice API
-export type Dashboard = {
-  empresasHabilitadas: number;
-  vehiculosHabilitados: number;
-  viajesPorPeriodo: { periodo: string; cantidad: number }[];
-  cargaPorRubro: { rubro: string; toneladas: number }[];
-  infraccionesPorTipo: { tipo: string; detectadas: number; confirmadas: number }[];
-};
-
 export const PERIODOS = {
   hoy: "Hoy",
   "ultimos-30-dias": "Últimos 30 días",
@@ -50,14 +41,6 @@ export function seleccionVacia(seleccion: Seleccion | undefined): boolean {
   return !seleccion || (seleccion.incluir.length === 0 && seleccion.excluir.length === 0);
 }
 
-// The values a filter leaves out of `todos`
-export function valoresFiltrados(seleccion: Seleccion | undefined, todos: readonly string[]): string[] {
-  if (seleccionVacia(seleccion)) return [...todos];
-  const incluidos = new Set(seleccion!.incluir);
-  const excluidos = new Set(seleccion!.excluir);
-  return todos.filter((v) => (incluidos.size === 0 || incluidos.has(v)) && !excluidos.has(v));
-}
-
 // The filters as they travel in the URL: "incluir.cargoType=2,4&excluir.cargoType=11"
 const INCLUIR = "incluir.";
 const EXCLUIR = "excluir.";
@@ -89,12 +72,6 @@ export function textoSeleccion(seleccion: Seleccion | undefined, nombre: (valor:
 }
 
 export const PERIODO_POR_DEFECTO: Periodo = "ultimos-30-dias";
-
-export const DEPARTAMENTOS = [
-  "Artigas", "Canelones", "Cerro Largo", "Colonia", "Durazno", "Flores", "Florida", "Lavalleja",
-  "Maldonado", "Montevideo", "Paysandú", "Río Negro", "Rivera", "Rocha", "Salto", "San José",
-  "Soriano", "Tacuarembó", "Treinta y Tres",
-] as const;
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -254,8 +231,6 @@ export function rangoComparacion(
   }
 }
 
-export type FiltrosCarga = Pick<FiltrosDashboard, "selecciones">;
-
 // "2026-10-09" -> "09/10/2026"
 export function fechaCorta(fecha: string): string {
   return fecha.split("-").reverse().join("/");
@@ -263,11 +238,4 @@ export function fechaCorta(fecha: string): string {
 
 export function textoRango(rango: Rango): string {
   return `${fechaCorta(rango.desde)} – ${fechaCorta(rango.hasta)}`;
-}
-
-// Confirmed over detected infractions; null when nothing was detected
-export function tasaConfirmadas(dashboard: Dashboard): number | null {
-  const detectadas = dashboard.infraccionesPorTipo.reduce((total, i) => total + i.detectadas, 0);
-  const confirmadas = dashboard.infraccionesPorTipo.reduce((total, i) => total + i.confirmadas, 0);
-  return detectadas === 0 ? null : confirmadas / detectadas;
 }

@@ -3,7 +3,8 @@ import { ArrowDownRight, ArrowUpRight, Minus, type LucideIcon } from "lucide-rea
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Grupo } from "@/lib/kpi";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Grupo, TablaKpi } from "@/lib/kpi";
 
 export type FormatoKpi = "numero" | "porcentaje" | "toneladas";
 
@@ -15,11 +16,15 @@ type Props = {
   formato?: FormatoKpi;
   // For KPIs where going up is bad (infractions): the arrow turns red when it rises
   mejorSiBaja?: boolean;
-  tipo?: "numero" | "columnas";
+  tipo?: "numero" | "columnas" | "tabla";
   // Only for "columnas": one column per group
   agrupacion?: Grupo[];
+  // Only for "tabla": several indicators side by side, one row per group; it shows no number of its own
+  tabla?: TablaKpi;
   // Shown in a tinted badge next to the title
   icono?: LucideIcon;
+  // Why the KPI could not be loaded, shown in place of its value
+  error?: string;
 };
 
 const NUMERO = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 1 });
@@ -106,7 +111,7 @@ function Columnas({ grupos, formato, conComparativo }: { grupos: Grupo[]; format
     <div className="space-y-2">
       <div className="flex h-36 items-end gap-1.5 border-b border-border">
         {grupos.map((grupo) => (
-          <div key={grupo.etiqueta} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
+          <div key={grupo.clave} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
             {conComparativo && (
               <Barra
                 alto={alto(grupo.comparativo ?? 0)}
@@ -125,7 +130,7 @@ function Columnas({ grupos, formato, conComparativo }: { grupos: Grupo[]; format
 
       <div className="flex gap-1.5">
         {grupos.map((grupo) => (
-          <span key={grupo.etiqueta} className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground">
+          <span key={grupo.clave} className="min-w-0 flex-1 truncate text-center text-[10px] text-muted-foreground">
             {grupo.etiqueta}
           </span>
         ))}
@@ -143,6 +148,55 @@ function Columnas({ grupos, formato, conComparativo }: { grupos: Grupo[]; format
   );
 }
 
+// One row per group and one column per indicator, each value with its change against the comparison
+function Tabla({ tabla }: { tabla: TablaKpi }) {
+  if (tabla.filas.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">Sin datos.</p>;
+  }
+
+  return (
+    <div className="max-h-96 overflow-auto rounded-md border">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-card">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="px-3">{tabla.encabezado}</TableHead>
+            {tabla.columnas.map((columna) => (
+              <TableHead key={columna.id} className="px-3 text-right whitespace-normal">
+                {columna.titulo}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tabla.filas.map((fila) => (
+            <TableRow key={fila.clave}>
+              <TableCell className="px-3 py-1.5 font-medium">{fila.etiqueta}</TableCell>
+              {tabla.columnas.map((columna) => {
+                const { valor, comparativo } = fila.valores[columna.id] ?? { valor: null, comparativo: null };
+                return (
+                  <TableCell key={columna.id} className="px-3 py-1.5 text-right tabular-nums">
+                    <div className="flex items-center justify-end gap-2">
+                      {valor === null ? "—" : formatear(valor, columna.formato)}
+                      {valor !== null && comparativo !== null && (
+                        <Variacion
+                          valor={valor}
+                          comparativo={comparativo}
+                          formato={columna.formato}
+                          mejorSiBaja={columna.mejorSiBaja}
+                        />
+                      )}
+                    </div>
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export default function Kpi({
   titulo,
   valor,
@@ -151,7 +205,9 @@ export default function Kpi({
   mejorSiBaja = false,
   tipo = "numero",
   agrupacion = [],
+  tabla,
   icono: Icono,
+  error,
 }: Props) {
   const hayComparativo = valor !== null && comparativo !== null && comparativo !== undefined;
 
@@ -169,6 +225,12 @@ export default function Kpi({
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
+        {error ? (
+          <p className="py-2 text-sm text-destructive">{error}</p>
+        ) : tipo === "tabla" ? (
+          tabla && <Tabla tabla={tabla} />
+        ) : (
+          <>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="text-3xl font-semibold tracking-tight tabular-nums">
             {valor === null ? "—" : formatear(valor, formato)}
@@ -186,6 +248,8 @@ export default function Kpi({
           <div className="mt-2">
             <Columnas grupos={agrupacion} formato={formato} conComparativo={hayComparativo} />
           </div>
+        )}
+          </>
         )}
       </CardContent>
     </Card>
