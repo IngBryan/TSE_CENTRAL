@@ -1,65 +1,89 @@
 import type { FormatoKpi } from "@/components/Kpi";
 
 import { COMPARATIVOS, type Comparativo } from "./reportes";
+import type { FacetaDisponible, ValorFaceta } from "./reportes-backend";
 
-// suma: adds up over the period. tasa: confirmed over detected. stock: how many there are at the end of it
+// suma: adds up over the period. tasa: closed over detected cases. stock: how many there are at the end of it
 export type Agregado = "suma" | "tasa" | "stock";
 
 export const KPIS = {
-  viajes: { nombre: "Viajes realizados", formato: "numero", agregado: "suma", mejorSiBaja: false },
-  toneladas: { nombre: "Volumen de carga transportado", formato: "toneladas", agregado: "suma", mejorSiBaja: false },
-  infracciones: { nombre: "Infracciones detectadas", formato: "numero", agregado: "suma", mejorSiBaja: true },
-  confirmadas: { nombre: "Infracciones confirmadas", formato: "numero", agregado: "suma", mejorSiBaja: true },
-  tasa: {
-    nombre: "Tasa de infracciones confirmadas sobre detectadas",
-    formato: "porcentaje",
-    agregado: "tasa",
-    mejorSiBaja: false,
-  },
-  empresas: { nombre: "Empresas habilitadas", formato: "numero", agregado: "stock", mejorSiBaja: false },
-  vehiculos: { nombre: "Vehículos habilitados", formato: "numero", agregado: "stock", mejorSiBaja: false },
-} as const satisfies Record<string, { nombre: string; formato: FormatoKpi; agregado: Agregado; mejorSiBaja: boolean }>;
+  viajes: { formato: "numero", agregado: "suma", mejorSiBaja: false },
+  toneladas: { formato: "toneladas", agregado: "suma", mejorSiBaja: false },
+  infracciones: { formato: "numero", agregado: "suma", mejorSiBaja: true },
+  casos_cerrados: { formato: "numero", agregado: "suma", mejorSiBaja: false },
+  tasa: { formato: "porcentaje", agregado: "tasa", mejorSiBaja: false },
+  empresas: { formato: "numero", agregado: "stock", mejorSiBaja: false },
+  vehiculos: { formato: "numero", agregado: "stock", mejorSiBaja: false },
+} as const satisfies Record<string, { formato: FormatoKpi; agregado: Agregado; mejorSiBaja: boolean }>;
 
 export type IdKpi = keyof typeof KPIS;
 
+// The names come from the backend (GET reports/kpis); the id stands in while it does not say
+export type NombresKpi = Partial<Record<IdKpi, string>>;
+
+export function nombreKpi(nombres: NombresKpi, id: IdKpi): string {
+  return nombres[id] ?? id;
+}
+
 // Each one becomes a column under its KPI
+// By the id the backend takes (POST reports/load)
 export const MEDIDAS = {
-  actual: "Actual",
-  anterior: "Anterior",
-  crecimiento: "Crecimiento",
-  diferencia: "Diferencia",
+  current: "Actual",
+  previous: "Anterior",
+  growth: "Crecimiento",
+  difference: "Diferencia",
 } as const;
 
 export type Medida = keyof typeof MEDIDAS;
 
-export const AGRUPACIONES = {
-  dia: "Día",
-  semana: "Semana",
-  mes: "Mes",
-  anio: "Año",
-  departamento: "Departamento",
-  tipoCarga: "Tipo de carga",
-  rubro: "Rubro",
-} as const;
+// The groupings and filters are the facets of the backend (GET reports/facets), by id: "month", "department"
+export const AGRUPACION_POR_DEFECTO = "month";
 
-export type Agrupacion = keyof typeof AGRUPACIONES;
+// The id stands in for a facet the backend did not name (it did not answer)
+export function nombreFaceta(facetas: readonly FacetaDisponible[] | null, id: string): string {
+  return facetas?.find((faceta) => faceta.id === id)?.name ?? id;
+}
 
-export const AGRUPACIONES_TIEMPO: readonly Agrupacion[] = ["dia", "semana", "mes", "anio"];
+// The grouping when the KPIs take it; if not, month or the first one they take. Null facetas: the backend could
+// not say, so it stays
+export function agrupacionPermitida(agrupacion: string, facetas: readonly FacetaDisponible[] | null): string {
+  if (!facetas || facetas.some((faceta) => faceta.id === agrupacion)) return agrupacion;
+  if (facetas.some((faceta) => faceta.id === AGRUPACION_POR_DEFECTO)) return AGRUPACION_POR_DEFECTO;
+  return facetas[0]?.id ?? agrupacion;
+}
+
+// The values of each catalog facet, by id, as its filter lists them; error when they could not be loaded
+export type CatalogosFaceta = Partial<Record<string, { valores: ValorFaceta[]; error?: string }>>;
+
+// The facets a report filters by: time is filtered by the period
+export function facetasDeFiltro(facetas: readonly FacetaDisponible[]): FacetaDisponible[] {
+  return facetas.filter((faceta) => faceta.kind === "catalog");
+}
+
+// What the KPIs of the backend, by id, look like here; a KPI without an entry is not offered
+export function esIdKpi(id: string): id is IdKpi {
+  return id in KPIS;
+}
 
 export type KpiReporte = { id: IdKpi; medidas: Medida[] };
 
-export type Reporte = { kpis: KpiReporte[]; agrupacion: Agrupacion };
+export type Reporte = { kpis: KpiReporte[]; agrupacion: string };
 
 // The whole report shares one comparison, chosen with the period; it starts here when a KPI first needs it
 export const COMPARATIVO_POR_DEFECTO: Comparativo = "anio-calendario";
 
 export const REPORTE_POR_DEFECTO: Reporte = {
-  kpis: [{ id: "viajes", medidas: ["actual"] }],
-  agrupacion: "mes",
+  kpis: [{ id: "viajes", medidas: ["current"] }],
+  agrupacion: AGRUPACION_POR_DEFECTO,
 };
 
+// The whole history has nothing to be compared with: only the current value
+export function sinComparar(kpis: KpiReporte[]): KpiReporte[] {
+  return kpis.map((kpi) => ({ ...kpi, medidas: ["current"] }));
+}
+
 export function usaComparativo(kpi: KpiReporte): boolean {
-  return kpi.medidas.some((m) => m !== "actual");
+  return kpi.medidas.some((m) => m !== "current");
 }
 
 // The comparison only exists while some KPI shows something other than the current value
@@ -69,13 +93,13 @@ export function reporteCompara(reporte: Reporte): boolean {
 
 const ORDEN_MEDIDAS = Object.keys(MEDIDAS) as Medida[];
 
-// In the URL: "kpis=viajes:actual|crecimiento,toneladas:actual"
+// In the URL: "kpis=viajes:current|growth,toneladas:current"
 function leerKpi(texto: string): KpiReporte | null {
-  const [id, medidasTexto = "actual"] = texto.split(":");
+  const [id, medidasTexto = "current"] = texto.split(":");
   if (!(id in KPIS)) return null;
 
   const medidas = ORDEN_MEDIDAS.filter((m) => medidasTexto.split("|").includes(m));
-  return { id: id as IdKpi, medidas: medidas.length ? medidas : ["actual"] };
+  return { id: id as IdKpi, medidas: medidas.length ? medidas : ["current"] };
 }
 
 export function leerReporte(params: Record<string, string | string[] | undefined>): Reporte {
@@ -92,7 +116,7 @@ export function leerReporte(params: Record<string, string | string[] | undefined
 
   return {
     kpis: kpis.length ? kpis : REPORTE_POR_DEFECTO.kpis,
-    agrupacion: agrupacion in AGRUPACIONES ? (agrupacion as Agrupacion) : REPORTE_POR_DEFECTO.agrupacion,
+    agrupacion: /^[A-Za-z]{1,40}$/.test(agrupacion) ? agrupacion : REPORTE_POR_DEFECTO.agrupacion,
   };
 }
 
@@ -121,8 +145,12 @@ export function textoComparativo(comparar: Comparativo, rangoComparar: string | 
  * (01/01/2026 – 07/11/2026), comparados con el año anterior (calendario)." `contra` is the comparison as
  * textoComparativo writes it, or null when the report compares nothing.
  */
-export function describirReporte(reporte: Reporte, periodo: string, rango: string, contra: string | null): string {
-  const nombres = reporte.kpis.map((kpi, i) => (i === 0 ? KPIS[kpi.id].nombre : minuscula(KPIS[kpi.id].nombre)));
+export function describirReporte(
+  reporte: Reporte,
+  nombres: NombresKpi,
+  facetas: readonly FacetaDisponible[] | null,
+  periodo: string, rango: string | null, contra: string | null): string {
+  const titulos = reporte.kpis.map((kpi, i) => (i === 0 ? nombreKpi(nombres, kpi.id) : minuscula(nombreKpi(nombres, kpi.id))));
   const comparados = reporte.kpis.filter(usaComparativo);
 
   let comparacion = "";
@@ -130,10 +158,10 @@ export function describirReporte(reporte: Reporte, periodo: string, rango: strin
     comparacion = `, ${comparados.length > 1 ? "comparados" : "comparado"} con ${contra}`;
   } else if (contra && comparados.length > 0) {
     // Only some KPIs compare: name them in a second sentence
-    const cuales = enLista(comparados.map((kpi) => minuscula(KPIS[kpi.id].nombre)));
+    const cuales = enLista(comparados.map((kpi) => minuscula(nombreKpi(nombres, kpi.id))));
     const verbo = comparados.length > 1 ? "se comparan" : "se compara";
     comparacion = `. ${cuales.charAt(0).toUpperCase()}${cuales.slice(1)} ${verbo} con ${contra}`;
   }
 
-  return `${enLista(nombres)} por ${minuscula(AGRUPACIONES[reporte.agrupacion])}, ${minuscula(periodo)} (${rango})${comparacion}.`;
+  return `${enLista(titulos)} por ${minuscula(nombreFaceta(facetas, reporte.agrupacion))}, ${minuscula(periodo)}${rango ? ` (${rango})` : ""}${comparacion}.`;
 }

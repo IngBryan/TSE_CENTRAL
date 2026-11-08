@@ -6,10 +6,22 @@ import { useState } from "react";
 import { formatear } from "@/components/Kpi";
 import { Button } from "@/components/ui/button";
 import { fechaCorta } from "@/lib/reportes";
-import type { FilaReporte, TablaReporte } from "@/lib/reportes-mock";
-import { AGRUPACIONES, KPIS, MEDIDAS, type IdKpi, type Medida, type Reporte } from "@/lib/reportes-kpis";
+import type { FilaReporte, TablaReporte } from "@/lib/reportes-tabla";
+import {
+  KPIS,
+  MEDIDAS,
+  nombreFaceta,
+  nombreKpi,
+  type IdKpi,
+  type Medida,
+  type NombresKpi,
+  type Reporte,
+} from "@/lib/reportes-kpis";
+import type { FacetaDisponible } from "@/lib/reportes-backend";
 
 type Props = {
+  nombres: NombresKpi;
+  facetas: FacetaDisponible[] | null;
   tabla: TablaReporte;
   reporte: Reporte;
   hoy: string;
@@ -37,32 +49,17 @@ function descargar(contenido: Blob, nombre: string) {
 
 function unidad(id: IdKpi, medida: Medida): string {
   const esTasa = KPIS[id].formato === "porcentaje";
-  if (medida === "crecimiento") return esTasa ? " (p.p.)" : " (%)";
-  if (medida === "diferencia") return esTasa ? " (p.p.)" : KPIS[id].formato === "toneladas" ? " (t)" : "";
+  if (medida === "growth") return " (%)";
+  if (medida === "difference") return esTasa ? " (p.p.)" : KPIS[id].formato === "toneladas" ? " (t)" : "";
   return esTasa ? " (%)" : KPIS[id].formato === "toneladas" ? " (t)" : "";
 }
 
 // Rates and growth as percentages with two decimals
 function valorCsv(fila: FilaReporte, id: IdKpi, medida: Medida): string {
-  const valor = fila.valores[id];
-  if (!valor) return "";
-  const esTasa = KPIS[id].formato === "porcentaje";
-  const { actual, anterior } = valor;
-
-  switch (medida) {
-    case "actual":
-      return esTasa ? (actual * 100).toFixed(2) : actual.toFixed(0);
-    case "anterior":
-      if (anterior === null) return "";
-      return esTasa ? (anterior * 100).toFixed(2) : anterior.toFixed(0);
-    case "crecimiento":
-      if (anterior === null) return "";
-      if (esTasa) return ((actual - anterior) * 100).toFixed(2);
-      return anterior === 0 ? "" : (((actual - anterior) / anterior) * 100).toFixed(2);
-    case "diferencia":
-      if (anterior === null) return "";
-      return esTasa ? ((actual - anterior) * 100).toFixed(2) : (actual - anterior).toFixed(0);
-  }
+  const valor = fila.valores[id]?.[medida];
+  if (valor === undefined || valor === null) return "";
+  const enPorcentaje = medida === "growth" || KPIS[id].formato === "porcentaje";
+  return enPorcentaje ? (valor * 100).toFixed(2) : valor.toFixed(KPIS[id].formato === "toneladas" ? 1 : 0);
 }
 
 function celdaCsv(texto: string): string {
@@ -70,10 +67,10 @@ function celdaCsv(texto: string): string {
 }
 
 // One line per group, then the total; every row, not just the page on screen
-function generarCsv({ tabla, reporte }: Props): string {
+function generarCsv({ tabla, reporte, nombres, facetas }: Props): string {
   const encabezado = [
-    AGRUPACIONES[reporte.agrupacion],
-    ...columnas(reporte).map(({ id, medida }) => `${KPIS[id].nombre} - ${MEDIDAS[medida]}${unidad(id, medida)}`),
+    nombreFaceta(facetas, reporte.agrupacion),
+    ...columnas(reporte).map(({ id, medida }) => `${nombreKpi(nombres, id)} - ${MEDIDAS[medida]}${unidad(id, medida)}`),
   ];
   const lineas = [...tabla.filas, tabla.total].map((fila) => [
     fila.etiqueta,
@@ -88,31 +85,23 @@ type Tono = "bueno" | "malo" | null;
 
 // Text of a cell and whether its change is good or bad news (green or red)
 function valorPdf(fila: FilaReporte, id: IdKpi, medida: Medida): [string, Tono] {
-  const valor = fila.valores[id];
+  const valor = fila.valores[id]?.[medida];
   const { formato, mejorSiBaja } = KPIS[id];
-  if (!valor) return ["—", null];
-  const { actual, anterior } = valor;
+  if (valor === undefined || valor === null) return ["—", null];
+  if (medida === "current" || medida === "previous") return [formatear(valor, formato), null];
+  if (valor === 0) return ["0", null];
 
-  if (medida === "actual") return [formatear(actual, formato), null];
-  if (anterior === null) return ["—", null];
-  if (medida === "anterior") return [formatear(anterior, formato), null];
-
-  const esTasa = formato === "porcentaje";
-  const diferencia = actual - anterior;
-  const cambio = medida === "crecimiento" && !esTasa ? (anterior === 0 ? null : diferencia / anterior) : diferencia;
-  if (cambio === null) return ["—", null];
-  if (cambio === 0) return ["0", null];
-
-  const signo = cambio > 0 ? "+" : "-";
-  const texto = esTasa
-    ? `${signo}${NUMERO.format(Math.abs(cambio) * 100)} p.p.`
-    : medida === "crecimiento"
-      ? `${signo}${NUMERO.format(Math.abs(cambio) * 100)} %`
-      : `${signo}${formatear(Math.abs(cambio), formato)}`;
-  return [texto, cambio > 0 !== mejorSiBaja ? "bueno" : "malo"];
+  const signo = valor > 0 ? "+" : "-";
+  const texto =
+    medida === "growth"
+      ? `${signo}${NUMERO.format(Math.abs(valor) * 100)} %`
+      : formato === "porcentaje"
+        ? `${signo}${NUMERO.format(Math.abs(valor) * 100)} p.p.`
+        : `${signo}${formatear(Math.abs(valor), formato)}`;
+  return [texto, valor > 0 !== mejorSiBaja ? "bueno" : "malo"];
 }
 
-async function generarPdf({ tabla, reporte, hoy, descripcion, filtros }: Props): Promise<Blob> {
+async function generarPdf({ tabla, reporte, nombres, facetas, hoy, descripcion, filtros }: Props): Promise<Blob> {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -151,8 +140,8 @@ async function generarPdf({ tabla, reporte, hoy, descripcion, filtros }: Props):
     columnStyles: Object.fromEntries(cols.map((_, i) => [i + 1, { halign: "right" as const }])),
     head: [
       [
-        { content: AGRUPACIONES[reporte.agrupacion], rowSpan: 2 },
-        ...reporte.kpis.map((kpi) => ({ content: KPIS[kpi.id].nombre, colSpan: kpi.medidas.length })),
+        { content: nombreFaceta(facetas, reporte.agrupacion), rowSpan: 2 },
+        ...reporte.kpis.map((kpi) => ({ content: nombreKpi(nombres, kpi.id), colSpan: kpi.medidas.length })),
       ],
       cols.map(({ medida }) => ({ content: MEDIDAS[medida], styles: { halign: "right" as const, fontSize: 7 } })),
     ],

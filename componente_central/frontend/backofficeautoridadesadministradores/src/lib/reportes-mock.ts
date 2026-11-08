@@ -1,21 +1,10 @@
 import {
-  AGRUPACIONES_TIEMPO,
-  KPIS,
-  usaComparativo,
-  type Agrupacion,
-  type IdKpi,
-  type Reporte,
-} from "./reportes-kpis";
-import {
   DEPARTAMENTOS,
-  rangoComparacion,
   valoresFiltrados,
-  type Comparativo,
   type Dashboard,
   type FiltrosCarga,
   type Rango,
   type Seleccion,
-  type TipoCargaOpcion,
 } from "./reportes";
 
 // Test data for the dashboard while there is no backend for it. Deterministic: the same range and filters
@@ -77,7 +66,8 @@ function proporcionSeleccion(seleccion: Seleccion | undefined, parte: Map<string
 }
 
 function proporcionFiltros(filtros: FiltrosCarga): number {
-  return proporcionSeleccion(filtros.departamentos, PARTE_DEPARTAMENTO) * proporcionSeleccion(filtros.tiposCarga, PARTE_TIPO_CARGA);
+  return proporcionSeleccion(filtros.selecciones.department, PARTE_DEPARTAMENTO) *
+    proporcionSeleccion(filtros.selecciones.cargoType, PARTE_TIPO_CARGA);
 }
 
 // Share of the companies a filter keeps. A company works in several departments and cargo types, so filtering
@@ -99,7 +89,7 @@ function diasPorMes(rango: Rango): Map<string, number> {
   return dias;
 }
 
-export function dashboardMock(rango: Rango, filtros: FiltrosCarga = {}): Dashboard {
+export function dashboardMock(rango: Rango, filtros: FiltrosCarga = { selecciones: {} }): Dashboard {
   const proporcion = proporcionFiltros(filtros);
   const anio = Number(rango.hasta.slice(0, 4));
 
@@ -135,10 +125,6 @@ export function dashboardMock(rango: Rango, filtros: FiltrosCarga = {}): Dashboa
   };
 }
 
-export function tiposCargaMock(): TipoCargaOpcion[] {
-  return TIPOS_CARGA.map((nombre, i) => ({ id: i + 1, nombre }));
-}
-
 // The period and, if there is one, the compared period
 export function dashboardConComparacion(
   periodo: Rango,
@@ -151,227 +137,3 @@ export function dashboardConComparacion(
   };
 }
 
-// ---- Reportes: one row per group, one value per KPI ----
-
-type Sumas = { viajes: number; toneladas: number; infracciones: number; confirmadas: number };
-
-// What happened on one day across the whole country, before any filter
-function metricasDia(fecha: string): Sumas {
-  const anio = Number(fecha.slice(0, 4));
-  const viajes = 46 * ESTACIONALIDAD[Number(fecha.slice(5, 7)) - 1] * crecimiento(anio) * ruido(fecha);
-  const infracciones = viajes * 0.033 * 0.9 ** (anio - 2025) * ruido(`i-${fecha}`);
-  return {
-    viajes,
-    toneladas: viajes * 24.5 * ruido(`t-${fecha}`),
-    infracciones,
-    confirmadas: infracciones * 0.66 * ruido(`c-${fecha}`),
-  };
-}
-
-function dias(rango: Rango): string[] {
-  const lista: string[] = [];
-  const dia = new Date(`${rango.desde}T00:00:00Z`);
-  const fin = new Date(`${rango.hasta}T00:00:00Z`);
-  while (dia <= fin) {
-    lista.push(dia.toISOString().slice(0, 10));
-    dia.setUTCDate(dia.getUTCDate() + 1);
-  }
-  return lista;
-}
-
-const SUMAS = new Map<string, Sumas>();
-
-function sumas(rango: Rango): Sumas {
-  const clave = `${rango.desde}/${rango.hasta}`;
-  const guardadas = SUMAS.get(clave);
-  if (guardadas) return guardadas;
-
-  const total: Sumas = { viajes: 0, toneladas: 0, infracciones: 0, confirmadas: 0 };
-  for (const fecha of dias(rango)) {
-    const dia = metricasDia(fecha);
-    total.viajes += dia.viajes;
-    total.toneladas += dia.toneladas;
-    total.infracciones += dia.infracciones;
-    total.confirmadas += dia.confirmadas;
-  }
-  SUMAS.set(clave, total);
-  return total;
-}
-
-function correrDias(fecha: string, cantidad: number): string {
-  const dia = new Date(`${fecha}T00:00:00Z`);
-  dia.setUTCDate(dia.getUTCDate() + cantidad);
-  return dia.toISOString().slice(0, 10);
-}
-
-function diasEntre(desde: string, hasta: string): number {
-  return Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000);
-}
-
-// Companies enabled at a date: about 14 more every year
-function empresasAl(fecha: string): number {
-  const anio = Number(fecha.slice(0, 4));
-  const mes = Number(fecha.slice(5, 7));
-  return 168 + (anio - 2024) * 14 + ((mes - 1) * 14) / 12;
-}
-
-function valorKpi(id: IdKpi, rango: Rango, proporcion: number, clave: string): number {
-  const kpi = KPIS[id];
-
-  if (kpi.agregado === "stock") {
-    // A department or cargo type keeps part of the companies (see parteEmpresas)
-    const empresas = empresasAl(rango.hasta) * parteEmpresas(proporcion);
-    return Math.round(id === "vehiculos" ? empresas * 5.8 * ruido(`v-${clave}`) : empresas);
-  }
-
-  const total = sumas(rango);
-  if (kpi.agregado === "tasa") {
-    return total.infracciones === 0
-      ? 0
-      : Math.min(1, (total.confirmadas / total.infracciones) * ruido(`tasa-${clave}-${proporcion.toFixed(4)}`));
-  }
-
-  return Math.round(total[id as keyof Sumas] * proporcion);
-}
-
-type GrupoReporte = { clave: string; etiqueta: string; rango: Rango; proporcion: number };
-
-const MES_ANIO = new Intl.DateTimeFormat("es-UY", { month: "short", year: "numeric", timeZone: "UTC" });
-
-function fechaDiaMes(fecha: string): string {
-  return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
-}
-
-// Time buckets cut to the period: a month that started before it only counts the days inside
-function gruposTiempo(agrupacion: Agrupacion, periodo: Rango, proporcion: number): GrupoReporte[] {
-  const grupos = new Map<string, GrupoReporte>();
-
-  for (const fecha of dias(periodo)) {
-    let clave: string;
-    let etiqueta: string;
-
-    if (agrupacion === "dia") {
-      clave = fecha;
-      etiqueta = fechaDiaMes(fecha);
-    } else if (agrupacion === "semana") {
-      const diaSemana = (new Date(`${fecha}T00:00:00Z`).getUTCDay() + 6) % 7;
-      clave = correrDias(fecha, -diaSemana);
-      etiqueta = `Semana del ${fechaDiaMes(clave)}`;
-    } else if (agrupacion === "mes") {
-      clave = fecha.slice(0, 7);
-      etiqueta = MES_ANIO.format(new Date(`${clave}-01T00:00:00Z`)).replace(".", "");
-    } else {
-      clave = fecha.slice(0, 4);
-      etiqueta = clave;
-    }
-
-    const grupo = grupos.get(clave);
-    if (grupo) {
-      grupo.rango.hasta = fecha;
-    } else {
-      grupos.set(clave, { clave, etiqueta, rango: { desde: fecha, hasta: fecha }, proporcion });
-    }
-  }
-
-  return [...grupos.values()];
-}
-
-function gruposNegocio(agrupacion: Agrupacion, periodo: Rango, filtros: FiltrosCarga): GrupoReporte[] {
-  if (agrupacion === "departamento") {
-    const otros = proporcionSeleccion(filtros.tiposCarga, PARTE_TIPO_CARGA);
-    return valoresFiltrados(filtros.departamentos, DEPARTAMENTOS).map((d) => ({
-      clave: d,
-      etiqueta: d,
-      rango: periodo,
-      proporcion: (PARTE_DEPARTAMENTO.get(d) ?? 0) * otros,
-    }));
-  }
-
-  if (agrupacion === "tipoCarga") {
-    const otros = proporcionSeleccion(filtros.departamentos, PARTE_DEPARTAMENTO);
-    const ids = TIPOS_CARGA.map((_, i) => String(i + 1));
-    return valoresFiltrados(filtros.tiposCarga, ids).map((id) => ({
-      clave: id,
-      etiqueta: TIPOS_CARGA[Number(id) - 1],
-      rango: periodo,
-      proporcion: (PARTE_TIPO_CARGA.get(id) ?? 0) * otros,
-    }));
-  }
-
-  const total = RUBROS.reduce((suma, [, peso]) => suma + peso, 0);
-  const otros = proporcionFiltros(filtros);
-  return RUBROS.map(([rubro, peso]) => ({
-    clave: rubro,
-    etiqueta: rubro,
-    rango: periodo,
-    proporcion: (peso / total) * otros,
-  }));
-}
-
-// The comparison of the whole report; a custom one brings its range
-export type ComparativoReporte = { comparar: Comparativo; rangoComparar?: Rango };
-
-// The range a group is compared with. Time groups move with the comparison (November against last November);
-// the other groups are the same group over the other range
-function rangoComparado(
-  comparativo: ComparativoReporte,
-  grupo: Rango,
-  periodo: Rango,
-  esTiempo: boolean
-): Rango | null {
-  const { comparar, rangoComparar } = comparativo;
-  if (comparar !== "personalizado") {
-    return rangoComparacion(comparar, grupo, undefined);
-  }
-  if (!rangoComparar) return null;
-  if (!esTiempo || (grupo.desde === periodo.desde && grupo.hasta === periodo.hasta)) return rangoComparar;
-
-  // Custom range: each time group keeps its distance from the start of the period
-  const corrimiento = diasEntre(periodo.desde, rangoComparar.desde);
-  return { desde: correrDias(grupo.desde, corrimiento), hasta: correrDias(grupo.hasta, corrimiento) };
-}
-
-export type ValorKpi = { actual: number; anterior: number | null };
-export type FilaReporte = { clave: string; etiqueta: string; valores: Partial<Record<IdKpi, ValorKpi>> };
-export type TablaReporte = { filas: FilaReporte[]; total: FilaReporte };
-
-// Only the KPIs showing something other than the current value get the compared value
-export function tablaReporteMock(
-  reporte: Reporte,
-  periodo: Rango,
-  filtros: FiltrosCarga = {},
-  comparativo: ComparativoReporte | null = null
-): TablaReporte {
-  const esTiempo = AGRUPACIONES_TIEMPO.includes(reporte.agrupacion);
-  const proporcionTotal = proporcionFiltros(filtros);
-
-  const fila = (grupo: GrupoReporte): FilaReporte => ({
-    clave: grupo.clave,
-    etiqueta: grupo.etiqueta,
-    valores: Object.fromEntries(
-      reporte.kpis.map((kpi) => {
-        const comparado =
-          comparativo && usaComparativo(kpi) ? rangoComparado(comparativo, grupo.rango, periodo, esTiempo) : null;
-        const valor: ValorKpi = {
-          actual: valorKpi(kpi.id, grupo.rango, grupo.proporcion, grupo.clave),
-          anterior: comparado ? valorKpi(kpi.id, comparado, grupo.proporcion, grupo.clave) : null,
-        };
-        return [kpi.id, valor];
-      })
-    ),
-  });
-
-  const grupos = esTiempo
-    ? gruposTiempo(reporte.agrupacion, periodo, proporcionTotal)
-    : gruposNegocio(reporte.agrupacion, periodo, filtros);
-  const filas = grupos.map(fila);
-
-  // Business groups are ranked by the first KPI, the biggest first
-  if (!esTiempo) {
-    const primero = reporte.kpis[0].id;
-    filas.sort((a, b) => (b.valores[primero]?.actual ?? 0) - (a.valores[primero]?.actual ?? 0));
-  }
-
-  const total = fila({ clave: "total", etiqueta: "Total", rango: periodo, proporcion: proporcionTotal });
-  return { filas, total };
-}

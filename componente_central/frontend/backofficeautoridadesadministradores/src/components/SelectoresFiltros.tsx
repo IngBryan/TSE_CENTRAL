@@ -14,7 +14,6 @@ import { Toggle } from "@/components/ui/toggle";
 import {
   COMPARATIVOS,
   consultaFiltros,
-  DEPARTAMENTOS,
   PERIODOS,
   rangoComparacion,
   rangoPeriodo,
@@ -25,7 +24,7 @@ import {
   type Periodo,
   type Rango,
   type Seleccion,
-  type TipoCargaOpcion,
+  type Selecciones,
 } from "@/lib/reportes";
 
 const SIN_SELECCION: Seleccion = { incluir: [], excluir: [] };
@@ -60,14 +59,12 @@ export function useEdicionFiltros(filtros: FiltrosDashboard, hoy: string, ruta: 
   const [rangoPropio, setRangoPropio] = useState<DateRange | undefined>(aDateRange(filtros.rango));
   const [comparar, setComparar] = useState<Comparativo | "">(filtros.comparar ?? "");
   const [rangoComparar, setRangoComparar] = useState<DateRange | undefined>(aDateRange(filtros.rangoComparar));
-  const [tiposCarga, setTiposCarga] = useState<Seleccion>(filtros.tiposCarga ?? SIN_SELECCION);
-  const [departamentos, setDepartamentos] = useState<Seleccion>(filtros.departamentos ?? SIN_SELECCION);
-  const [rubros, setRubros] = useState<Seleccion>(filtros.rubros ?? SIN_SELECCION);
+  const [selecciones, setSelecciones] = useState<Selecciones>(filtros.selecciones);
 
   const rangoElegido = aRango(rangoPropio);
   const rangoCompararElegido = aRango(rangoComparar);
   const rangoActual = rangoPeriodo(periodo, rangoElegido, hoy);
-  const comparacion = comparar ? rangoComparacion(comparar, rangoActual, rangoCompararElegido) : null;
+  const comparacion = comparar && rangoActual ? rangoComparacion(comparar, rangoActual, rangoCompararElegido) : null;
 
   // A custom range needs both ends before it can be applied
   const incompleto =
@@ -78,15 +75,18 @@ export function useEdicionFiltros(filtros: FiltrosDashboard, hoy: string, ruta: 
     rango: periodo === "personalizado" ? rangoElegido : undefined,
     comparar: comparar || undefined,
     rangoComparar: comparar === "personalizado" ? rangoCompararElegido : undefined,
-    tiposCarga: seleccionVacia(tiposCarga) ? undefined : tiposCarga,
-    departamentos: seleccionVacia(departamentos) ? undefined : departamentos,
-    rubros: seleccionVacia(rubros) ? undefined : rubros,
+    selecciones: Object.fromEntries(Object.entries(selecciones).filter(([, s]) => !seleccionVacia(s))),
   };
 
   return {
     periodo, setPeriodo, rangoPropio, setRangoPropio,
     comparar, setComparar, rangoComparar, setRangoComparar,
-    tiposCarga, setTiposCarga, departamentos, setDepartamentos, rubros, setRubros,
+    // The filters being edited that select something, by facet id
+    selecciones: elegidos.selecciones,
+    // The filter of a facet, by its id
+    seleccion: (faceta: string) => selecciones[faceta] ?? SIN_SELECCION,
+    setSeleccion: (faceta: string, seleccion: Seleccion) =>
+      setSelecciones((actuales) => ({ ...actuales, [faceta]: seleccion })),
     rangoActual, comparacion, incompleto,
     // extra: more query parameters of the page (the report KPIs and grouping)
     aplicar: (cambios: Partial<FiltrosDashboard> = {}, extra = "") => {
@@ -148,7 +148,9 @@ function SelectorRango({ valor, onCambiar }: { valor?: DateRange; onCambiar: (ra
 }
 
 export function textoPeriodo(edicion: EdicionFiltros): string {
-  return edicion.periodo === "personalizado" ? textoRango(edicion.rangoActual) : PERIODOS[edicion.periodo];
+  return edicion.periodo === "personalizado" && edicion.rangoActual
+    ? textoRango(edicion.rangoActual)
+    : PERIODOS[edicion.periodo];
 }
 
 export function textoComparativo(edicion: EdicionFiltros): string {
@@ -156,18 +158,24 @@ export function textoComparativo(edicion: EdicionFiltros): string {
   return edicion.comparar ? COMPARATIVOS[edicion.comparar] : "Ninguno";
 }
 
-export function OpcionesPeriodo({ edicion, hoy }: { edicion: EdicionFiltros; hoy: string }) {
+// The whole history only where the page can show it: the dashboard compares, so it does not offer it
+export function OpcionesPeriodo({ edicion, hoy, conHistorico = false }: {
+  edicion: EdicionFiltros;
+  hoy: string;
+  conHistorico?: boolean;
+}) {
   return (
     <>
       <Opciones
         nombre="Período"
         valor={edicion.periodo}
         onCambiar={edicion.setPeriodo}
-        opciones={(Object.keys(PERIODOS) as Periodo[]).map((opcion) => ({
-          valor: opcion,
-          etiqueta: PERIODOS[opcion],
-          detalle: opcion === "personalizado" ? undefined : textoRango(rangoPeriodo(opcion, undefined, hoy)),
-        }))}
+        opciones={(Object.keys(PERIODOS) as Periodo[])
+          .filter((opcion) => conHistorico || opcion !== "historico")
+          .map((opcion) => {
+            const rango = opcion === "personalizado" ? null : rangoPeriodo(opcion, undefined, hoy);
+            return { valor: opcion, etiqueta: PERIODOS[opcion], detalle: rango ? textoRango(rango) : undefined };
+          })}
       />
       {edicion.periodo === "personalizado" && (
         <SelectorRango valor={edicion.rangoPropio} onCambiar={edicion.setRangoPropio} />
@@ -182,7 +190,7 @@ type SelectorComparativoProps = {
   rangoComparar?: DateRange;
   onRangoComparar: (rango?: DateRange) => void;
   // The period being compared, to show the dates of each option
-  rangoActual: Rango;
+  rangoActual: Rango | null;
   // Without it there is always a comparison (a report KPI that shows the previous value needs one)
   conNinguno?: boolean;
 };
@@ -198,7 +206,7 @@ export function SelectorComparativo({
   const opciones: { valor: Comparativo | ""; etiqueta: string; detalle?: string }[] = [
     ...(conNinguno ? [{ valor: "" as const, etiqueta: "Ninguno" }] : []),
     ...(Object.keys(COMPARATIVOS) as Comparativo[]).map((opcion) => {
-      const rango = opcion === "personalizado" ? null : rangoComparacion(opcion, rangoActual, undefined);
+      const rango = opcion === "personalizado" || !rangoActual ? null : rangoComparacion(opcion, rangoActual, undefined);
       return { valor: opcion, etiqueta: COMPARATIVOS[opcion], detalle: rango ? textoRango(rango) : undefined };
     }),
   ];
@@ -313,40 +321,26 @@ function SelectorMultiple({ nombre, opciones, seleccion, onCambiar }: SelectorMu
   );
 }
 
-export function SelectorTiposCarga({ edicion, tiposCarga }: { edicion: EdicionFiltros; tiposCarga: TipoCargaOpcion[] }) {
+type SelectorValoresProps = {
+  nombre: string;
+  valores: { id: string; name: string }[];
+  seleccion: Seleccion;
+  onCambiar: (seleccion: Seleccion) => void;
+};
+
+// The values of a facet, as the backend lists them
+export function SelectorValores({ nombre, valores, seleccion, onCambiar }: SelectorValoresProps) {
   return (
     <SelectorMultiple
-      nombre="Tipo de carga"
-      opciones={tiposCarga.map((t) => ({ valor: String(t.id), nombre: t.nombre }))}
-      seleccion={edicion.tiposCarga}
-      onCambiar={edicion.setTiposCarga}
+      nombre={nombre}
+      opciones={valores.map((v) => ({ valor: v.id, nombre: v.name }))}
+      seleccion={seleccion}
+      onCambiar={onCambiar}
     />
   );
 }
 
-export function SelectorDepartamentos({ edicion }: { edicion: EdicionFiltros }) {
-  return (
-    <SelectorMultiple
-      nombre="Departamento"
-      opciones={DEPARTAMENTOS.map((d) => ({ valor: d, nombre: d }))}
-      seleccion={edicion.departamentos}
-      onCambiar={edicion.setDepartamentos}
-    />
-  );
-}
-
-// Rubros come from the backend catalog, with their id
-export function SelectorRubros({ edicion, rubros }: { edicion: EdicionFiltros; rubros: { id: string; name: string }[] }) {
-  return (
-    <SelectorMultiple
-      nombre="Rubro"
-      opciones={rubros.map((r) => ({ valor: r.id, nombre: r.name }))}
-      seleccion={edicion.rubros}
-      onCambiar={edicion.setRubros}
-    />
-  );
-}
-
-export function nombreTipoCarga(tiposCarga: TipoCargaOpcion[]): (id: string) => string {
-  return (id) => tiposCarga.find((t) => String(t.id) === id)?.nombre ?? id;
+// The name of a value by its id; the id when the list does not have it
+export function nombreValor(valores: { id: string; name: string }[]): (id: string) => string {
+  return (id) => valores.find((v) => v.id === id)?.name ?? id;
 }

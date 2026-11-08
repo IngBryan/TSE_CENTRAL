@@ -7,13 +7,13 @@ export type Dashboard = {
   infraccionesPorTipo: { tipo: string; detectadas: number; confirmadas: number }[];
 };
 
-export type TipoCargaOpcion = { id: number; nombre: string };
-
 export const PERIODOS = {
+  hoy: "Hoy",
   "ultimos-30-dias": "Últimos 30 días",
   "ultimos-90-dias": "Últimos 90 días",
   "este-mes": "Este mes",
   "este-anio": "Este año",
+  historico: "Histórico completo",
   personalizado: "Personalizado",
 } as const;
 
@@ -36,14 +36,15 @@ export type FiltrosDashboard = {
   rango?: Rango;
   comparar?: Comparativo;
   rangoComparar?: Rango;
-  tiposCarga?: Seleccion;
-  departamentos?: Seleccion;
-  rubros?: Seleccion;
+  // By facet id, as the backend names them: "cargoType", "department", "category"
+  selecciones: Selecciones;
 };
 
 // Each value of a filter can be included, excluded or left alone. The filter keeps the included values (all of
 // them when none is included) minus the excluded ones. A value is never in both lists; both empty is no filter
 export type Seleccion = { incluir: string[]; excluir: string[] };
+
+export type Selecciones = Partial<Record<string, Seleccion>>;
 
 export function seleccionVacia(seleccion: Seleccion | undefined): boolean {
   return !seleccion || (seleccion.incluir.length === 0 && seleccion.excluir.length === 0);
@@ -57,20 +58,22 @@ export function valoresFiltrados(seleccion: Seleccion | undefined, todos: readon
   return todos.filter((v) => (incluidos.size === 0 || incluidos.has(v)) && !excluidos.has(v));
 }
 
-// The filters as they travel in the URL: "tipoCarga=2,4&excluirTipoCarga=11"
-const PARAMETROS_SELECCION = {
-  tiposCarga: { incluir: "tipoCarga", excluir: "excluirTipoCarga" },
-  departamentos: { incluir: "departamento", excluir: "excluirDepartamento" },
-  rubros: { incluir: "rubro", excluir: "excluirRubro" },
-} as const;
+// The filters as they travel in the URL: "incluir.cargoType=2,4&excluir.cargoType=11"
+const INCLUIR = "incluir.";
+const EXCLUIR = "excluir.";
+const ID_FACETA = /^[A-Za-z]{1,40}$/;
 
-function escribirSelecciones(query: URLSearchParams, filtros: Pick<FiltrosDashboard, keyof typeof PARAMETROS_SELECCION>) {
-  for (const clave of Object.keys(PARAMETROS_SELECCION) as (keyof typeof PARAMETROS_SELECCION)[]) {
-    const seleccion = filtros[clave];
+function escribirSelecciones(query: URLSearchParams, selecciones: Selecciones) {
+  for (const [faceta, seleccion] of Object.entries(selecciones)) {
     if (seleccionVacia(seleccion)) continue;
-    if (seleccion!.incluir.length) query.set(PARAMETROS_SELECCION[clave].incluir, seleccion!.incluir.join(","));
-    if (seleccion!.excluir.length) query.set(PARAMETROS_SELECCION[clave].excluir, seleccion!.excluir.join(","));
+    if (seleccion!.incluir.length) query.set(INCLUIR + faceta, seleccion!.incluir.join(","));
+    if (seleccion!.excluir.length) query.set(EXCLUIR + faceta, seleccion!.excluir.join(","));
   }
+}
+
+// Only the facets in `facetas`; the others are dropped (a company has no department)
+export function seleccionesDe(selecciones: Selecciones, facetas: readonly string[]): Selecciones {
+  return Object.fromEntries(Object.entries(selecciones).filter(([faceta]) => facetas.includes(faceta)));
 }
 
 // "Todos", "Salto, Rivera", "Todos menos Salto", "Soja, Trigo (sin Arena)"; long lists become a count
@@ -123,24 +126,29 @@ export function leerFiltros(
     return typeof v === "string" && v.trim() ? v.trim() : undefined;
   };
 
-  // Unknown and repeated values are dropped; a value in both lists stays excluded
-  const lista = (parametro: string, valido: (v: string) => boolean) =>
-    [...new Set((valor(parametro) ?? "").split(",").map((v) => v.trim()))].filter(valido);
+  // Repeated values are dropped; a value in both lists stays excluded. The backend checks the ids
+  const lista = (parametro: string) =>
+    [...new Set((valor(parametro) ?? "").split(",").map((v) => v.trim()))].filter((v) => v.length > 0 && v.length <= 60);
 
-  const seleccion = (clave: keyof typeof PARAMETROS_SELECCION, valido: (v: string) => boolean): Seleccion | undefined => {
-    const excluir = lista(PARAMETROS_SELECCION[clave].excluir, valido);
-    const incluir = lista(PARAMETROS_SELECCION[clave].incluir, valido).filter((v) => !excluir.includes(v));
-    return incluir.length || excluir.length ? { incluir, excluir } : undefined;
-  };
+  const selecciones: Selecciones = {};
+  const facetas = new Set(
+    Object.keys(params)
+      .filter((clave) => clave.startsWith(INCLUIR) || clave.startsWith(EXCLUIR))
+      .map((clave) => clave.slice(clave.indexOf(".") + 1))
+      .filter((faceta) => ID_FACETA.test(faceta))
+  );
+  for (const faceta of facetas) {
+    const excluir = lista(EXCLUIR + faceta);
+    const incluir = lista(INCLUIR + faceta).filter((v) => !excluir.includes(v));
+    if (incluir.length || excluir.length) selecciones[faceta] = { incluir, excluir };
+  }
 
   const periodo = valor("periodo");
   const comparar = valor("comparar");
 
   const filtros: FiltrosDashboard = {
     periodo: periodo && periodo in PERIODOS ? (periodo as Periodo) : predeterminados.periodo,
-    tiposCarga: seleccion("tiposCarga", (v) => /^\d+$/.test(v)),
-    departamentos: seleccion("departamentos", (v) => (DEPARTAMENTOS as readonly string[]).includes(v)),
-    rubros: seleccion("rubros", (v) => /^d+$/.test(v)),
+    selecciones,
   };
 
   if (filtros.periodo === "personalizado") {
@@ -177,7 +185,7 @@ export function consultaFiltros(filtros: FiltrosDashboard): string {
     query.set("compararDesde", filtros.rangoComparar.desde);
     query.set("compararHasta", filtros.rangoComparar.hasta);
   }
-  escribirSelecciones(query, filtros);
+  escribirSelecciones(query, filtros.selecciones);
   return query.toString();
 }
 
@@ -208,8 +216,13 @@ export function hoyEnUruguay(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo" }).format(new Date());
 }
 
-export function rangoPeriodo(periodo: Periodo, rango: Rango | undefined, hoy: string): Rango {
+// null for the whole history: the backend takes it from the first trip or case to today
+export function rangoPeriodo(periodo: Periodo, rango: Rango | undefined, hoy: string): Rango | null {
   switch (periodo) {
+    case "hoy":
+      return { desde: hoy, hasta: hoy };
+    case "historico":
+      return null;
     case "ultimos-30-dias":
       return { desde: sumarDias(hoy, -29), hasta: hoy };
     case "ultimos-90-dias":
@@ -241,7 +254,7 @@ export function rangoComparacion(
   }
 }
 
-export type FiltrosCarga = Pick<FiltrosDashboard, "tiposCarga" | "departamentos">;
+export type FiltrosCarga = Pick<FiltrosDashboard, "selecciones">;
 
 // "2026-10-09" -> "09/10/2026"
 export function fechaCorta(fecha: string): string {

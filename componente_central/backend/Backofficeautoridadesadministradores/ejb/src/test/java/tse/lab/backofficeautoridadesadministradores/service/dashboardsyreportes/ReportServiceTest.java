@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,7 @@ class ReportServiceTest {
 
     private static final Range PERIOD = new Range("2026-10-01T00:00:00", "2026-11-07T23:59:59.999");
     private static final Range COMPARISON = new Range("2025-10-01T00:00:00", "2025-11-07T23:59:59.999");
+    private static final Clock TODAY = Clock.fixed(Instant.parse("2026-11-07T15:00:00Z"), ZoneId.of("America/Montevideo"));
     private static final List<String> ALL_MEASURES = List.of("current", "previous", "growth", "difference");
 
     private EntityManagerFactory emf;
@@ -37,7 +41,7 @@ class ReportServiceTest {
         emf = Persistence.createEntityManagerFactory("backofficeTestPersistenceUnit");
         em = emf.createEntityManager();
         ReportTestData.load(em);
-        service = new ReportService(em);
+        service = new ReportService(em, TODAY);
     }
 
     @AfterEach
@@ -77,14 +81,27 @@ class ReportServiceTest {
     }
 
     @Test
-    void listsEveryDayOfThePeriodEvenWithoutRows() {
+    void leavesOutTheRowsWhereEveryValueIsZero() {
         ReportResult result = service.load(request(List.of(new KpiRequest("viajes", List.of("current"))), null,
                 "day", Map.of()));
 
-        assertEquals(38, result.rows().size());
-        assertEquals("2026-10-01", result.rows().get(0).group().id());
-        assertEquals(Map.of("current", 0.0), result.rows().get(0).values().get("viajes"));
-        assertEquals(Map.of("current", 1.0), result.rows().get(4).values().get("viajes"));
+        assertEquals(List.of("2026-10-05", "2026-10-20", "2026-11-02"),
+                result.rows().stream().map(row -> row.group().id()).toList());
+    }
+
+    // From the first trip, in October 2025, to today; the case of G1 and the one a year before are closed
+    @Test
+    void takesTheWholeHistoryWithoutAPeriod() {
+        ReportResult result = service.load(new ReportRequest(List.of(new KpiRequest("viajes", List.of("current")),
+                new KpiRequest("tasa", List.of("current"))), null, null, "year", Map.of()));
+
+        assertEquals(List.of("2025", "2026"), result.rows().stream().map(row -> row.group().id()).toList());
+        assertEquals(Map.of("current", 1.0), result.rows().get(0).values().get("viajes"));
+        assertEquals(Map.of("current", 4.0), result.total().get("viajes"));
+        assertEquals(Map.of("current", 0.75), result.total().get("tasa"));
+
+        assertThrows(InvalidReportException.class, () -> service.load(new ReportRequest(
+                List.of(new KpiRequest("viajes", ALL_MEASURES)), null, COMPARISON, "year", Map.of())));
     }
 
     // A snapshot's total is taken on the last day, not added up over the months

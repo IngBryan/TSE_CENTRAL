@@ -1,7 +1,11 @@
 package tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -31,7 +35,8 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 /**
  * Calculates a report: each KPI grouped by the facet, over the period and, when a measure needs it, over the
  * comparison. Grouped by time, row i of the period is compared with group i of the comparison (November 2026 with
- * November 2025); grouped by anything else, each group with the same group.
+ * November 2025); grouped by anything else, each group with the same group. Rows where every value is zero or
+ * missing are left out: they say nothing.
  */
 @Stateless
 public class ReportService {
@@ -41,11 +46,15 @@ public class ReportService {
     @PersistenceContext(unitName = "backofficeautoridadesadministradoresPersistenceUnit")
     private EntityManager em;
 
+    // "Today" for the whole history, in Uruguay
+    private Clock clock = Clock.system(ZoneId.of("America/Montevideo"));
+
     public ReportService() {
     }
 
-    ReportService(EntityManager em) {
+    ReportService(EntityManager em, Clock clock) {
         this.em = em;
+        this.clock = clock;
     }
 
     private record Column(Kpi kpi, List<Measure> measures, List<KpiValue> current, List<KpiValue> previous) {
@@ -94,8 +103,11 @@ public class ReportService {
             throw new InvalidReportException("A report needs at least one KPI");
         }
         Map<Kpi, List<Measure>> kpis = kpis(request.kpis());
-        Period period = period(request.period(), "period");
         boolean compares = kpis.values().stream().flatMap(List::stream).anyMatch(Measure::needsComparison);
+        if (request.period() == null && compares) {
+            throw new InvalidReportException("The whole history has nothing to be compared with");
+        }
+        Period period = request.period() == null ? wholeHistory() : period(request.period(), "period");
         Period comparison = compares ? period(request.comparison(), "comparison") : null;
         Facet grouping = facet(request.groupBy(), "group by");
         Map<Facet, Selection> filters = filters(request.filters());
@@ -114,10 +126,31 @@ public class ReportService {
             throw new InvalidReportException(e.getMessage());
         }
 
-        List<Row> rows = grouping instanceof TimeFacet time
+        List<Row> rows = (grouping instanceof TimeFacet time
                 ? timeRows(time, period, comparison, columns)
-                : rows(columns);
+                : rows(columns)).stream()
+                .filter(row -> row.values().values().stream()
+                        .flatMap(measures -> measures.values().stream())
+                        .anyMatch(value -> value != null && value != 0))
+                .toList();
         return new ReportResult(grouping.id(), rows, total);
+    }
+
+    // Without a period: from the first trip or case to today
+    private Period wholeHistory() {
+        LocalDate today = LocalDate.now(clock);
+        LocalDate firstTrip = em.createQuery("SELECT MIN(g.fecha) FROM Guia g", LocalDate.class).getSingleResult();
+        Instant firstCase = em.createQuery("SELECT MIN(c.fechaDeteccion) FROM CasoFiscalizacion c", Instant.class)
+                .getSingleResult();
+
+        LocalDate from = today;
+        if (firstTrip != null && firstTrip.isBefore(from)) {
+            from = firstTrip;
+        }
+        if (firstCase != null && firstCase.atZone(clock.getZone()).toLocalDate().isBefore(from)) {
+            from = firstCase.atZone(clock.getZone()).toLocalDate();
+        }
+        return new Period(from, today);
     }
 
     // Every day, week, month or year of the period, even without rows, next to the same one of the comparison

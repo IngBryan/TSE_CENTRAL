@@ -2,16 +2,15 @@
 
 import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import {
   aRango,
-  nombreTipoCarga,
+  nombreValor,
   Opciones,
   OpcionesPeriodo,
   SelectorComparativo,
-  SelectorDepartamentos,
-  SelectorTiposCarga,
+  SelectorValores,
   textoPeriodo,
   useEdicionFiltros,
 } from "@/components/SelectoresFiltros";
@@ -29,25 +28,36 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { COMPARATIVOS, textoRango, textoSeleccion, type FiltrosDashboard, type TipoCargaOpcion } from "@/lib/reportes";
+import { COMPARATIVOS, seleccionesDe, textoRango, textoSeleccion, type FiltrosDashboard } from "@/lib/reportes";
+import type { FacetaDisponible } from "@/lib/reportes-backend";
 import {
-  AGRUPACIONES,
+  agrupacionPermitida,
   COMPARATIVO_POR_DEFECTO,
   consultaReporte,
-  KPIS,
+  facetasDeFiltro,
+  sinComparar,
   MEDIDAS,
+  nombreFaceta,
   usaComparativo,
-  type Agrupacion,
+  type CatalogosFaceta,
   type IdKpi,
   type KpiReporte,
   type Medida,
   type Reporte,
 } from "@/lib/reportes-kpis";
+import { facetasPermitidas, valoresDeFaceta } from "./actions";
 
 type Props = {
   filtros: FiltrosDashboard;
   reporte: Reporte;
-  tiposCarga: TipoCargaOpcion[];
+  // The KPIs of the backend the front knows how to show, in its order
+  kpisDisponibles: { id: IdKpi; nombre: string }[];
+  errorKpis?: string;
+  // The facets the KPIs of the report take, with their names, or null when the backend could not say
+  facetas: FacetaDisponible[] | null;
+  errorFacetas?: string;
+  // The values of the catalog facets of `facetas`; the panel loads the ones a change of KPIs brings
+  catalogos: CatalogosFaceta;
   // "YYYY-MM-DD" in Uruguay, computed by the server so both renders agree
   hoy: string;
 };
@@ -120,11 +130,26 @@ export function BotonConfigurar() {
   );
 }
 
-export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Props) {
+export default function PanelFiltros({
+  filtros,
+  reporte,
+  kpisDisponibles,
+  errorKpis,
+  facetas: facetasIniciales,
+  errorFacetas,
+  catalogos: catalogosIniciales,
+  hoy,
+}: Props) {
   const edicion = useEdicionFiltros(filtros, hoy, "/reportes");
   const [filaAbierta, setFilaAbierta] = useState<string | null>(null);
-  const [agrupacion, setAgrupacion] = useState<Agrupacion>(reporte.agrupacion);
+  const [agrupacion, setAgrupacion] = useState(reporte.agrupacion);
   const [kpis, setKpis] = useState<KpiReporte[]>(reporte.kpis);
+  const [facetas, setFacetas] = useState<FacetaDisponible[] | null>(facetasIniciales);
+  const [errorPermitidas, setErrorPermitidas] = useState(errorFacetas);
+  const [cargando, setCargando] = useState(false);
+  const [catalogos, setCatalogos] = useState<CatalogosFaceta>(catalogosIniciales);
+  // Only the answer to the last change counts: an earlier one may arrive later
+  const ultimoPedido = useRef(0);
 
   const alternarFila = (fila: string) => setFilaAbierta((actual) => (actual === fila ? null : fila));
 
@@ -136,15 +161,51 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
     setKpis((lista) => lista.map((k) => (k.id === kpi.id ? { ...k, medidas } : k)));
   }
 
+  // Each KPI added or removed changes what the report can be grouped and filtered by: the backend says
+  async function cambiarKpis(nuevos: KpiReporte[]) {
+    setKpis(nuevos);
+    const pedido = ++ultimoPedido.current;
+    setCargando(true);
+    const respuesta = await facetasPermitidas(nuevos.map((kpi) => kpi.id));
+    if (pedido !== ultimoPedido.current) return;
+
+    setCargando(false);
+    if (!respuesta.ok) {
+      setErrorPermitidas(respuesta.mensaje);
+      return;
+    }
+    setFacetas(respuesta.datos);
+    setErrorPermitidas(undefined);
+    setAgrupacion((actual) => agrupacionPermitida(actual, respuesta.datos));
+    cargarCatalogos(facetasDeFiltro(respuesta.datos).map((faceta) => faceta.id));
+  }
+
+  // Removing a KPI can bring back a filter whose values the page did not load
+  function cargarCatalogos(ids: string[]) {
+    for (const id of ids.filter((faceta) => !catalogos[faceta])) {
+      valoresDeFaceta(id).then((respuesta) =>
+        setCatalogos((actuales) => ({
+          ...actuales,
+          [id]: respuesta.ok ? { valores: respuesta.datos } : { valores: [], error: respuesta.mensaje },
+        }))
+      );
+    }
+  }
+
   function agregarKpi(id: IdKpi) {
-    setKpis((lista) => [...lista, { id, medidas: ["actual"] }]);
+    cambiarKpis([...kpis, { id, medidas: ["current"] }]);
     setFilaAbierta(`kpi-${id}`);
   }
 
-  const disponibles = (Object.keys(KPIS) as IdKpi[]).filter((id) => !kpis.some((kpi) => kpi.id === id));
+  const nombreKpi = (id: IdKpi) => kpisDisponibles.find((kpi) => kpi.id === id)?.nombre ?? id;
+  const disponibles = kpisDisponibles.filter((disponible) => !kpis.some((kpi) => kpi.id === disponible.id));
+  const deFiltro = facetasDeFiltro(facetas ?? []);
 
   // One comparison for the whole report: it shows up in Período as soon as a KPI needs it
-  const compara = kpis.some(usaComparativo);
+  // The whole history has nothing to be compared with: the KPIs only show their current value
+  const historico = edicion.periodo === "historico";
+  const medidasDe = (kpi: KpiReporte) => (historico ? sinComparar([kpi])[0].medidas : kpi.medidas);
+  const compara = !historico && kpis.some(usaComparativo);
   const comparar = edicion.comparar || COMPARATIVO_POR_DEFECTO;
   const rangoComparar = aRango(edicion.rangoComparar);
   const incompleto =
@@ -152,10 +213,14 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
     (compara && comparar === "personalizado" && !rangoComparar);
 
   function aplicar() {
-    if (incompleto) return;
+    if (incompleto || cargando) return;
     edicion.aplicar(
-      compara ? { comparar, rangoComparar } : { comparar: undefined, rangoComparar: undefined },
-      consultaReporte({ agrupacion, kpis })
+      {
+        // A filter the KPIs do not take is dropped, even if it was set before the KPI that refuses it was added
+        selecciones: seleccionesDe(edicion.selecciones, deFiltro.map((faceta) => faceta.id)),
+        ...(compara ? { comparar, rangoComparar } : { comparar: undefined, rangoComparar: undefined }),
+      },
+      consultaReporte({ agrupacion, kpis: historico ? sinComparar(kpis) : kpis })
     );
   }
 
@@ -178,8 +243,8 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
           {kpis.map((kpi) => (
             <FilaFiltro
               key={kpi.id}
-              nombre={KPIS[kpi.id].nombre}
-              valor={kpi.medidas.map((m) => MEDIDAS[m]).join(" · ")}
+              nombre={nombreKpi(kpi.id)}
+              valor={medidasDe(kpi).map((m) => MEDIDAS[m]).join(" · ")}
               abierta={filaAbierta === `kpi-${kpi.id}`}
               onAlternar={() => alternarFila(`kpi-${kpi.id}`)}
             >
@@ -191,8 +256,8 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
                     className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 font-normal hover:bg-sidebar-accent"
                   >
                     <Checkbox
-                      checked={kpi.medidas.includes(medida)}
-                      disabled={kpi.medidas.length === 1 && kpi.medidas.includes(medida)}
+                      checked={medidasDe(kpi).includes(medida)}
+                      disabled={historico || (kpi.medidas.length === 1 && kpi.medidas.includes(medida))}
                       onCheckedChange={() => alternarMedida(kpi, medida)}
                     />
                     {MEDIDAS[medida]}
@@ -200,8 +265,12 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
                 ))}
               </div>
 
-              {usaComparativo(kpi) && (
-                <p className="text-xs text-muted-foreground">El comparativo se elige en Período.</p>
+              {historico ? (
+                <p className="text-xs text-muted-foreground">El histórico completo solo muestra el valor actual.</p>
+              ) : (
+                usaComparativo(kpi) && (
+                  <p className="text-xs text-muted-foreground">El comparativo se elige en Período.</p>
+                )
               )}
 
               <Button
@@ -209,13 +278,15 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
                 variant="ghost"
                 size="xs"
                 disabled={kpis.length === 1}
-                onClick={() => setKpis((lista) => lista.filter((k) => k.id !== kpi.id))}
+                onClick={() => cambiarKpis(kpis.filter((k) => k.id !== kpi.id))}
                 className="-ml-2 text-muted-foreground hover:text-destructive"
               >
                 <Trash2 /> Quitar KPI
               </Button>
             </FilaFiltro>
           ))}
+
+          {errorKpis && <p className="px-5 pb-2 text-xs text-destructive">{errorKpis}</p>}
 
           {disponibles.length > 0 && (
             <div className="px-5 pt-1 pb-2">
@@ -225,8 +296,8 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
                   <SelectValue placeholder="Agregar KPI…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {disponibles.map((id) => (
-                    <SelectItem key={id} value={id}>{KPIS[id].nombre}</SelectItem>
+                  {disponibles.map((kpi) => (
+                    <SelectItem key={kpi.id} value={kpi.id}>{kpi.nombre}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -241,7 +312,7 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
             abierta={filaAbierta === "periodo"}
             onAlternar={() => alternarFila("periodo")}
           >
-            <OpcionesPeriodo edicion={edicion} hoy={hoy} />
+            <OpcionesPeriodo edicion={edicion} hoy={hoy} conHistorico />
           </FilaFiltro>
 
           {compara && (
@@ -264,9 +335,10 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
         </Seccion>
 
         <Seccion titulo="Agrupación">
+          {errorPermitidas && <p className="px-5 pt-1 text-xs text-destructive">{errorPermitidas}</p>}
           <FilaFiltro
             nombre="Agrupar por"
-            valor={AGRUPACIONES[agrupacion]}
+            valor={nombreFaceta(facetas, agrupacion)}
             abierta={filaAbierta === "agrupacion"}
             onAlternar={() => alternarFila("agrupacion")}
           >
@@ -274,38 +346,44 @@ export default function PanelFiltros({ filtros, reporte, tiposCarga, hoy }: Prop
               nombre="Agrupar por"
               valor={agrupacion}
               onCambiar={setAgrupacion}
-              opciones={(Object.keys(AGRUPACIONES) as Agrupacion[]).map((opcion) => ({
-                valor: opcion,
-                etiqueta: AGRUPACIONES[opcion],
-              }))}
+              opciones={(facetas ?? []).map((faceta) => ({ valor: faceta.id, etiqueta: faceta.name }))}
             />
           </FilaFiltro>
         </Seccion>
 
         <Seccion titulo="Filtros">
-          <FilaFiltro
-            nombre="Tipo de carga"
-            valor={textoSeleccion(edicion.tiposCarga, nombreTipoCarga(tiposCarga))}
-            abierta={filaAbierta === "tipoCarga"}
-            onAlternar={() => alternarFila("tipoCarga")}
-          >
-            <SelectorTiposCarga edicion={edicion} tiposCarga={tiposCarga} />
-          </FilaFiltro>
-
-          <FilaFiltro
-            nombre="Departamento"
-            valor={textoSeleccion(edicion.departamentos, (d) => d)}
-            abierta={filaAbierta === "departamento"}
-            onAlternar={() => alternarFila("departamento")}
-          >
-            <SelectorDepartamentos edicion={edicion} />
-          </FilaFiltro>
+          {deFiltro.map((faceta) => {
+            const catalogo = catalogos[faceta.id];
+            const seleccion = edicion.seleccion(faceta.id);
+            return (
+              <FilaFiltro
+                key={faceta.id}
+                nombre={faceta.name}
+                valor={textoSeleccion(seleccion, nombreValor(catalogo?.valores ?? []))}
+                abierta={filaAbierta === `filtro-${faceta.id}`}
+                onAlternar={() => alternarFila(`filtro-${faceta.id}`)}
+              >
+                {!catalogo ? (
+                  <p className="text-xs text-muted-foreground">Cargando valores…</p>
+                ) : catalogo.error ? (
+                  <p className="text-xs text-destructive">{catalogo.error}</p>
+                ) : (
+                  <SelectorValores
+                    nombre={faceta.name}
+                    valores={catalogo.valores}
+                    seleccion={seleccion}
+                    onCambiar={(nueva) => edicion.setSeleccion(faceta.id, nueva)}
+                  />
+                )}
+              </FilaFiltro>
+            );
+          })}
         </Seccion>
       </SidebarContent>
 
       <SidebarFooter className="flex-row gap-2 border-t border-sidebar-border p-4 group-data-[collapsible=icon]:hidden">
-        <Button type="button" disabled={incompleto} onClick={aplicar} className="h-9 flex-1">
-          Aplicar
+        <Button type="button" disabled={incompleto || cargando} onClick={aplicar} className="h-9 flex-1">
+          {cargando ? "Actualizando…" : "Aplicar"}
         </Button>
         <Button variant="outline" className="h-9" nativeButton={false} render={<Link href="/reportes" />}>
           Limpiar

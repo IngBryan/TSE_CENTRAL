@@ -6,12 +6,12 @@ import { useState, type ReactNode } from "react";
 import {
   OpcionesComparativo,
   OpcionesPeriodo,
-  SelectorRubros,
+  SelectorValores,
   useEdicionFiltros,
 } from "@/components/SelectoresFiltros";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { ValorFaceta } from "@/lib/facetas-backend";
+import type { ValorFaceta } from "@/lib/reportes-backend";
 import type { FiltrosDashboard } from "@/lib/reportes";
 
 type Props = {
@@ -33,7 +33,7 @@ function Titulo({ children }: { children: ReactNode }) {
 export default function BarraDashboard({ filtros, rubros, errorRubros, hoy }: Props) {
   const edicion = useEdicionFiltros(filtros, hoy, "/dashboard");
   const [abierto, setAbierto] = useState<"periodo" | "filtros" | null>(null);
-  const activos = filtros.rubros ? 1 : 0;
+  const activos = filtros.selecciones.category ? 1 : 0;
 
   const alternar = (popover: "periodo" | "filtros") => (abrir: boolean) => setAbierto(abrir ? popover : null);
 
@@ -70,7 +70,12 @@ export default function BarraDashboard({ filtros, rubros, errorRubros, hoy }: Pr
           {errorRubros ? (
             <p className="px-1 text-sm text-destructive">{errorRubros}</p>
           ) : (
-            <SelectorRubros edicion={edicion} rubros={rubros} />
+            <SelectorValores
+              nombre="Rubro"
+              valores={rubros}
+              seleccion={edicion.seleccion("category")}
+              onCambiar={(seleccion) => edicion.setSeleccion("category", seleccion)}
+            />
           )}
           <div className="mt-1 flex gap-2">
             <Button type="button" onClick={() => edicion.aplicar()} className="h-9 flex-1">Aplicar</Button>
@@ -78,7 +83,7 @@ export default function BarraDashboard({ filtros, rubros, errorRubros, hoy }: Pr
               type="button"
               variant="outline"
               className="h-9"
-              onClick={() => edicion.aplicar({ rubros: undefined })}
+              onClick={() => edicion.aplicar({ selecciones: {} })}
             >
               Quitar
             </Button>

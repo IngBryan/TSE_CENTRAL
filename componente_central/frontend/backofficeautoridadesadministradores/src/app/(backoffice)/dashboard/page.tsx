@@ -2,7 +2,7 @@ import { BadgeCheck, Building2, Package, Route, ShieldAlert, Truck } from "lucid
 
 import Kpi from "@/components/Kpi";
 import { requerirRol } from "@/lib/backoffice-sesion";
-import { valoresFaceta } from "@/lib/facetas-backend";
+import { valoresFaceta } from "@/lib/reportes-backend";
 import {
   cargaPorRubro,
   infraccionesPorTipo,
@@ -19,6 +19,7 @@ import {
   PREDETERMINADOS_DASHBOARD,
   rangoComparacion,
   rangoPeriodo,
+  seleccionesDe,
   tasaConfirmadas,
   textoRango,
   textoSeleccion,
@@ -27,27 +28,33 @@ import {
 import { dashboardConComparacion } from "@/lib/reportes-mock";
 import BarraDashboard from "./BarraDashboard";
 
+// The facet of the backend the dashboard filters by
+const RUBRO = "category";
+
 // This year against the same days of last year, unless the clock or the filters say otherwise
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   await requerirRol("AUTORIDAD");
   // Rubro is the only filter every KPI of the dashboard can take: companies and vehicles have no department or
   // cargo type
+  const leidos = leerFiltros(await searchParams, PREDETERMINADOS_DASHBOARD);
+  // The dashboard compares, so it does not take the whole history
   const filtros: FiltrosDashboard = {
-    ...leerFiltros(await searchParams, PREDETERMINADOS_DASHBOARD),
-    tiposCarga: undefined,
-    departamentos: undefined,
+    ...leidos,
+    periodo: leidos.periodo === "historico" ? PREDETERMINADOS_DASHBOARD.periodo : leidos.periodo,
+    selecciones: seleccionesDe(leidos.selecciones, [RUBRO]),
   };
 
   const hoy = hoyEnUruguay();
-  const periodo = rangoPeriodo(filtros.periodo, filtros.rango, hoy);
+  const periodo = rangoPeriodo(filtros.periodo, filtros.rango, hoy) ?? { desde: hoy, hasta: hoy };
   const comparacion = rangoComparacion(filtros.comparar, periodo, filtros.rangoComparar);
   // Test data until the backend has the reports
   const { actual: datos, anterior } = dashboardConComparacion(periodo, comparacion, filtros);
-  const rubros = await valoresFaceta("category");
-  const valores = rubros.ok ? rubros.valores : [];
+  const rubros = await valoresFaceta(RUBRO);
+  const valores = rubros.ok ? rubros.datos : [];
 
   const nombreRubro = (id: string) => valores.find((r) => r.id === id)?.name ?? id;
-  const filtrosActivos = [filtros.rubros && `Rubro: ${textoSeleccion(filtros.rubros, nombreRubro)}`].filter(Boolean);
+  const rubro = filtros.selecciones[RUBRO];
+  const filtrosActivos = [rubro && `Rubro: ${textoSeleccion(rubro, nombreRubro)}`].filter(Boolean);
 
   return (
     <div className="w-full min-w-0 space-y-6 px-6 py-8 lg:px-8">

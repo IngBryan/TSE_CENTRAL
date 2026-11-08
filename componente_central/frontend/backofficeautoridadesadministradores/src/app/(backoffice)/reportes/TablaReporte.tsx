@@ -1,4 +1,4 @@
-import { formatear, Variacion, type FormatoKpi } from "@/components/Kpi";
+import { BadgeCambio, formatear, type FormatoKpi } from "@/components/Kpi";
 import {
   Pagination,
   PaginationContent,
@@ -17,49 +17,53 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { FilaReporte, TablaReporte as Tabla, ValorKpi } from "@/lib/reportes-mock";
-import { AGRUPACIONES, KPIS, MEDIDAS, type Medida, type Reporte } from "@/lib/reportes-kpis";
+import type { FilaReporte, TablaReporte as Tabla } from "@/lib/reportes-tabla";
+import {
+  KPIS,
+  MEDIDAS,
+  nombreFaceta,
+  nombreKpi,
+  type Medida,
+  type NombresKpi,
+  type Reporte,
+} from "@/lib/reportes-kpis";
+import type { FacetaDisponible } from "@/lib/reportes-backend";
 
 const NUMERO = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 1 });
 
+const SIN_VALOR = <span className="text-muted-foreground">—</span>;
+
 // Signed change against the previous value; rates in percentage points
-function Diferencia({ valor, formato, mejorSiBaja }: { valor: ValorKpi; formato: FormatoKpi; mejorSiBaja: boolean }) {
-  if (valor.anterior === null) return <span className="text-muted-foreground">—</span>;
+function Diferencia({ valor, formato, mejorSiBaja }: { valor: number; formato: FormatoKpi; mejorSiBaja: boolean }) {
+  if (valor === 0) return <span className="text-muted-foreground">0</span>;
 
-  const diferencia = valor.actual - valor.anterior;
-  if (diferencia === 0) return <span className="text-muted-foreground">0</span>;
-
-  const signo = diferencia > 0 ? "+" : "−";
+  const signo = valor > 0 ? "+" : "−";
   const texto =
     formato === "porcentaje"
-      ? `${signo}${NUMERO.format(Math.abs(diferencia) * 100)} p.p.`
-      : `${signo}${formatear(Math.abs(diferencia), formato)}`;
-  const bueno = diferencia > 0 !== mejorSiBaja;
+      ? `${signo}${NUMERO.format(Math.abs(valor) * 100)} p.p.`
+      : `${signo}${formatear(Math.abs(valor), formato)}`;
+  const bueno = valor > 0 !== mejorSiBaja;
 
   return <span className={bueno ? "text-emerald-700" : "text-red-700"}>{texto}</span>;
 }
 
+// The value the backend gives; growth is relative to the previous value, for a rate too
 function Celda({ fila, idKpi, medida }: {
   fila: FilaReporte;
   idKpi: Reporte["kpis"][number]["id"];
   medida: Medida;
 }) {
-  const valor = fila.valores[idKpi];
+  const valor = fila.valores[idKpi]?.[medida];
   const { formato, mejorSiBaja } = KPIS[idKpi];
-  if (!valor) return <span className="text-muted-foreground">—</span>;
+  if (valor === undefined || valor === null) return SIN_VALOR;
 
   switch (medida) {
-    case "actual":
-      return <>{formatear(valor.actual, formato)}</>;
-    case "anterior":
-      return valor.anterior === null
-        ? <span className="text-muted-foreground">—</span>
-        : <>{formatear(valor.anterior, formato)}</>;
-    case "crecimiento":
-      return valor.anterior === null
-        ? <span className="text-muted-foreground">—</span>
-        : <Variacion valor={valor.actual} comparativo={valor.anterior} formato={formato} mejorSiBaja={mejorSiBaja} />;
-    case "diferencia":
+    case "current":
+    case "previous":
+      return <>{formatear(valor, formato)}</>;
+    case "growth":
+      return <BadgeCambio cambio={valor} texto={formatear(Math.abs(valor), "porcentaje")} mejorSiBaja={mejorSiBaja} />;
+    case "difference":
       return <Diferencia valor={valor} formato={formato} mejorSiBaja={mejorSiBaja} />;
   }
 }
@@ -89,6 +93,8 @@ function Fila({ fila, reporte, total = false }: { fila: FilaReporte; reporte: Re
 export const FILAS_POR_PAGINA = 15;
 
 type Props = {
+  nombres: NombresKpi;
+  facetas: FacetaDisponible[] | null;
   tabla: Tabla;
   reporte: Reporte;
   pagina: number;
@@ -98,7 +104,7 @@ type Props = {
 
 // One row per group; each KPI spans one column per measure it shows. Only the current page is drawn: the
 // exports take every row from the data
-export default function TablaReporte({ tabla, reporte, pagina, hrefPagina }: Props) {
+export default function TablaReporte({ tabla, reporte, nombres, facetas, pagina, hrefPagina }: Props) {
   const paginas = Math.max(1, Math.ceil(tabla.filas.length / FILAS_POR_PAGINA));
   const paginaActual = Math.min(Math.max(pagina, 1), paginas);
   const desde = (paginaActual - 1) * FILAS_POR_PAGINA;
@@ -114,7 +120,7 @@ export default function TablaReporte({ tabla, reporte, pagina, hrefPagina }: Pro
                 rowSpan={2}
                 className="sticky left-0 z-20 h-auto bg-muted px-3 py-1.5 align-bottom"
               >
-                {AGRUPACIONES[reporte.agrupacion]}
+                {nombreFaceta(facetas, reporte.agrupacion)}
               </TableHead>
               {reporte.kpis.map((kpi) => (
                 <TableHead
@@ -124,7 +130,7 @@ export default function TablaReporte({ tabla, reporte, pagina, hrefPagina }: Pro
                   className="h-auto border-l px-3 pt-1.5 pb-0.5 align-bottom font-semibold whitespace-normal"
                 >
                   {/* Long names wrap downwards instead of widening the columns */}
-                  <span className="block max-w-48 leading-snug">{KPIS[kpi.id].nombre}</span>
+                  <span className="block max-w-48 leading-snug">{nombreKpi(nombres, kpi.id)}</span>
                 </TableHead>
               ))}
             </TableRow>

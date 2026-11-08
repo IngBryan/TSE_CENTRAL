@@ -48,7 +48,11 @@ export function Variacion({ valor, comparativo, formato, mejorSiBaja }: {
     formato === "porcentaje"
       ? `${NUMERO.format(Math.abs(cambio) * 100)} p.p.`
       : PORCENTAJE.format(Math.abs(cambio));
+  return <BadgeCambio cambio={cambio} texto={texto} mejorSiBaja={mejorSiBaja} />;
+}
 
+// An arrow up or down, green when the change is good news
+export function BadgeCambio({ cambio, texto, mejorSiBaja }: { cambio: number; texto: string; mejorSiBaja: boolean }) {
   if (cambio === 0) {
     return (
       <Badge variant="secondary" className="text-muted-foreground">
