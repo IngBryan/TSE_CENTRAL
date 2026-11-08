@@ -2,9 +2,11 @@ package tse.lab.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.io.Serializable;
 
 @Embeddable
-public class EvidenciaReglas {
+public class EvidenciaReglas implements Serializable {
+    private static final long serialVersionUID = 1L;
     @Column(nullable=false) private String matricula;
     @Column(name="fecha_hora", nullable=false) private Instant fechaHora;
     @Column(nullable=false) private String origen;

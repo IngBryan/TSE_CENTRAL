@@ -10,7 +10,7 @@ export async function guardarReglas(_previo: EstadoReglas, data: FormData): Prom
   if (identidad?.rol !== "ADMINISTRADOR") return { estado: "error", mensaje: "Iniciá sesión como administrador para continuar." };
   const numero = (campo: string): number => {
     const valor = data.get(campo);
-    return typeof valor === "string" && valor.trim() !== "" ? Number(valor) : NaN;
+    return typeof valor === "string" && valor.trim() !== "" ? Number(valor) : Number.NaN;
   };
   const revisionBase = numero("revisionBase");
   const toleranciaCargaPorcentaje = numero("toleranciaCargaPorcentaje");

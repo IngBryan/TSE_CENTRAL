@@ -24,13 +24,13 @@ public final class ConfiguracionReglas implements Serializable {
         if (kg < 0 || kg > 5000) throw new IllegalArgumentException("El margen de carga debe estar entre 0 y 5000 kg");
         if (metros < 1 || metros > 10000) throw new IllegalArgumentException("La distancia debe estar entre 1 y 10000 metros");
         if (segundos < 1 || segundos > 600) throw new IllegalArgumentException("La ventana debe estar entre 1 y 600 segundos");
-        Instant.parse(Objects.requireNonNull(fecha));
+        String fechaValidada = Instant.parse(Objects.requireNonNull(fecha)).toString();
         this.revision = revision;
         this.toleranciaCargaPorcentaje = porcentaje;
         this.toleranciaCargaKg = kg;
         this.distanciaDesvioMetros = metros;
         this.ventanaDesvioSegundos = segundos;
-        this.fechaActualizacion = fecha;
+        this.fechaActualizacion = fechaValidada;
         this.usuario = Objects.requireNonNull(usuario);
         this.fundamento = Objects.requireNonNull(fundamento);
         this.publicada = publicada;

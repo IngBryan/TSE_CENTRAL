@@ -1,6 +1,7 @@
 package tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -72,6 +73,21 @@ class PesajesServiceTest {
 
     private static DatosPesaje pesaje(long id, String matricula, Instant fechaHora) {
         return new DatosPesaje(id, 4, matricula, fechaHora, 18_450);
+    }
+
+    @Test
+    void fijaLaRevisionUnaSolaVezAunqueElPesajeSeReprocese() {
+        enTransaccion(() -> servicio.guardarPesajes(List.of(pesaje(3, "SBC1234", T1))));
+        assertEquals(2, enTransaccion(() -> servicio.fijarRevisionReglas("SBC1234", T1, 2)));
+        em.clear();
+        assertEquals(2, enTransaccion(() -> servicio.fijarRevisionReglas("SBC1234", T1, 8)));
+    }
+
+    @Test
+    void noPuedeFijarUnaRevisionEnUnPesajeInexistente() {
+        assertThrows(IllegalArgumentException.class,
+                () -> enTransaccion(() -> servicio.fijarRevisionReglas("SBC1234", T1, 2)));
+        em.getTransaction().rollback();
     }
 
     @Test

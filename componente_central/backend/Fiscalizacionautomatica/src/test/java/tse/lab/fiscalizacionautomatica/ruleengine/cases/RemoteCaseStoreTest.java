@@ -75,4 +75,19 @@ class RemoteCaseStoreTest {
         store.close();
         verify(context).close();
     }
+    @Test void transmiteLaRevisionYElPesoBaseDeLaDeteccion() throws Exception {
+        var config=tse.lab.reglas.ConfiguracionReglas.inicial();
+        store.registrarConReglas(TipoCasoAutomatico.EXCESO_CARGA,"G1",EVENT,config,30000);
+        var captor=org.mockito.ArgumentCaptor.forClass(EventoFiscalizado.class);
+        verify(remote).registrarEvidencia(eq(TipoCasoAutomatico.EXCESO_CARGA),eq("G1"),captor.capture());
+        assertEquals(1L,captor.getValue().getRevisionReglas());
+        assertEquals(30000L,captor.getValue().getPesoBaseKg());
+        var otra=new TrackingEvent("m2",8,1,"SBC1234",-34.91,-56.1,NOW.plusSeconds(10));
+        var prueba=new PruebaDesvio(EVENT,otra,2500,2600,2000,30,List.of("sha"));
+        store.registrarDesvioConReglas("G1",EVENT,prueba,config);
+        verify(remote).registrarDesvio(eq("G1"),captor.capture(),any());
+        assertEquals(1L,captor.getValue().getRevisionReglas());
+        assertNull(captor.getValue().getPesoBaseKg());
+    }
+
 }

@@ -159,4 +159,29 @@ class SituationDetectorTest {
         assertThrows(IOException.class, () -> detectorHistorico.detect(tracking("SBC1234")));
     }
 
+    @Test
+    void evaluaElDesvioConElSnapshotYConservaLaPruebaSoloSiConfirma() throws IOException {
+        var config=tse.lab.reglas.ConfiguracionReglas.inicial();
+        var gps=tracking("SBC1234");
+        var hechos=withTrip("SBC1234","EN_CURSO");
+        var ruta=org.mockito.Mockito.mock(tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.class);
+        org.mockito.Mockito.when(ruta.situation()).thenReturn(Situation.ROUTE_DEVIATION);
+        var pareja=new TrackingEvent("m2",8,1,"SBC1234",-34.9,-56.1,NOW.plusSeconds(10));
+        var prueba=new tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviationRule.PruebaDesvio(
+                gps,pareja,2500,2600,2000,30,List.of("sha"));
+        org.mockito.Mockito.when(ruta.evaluar(gps,hechos,config)).thenReturn(Optional.of(prueba),Optional.empty());
+        var configurado=new SituationDetector(m->Optional.of(hechos),List.of(ruta),null,
+                tse.lab.fiscalizacionautomatica.ruleengine.config.ReglasSource.fija(config));
+        Detection confirmado=configurado.detect(gps);
+        assertEquals(List.of(Situation.ROUTE_DEVIATION),confirmado.situations());
+        assertEquals(prueba,confirmado.pruebaDesvio());
+        assertEquals(List.of(),configurado.detect(gps).situations());
+    }
+    @Test
+    void noEvaluaExcesoDeCargaCuandoNoExisteUnViajeActivo() throws IOException {
+        var configurado=new SituationDetector(m->Optional.of(withoutTrips(m)),
+                List.of(new tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule()));
+        assertEquals(List.of(),configurado.detect(new Weighing(1,1,"SBC1234",NOW,50000)).situations());
+    }
+
 }

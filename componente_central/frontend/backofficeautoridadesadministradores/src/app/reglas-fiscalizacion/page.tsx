@@ -23,7 +23,7 @@ export default async function ReglasFiscalizacionPage() {
         <p className="mt-2 text-muted-foreground">Ajustá las tolerancias de carga y desvío de ruta para toda la plataforma.</p>
         <p className="mt-1 text-xs text-muted-foreground">Sesión: {identidad.ci} · Administrador</p>
       </div>
-      <form action={cerrarSesionAction}><button className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Cerrar sesión</button></form>
+      <form action={cerrarSesionAction}><button type="submit" className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Cerrar sesión</button></form>
     </header>
     {!resultado.ok ? <div role="alert" className="rounded-lg border p-4 text-destructive">{resultado.mensaje}</div> : <>
       <div className="rounded-lg bg-muted p-4 text-sm">

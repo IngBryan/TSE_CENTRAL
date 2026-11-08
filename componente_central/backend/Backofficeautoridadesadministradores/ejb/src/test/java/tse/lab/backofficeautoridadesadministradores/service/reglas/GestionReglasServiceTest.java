@@ -62,4 +62,37 @@ class GestionReglasServiceTest {
         assertEquals(1,tx(service::obtener).getRevision());
         assertEquals(1,tx(service::historial).size());
     }
+    @Test void publicarElOutboxNoRepiteRevisionesYaConfirmadas() {
+        assertEquals(1, tx(()->dao.siguientePendiente().datos().getRevision()));
+        tx(()->{ dao.revision(1).publicada(); return null; });
+        em.clear();
+        assertNull(tx(dao::siguientePendiente));
+        tx(()->cambiar(1));
+        assertEquals(2, tx(()->dao.siguientePendiente().datos().getRevision()));
+    }
+    @Test void laConsultaInternaDevuelveLaVigenteYLaRevisionHistorica() throws Exception {
+        var consulta=new ConsultaReglasService(); set(consulta,"reglas",dao);
+        tx(()->cambiar(1));
+        assertEquals(2,tx(consulta::obtenerVigente).getRevision());
+        assertEquals(1,tx(()->consulta.obtenerRevision(1)).getRevision());
+        assertEquals(404,assertThrows(ReglasException.class,()->tx(()->consulta.obtenerRevision(99))).getStatus());
+    }
+    @Test void sinConfiguracionInicialSeInformaIndisponibilidad() {
+        tx(()->{ em.createQuery("DELETE FROM ReglasVigentes").executeUpdate(); return null; });
+        em.clear();
+        assertEquals(503,assertThrows(ReglasException.class,()->tx(service::obtener)).getStatus());
+    }
+    @Test void fundamentoInvalidoNoModificaElHistorial() {
+        for (String fundamento : new String[]{null," ","x".repeat(501)})
+            assertEquals(400,assertThrows(ReglasException.class,()->tx(()->service.actualizar(
+                    1,BigDecimal.ZERO,0,2000,30,fundamento,"c"))).getStatus());
+        assertEquals(1,tx(service::historial).size());
+        admin=false;
+        assertEquals(403,assertThrows(ReglasException.class,service::historial).getStatus());
+    }
+    @Test void sinContextoDeSeguridadNoSeAutoriza() throws Exception {
+        set(service,"seguridad",null);
+        assertEquals(403,assertThrows(ReglasException.class,service::obtener).getStatus());
+    }
+
 }

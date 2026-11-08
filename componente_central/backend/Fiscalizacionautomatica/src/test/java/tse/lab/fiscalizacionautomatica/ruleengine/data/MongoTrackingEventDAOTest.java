@@ -103,4 +103,32 @@ class MongoTrackingEventDAOTest {
 
         verify(collection, never()).insertMany(anyList(), any(InsertManyOptions.class));
     }
+    @Test
+    void fijarRevisionConservaLaGanadoraYNoSobrescribeAlReprocesar() {
+        @SuppressWarnings("unchecked")
+        com.mongodb.client.FindIterable<Document> consulta=mock(com.mongodb.client.FindIterable.class);
+        when(collection.find(any(org.bson.conversions.Bson.class))).thenReturn(consulta);
+        when(consulta.projection(any(org.bson.conversions.Bson.class))).thenReturn(consulta);
+        when(consulta.first()).thenReturn(new Document("revisionReglas",2L));
+        var dao=dao();
+        assertEquals(2,dao.fijarRevisionReglas(EVENT,5));
+        var filtro=ArgumentCaptor.forClass(org.bson.conversions.Bson.class);
+        verify(collection).updateOne(filtro.capture(),any(org.bson.conversions.Bson.class));
+        var json=filtro.getValue().toBsonDocument(Document.class,com.mongodb.MongoClientSettings.getDefaultCodecRegistry()).toJson();
+        org.junit.jupiter.api.Assertions.assertTrue(json.contains("revisionReglas"));
+        org.junit.jupiter.api.Assertions.assertTrue(json.contains("$exists"));
+        org.junit.jupiter.api.Assertions.assertTrue(json.contains("false"));
+    }
+    @Test
+    void unGpsSinRevisionPersistidaNoSeMarcaComoEvaluado() {
+        @SuppressWarnings("unchecked")
+        com.mongodb.client.FindIterable<Document> consulta=mock(com.mongodb.client.FindIterable.class);
+        when(collection.find(any(org.bson.conversions.Bson.class))).thenReturn(consulta);
+        when(consulta.projection(any(org.bson.conversions.Bson.class))).thenReturn(consulta);
+        var dao=dao();
+        assertThrows(IllegalStateException.class,()->dao.fijarRevisionReglas(EVENT,2));
+        when(consulta.first()).thenReturn(new Document("revisionReglas","invalida"));
+        assertThrows(IllegalStateException.class,()->dao.fijarRevisionReglas(EVENT,2));
+    }
+
 }
