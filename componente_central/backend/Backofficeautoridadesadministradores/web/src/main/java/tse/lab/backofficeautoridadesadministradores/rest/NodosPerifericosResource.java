@@ -49,7 +49,7 @@ public class NodosPerifericosResource {
      */
     @GET
     public Response listar() {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
+        Response acceso = AccesoPorRol.verificar(seguridad, "ADMINISTRADOR");
 
         if (acceso != null) {
             return acceso;
@@ -63,7 +63,7 @@ public class NodosPerifericosResource {
      */
     @POST
     public Response registrar(AltaNodoRequest datos) {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
+        Response acceso = AccesoPorRol.verificar(seguridad, "ADMINISTRADOR");
 
         if (acceso != null) {
             return acceso;

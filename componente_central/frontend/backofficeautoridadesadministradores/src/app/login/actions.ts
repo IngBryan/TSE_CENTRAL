@@ -12,6 +12,7 @@ import {
   urlBackend,
   wildFlyAuthorization,
 } from "@/lib/backoffice-sesion";
+import { esRol, inicioPorRol, type Rol } from "@/lib/rutas";
 
 export type EstadoLogin = {
   estado: "inicial" | "error";
@@ -40,6 +41,7 @@ export async function iniciarSesionAction(
 
   let sesion: string;
   let duracionSesion: number;
+  let rol: Rol;
 
   try {
     const respuesta = await fetchBackend(urlBackend("auth/login"), {
@@ -112,7 +114,7 @@ export async function iniciarSesionAction(
       !identidad ||
       typeof identidad !== "object" ||
       !("rol" in identidad) ||
-      identidad.rol !== "ADMINISTRADOR"
+      !esRol(identidad.rol)
     ) {
       await fetchBackend(urlBackend("auth/logout"), {
         method: "POST",
@@ -124,9 +126,11 @@ export async function iniciarSesionAction(
 
       return {
         estado: "error",
-        mensaje: "Tu usuario no tiene rol Administrador.",
+        mensaje: "Tu usuario no tiene acceso al Backoffice.",
       };
     }
+
+    rol = identidad.rol;
   } catch {
     return {
       estado: "error",
@@ -143,7 +147,7 @@ export async function iniciarSesionAction(
     maxAge: duracionSesion,
   });
 
-  redirect("/nodos-perifericos");
+  redirect(inicioPorRol(rol));
 }
 
 export async function cerrarSesionAction(): Promise<void> {
