@@ -62,6 +62,7 @@ export function useEdicionFiltros(filtros: FiltrosDashboard, hoy: string, ruta: 
   const [rangoComparar, setRangoComparar] = useState<DateRange | undefined>(aDateRange(filtros.rangoComparar));
   const [tiposCarga, setTiposCarga] = useState<Seleccion>(filtros.tiposCarga ?? SIN_SELECCION);
   const [departamentos, setDepartamentos] = useState<Seleccion>(filtros.departamentos ?? SIN_SELECCION);
+  const [rubros, setRubros] = useState<Seleccion>(filtros.rubros ?? SIN_SELECCION);
 
   const rangoElegido = aRango(rangoPropio);
   const rangoCompararElegido = aRango(rangoComparar);
@@ -79,12 +80,13 @@ export function useEdicionFiltros(filtros: FiltrosDashboard, hoy: string, ruta: 
     rangoComparar: comparar === "personalizado" ? rangoCompararElegido : undefined,
     tiposCarga: seleccionVacia(tiposCarga) ? undefined : tiposCarga,
     departamentos: seleccionVacia(departamentos) ? undefined : departamentos,
+    rubros: seleccionVacia(rubros) ? undefined : rubros,
   };
 
   return {
     periodo, setPeriodo, rangoPropio, setRangoPropio,
     comparar, setComparar, rangoComparar, setRangoComparar,
-    tiposCarga, setTiposCarga, departamentos, setDepartamentos,
+    tiposCarga, setTiposCarga, departamentos, setDepartamentos, rubros, setRubros,
     rangoActual, comparacion, incompleto,
     // extra: more query parameters of the page (the report KPIs and grouping)
     aplicar: (cambios: Partial<FiltrosDashboard> = {}, extra = "") => {
@@ -329,6 +331,18 @@ export function SelectorDepartamentos({ edicion }: { edicion: EdicionFiltros }) 
       opciones={DEPARTAMENTOS.map((d) => ({ valor: d, nombre: d }))}
       seleccion={edicion.departamentos}
       onCambiar={edicion.setDepartamentos}
+    />
+  );
+}
+
+// Rubros come from the backend catalog, with their id
+export function SelectorRubros({ edicion, rubros }: { edicion: EdicionFiltros; rubros: { id: string; name: string }[] }) {
+  return (
+    <SelectorMultiple
+      nombre="Rubro"
+      opciones={rubros.map((r) => ({ valor: r.id, nombre: r.name }))}
+      seleccion={edicion.rubros}
+      onCambiar={edicion.setRubros}
     />
   );
 }

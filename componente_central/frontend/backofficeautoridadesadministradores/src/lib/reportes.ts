@@ -38,6 +38,7 @@ export type FiltrosDashboard = {
   rangoComparar?: Rango;
   tiposCarga?: Seleccion;
   departamentos?: Seleccion;
+  rubros?: Seleccion;
 };
 
 // Each value of a filter can be included, excluded or left alone. The filter keeps the included values (all of
@@ -56,14 +57,15 @@ export function valoresFiltrados(seleccion: Seleccion | undefined, todos: readon
   return todos.filter((v) => (incluidos.size === 0 || incluidos.has(v)) && !excluidos.has(v));
 }
 
-// The two filters as they travel in the URL: "tipoCarga=2,4&excluirTipoCarga=11"
+// The filters as they travel in the URL: "tipoCarga=2,4&excluirTipoCarga=11"
 const PARAMETROS_SELECCION = {
   tiposCarga: { incluir: "tipoCarga", excluir: "excluirTipoCarga" },
   departamentos: { incluir: "departamento", excluir: "excluirDepartamento" },
+  rubros: { incluir: "rubro", excluir: "excluirRubro" },
 } as const;
 
-function escribirSelecciones(query: URLSearchParams, filtros: Pick<FiltrosDashboard, "tiposCarga" | "departamentos">) {
-  for (const clave of ["tiposCarga", "departamentos"] as const) {
+function escribirSelecciones(query: URLSearchParams, filtros: Pick<FiltrosDashboard, keyof typeof PARAMETROS_SELECCION>) {
+  for (const clave of Object.keys(PARAMETROS_SELECCION) as (keyof typeof PARAMETROS_SELECCION)[]) {
     const seleccion = filtros[clave];
     if (seleccionVacia(seleccion)) continue;
     if (seleccion!.incluir.length) query.set(PARAMETROS_SELECCION[clave].incluir, seleccion!.incluir.join(","));
@@ -138,6 +140,7 @@ export function leerFiltros(
     periodo: periodo && periodo in PERIODOS ? (periodo as Periodo) : predeterminados.periodo,
     tiposCarga: seleccion("tiposCarga", (v) => /^\d+$/.test(v)),
     departamentos: seleccion("departamentos", (v) => (DEPARTAMENTOS as readonly string[]).includes(v)),
+    rubros: seleccion("rubros", (v) => /^d+$/.test(v)),
   };
 
   if (filtros.periodo === "personalizado") {

@@ -6,17 +6,19 @@ import { useState, type ReactNode } from "react";
 import {
   OpcionesComparativo,
   OpcionesPeriodo,
-  SelectorDepartamentos,
-  SelectorTiposCarga,
+  SelectorRubros,
   useEdicionFiltros,
 } from "@/components/SelectoresFiltros";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { FiltrosDashboard, TipoCargaOpcion } from "@/lib/reportes";
+import type { ValorFaceta } from "@/lib/facetas-backend";
+import type { FiltrosDashboard } from "@/lib/reportes";
 
 type Props = {
   filtros: FiltrosDashboard;
-  tiposCarga: TipoCargaOpcion[];
+  rubros: ValorFaceta[];
+  // Why the rubros could not be loaded
+  errorRubros?: string;
   hoy: string;
 };
 
@@ -27,11 +29,11 @@ function Titulo({ children }: { children: ReactNode }) {
   return <h3 className="px-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{children}</h3>;
 }
 
-// Clock: period and comparison of the dashboard. Sliders: the cargo type and department filters
-export default function BarraDashboard({ filtros, tiposCarga, hoy }: Props) {
+// Clock: period and comparison of the dashboard. Sliders: the rubro filter, the only one every KPI of the dashboard can take
+export default function BarraDashboard({ filtros, rubros, errorRubros, hoy }: Props) {
   const edicion = useEdicionFiltros(filtros, hoy, "/dashboard");
   const [abierto, setAbierto] = useState<"periodo" | "filtros" | null>(null);
-  const activos = [filtros.tiposCarga, filtros.departamentos].filter(Boolean).length;
+  const activos = filtros.rubros ? 1 : 0;
 
   const alternar = (popover: "periodo" | "filtros") => (abrir: boolean) => setAbierto(abrir ? popover : null);
 
@@ -64,19 +66,19 @@ export default function BarraDashboard({ filtros, tiposCarga, hoy }: Props) {
           )}
         </PopoverTrigger>
         <PopoverContent align="end" className="max-h-[80vh] w-80 overflow-y-auto">
-          <Titulo>Tipo de carga</Titulo>
-          <SelectorTiposCarga edicion={edicion} tiposCarga={tiposCarga} />
-          <div className="border-t pt-2.5">
-            <Titulo>Departamento</Titulo>
-          </div>
-          <SelectorDepartamentos edicion={edicion} />
+          <Titulo>Rubro</Titulo>
+          {errorRubros ? (
+            <p className="px-1 text-sm text-destructive">{errorRubros}</p>
+          ) : (
+            <SelectorRubros edicion={edicion} rubros={rubros} />
+          )}
           <div className="mt-1 flex gap-2">
             <Button type="button" onClick={() => edicion.aplicar()} className="h-9 flex-1">Aplicar</Button>
             <Button
               type="button"
               variant="outline"
               className="h-9"
-              onClick={() => edicion.aplicar({ tiposCarga: undefined, departamentos: undefined })}
+              onClick={() => edicion.aplicar({ rubros: undefined })}
             >
               Quitar
             </Button>
