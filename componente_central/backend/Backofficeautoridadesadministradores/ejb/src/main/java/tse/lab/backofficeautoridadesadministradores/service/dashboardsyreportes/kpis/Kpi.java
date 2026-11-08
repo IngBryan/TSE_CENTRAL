@@ -40,8 +40,29 @@ public abstract class Kpi {
         return compute(em, period, grouping, filters == null ? Map.of() : filters);
     }
 
-    // The calculation itself; grouping may be null here, for a KPI that needs its total on its own (a snapshot
-    // takes one per day it is evaluated on)
+    /**
+     * The KPI over the whole period, the only calculation without grouping: it is not the sum of the groups (a
+     * rate is recalculated, a snapshot is taken on the last day, a company with two rubros is in two groups). Null
+     * when it has no value, a rate without detected cases.
+     */
+    public final Double total(EntityManager em, Period period, Map<Facet, Selection> filters) {
+        return computeTotal(em, period, filters == null ? Map.of() : filters);
+    }
+
+    // Whether calculate() takes the facet, to group by it or, unless it is time, to filter by it
+    public abstract boolean supports(Facet facet);
+
+    // The value of a group without rows: none of what it counts happened there
+    public Double valueWithoutRows() {
+        return 0.0;
+    }
+
+    // The calculation itself; grouping is null for the total (a snapshot also takes one per day it is evaluated on)
     protected abstract List<KpiValue> compute(EntityManager em, Period period, Facet grouping,
             Map<Facet, Selection> filters);
+
+    protected Double computeTotal(EntityManager em, Period period, Map<Facet, Selection> filters) {
+        List<KpiValue> values = compute(em, period, null, filters);
+        return values.isEmpty() ? valueWithoutRows() : values.get(0).value();
+    }
 }

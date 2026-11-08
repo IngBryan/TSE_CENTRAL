@@ -31,6 +31,11 @@ public abstract class CompositeKpi extends Kpi {
         this.denominator = denominator;
     }
 
+    @Override
+    public boolean supports(Facet facet) {
+        return numerator.supports(facet) && denominator.supports(facet);
+    }
+
     // A group the denominator has and the numerator lacks is a zero; one with a zero denominator has no value
     @Override
     protected List<KpiValue> compute(EntityManager em, Period period, Facet grouping, Map<Facet, Selection> filters) {
@@ -45,9 +50,26 @@ public abstract class CompositeKpi extends Kpi {
         }
 
         // Time keeps its order; anything else goes by the ratio, the biggest first
-        if (grouping != null && !(grouping instanceof TimeFacet)) {
+        if (!(grouping instanceof TimeFacet)) {
             values.sort(Comparator.comparingDouble(KpiValue::value).reversed());
         }
         return values;
+    }
+
+    // Recalculated over the whole period, never the sum or average of the groups
+    @Override
+    protected Double computeTotal(EntityManager em, Period period, Map<Facet, Selection> filters) {
+        Double base = denominator.total(em, period, filters);
+        if (base == null || base == 0) {
+            return null;
+        }
+        Double part = numerator.total(em, period, filters);
+        return (part == null ? 0 : part) / base;
+    }
+
+    // Nothing to divide: a group without rows has no rate
+    @Override
+    public Double valueWithoutRows() {
+        return null;
     }
 }

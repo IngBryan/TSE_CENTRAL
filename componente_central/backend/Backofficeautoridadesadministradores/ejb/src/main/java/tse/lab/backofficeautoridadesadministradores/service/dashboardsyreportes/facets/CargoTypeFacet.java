@@ -14,7 +14,7 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 public class CargoTypeFacet extends Facet {
 
     public CargoTypeFacet() {
-        super("cargoType", Map.of(
+        super("cargoType", "Tipo de carga", Map.of(
                 Table.TRIP, new Link(
                         List.of("LEFT JOIN TipoCarga cargoType ON cargoType.nombre = {t}.tipoCarga"),
                         "cargoType.id", "cargoType.nombre"),

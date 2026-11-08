@@ -42,6 +42,11 @@ public abstract class BaseQueryKpi extends Kpi {
     protected abstract String condition();
 
     @Override
+    public boolean supports(Facet facet) {
+        return facet.resolve(tables()) != null;
+    }
+
+    @Override
     protected List<KpiValue> compute(EntityManager em, Period period, Facet grouping, Map<Facet, Selection> filters) {
         Map<String, Object> parameters = new HashMap<>();
         // The joins the facets in use need, each once even when several facets share it (a case's trip)

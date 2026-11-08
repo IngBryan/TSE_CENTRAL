@@ -15,7 +15,7 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 public class CategoryFacet extends Facet {
 
     public CategoryFacet() {
-        super("category", Map.of(
+        super("category", "Rubro", Map.of(
                 Table.COMPANY, new Link(
                         List.of("LEFT JOIN {t}.rubros category"),
                         "category.id", "category.nombre"),

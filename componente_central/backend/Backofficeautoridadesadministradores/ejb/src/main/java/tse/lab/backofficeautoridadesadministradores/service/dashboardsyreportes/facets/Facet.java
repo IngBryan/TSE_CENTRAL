@@ -35,15 +35,22 @@ public abstract class Facet {
     }
 
     private final String id;
+    private final String name;
     private final Map<Table, Link> links;
 
-    protected Facet(String id, Map<Table, Link> links) {
+    protected Facet(String id, String name, Map<Table, Link> links) {
         this.id = id;
+        this.name = name;
         this.links = Map.copyOf(links);
     }
 
     public String id() {
         return id;
+    }
+
+    // What the report shows: "Departamento"
+    public String name() {
+        return name;
     }
 
     // Every value of the facet, with no filter: what the sidebar lists

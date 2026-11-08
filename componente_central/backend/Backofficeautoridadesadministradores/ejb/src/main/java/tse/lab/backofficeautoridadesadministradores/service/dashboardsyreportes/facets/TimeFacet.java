@@ -5,6 +5,7 @@ import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import jakarta.persistence.EntityManager;
@@ -20,12 +21,21 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
  */
 public class TimeFacet extends Facet {
 
-    public enum Granularity { DAY, WEEK, MONTH, YEAR }
+    public enum Granularity {
+
+        DAY("Día"), WEEK("Semana"), MONTH("Mes"), YEAR("Año");
+
+        private final String label;
+
+        Granularity(String label) {
+            this.label = label;
+        }
+    }
 
     private final Granularity granularity;
 
     public TimeFacet(Granularity granularity) {
-        super("time", Map.of(
+        super(granularity.name().toLowerCase(Locale.ROOT), granularity.label, Map.of(
                 Table.TRIP, Link.of("{t}.fecha"),
                 Table.CASE, Link.of("EXTRACT(DATE FROM {t}.fechaDeteccion)")));
         this.granularity = granularity;

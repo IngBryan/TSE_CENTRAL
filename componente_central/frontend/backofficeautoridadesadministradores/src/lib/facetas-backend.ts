@@ -1,6 +1,6 @@
 import { fetchBackend, idSesion, urlBackend, wildFlyAuthorization } from "./backoffice-sesion";
 
-// Contract of GET dashboard/facets/{facetId}/values in the backoffice API
+// Contract of GET reports/facets/{facetId}/values in the backoffice API
 export type ValorFaceta = { id: string; name: string };
 
 type ResultadoValores = { ok: true; valores: ValorFaceta[] } | { ok: false; mensaje: string };
@@ -22,7 +22,7 @@ export async function valoresFaceta(facetId: string): Promise<ResultadoValores> 
   if (!sesion) return { ok: false, mensaje: "La sesión venció. Vuelve a iniciar sesión." };
 
   try {
-    const respuesta = await fetchBackend(urlBackend(`dashboard/facets/${encodeURIComponent(facetId)}/values`), {
+    const respuesta = await fetchBackend(urlBackend(`reports/facets/${encodeURIComponent(facetId)}/values`), {
       headers: { Accept: "application/json", Authorization: wildFlyAuthorization(sesion) },
       cache: "no-store",
     });

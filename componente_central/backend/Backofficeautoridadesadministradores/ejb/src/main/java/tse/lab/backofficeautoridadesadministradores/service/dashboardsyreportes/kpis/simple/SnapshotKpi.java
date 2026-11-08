@@ -32,6 +32,12 @@ public abstract class SnapshotKpi extends BaseQueryKpi {
         return condition(":day");
     }
 
+    // Time has no link to its table: it is the day it is evaluated on
+    @Override
+    public boolean supports(Facet facet) {
+        return facet instanceof TimeFacet || super.supports(facet);
+    }
+
     @Override
     protected List<KpiValue> compute(EntityManager em, Period period, Facet grouping, Map<Facet, Selection> filters) {
         if (!(grouping instanceof TimeFacet time)) {

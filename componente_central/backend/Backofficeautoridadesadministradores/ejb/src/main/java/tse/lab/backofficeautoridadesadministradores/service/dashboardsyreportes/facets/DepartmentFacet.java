@@ -14,7 +14,7 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 public class DepartmentFacet extends Facet {
 
     public DepartmentFacet() {
-        super("department", Map.of(
+        super("department", "Departamento", Map.of(
                 Table.TRIP, new Link(
                         List.of("LEFT JOIN {t}.origenLocalidad origin"),
                         "origin.departamento", "origin.departamento"),
