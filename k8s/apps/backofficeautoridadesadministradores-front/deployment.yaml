@@ -30,13 +30,13 @@ spec:
               value: "http://wildfly:8080/backofficeautoridadesadministradores-web/api"
           readinessProbe:
             httpGet:
-              path: /backoffice
+              path: /backoffice/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /backoffice
+              path: /backoffice/health
               port: http
             initialDelaySeconds: 15
             periodSeconds: 20
