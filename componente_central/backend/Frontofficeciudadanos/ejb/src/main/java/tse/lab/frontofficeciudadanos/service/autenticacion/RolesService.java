@@ -28,6 +28,9 @@ public class RolesService {
             roles.add(new RolPersona(RolPersona.Rol.RESPONSABLE, e.getNroEmpresa(), e.getNombrePublico(), null));
         }
         for (Chofer c : choferes.buscarPorCi(ci)) {
+            if (c.isDadoDeBaja()) {
+                continue; // ya no es chofer de esa empresa
+            }
             Empresa e = c.getEmpresa();
             roles.add(new RolPersona(RolPersona.Rol.CHOFER, e.getNroEmpresa(), e.getNombrePublico(),
                     c.getEstado() == null ? null : c.getEstado().name()));

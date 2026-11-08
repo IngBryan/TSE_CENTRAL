@@ -80,4 +80,14 @@ public class Chofer implements Serializable {
     public Instant getFechaAlta() {
         return fechaAlta;
     }
+
+    public boolean isDadoDeBaja() {
+        return estado == EstadoChofer.DADO_DE_BAJA;
+    }
+
+    // Vuelve a dar de alta en la empresa a un chofer dado de baja: nuevo estado y nueva fecha de alta
+    public void reactivar(EstadoChofer nuevo) {
+        this.estado = nuevo;
+        this.fechaAlta = Instant.now();
+    }
 }
