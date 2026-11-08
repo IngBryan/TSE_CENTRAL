@@ -20,6 +20,7 @@ import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.DatosViaje;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.ViajesEnCursoRemote;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.VehiculosRemote;
+import tse.lab.model.EvidenciaHabilitacion;
 
 class VehicleFactsClientTest {
 
@@ -37,6 +38,19 @@ class VehicleFactsClientTest {
         when(trips.buscarViajesEnCurso("SBC1234")).thenReturn(List.of(trip));
 
         assertEquals(Optional.of(new VehicleFacts(vehicle, List.of(trip))), client.find("SBC1234"));
+    }
+
+    @Test
+    void consultaDocumentosConLaFechaDeMedicionYPropagaFallas() throws IOException {
+        Instant fecha = Instant.parse("2026-11-06T12:00:00Z");
+        var prueba = new EvidenciaHabilitacion("SBC1234", fecha, null, null, null, null, null);
+        var vehiculo = new DatosVehiculo("SBC1234", 1L, 9000, 25000, prueba);
+        when(vehicles.buscarVehiculo("SBC1234", fecha)).thenReturn(vehiculo);
+        when(trips.buscarViajesEnCurso("SBC1234")).thenReturn(List.of());
+        assertEquals(prueba, client.find("SBC1234", fecha).orElseThrow().vehicle().getHabilitacion());
+        verify(vehicles).buscarVehiculo("SBC1234", fecha);
+        when(vehicles.buscarVehiculo("SBC1234", fecha)).thenThrow(new EJBException("fallo"));
+        assertThrows(IOException.class, () -> client.find("SBC1234", fecha));
     }
 
     @Test

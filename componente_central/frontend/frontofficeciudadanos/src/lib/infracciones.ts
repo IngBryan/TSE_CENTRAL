@@ -1,3 +1,5 @@
+import type { PruebaHabilitacion } from "./habilitacion";
+
 // Gestion de Infracciones: lo que devuelve el backend (/empresa/infracciones) y como se muestra.
 
 export type EstadoInfraccion = "NOTIFICADA" | "EN_DESCARGO" | "CONFIRMADA" | "DESESTIMADA";
@@ -15,6 +17,7 @@ export type InfraccionResumen = {
 };
 
 export type InfraccionDetalle = {
+  pruebasHabilitacion?: PruebaHabilitacion[];
   infraccion: InfraccionResumen;
   guia: {
     id: string;

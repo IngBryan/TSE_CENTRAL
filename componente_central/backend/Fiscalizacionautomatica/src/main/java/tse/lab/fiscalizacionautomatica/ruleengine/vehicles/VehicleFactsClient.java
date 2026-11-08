@@ -10,6 +10,8 @@ import tse.lab.fiscalizacionautomatica.ruleengine.remote.WildFlyContexts;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.ViajesEnCursoRemote;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.DatosVehiculo;
 import tse.lab.frontofficeciudadanos.service.gestionvehiculos.VehiculosRemote;
+import java.time.Instant;
+import java.util.Objects;
 
 /** Vehicle and active trips (guides ASIGNADA or EN_CURSO), through the Frontofficeciudadanos remote EJBs. */
 public class VehicleFactsClient implements VehicleFactsSource, AutoCloseable {
@@ -39,8 +41,18 @@ public class VehicleFactsClient implements VehicleFactsSource, AutoCloseable {
 
     @Override
     public Optional<VehicleFacts> find(String licensePlate) throws IOException {
+        return findVehicle(licensePlate, null);
+    }
+
+    @Override
+    public Optional<VehicleFacts> find(String licensePlate, Instant fechaHora) throws IOException {
+        return findVehicle(licensePlate, Objects.requireNonNull(fechaHora));
+    }
+
+    private Optional<VehicleFacts> findVehicle(String licensePlate, Instant fechaHora) throws IOException {
         try {
-            DatosVehiculo vehicle = vehicles.buscarVehiculo(licensePlate);
+            DatosVehiculo vehicle = fechaHora == null ? vehicles.buscarVehiculo(licensePlate)
+                    : vehicles.buscarVehiculo(licensePlate, fechaHora);
             if (vehicle == null) {
                 return Optional.empty();
             }

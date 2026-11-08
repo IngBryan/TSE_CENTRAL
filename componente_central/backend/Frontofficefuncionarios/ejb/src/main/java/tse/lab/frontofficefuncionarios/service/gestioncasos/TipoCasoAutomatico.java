@@ -5,7 +5,7 @@ package tse.lab.frontofficefuncionarios.service.gestioncasos;
 public enum TipoCasoAutomatico {
     VIAJE_SIN_GUIA("Actividad del vehículo sin un viaje asignado ni en curso"),
     EXCESO_CARGA("El pesaje supera el peso del vehículo más su capacidad de carga declarada"),
-    VEHICULO_SIN_HABILITACION("Actividad del vehículo con el permiso nacional de circulación o la ITV vencidos"),
+    VEHICULO_SIN_HABILITACION("Actividad del vehículo sin permiso nacional de circulación o ITV vigentes"),
     DESVIO_RUTA("La ruta reportada se aparta del recorrido entre el origen y el destino de la guía");
 
     private final String descripcion;

@@ -1,3 +1,5 @@
+import type { PruebaHabilitacion } from "./habilitacion";
+
 // Tipos de la API /casos del backend Frontofficefuncionarios (records de GestionCasosService) y
 // textos para mostrarlos.
 
@@ -88,6 +90,7 @@ export type EvidenciaVista = {
   pesajes: PesajeVista[];
   eventosTracking: EventoTrackingVista[];
   pruebasDesvio?: PruebaDesvioVista[];
+  pruebasHabilitacion?: PruebaHabilitacion[];
 };
 
 // Instantánea persistida de la evaluación geométrica al confirmar un desvío.

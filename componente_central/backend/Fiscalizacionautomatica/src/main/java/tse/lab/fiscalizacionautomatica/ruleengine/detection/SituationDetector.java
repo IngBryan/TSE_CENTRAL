@@ -32,7 +32,7 @@ public class SituationDetector {
     }
 
     public Detection detect(VehicleEvent event) throws IOException {
-        Optional<VehicleFacts> facts = factsSource.find(event.licensePlate());
+        Optional<VehicleFacts> facts = factsSource.find(event.licensePlate(), event.timestamp());
         if (facts.isEmpty()) {
             return new Detection(event, null, List.of());
         }

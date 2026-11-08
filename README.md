@@ -597,52 +597,54 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
 
 **Deteccion de situaciones (`ruleengine/detection`):**
 
-- Situaciones, en orden de prioridad (`Situation`): Viaje sin guia, Exceso de carga, Vehiculo sin
-  habilitacion vigente y Desvio de ruta. Sin viaje en curso solo pueden aplicar Viaje sin guia y
-  Habilitacion.
-- Cada situacion es una regla (`SituationRule`, en `detection/rules`) que dice si aplica a un
-  evento (`VehicleEvent`: un `TrackingEvent` o un `Weighing`) segun lo que el central sabe del
-  vehiculo (`VehicleFacts`: el vehiculo y sus viajes en curso, por EJB remoto).
-- `SituationDetector` devuelve las situaciones que aplican, en orden de prioridad. Si el vehiculo no
-  existe en el central no devuelve ninguna (no hay empresa a la que notificar). Si WildFly no
-  responde, falla: el evento se vuelve a evaluar despues.
-- Agregar una situacion = agregar su regla en `Main.createDetector`.
-- Implementadas:
-  - Viaje sin guia (`TripWithoutGuideRule`): el vehiculo no tiene guias `ASIGNADA` ni `EN_CURSO`.
-  - Exceso de carga (`OverloadRule`): en un pesaje de un vehiculo con viaje en curso, peso del
-    vehiculo + su capacidad de carga declarada < peso medido por la balanza. La carga declarada en la
-    guia no se usa. La tolerancia sera configurable (requisito 5); por ahora cualquier exceso cuenta.
-- Eventos de tracking: los evalua el consumidor en segundo plano (`TrackingDetectionWorker`, ver
-  *Consumidor de tracking*).
+- Cada situacion implementa `SituationRule`. `SituationDetector` consulta los datos del vehiculo y
+  resuelve la Guia a la fecha de medicion; devuelve todas las infracciones aplicables en el orden de
+  `Situation`. Un vehiculo desconocido no genera casos. Si falla una consulta remota, el evento queda
+  pendiente para reintento.
+- Viaje sin guia (`TripWithoutGuideRule`): GPS sin Guia asociada a la fecha del evento. La creacion
+  del expediente exige movimiento confirmado mediante el seguimiento de circulaciones.
+- Exceso de carga (`OverloadRule`): un pesaje con Guia asociada supera el peso del vehiculo mas su
+  capacidad de carga declarada. La carga de la Guia no se usa; por ahora cualquier exceso cuenta.
+- **Vehiculo sin habilitacion vigente** (`VehicleWithoutValidPermitRule`): se evalua tanto GPS como
+  pesajes, con o sin Guia. Se fiscaliza si falta el Permiso Nacional de Circulacion, si no esta vigente,
+  o si no hay ninguna ITV vigente. Ambos documentos deben cubrir el dia del evento en
+  `America/Montevideo`, con emision y vencimiento inclusivos. Una ITV futura no reemplaza una que
+  cubre ese dia. No se agregan condiciones de baja del vehiculo ni habilitacion de la empresa.
+  - `VehiculosRemote.buscarVehiculo(matricula, fechaHora)` devuelve la evaluacion documental junto
+    a los datos del vehiculo; una respuesta sin evaluacion es un error, no ausencia de documentos.
+  - Se guarda una copia de los documentos y sus ausencias en `casos_evidencias_habilitacion`, por
+    caso, evento y origen (`TRACKING` o `PESAJE`). Una renovacion posterior no modifica esa evidencia.
+  - Funcionarios y empresa ven el documento que motivo el caso, sus fechas y su estado
+    (`VIGENTE`, `VENCIDO`, `AUN_NO_VIGENTE` o `SIN_REGISTRO`) en el detalle del expediente/infraccion.
+  - Alcance temporal: se usan los documentos registrados al procesar el evento. No se reconstruyen
+    permisos reemplazados antes de su primera evaluacion; este cambio no agrega historial de permisos.
+- Desvio de ruta (`RouteDeviationRule`): compara mediciones GPS con las rutas autorizadas de la Guia
+  y conserva la prueba geometrica al confirmarse, cuando la regla esta habilitada.
+- La regla de habilitacion se registra en los tres modos: consumidor GPS, poller de pesajes y
+  deteccion manual. Los GPS se evaluan en `TrackingDetectionWorker`; los pesajes, en
+  `PendingWeighingsDetection`.
 
-**Casos de fiscalizacion:** con las situaciones de un evento, `ruleengine/cases/CaseAssigner` decide
-el caso aplicando la jerarquia, y deja el evento asociado a **un unico caso**:
+**Casos de fiscalizacion:** `CaseAssigner` registra **cada infraccion** aplicable. Un evento puede
+respaldar varios casos y no se pierde una infraccion por la prioridad de otra.
 
-- Recorre las situaciones en orden de prioridad y crea un caso, en estado **DETECTADA**, para la
-  primera que el vehiculo no tenga **abierta**; a continuacion lo **notifica a la empresa** (pasa a
-  `NOTIFICADA`). Abierto = `DETECTADA` o `NOTIFICADA` (`EstadoCaso.ABIERTOS`); un caso en descargo o
-  resuelto ya no cuenta, y el proximo evento abre uno nuevo.
-- Si todas las situaciones ya tienen un caso abierto, el evento se suma como evidencia al de mayor
-  prioridad.
-- Un evento que ya es evidencia de un caso no se vuelve a asignar (reprocesamiento). La base lo
-  garantiza: `(matricula, fecha_hora)` es unico en `casos_eventos_tracking` y `casos_eventos_pesajes`.
-- Un caso que quedo `DETECTADA` (fallo la notificacion) se notifica con su proximo evento.
-- El caso guarda el vehiculo (y por el, la empresa) y, si hay viaje en curso, su guia (un Viaje sin
-  guia no tiene). Tipos: `VIAJE_SIN_GUIA`, `EXCESO_CARGA`, `VEHICULO_SIN_HABILITACION`, `DESVIO_RUTA`.
-- Los casos se guardan con el EJB remoto `CasosAutomaticosRemote` (Frontofficefuncionarios, paquete
-  `service.gestioncasos`, cliente `ruleengine/cases/RemoteCaseStore`), que no decide nada: devuelve
-  los casos abiertos de un vehiculo y el caso de un evento, crea un caso, agrega evidencia y notifica.
-  La creacion y la notificacion quedan en la auditoria (`auditoria_casos`) con usuario `SISTEMA`
-  (acciones `CREACION` y `CAMBIO_ESTADO`).
-- **Varios pods a la vez:** como la decision la toma fiscalizacion, la base impide dos casos abiertos
-  del mismo tipo para un vehiculo con un indice unico parcial (`uk_caso_abierto`, en
-  `Frontofficeciudadanos/.../META-INF/esquema-adicional.sql`). Si dos pods crean el mismo caso a la
-  vez, el segundo falla, su evento queda pendiente y al reintentarlo se suma al caso que ya existe.
-- Si una llamada falla (WildFly caido), el evento queda pendiente y se vuelve a evaluar.
-- En el log: `Created case 4 (VIAJE_SIN_GUIA) for SBC1234 at ...`, `Notified case 4 (VIAJE_SIN_GUIA)`
-  o `Added to case 4 ...`.
-- La notificacion es el cambio de estado y su auditoria. La empresa la ve en la campana del
-  Frontoffice Ciudadanos (ver *Infracciones y descargos*); el envio por correo u otro canal esta pendiente.
+- El EJB `CasosAutomaticosRemote` de Frontofficefuncionarios registra caso y evidencia en una misma
+  transaccion. La habilitacion usa `registrarHabilitacion`, que exige prueba documental del mismo
+  vehiculo e instante, y rechaza documentos que acreditan habilitacion vigente.
+- Se reutiliza un caso abierto por `(Guia, tipo)`; sin Guia, por `(vehiculo, tipo)`. Abierto significa
+  `DETECTADA` o `NOTIFICADA`. Viaje sin Guia se agrupa por circulacion confirmada.
+- La idempotencia se comprueba por contexto, tipo y evento, incluso si el caso paso a descargo o fue
+  resuelto. Cada vinculo `(caso, matricula, fecha_hora)` es unico para GPS/pesajes; la prueba documental
+  tambien distingue el origen. Un reintento no duplica ni reemplaza la evidencia documental guardada.
+- Los indices parciales `uk_caso_abierto_guia` y `uk_caso_abierto_sin_guia` impiden duplicar casos
+  abiertos ante creaciones concurrentes. Si una transaccion falla, el evento queda pendiente.
+- El caso nace `DETECTADA` y se notifica a la empresa (`NOTIFICADA`), con auditoria de `SISTEMA` y
+  `correlationId`. La empresa lo ve en su campana, puede consultar la evidencia y presentar descargo;
+  el funcionario conserva el flujo de resolucion existente. El envio por correo sigue pendiente.
+- **Bases existentes:** con `schema-generation=none`, ejecutar
+  `Frontofficeciudadanos/ejb/src/main/resources/META-INF/migracion-evidencia-habilitacion.sql` antes de
+  desplegar. Solo agrega la tabla de evidencia. Recompilar Modelo, ambos frontoffices y el jar de
+  fiscalizacion para que los contratos remotos coincidan. Con generacion de esquema desde JPA,
+  la tabla se crea desde las anotaciones.
 
 El jar se arma con `maven-shade-plugin` (no `maven-assembly-plugin`) porque combina los archivos
 `META-INF/services` con los que RESTEasy registra sus providers.

@@ -36,6 +36,7 @@ import tse.lab.model.Guia;
 import tse.lab.model.NodoBalanza;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // Operaciones de la fiscalizacion automatica sobre los casos (EJB remoto) contra H2 con los DAOs reales.
 class CasosAutomaticosServiceTest {
@@ -84,6 +85,44 @@ class CasosAutomaticosServiceTest {
     void tearDown() {
         em.close();
         emf.close();
+    }
+
+    private static EvidenciaHabilitacion sinDocumentos(Instant fecha) {
+        return new EvidenciaHabilitacion("SBC1234", fecha, null, null, null, null, null);
+    }
+
+    @Test
+    void conservaPruebaDocumentalPorEventoYOrigenSinDuplicarTrasElDescargo() {
+        var prueba = sinDocumentos(T1);
+        DatosCaso creado = enTx(() -> servicio.registrarHabilitacion("GV-1", TRACKING_T1, prueba));
+        enTx(() -> servicio.registrarHabilitacion("GV-1", TRACKING_T1, prueba));
+        enTx(() -> servicio.registrarHabilitacion("GV-1", PESAJE_T1, prueba));
+        assertEquals(2, caso(creado.getId()).getEvidenciasHabilitacion().size());
+        enTx(() -> {
+            var c = em.find(CasoFiscalizacion.class, creado.getId());
+            c.cambiarEstado(EstadoCaso.NOTIFICADA);
+            c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            return null;
+        });
+        var repetido = enTx(() -> servicio.registrarHabilitacion("GV-1", TRACKING_T1, prueba));
+        assertEquals(creado.getId(), repetido.getId());
+        assertEquals(2, caso(creado.getId()).getEvidenciasHabilitacion().size());
+        assertEquals(prueba.conOrigen("TRACKING"), caso(creado.getId()).getEvidenciasHabilitacion()
+                .stream().filter(p -> p.getOrigen().equals("TRACKING")).findFirst().orElseThrow());
+    }
+
+    @Test
+    void rechazaHabilitacionSinPruebaOConPruebaAjenaOConDocumentosVigentes() {
+        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T1)));
+        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.registrarHabilitacion(
+                null, TRACKING_T1, null)));
+        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.registrarHabilitacion(
+                null, TRACKING_T1, sinDocumentos(T2))));
+        var vigente = new EvidenciaHabilitacion("SBC1234", T1, "PNC", LocalDate.of(2026, 1, 1),
+                LocalDate.of(2027, 1, 1), LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1));
+        assertThrows(IllegalArgumentException.class, () -> enTx(() -> servicio.registrarHabilitacion(
+                null, TRACKING_T1, vigente)));
     }
 
     private CasoFiscalizacion caso(long id) {
@@ -165,7 +204,7 @@ class CasosAutomaticosServiceTest {
     @Test
     void losCasosAbiertosSonLosDetectadosYNotificados() {
         DatosCaso detectado = iniciarCirculacion();
-        DatosCaso enDescargo = enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T2));
+        DatosCaso enDescargo = enTx(() -> servicio.registrarHabilitacion(null, TRACKING_T2, sinDocumentos(T2)));
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, enDescargo.getId());
             c.cambiarEstado(EstadoCaso.NOTIFICADA);
@@ -179,8 +218,7 @@ class CasosAutomaticosServiceTest {
     @Test
     void variasInfraccionesCompartenGpsSinDuplicarloEnCadaCaso() {
         DatosCaso sinGuia = iniciarCirculacion();
-        DatosCaso habilitacion = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, null, TRACKING_T1));
+        DatosCaso habilitacion = enTx(() -> servicio.registrarHabilitacion(null, TRACKING_T1, sinDocumentos(T1)));
         DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.9, -56.098)));
         assertEquals(sinGuia.getId(), repetido.getId());
         assertEquals(2, caso(sinGuia.getId()).getClavesEventosTracking().size());
@@ -243,8 +281,7 @@ class CasosAutomaticosServiceTest {
     void unPesajePuedeSerEvidenciaDeDosCasosYNoSeRepite() {
         DatosCaso exceso = enTx(() -> servicio.registrarEvidencia(
                 TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
-        DatosCaso habilitacion = enTx(() -> servicio.registrarEvidencia(
-                TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, "GV-1", PESAJE_T1));
+        DatosCaso habilitacion = enTx(() -> servicio.registrarHabilitacion("GV-1", PESAJE_T1, sinDocumentos(T1)));
         enTx(() -> servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
 
         assertEquals(1, caso(exceso.getId()).getEventosPesajes().size());

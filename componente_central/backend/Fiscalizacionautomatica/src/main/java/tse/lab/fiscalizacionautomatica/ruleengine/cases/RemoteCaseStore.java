@@ -15,6 +15,8 @@ import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.EventoFiscalizado;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.OrigenEvento;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
+import java.time.Instant;
+import tse.lab.model.EvidenciaHabilitacion;
 
 /** Fiscalization cases in PostgreSQL, through the Frontofficefuncionarios remote EJB. */
 public class RemoteCaseStore implements CaseStore, AutoCloseable {
@@ -44,6 +46,12 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
+    public DatosCaso registrarHabilitacion(String idGuia, VehicleEvent evento,
+            EvidenciaHabilitacion prueba) throws IOException {
+        return call(() -> cases.registrarHabilitacion(idGuia, toEventoFiscalizado(evento), prueba));
+    }
+
+    @Override
     public DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException {
         return call(() -> cases.registrarEvidencia(tipo, idGuia, toEventoFiscalizado(evento)));
     }
@@ -69,7 +77,7 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     }
 
     @Override
-    public void cerrarCirculacionPorGuia(String matricula, java.time.Instant fecha) throws IOException {
+    public void cerrarCirculacionPorGuia(String matricula, Instant fecha) throws IOException {
         call(() -> { cases.cerrarCirculacionPorGuia(matricula, fecha); return null; });
     }
 
