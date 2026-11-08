@@ -5,11 +5,11 @@ import java.util.List;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Table;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.TableAlias;
 
-// Cases detected in the period and confirmed
+// Cases detected in the period and confirmed as infractions; a dismissed case is closed but not confirmed
 public class ConfirmedInfractionsKpi extends BaseQueryKpi {
 
     public ConfirmedInfractionsKpi() {
-        super("casos_cerrados", "Casos cerrados");
+        super("confirmadas", "Infracciones confirmadas");
     }
 
     @Override
@@ -24,6 +24,6 @@ public class ConfirmedInfractionsKpi extends BaseQueryKpi {
 
     @Override
     protected String condition() {
-        return "c.estado = tse.lab.model.EstadoCaso.CONFIRMADA or c.estado =tse.lab.model.EstadoCaso.DESESTIMADA";
+        return "c.estado = tse.lab.model.EstadoCaso.CONFIRMADA";
     }
 }

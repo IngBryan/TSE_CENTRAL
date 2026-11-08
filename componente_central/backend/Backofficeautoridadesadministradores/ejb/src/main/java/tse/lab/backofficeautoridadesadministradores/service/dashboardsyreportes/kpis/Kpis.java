@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.composite.ConfirmationRateKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.CargoVolumeKpi;
+import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.ClosedCasesKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.ConfirmedInfractionsKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.DetectedInfractionsKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.EnabledCompaniesKpi;
@@ -22,6 +23,7 @@ public final class Kpis {
             new CargoVolumeKpi(),
             new DetectedInfractionsKpi(),
             new ConfirmedInfractionsKpi(),
+            new ClosedCasesKpi(),
             new ConfirmationRateKpi(),
             new EnabledCompaniesKpi(),
             new EnabledVehiclesKpi());

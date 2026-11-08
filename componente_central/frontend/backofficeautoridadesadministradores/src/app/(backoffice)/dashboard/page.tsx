@@ -164,7 +164,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           {...datos(vehiculos)}
         />
         <Kpi
-          titulo="Tasa de casos cerrados sobre detectados"
+          titulo="Tasa de infracciones confirmadas sobre detectadas"
           icono={BadgeCheck}
           formato="porcentaje"
           href={enReportes(["tasa"], AGRUPACION.tasa)}

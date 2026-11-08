@@ -145,7 +145,8 @@ class ReportServiceTest {
     @Test
     void listsTheKpisInTheOrderOfTheReport() {
         List<KpiDefinition> kpis = service.kpis();
-        assertEquals(List.of("viajes", "toneladas", "infracciones", "casos_cerrados", "tasa", "empresas", "vehiculos"),
+        assertEquals(List.of("viajes", "toneladas", "infracciones", "confirmadas", "casos_cerrados", "tasa", "empresas",
+                "vehiculos"),
                 kpis.stream().map(KpiDefinition::id).toList());
         assertEquals(new KpiDefinition("viajes", "Viajes realizados"), kpis.get(0));
     }

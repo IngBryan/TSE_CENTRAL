@@ -25,12 +25,14 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.facets.TimeFacet.Bucket;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.composite.ConfirmationRateKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.CargoVolumeKpi;
+import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.ClosedCasesKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.ConfirmedInfractionsKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.DetectedInfractionsKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.EnabledCompaniesKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.EnabledVehiclesKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.TripsKpi;
 import tse.lab.model.CasoFiscalizacion;
+import tse.lab.model.EstadoCaso;
 import tse.lab.model.Empresa;
 import tse.lab.model.Rubro;
 import tse.lab.model.Vehiculo;
@@ -151,6 +153,25 @@ class KpiTest {
                 values(new EnabledVehiclesKpi(), Facets.YEAR, Map.of(Facets.COMPANY, soloObras)));
         assertEquals(List.of(new FacetValue("1", "Empresa 1"), new FacetValue("2", "Empresa 2"),
                 new FacetValue("3", "Empresa 3")), Facets.COMPANY.values(em));
+    }
+
+    // A dismissed case is closed but not a confirmed infraction: the rate counts only the confirmed ones
+    @Test
+    void ratesOnlyTheConfirmedInfractions() {
+        em.getTransaction().begin();
+        CasoFiscalizacion desestimado = new CasoFiscalizacion("Desestimado", "EXCESO_CARGA", em.find(Vehiculo.class, "SAA1001"), null);
+        em.persist(desestimado);
+        em.flush();
+        em.createQuery("UPDATE CasoFiscalizacion c SET c.fechaDeteccion = :fecha, c.estado = :estado WHERE c.id = :id")
+                .setParameter("fecha", Instant.parse("2026-10-30T15:00:00Z"))
+                .setParameter("estado", EstadoCaso.DESESTIMADA)
+                .setParameter("id", desestimado.getId())
+                .executeUpdate();
+        em.getTransaction().commit();
+
+        assertEquals(Map.of("2026", 2.0), values(new ConfirmedInfractionsKpi(), Facets.YEAR, Map.of()));
+        assertEquals(Map.of("2026", 3.0), values(new ClosedCasesKpi(), Facets.YEAR, Map.of()));
+        assertEquals(0.5, values(new ConfirmationRateKpi(), Facets.YEAR, Map.of()).get("2026"), 1e-9);
     }
 
     // Excluding a rubro leaves out the companies that work in it, even when they work in another one too; the first

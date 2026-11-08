@@ -3,11 +3,11 @@ package tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.ConfirmedInfractionsKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.DetectedInfractionsKpi;
 
-// Share of the cases detected in the period that are closed (confirmed or dismissed)
+// Share of the cases detected in the period that are confirmed as infractions
 public class ConfirmationRateKpi extends CompositeKpi {
 
     public ConfirmationRateKpi() {
-        super("tasa", "Tasa de casos cerrados sobre detectadas",
+        super("tasa", "Tasa de infracciones confirmadas sobre detectadas",
                 new ConfirmedInfractionsKpi(), new DetectedInfractionsKpi());
     }
 }

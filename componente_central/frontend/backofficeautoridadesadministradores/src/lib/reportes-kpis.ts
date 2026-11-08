@@ -3,13 +3,14 @@ import type { FormatoKpi } from "@/components/Kpi";
 import { COMPARATIVOS, type Comparativo } from "./reportes";
 import type { FacetaDisponible, ValorFaceta } from "./reportes-backend";
 
-// suma: adds up over the period. tasa: closed over detected cases. stock: how many there are at the end of it
+// suma: adds up over the period. tasa: confirmed over detected infractions. stock: how many there are at the end of it
 export type Agregado = "suma" | "tasa" | "stock";
 
 export const KPIS = {
   viajes: { formato: "numero", agregado: "suma", mejorSiBaja: false },
   toneladas: { formato: "toneladas", agregado: "suma", mejorSiBaja: false },
   infracciones: { formato: "numero", agregado: "suma", mejorSiBaja: true },
+  confirmadas: { formato: "numero", agregado: "suma", mejorSiBaja: true },
   casos_cerrados: { formato: "numero", agregado: "suma", mejorSiBaja: false },
   tasa: { formato: "porcentaje", agregado: "tasa", mejorSiBaja: false },
   empresas: { formato: "numero", agregado: "stock", mejorSiBaja: false },
