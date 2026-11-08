@@ -127,7 +127,7 @@ public class UsuariosResource {
 
     // Verifica el rol y traduce las excepciones de los servicios a su estado HTTP, para todas las operaciones
     private Response comoAdministrador(Function<String, Response> operacion) {
-        Response acceso = AccesoAdministrador.verificar(seguridad);
+        Response acceso = AccesoPorRol.verificar(seguridad, "ADMINISTRADOR");
 
         if (acceso != null) {
             return acceso;

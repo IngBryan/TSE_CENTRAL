@@ -1,11 +1,11 @@
-
 "use client";
 
 import { useActionState } from "react";
-import {
-  iniciarSesionAction,
-  type EstadoLogin,
-} from "./actions";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { iniciarSesionAction, type EstadoLogin } from "./actions";
 
 const estadoInicial: EstadoLogin = {
   estado: "inicial",
@@ -13,22 +13,13 @@ const estadoInicial: EstadoLogin = {
 };
 
 export default function FormularioLogin() {
-  const [estado, accion, pendiente] = useActionState(
-    iniciarSesionAction,
-    estadoInicial
-  );
+  const [estado, accion, pendiente] = useActionState(iniciarSesionAction, estadoInicial);
 
   return (
     <form action={accion} className="space-y-5">
       <div className="space-y-2">
-        <label
-          htmlFor="ci"
-          className="block text-sm font-medium"
-        >
-          Cédula de identidad
-        </label>
-
-        <input
+        <Label htmlFor="ci">Cédula de identidad</Label>
+        <Input
           id="ci"
           name="ci"
           type="text"
@@ -37,45 +28,32 @@ export default function FormularioLogin() {
           maxLength={255}
           required
           placeholder="Ingresá tu cédula"
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
+          className="h-10"
         />
       </div>
 
       <div className="space-y-2">
-        <label
-          htmlFor="contrasena"
-          className="block text-sm font-medium"
-        >
-          Contraseña
-        </label>
-
-        <input
+        <Label htmlFor="contrasena">Contraseña</Label>
+        <Input
           id="contrasena"
           name="contrasena"
           type="password"
           autoComplete="current-password"
           required
           placeholder="Ingresá tu contraseña"
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
+          className="h-10"
         />
       </div>
 
       {estado.estado === "error" && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive p-3 text-sm text-destructive"
-        >
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {estado.mensaje}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="w-full rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pendiente} className="h-10 w-full shadow-sm shadow-primary/30">
         {pendiente ? "Ingresando..." : "Iniciar sesión"}
-      </button>
+      </Button>
     </form>
   );
 }
