@@ -52,7 +52,7 @@ async function gpsDelViaje(idGuia: string, desdeTexto: string, hastaTexto: strin
         return { puntos: unirPosiciones([], puntos.slice(0, MAX_PUNTOS)), incompleto: true };
       }
       if (!pagina.hayMas) break;
-      const siguiente = pagina.siguienteDesde ? Date.parse(pagina.siguienteDesde) : NaN;
+      const siguiente = pagina.siguienteDesde ? Date.parse(pagina.siguienteDesde) : Number.NaN;
       if (!Number.isFinite(siguiente) || siguiente <= cursor) {
         throw new Error("La paginación del historial GPS no avanzó.");
       }

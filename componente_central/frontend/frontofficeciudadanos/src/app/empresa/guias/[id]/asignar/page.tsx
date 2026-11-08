@@ -1,4 +1,4 @@
-import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
+import { mostrarLocalidad } from "@/lib/localidades";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";

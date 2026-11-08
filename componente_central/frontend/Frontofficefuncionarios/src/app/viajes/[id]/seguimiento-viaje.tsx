@@ -41,7 +41,7 @@ async function obtenerHistorial(id: string, desde: number, hasta: number, signal
         return { puntos: unirPosiciones([], puntos.slice(0, MAX_PUNTOS)), incompleto };
       }
       if (!pagina.hayMas) break;
-      const siguiente = pagina.siguienteDesde ? Date.parse(pagina.siguienteDesde) : NaN;
+      const siguiente = pagina.siguienteDesde ? Date.parse(pagina.siguienteDesde) : Number.NaN;
       if (!Number.isFinite(siguiente) || siguiente <= cursor) {
         throw new Error("El cursor GPS no avanzó; se interrumpió la paginación para evitar un ciclo.");
       }

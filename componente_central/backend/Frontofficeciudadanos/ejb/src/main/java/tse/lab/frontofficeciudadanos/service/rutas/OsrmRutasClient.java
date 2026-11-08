@@ -33,13 +33,17 @@ public class OsrmRutasClient {
         if (base == null || base.isBlank()) {
             base = "https://router.project-osrm.org"; // solo desarrollo: configurar servicio propio para carga
         }
+        return obtener(base, origen, destino);
+    }
+
+    List<Candidata> obtener(String base, Localidad origen, Localidad destino) {
         if (!base.matches("https?://[^?#]+")) {
             throw new RutasException(500, "osrm_configuracion", "OSRM_BASE_URL invalida");
         }
         String ruta = String.format(Locale.ROOT, "/route/v1/driving/%.6f,%.6f;%.6f,%.6f"
                 + "?alternatives=false&overview=full&geometries=geojson&steps=false",
                 origen.getLongitud(), origen.getLatitud(), destino.getLongitud(), destino.getLatitud());
-        URI url = URI.create(base.replaceAll("/+$", "") + ruta);
+        URI url = URI.create(sinBarrasFinales(base) + ruta);
         HttpRequest req = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(20))
                 .header("Accept", "application/json")
                 .header("User-Agent", "TSE-educativo/1.0 (route-preview)").GET().build();
@@ -58,6 +62,14 @@ public class OsrmRutasClient {
         } catch (java.io.IOException e) {
             throw new RutasException(503, "osrm_no_disponible", "No se pudo contactar OSRM", e);
         }
+    }
+
+    static String sinBarrasFinales(String url) {
+        int fin = url.length();
+        while (fin > 0 && url.charAt(fin - 1) == '/') {
+            fin--;
+        }
+        return url.substring(0, fin);
     }
 
     /** Puro respecto a la red: permite probar OSRM con respuestas fijadas en tests. */

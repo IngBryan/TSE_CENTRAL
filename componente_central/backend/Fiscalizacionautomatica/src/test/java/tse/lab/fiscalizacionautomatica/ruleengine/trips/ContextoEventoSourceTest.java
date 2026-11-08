@@ -27,4 +27,20 @@ class ContextoEventoSourceTest {
         assertEquals(ResultadoAsociacionGpsGuia.Estado.AMBIGUO,
                 new ContextoEventoSource((m, desde, hasta) -> List.of(a, b)).resolver(EVENTO).estado());
     }
+
+    @Test void sinRespuestaDelBackendSeReintenta() {
+        var src = new ContextoEventoSource((m, desde, hasta) -> null);
+        assertThrows(java.io.IOException.class, () -> src.resolver(EVENTO));
+    }
+
+    @Test void sinIntervalosNoHayGuia() throws Exception {
+        assertEquals(ResultadoAsociacionGpsGuia.Estado.SIN_GUIA,
+                new ContextoEventoSource((m, desde, hasta) -> List.of()).resolver(EVENTO).estado());
+    }
+
+    @Test void guiaFinalizadaSinFinNoEsDeterminable() throws Exception {
+        var sinFin = new IntervaloGuiaGps("A", "SBC1234", "FINALIZADA", T.minusSeconds(5), T.minusSeconds(4), null);
+        assertEquals(ResultadoAsociacionGpsGuia.Estado.NO_DETERMINABLE,
+                new ContextoEventoSource((m, desde, hasta) -> List.of(sinFin)).resolver(EVENTO).estado());
+    }
 }

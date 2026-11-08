@@ -66,4 +66,15 @@ class RemoteCaseStoreTest {
         store.close();
         verify(context).close();
     }
+
+    @Test void noRegistraDesvioConPruebaDeOtroGps() {
+        TrackingEvent otra = new TrackingEvent("msg-2", 8, 1, "SBC1234", -34.91, -56.12, NOW.plusSeconds(10));
+        PruebaDesvio ajena = new PruebaDesvio(otra, EVENT, 2500, 2600, 2000, 30, List.of("sha-a"));
+        assertThrows(IOException.class, () -> store.registrarDesvio("GV-1", EVENT, null));
+        assertThrows(IOException.class, () -> store.registrarDesvio("GV-1", EVENT, ajena));
+    }
+    @Test void cierraLaCirculacionMedianteEjb() throws IOException {
+        store.cerrarCirculacionPorGuia("SBC1234", NOW);
+        verify(remote).cerrarCirculacionPorGuia("SBC1234", NOW);
+    }
 }

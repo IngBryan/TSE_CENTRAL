@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.LocalidadDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
+import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.EdicionGuia;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.NuevaGuia;
@@ -24,6 +25,10 @@ class RutasGuiaServiceTest {
     private final PrevisualizacionRutasService planificador = mock(PrevisualizacionRutasService.class);
     private final GeometriasService geometrias = mock(GeometriasService.class);
     private final LocalidadDAO localidades = mock(LocalidadDAO.class);
+    private final GuiaDAO guias = mock(GuiaDAO.class);
+    private final RutasAutorizadasService rutas = mock(RutasAutorizadasService.class);
+    private final AsignacionRutasService asignacion = mock(AsignacionRutasService.class);
+    private static final List<DatosRutaAutorizada> GUARDADAS = List.of(new DatosRutaAutorizada(7L, 1, "sha", 100, "geo"));
     private Guia guia;
     private static final String TOKEN = "a".repeat(64);
 
@@ -35,10 +40,12 @@ class RutasGuiaServiceTest {
         guia.setDestinoLocalidad(new Localidad(2L, "Destino", "B", -33, -55));
         AutorizacionResponsable autorizacion = mock(AutorizacionResponsable.class);
         when(autorizacion.empresaDelResponsable("ci", true, "t")).thenReturn(empresa);
-        GuiaDAO guias = mock(GuiaDAO.class);
         when(guias.buscarPorId("G1")).thenReturn(guia);
         inyectar("autorizacion", autorizacion);
         inyectar("guias", guias);
+        inyectar("rutas", rutas);
+        inyectar("asignacion", asignacion);
+        when(rutas.obtenerPorGuia("G1")).thenReturn(GUARDADAS);
         inyectar("localidades", localidades);
         inyectar("viajes", viajes);
         inyectar("planificador", planificador);
@@ -103,6 +110,95 @@ class RutasGuiaServiceTest {
         assertEquals("rutas_actualizadas", assertThrows(RutasException.class,
                 () -> servicio.editarGuia("ci", "G1", edicion(3L, "b".repeat(64)), "t")).codigo());
         verifyNoInteractions(viajes, geometrias);
+    }
+
+    @Test
+    void returnsTheRoutesOfItsOwnGuide() throws Exception {
+        assertSame(GUARDADAS, servicio.consultar("ci", "G1", "t"));
+    }
+
+    @Test
+    void aGuideOfAnotherCompanyDoesNotExist() {
+        when(guias.buscarPorId("G2")).thenReturn(otraGuia(2L));
+
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.consultar("ci", "G2", "t"));
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.consultar("ci", "G3", "t"));
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.consultar("ci", null, "t"));
+    }
+
+    @Test
+    void aGuideWithoutCompanyDoesNotExist() {
+        when(guias.buscarPorId("G2")).thenReturn(otraGuia(null));
+
+        assertThrows(RecursoNoEncontradoException.class, () -> servicio.consultar("ci", "G2", "t"));
+    }
+
+    @Test
+    void confirmingStoresTheRoutesOfThePreview() throws Exception {
+        previewConfirmacion();
+        when(geometrias.obtenerOCrear("geo", 100)).thenReturn(7L);
+
+        assertSame(GUARDADAS, servicio.confirmar("ci", "G1", 1L, 2L, TOKEN, "t"));
+
+        verify(asignacion).asociar("ci", "G1", 1L, 2L, List.of(7L), "t");
+    }
+
+    @Test
+    void aPreviewIsRequired() {
+        for (String id : new String[] { null, "corto" }) {
+            RutasException e = assertThrows(RutasException.class,
+                    () -> servicio.confirmar("ci", "G1", 1L, 2L, id, "t"));
+            assertEquals(400, e.status());
+            assertEquals("previsualizacion_requerida", e.codigo());
+        }
+    }
+
+    @Test
+    void anOutdatedPreviewIsAConflict() {
+        previewConfirmacion();
+        RutasException e = assertThrows(RutasException.class,
+                () -> servicio.confirmar("ci", "G1", 1L, 2L, "b".repeat(64), "t"));
+
+        assertEquals(409, e.status());
+        assertEquals("rutas_actualizadas", e.codigo());
+        verify(geometrias, never()).obtenerOCrear(anyString(), anyDouble());
+    }
+
+    @Test
+    void ifAnotherTransactionInsertedTheGeometryItUsesThatOne() throws Exception {
+        previewConfirmacion();
+        when(geometrias.obtenerOCrear("geo", 100)).thenThrow(new IllegalStateException("unique"));
+        when(geometrias.buscarId("sha")).thenReturn(9L);
+
+        servicio.confirmar("ci", "G1", 1L, 2L, TOKEN, "t");
+
+        verify(asignacion).asociar("ci", "G1", 1L, 2L, List.of(9L), "t");
+    }
+
+    @Test
+    void aFailureThatLeftNoGeometryIsNotHidden() {
+        previewConfirmacion();
+        IllegalStateException fallo = new IllegalStateException("base caida");
+        when(geometrias.obtenerOCrear("geo", 100)).thenThrow(fallo);
+        when(geometrias.buscarId("sha")).thenReturn(null);
+
+        assertSame(fallo, assertThrows(IllegalStateException.class,
+                () -> servicio.confirmar("ci", "G1", 1L, 2L, TOKEN, "t")));
+    }
+
+    private void previewConfirmacion() {
+        var ruta = new PrevisualizacionRutasService.RutaVista(1, "sha", 100, 60, "geo");
+        when(planificador.calcular(1L, 2L)).thenReturn(
+                new PrevisualizacionRutasService.Previsualizacion(1L, 2L, TOKEN, List.of(ruta)));
+    }
+
+    private Guia otraGuia(Long numeroEmpresa) {
+        Empresa otra = null;
+        if (numeroEmpresa != null) {
+            otra = new Empresa();
+            otra.setNroEmpresa(numeroEmpresa);
+        }
+        return new Guia("G2", "Agro", 1000, LocalDate.now(), "Origen", "Destino", otra);
     }
 
     private EdicionGuia edicion(Long destino, String token) {
