@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -22,6 +23,7 @@ import tse.lab.model.Empresa;
 import tse.lab.model.EstadoValidacion;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
 
 // Perfil de la Empresa contra H2 con los DAOs reales.
 class PerfilEmpresaServiceTest {
@@ -61,8 +63,22 @@ class PerfilEmpresaServiceTest {
 
     @Test
     void elResponsableConsultaLosDatosDeSuEmpresa() throws Exception {
-        assertEquals(new DatosEmpresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", false),
+        assertEquals(new DatosEmpresa(1L, "Transportes del Este", "Transportes del Este S.A.", "Ruta 8 km 29", false, List.of()),
                 servicio.obtener(RESPONSABLE, "t"));
+    }
+
+    @Test
+    void elResponsableVeLosRubrosQueLeAsignoElMtopOrdenados() throws Exception {
+        em.getTransaction().begin();
+        Rubro forestal = new Rubro(2L, "Forestal");
+        Rubro agro = new Rubro(1L, "Agropecuario");
+        em.persist(forestal);
+        em.persist(agro);
+        em.find(Empresa.class, 1L).setRubros(List.of(forestal, agro));
+        em.getTransaction().commit();
+        em.clear();
+
+        assertEquals(List.of("Agropecuario", "Forestal"), servicio.obtener(RESPONSABLE, "t").rubros());
     }
 
     @Test
@@ -73,7 +89,7 @@ class PerfilEmpresaServiceTest {
         em.getTransaction().commit();
         em.clear();
 
-        assertEquals(new DatosEmpresa(1L, "TDE Cargas", "TDE Cargas S.R.L.", "Av. Italia 1234, Montevideo", false), r);
+        assertEquals(new DatosEmpresa(1L, "TDE Cargas", "TDE Cargas S.R.L.", "Av. Italia 1234, Montevideo", false, List.of()), r);
         Empresa guardada = em.find(Empresa.class, 1L);
         assertEquals("TDE Cargas", guardada.getNombrePublico());
         assertEquals("Av. Italia 1234, Montevideo", guardada.getDireccion());

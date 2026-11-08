@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -23,6 +24,8 @@ import tse.lab.frontofficeciudadanos.data.EventoViajeDAO;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.LocalidadDAO;
 import tse.lab.frontofficeciudadanos.data.ModificacionGuiaDAO;
+import tse.lab.frontofficeciudadanos.data.RubroDAO;
+import tse.lab.frontofficeciudadanos.data.TipoCargaDAO;
 import tse.lab.frontofficeciudadanos.data.CiudadanoDAO;
 import tse.lab.frontofficeciudadanos.data.ResponsableDAO;
 import tse.lab.frontofficeciudadanos.data.RutaReferenciaDAO;
@@ -47,7 +50,9 @@ import tse.lab.model.Guia;
 import tse.lab.model.Localidad;
 import tse.lab.model.Ciudadano;
 import tse.lab.model.Responsable;
+import tse.lab.model.Rubro;
 import tse.lab.model.RutaReferencia;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Vehiculo;
 
 // Gestion de Viajes de Carga y CU-07 contra H2 con los DAOs reales.
@@ -80,6 +85,8 @@ class GuiasServiceTest {
         set(servicio, "perfiles", perfiles);
         set(servicio, "eventos", conEm(new EventoViajeDAO()));
         set(servicio, "modificaciones", conEm(new ModificacionGuiaDAO()));
+        set(servicio, "tiposCarga", conEm(new TipoCargaDAO()));
+        set(servicio, "rubros", conEm(new RubroDAO()));
         AsignacionRutasService asignacionRutas = new AsignacionRutasService();
         set(asignacionRutas, "autorizacion", autorizacion);
         set(asignacionRutas, "guias", conEm(new GuiaDAO()));
@@ -101,6 +108,10 @@ class GuiasServiceTest {
         em.getTransaction().begin();
         em.persist(empresa);
         em.persist(otra);
+        em.persist(new Rubro(1L, "Agropecuario"));
+        em.persist(new Rubro(2L, "Forestal"));
+        em.persist(new TipoCarga(1L, "Granos a granel"));
+        em.persist(new TipoCarga(2L, "Rollizos"));
         em.persist(new Localidad(1L, "Montevideo", "Montevideo", -34.90, -56.17));
         em.persist(new Localidad(2L, "Paysandú", "Paysandú", -32.32, -58.08));
         em.persist(new Localidad(3L, "Salto", "Salto", -31.38, -57.96));
@@ -150,6 +161,38 @@ class GuiasServiceTest {
     }
 
     @Test
+    void elTipoDeCargaTieneQueSerDelCatalogoYSeGuardaConSuNombre() throws Exception {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Agropecuario", "Cohetes", 18000L, MANANA, "Montevideo", "Paysandú", null, null, null), "t"));
+        assertEquals(Map.of("tipoCarga", "Elegí un tipo de carga de la lista."), e.getErrores());
+
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Forestal", "ROLLIZOS", 18000L, MANANA, "Rivera", "Montevideo", null, null, null), "t"));
+        assertEquals("Rollizos", g.tipoCarga());
+    }
+
+    @Test
+    void elRubroDelClienteTieneQueSerDelCatalogoYSeGuardaConSuNombre() throws Exception {
+        DatosInvalidosException e = assertThrows(DatosInvalidosException.class, () -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("Agro", "Rollizos", 18000L, MANANA, "Rivera", "Montevideo", null, null, null), "t"));
+        assertEquals(Map.of("rubroCliente", "Elegí un rubro de la lista."), e.getErrores());
+
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("forestal", "Rollizos", 18000L, MANANA, "Rivera", "Montevideo", null, null, null), "t"));
+        assertEquals("Forestal", g.rubroCliente());
+        assertEquals(List.of(new GuiasService.RubroVista(1L, "Agropecuario"), new GuiasService.RubroVista(2L, "Forestal")),
+                servicio.rubros(RESPONSABLE, "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.rubros("99999999", "t"));
+    }
+
+    @Test
+    void elCatalogoDeTiposDeCargaVieneOrdenadoYSoloParaElResponsable() throws Exception {
+        assertEquals(List.of(new GuiasService.TipoCargaVista(1L, "Granos a granel"),
+                new GuiasService.TipoCargaVista(2L, "Rollizos")), servicio.tiposCarga(RESPONSABLE, "t"));
+        assertThrows(NoAutorizadoException.class, () -> servicio.tiposCarga("99999999", "t"));
+    }
+
+    @Test
     void crearConIdsPersisteLaReferenciaYElNombreCanonico() throws Exception {
         GuiaVista creada = enTx(() -> servicio.crear(RESPONSABLE,
                 new NuevaGuia("Forestal", "Rollizos", 10000L, MANANA, null, null, 4L, 1L, null), "t"));
@@ -166,15 +209,15 @@ class GuiasServiceTest {
     void losIdsRechazanLocalidadesInexistentesIgualesOMensajesContradictorios() {
         DatosInvalidosException desconocida = assertThrows(DatosInvalidosException.class,
                 () -> servicio.crear(RESPONSABLE,
-                        new NuevaGuia("X", "Y", 1000L, MANANA, null, null, 9999L, 1L, null), "t"));
+                        new NuevaGuia("Forestal", "Rollizos", 1000L, MANANA, null, null, 9999L, 1L, null), "t"));
         assertTrue(desconocida.getErrores().containsKey("origenId"));
         DatosInvalidosException iguales = assertThrows(DatosInvalidosException.class,
                 () -> servicio.crear(RESPONSABLE,
-                        new NuevaGuia("X", "Y", 1000L, MANANA, null, null, 1L, 1L, null), "t"));
+                        new NuevaGuia("Forestal", "Rollizos", 1000L, MANANA, null, null, 1L, 1L, null), "t"));
         assertTrue(iguales.getErrores().containsKey("destinoId"));
         DatosInvalidosException contradiccion = assertThrows(DatosInvalidosException.class,
                 () -> servicio.crear(RESPONSABLE,
-                        new NuevaGuia("X", "Y", 1000L, MANANA, "Salto", null, 4L, 1L, null), "t"));
+                        new NuevaGuia("Forestal", "Rollizos", 1000L, MANANA, "Salto", null, 4L, 1L, null), "t"));
         assertTrue(contradiccion.getErrores().containsKey("origen"));
     }
 
@@ -182,10 +225,10 @@ class GuiasServiceTest {
     void nombreAmbiguoNoSeAceptaPeroIdsDistinguenDepartamentos() throws Exception {
         DatosInvalidosException ambiguo = assertThrows(DatosInvalidosException.class,
                 () -> servicio.crear(RESPONSABLE,
-                        new NuevaGuia("X", "Y", 1000L, MANANA, "San José", "Montevideo", null, null, null), "t"));
+                        new NuevaGuia("Forestal", "Rollizos", 1000L, MANANA, "San José", "Montevideo", null, null, null), "t"));
         assertTrue(ambiguo.getErrores().containsKey("origen"));
         GuiaVista creada = enTx(() -> servicio.crear(RESPONSABLE,
-                new NuevaGuia("X", "Y", 1000L, MANANA, null, null, 6L, 1L, null), "t"));
+                new NuevaGuia("Forestal", "Rollizos", 1000L, MANANA, null, null, 6L, 1L, null), "t"));
         assertEquals(6L, creada.origenId());
         assertEquals("San José", creada.origen());
     }
@@ -271,11 +314,11 @@ class GuiasServiceTest {
     void guiaSinAsignarYSinRutaPermiteEditarSinAsignarla() throws Exception {
         GuiaVista g = nuevaGuia();
         GuiaVista editada = enTx(() -> servicio.editar(RESPONSABLE, g.id(),
-                new GuiasService.EdicionGuia("Agro", "Rollizos", 21000L, MANANA, null, null, 4L, 1L, g.version(), null), "t"));
+                new GuiasService.EdicionGuia("Agropecuario", "Rollizos", 21000L, MANANA, null, null, 4L, 1L, g.version(), null), "t"));
         em.clear();
         Guia guardada = em.find(Guia.class, g.id());
         assertEquals("SIN_ASIGNAR", editada.estado());
-        assertEquals("Agro", guardada.getRubroCliente());
+        assertEquals("Agropecuario", guardada.getRubroCliente());
         assertTrue(guardada.getRutasAutorizadas().isEmpty());
         assertTrue(editada.version() > g.version());
         assertEquals("EDICION", servicio.eventos(RESPONSABLE, g.id(), "t").modificaciones().getFirst().tipo());
@@ -307,7 +350,7 @@ class GuiasServiceTest {
         GuiaVista g = enTx(() -> servicio.crearConRuta(RESPONSABLE,
                 new NuevaGuia("Forestal", "Rollizos", 20000L, MANANA, null, null, 4L, 1L, null), List.of(ruta), "t"));
         falla(RutasException.class, () -> servicio.editarConRuta(RESPONSABLE, g.id(),
-                new GuiasService.EdicionGuia("Agro", "Rollizos", 21000L, MANANA, null, null, 4L, 3L, g.version(), null),
+                new GuiasService.EdicionGuia("Agropecuario", "Rollizos", 21000L, MANANA, null, null, 4L, 3L, g.version(), null),
                 List.of(-1L), "t"));
         em.clear();
         Guia guardada = em.find(Guia.class, g.id());
@@ -558,6 +601,41 @@ class GuiasServiceTest {
             em.persist(ruta);
             return ruta.getId();
         });
+    }
+
+    @Test
+    void elCatalogoSeBuscaSinDistinguirTildes() throws Exception {
+        GuiaVista g = enTx(() -> servicio.crear(RESPONSABLE,
+                new NuevaGuia("FORESTÁL", "Rollizós", 18000L, MANANA, "Rivera", "Montevideo", null, null, null), "t"));
+
+        assertEquals("Forestal", g.rubroCliente());
+        assertEquals("Rollizos", g.tipoCarga());
+    }
+
+    @Test
+    void unaGuiaAnteriorAlCatalogoSeEditaSinCambiarSuRubroNiSuTipo() throws Exception {
+        GuiaVista g = asignada();
+        enTx(() -> em.createQuery("UPDATE Guia g SET g.rubroCliente = 'Agro viejo', g.tipoCarga = 'Bolsas' WHERE g.id = :id")
+                .setParameter("id", g.id()).executeUpdate());
+        em.clear();
+
+        GuiaVista editada = enTx(() -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Agro viejo", "Bolsas", 21000L, MANANA, "Rivera", "Montevideo", null, null,
+                        g.version(), null), "t"));
+
+        assertEquals("Agro viejo", editada.rubroCliente());
+        assertEquals(21000L, editada.pesoCargaKg());
+    }
+
+    @Test
+    void alEditarNoSePuedeCambiarAUnValorFueraDelCatalogo() throws Exception {
+        GuiaVista g = asignada();
+
+        DatosInvalidosException e = falla(DatosInvalidosException.class, () -> servicio.editar(RESPONSABLE, g.id(),
+                new GuiasService.EdicionGuia("Otro", "Rollizos", 21000L, MANANA, "Rivera", "Montevideo", null, null,
+                        g.version(), null), "t"));
+
+        assertEquals(Map.of("rubroCliente", "Elegí un rubro de la lista."), e.getErrores());
     }
 
     private GuiaVista nuevaGuia() throws Exception {

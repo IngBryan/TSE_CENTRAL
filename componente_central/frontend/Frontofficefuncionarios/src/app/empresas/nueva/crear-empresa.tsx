@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { botonPrimario, botonSecundario } from "@/components/encabezado";
 import { MAX_DIRECCION, MAX_NOMBRE, nombreUsuario, type UsuarioDisponible } from "@/lib/empresas";
-import { crearEmpresa, type ResultadoUsuarios } from "../actions";
+import { crearEmpresa, type ResultadoRubros, type ResultadoUsuarios } from "../actions";
 import { ElegirResponsable } from "../elegir-responsable";
+import { ElegirRubros } from "../elegir-rubros";
 
 const entrada =
   "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:text-zinc-50";
@@ -13,7 +14,7 @@ const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:tex
 // FA1: el funcionario ingresa los datos de la empresa, elige (opcionalmente) su responsable entre los
 // usuarios disponibles y confirma. Las reglas las valida el backend; si sale bien, la action redirige
 // al detalle de la empresa nueva.
-export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }) {
+export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUsuarios; rubros: ResultadoRubros }) {
   const [datos, setDatos] = useState({
     nroEmpresa: "",
     nombrePublico: "",
@@ -22,6 +23,7 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
     habilitada: false,
   });
   const [responsable, setResponsable] = useState<UsuarioDisponible | null>(null);
+  const [rubrosElegidos, setRubrosElegidos] = useState<number[]>([]);
   const [rechazados, setRechazados] = useState<string[]>([]);
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
         nroEmpresa: Number(datos.nroEmpresa),
         habilitada: datos.habilitada && responsable !== null,
         ciResponsable: responsable?.ci ?? null,
+        rubros: rubrosElegidos,
       });
       setError(r.error);
       setCampos(r.campos ?? {});
@@ -136,6 +139,14 @@ export function CrearEmpresa({ disponibles }: { disponibles: ResultadoUsuarios }
           />
           {errorCampo("direccion")}
         </label>
+
+        <ElegirRubros
+          catalogo={rubros}
+          elegidos={rubrosElegidos}
+          onCambiar={setRubrosElegidos}
+          deshabilitado={bloqueado}
+          error={campos.rubros}
+        />
 
         <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
           <input

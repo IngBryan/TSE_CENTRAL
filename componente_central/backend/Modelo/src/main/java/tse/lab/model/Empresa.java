@@ -5,8 +5,12 @@ import java.io.Serializable;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -34,6 +38,12 @@ public class Empresa implements Serializable {
     private List<Guia> guias;
     @OneToMany(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<Vehiculo> vehiculos;
+    // Rubros de la empresa, elegidos del catalogo precargado (tabla rubros) al darla de alta o modificarla
+    @ManyToMany
+    @JoinTable(name = "empresa_rubros", joinColumns = @JoinColumn(name = "nro_empresa"),
+            inverseJoinColumns = @JoinColumn(name = "id_rubro"))
+    @OrderBy("nombre")
+    private List<Rubro> rubros;
     // Bloqueo optimista: el funcionario manda la version que estaba mirando al modificar la empresa, para no
     // pisar sin aviso lo que otro cambio mientras tanto
     @Version
@@ -43,6 +53,7 @@ public class Empresa implements Serializable {
         this.choferes = new ArrayList<>();
         this.guias = new ArrayList<>();
         this.vehiculos = new ArrayList<>();
+        this.rubros = new ArrayList<>();
     }
 
     public Empresa(Long nroEmpresa, String nombrePublico, String razonSocial, String direccion,
@@ -55,6 +66,7 @@ public class Empresa implements Serializable {
         this.choferes = new ArrayList<>(); /* inicialmente no tiene choferes asignados */
         this.guias = new ArrayList<>(); /* inicialmente no tiene guias asignadas */
         this.vehiculos = new ArrayList<>(); /* inicialmente no tiene vehiculos asignados */
+        this.rubros = new ArrayList<>();
     }
 
     public Long getNroEmpresa() {
@@ -95,6 +107,16 @@ public class Empresa implements Serializable {
 
     public List<Vehiculo> getVehiculos() {
         return vehiculos;
+    }
+
+    public List<Rubro> getRubros() {
+        return rubros;
+    }
+
+    // Reemplaza los rubros de la empresa: la coleccion administrada se vacia y se vuelve a llenar
+    public void setRubros(List<Rubro> rubros) {
+        this.rubros.clear();
+        this.rubros.addAll(rubros);
     }
 
     public Long getVersion() {

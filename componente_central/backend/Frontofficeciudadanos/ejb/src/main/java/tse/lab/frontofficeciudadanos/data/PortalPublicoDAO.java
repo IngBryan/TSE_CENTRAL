@@ -17,6 +17,13 @@ import tse.lab.model.EstadoGuia;
 @Stateless
 public class PortalPublicoDAO {
 
+    private static final String CARGA_DE_VIAJES = ", COUNT(g), SUM(g.pesoCargaKg) FROM Guia g"
+            + " WHERE g.estado = :finalizada AND g.fecha BETWEEN :desde AND :hasta GROUP BY g.empresa.nroEmpresa, ";
+    private static final String VIAJES_POR_RUBRO = "SELECT g.empresa.nroEmpresa, g.rubroCliente" + CARGA_DE_VIAJES
+            + "g.rubroCliente";
+    private static final String VIAJES_POR_TIPO_CARGA = "SELECT g.empresa.nroEmpresa, g.tipoCarga" + CARGA_DE_VIAJES
+            + "g.tipoCarga";
+
     @PersistenceContext(unitName = "frontofficeciudadanosPersistenceUnit")
     private EntityManager em;
 
@@ -66,12 +73,26 @@ public class PortalPublicoDAO {
 
     // [nroEmpresa, rubroCliente, viajes, kg] de los viajes FINALIZADOS entre las dos fechas (inclusive)
     public List<Object[]> viajesPorEmpresaYRubro(LocalDate desde, LocalDate hasta) {
-        return em.createQuery("SELECT g.empresa.nroEmpresa, g.rubroCliente, COUNT(g), SUM(g.pesoCargaKg) FROM Guia g"
-                + " WHERE g.estado = :finalizada AND g.fecha BETWEEN :desde AND :hasta"
-                + " GROUP BY g.empresa.nroEmpresa, g.rubroCliente", Object[].class)
+        return viajesFinalizados(VIAJES_POR_RUBRO, desde, hasta);
+    }
+
+    // [nroEmpresa, tipoCarga, viajes, kg] de los viajes FINALIZADOS entre las dos fechas (inclusive)
+    public List<Object[]> viajesPorEmpresaYTipoCarga(LocalDate desde, LocalDate hasta) {
+        return viajesFinalizados(VIAJES_POR_TIPO_CARGA, desde, hasta);
+    }
+
+    private List<Object[]> viajesFinalizados(String consulta, LocalDate desde, LocalDate hasta) {
+        return em.createQuery(consulta, Object[].class)
                 .setParameter("finalizada", EstadoGuia.FINALIZADA)
                 .setParameter("desde", desde)
                 .setParameter("hasta", hasta)
+                .getResultList();
+    }
+
+    // [nombre del rubro, nroEmpresa] de cada rubro de cada empresa habilitada (una empresa puede tener varios)
+    public List<Object[]> rubrosDeEmpresasHabilitadas() {
+        return em.createQuery("SELECT r.nombre, e.nroEmpresa FROM Empresa e JOIN e.rubros r"
+                + " WHERE e.habilitada = true", Object[].class)
                 .getResultList();
     }
 

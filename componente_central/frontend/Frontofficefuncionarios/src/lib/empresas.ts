@@ -28,22 +28,29 @@ export type EmpresaDetalle = {
   direccion: string | null;
   habilitada: boolean;
   responsable: ResponsableVista | null;
+  // Rubros de la empresa (del catalogo precargado), ordenados por nombre
+  rubros: Rubro[];
   // @Version de la empresa: se manda al modificarla para no pisar lo que otro cambio mientras tanto
   version: number | null;
 };
 
+// Un rubro del catalogo precargado (GET /empresas/rubros)
+export type Rubro = { id: number; nombre: string };
+
 // Cuerpo de PUT /empresas/{nro}: el numero de empresa no se modifica. version: la que se estaba mirando al
-// editar (409 EMPRESA_DESACTUALIZADA si ya no es la actual).
+// editar (409 EMPRESA_DESACTUALIZADA si ya no es la actual). rubros: ids del catalogo; si no viene, el
+// backend conserva los actuales.
 export type CambiosEmpresa = {
   nombrePublico: string;
   razonSocial: string;
   direccion: string;
   habilitada: boolean;
+  rubros?: number[];
   version: number;
 };
 
 // Cuerpo de POST /empresas. ciResponsable: cedula de un usuario disponible, o null para darla de alta sin
-// responsable.
+// responsable. rubros: ids del catalogo (puede tener varios o ninguno).
 export type AltaEmpresa = {
   nroEmpresa: number;
   nombrePublico: string;
@@ -51,6 +58,7 @@ export type AltaEmpresa = {
   direccion: string;
   habilitada: boolean;
   ciResponsable: string | null;
+  rubros: number[];
 };
 
 // GET /empresas/usuarios-disponibles: validados que no son responsables de ninguna empresa

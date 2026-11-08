@@ -43,9 +43,7 @@ class IngresoFuncionarioServiceTest {
         FuncionarioDAO dao = new FuncionarioDAO();
         set(dao, "em", em);
         pdi = new PdiFalsa();
-        servicio = new IngresoFuncionarioService();
-        set(servicio, "funcionarios", dao);
-        set(servicio, "clientePdi", pdi);
+        servicio = new IngresoFuncionarioService(dao, pdi);
 
         em.getTransaction().begin();
         em.persist(new Funcionario(FUNCIONARIO, "viejo@mtop.gub.uy"));
@@ -91,6 +89,19 @@ class IngresoFuncionarioServiceTest {
     @Test
     void quienNoEsFuncionarioNoEntraNiSeConsultaLaPdi() {
         ResultadoIngreso r = servicio.ingresarConGubUy(NO_FUNCIONARIO, "x@prueba.uy", "t");
+
+        assertEquals(Resultado.NO_ES_FUNCIONARIO, r.resultado());
+        assertFalse(r.sesionPermitida());
+        assertEquals(0, pdi.consultas);
+    }
+
+    @Test
+    void unFuncionarioInactivoNoEntraNiSeConsultaLaPdi() {
+        em.getTransaction().begin();
+        em.find(Funcionario.class, FUNCIONARIO).setActivo(false);
+        em.getTransaction().commit();
+
+        ResultadoIngreso r = servicio.ingresarParaTesting(FUNCIONARIO, "t");
 
         assertEquals(Resultado.NO_ES_FUNCIONARIO, r.resultado());
         assertFalse(r.sesionPermitida());

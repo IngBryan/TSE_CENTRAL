@@ -5,7 +5,7 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { BASE_PATH } from "@/lib/base-path";
-import type { ChoferResumen, Guia, VehiculoResumen } from "../actions";
+import { obtenerCatalogos, type ChoferResumen, type Guia, type VehiculoResumen } from "../actions";
 import { ModificarGuia } from "./modificar-guia";
 import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
 import type { RutaAsignada } from "./rutas/tipos-rutas";
@@ -81,6 +81,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   let rutasAutorizadas: RutaAsignada[] = [];
   let errorRutas = false;
   let localidades: LocalidadVista[] = [];
+  let catalogos: Awaited<ReturnType<typeof obtenerCatalogos>> = { tiposCarga: [], rubros: [] };
   try {
     const res = await llamarBackend<DetalleGuia & { detalle?: string }>(
       `/empresa/guias/${encodeURIComponent(id)}/eventos`,
@@ -109,6 +110,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
     }
   }
   if (datos && (datos.guia.estado === "ASIGNADA" || datos.guia.estado === "SIN_ASIGNAR")) {
+    catalogos = await obtenerCatalogos();
     try {
       const res = await llamarBackend<LocalidadVista[]>("/localidades", {
         correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
@@ -195,7 +197,15 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             </section>
 
             {(datos.guia.estado === "ASIGNADA" || datos.guia.estado === "SIN_ASIGNAR") && (
-              <ModificarGuia guia={datos.guia} vehiculos={datos.vehiculos} choferes={datos.choferes} hoy={hoy} localidades={localidades} />
+              <ModificarGuia
+                guia={datos.guia}
+                vehiculos={datos.vehiculos}
+                choferes={datos.choferes}
+                tiposCarga={catalogos.tiposCarga}
+                rubros={catalogos.rubros}
+                hoy={hoy}
+                localidades={localidades}
+              />
             )}
 
             {datos.guia.estado === "SIN_ASIGNAR" && <Link href={`/empresa/guias/${encodeURIComponent(id)}/asignar`}

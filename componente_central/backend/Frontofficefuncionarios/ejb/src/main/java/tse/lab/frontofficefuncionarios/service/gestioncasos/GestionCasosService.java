@@ -46,6 +46,8 @@ import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacionVista;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // CU Gestionar casos de fiscalizacion (funcionario): bandeja de trabajo, detalle del caso, evidencia,
 // descargo de la empresa y resolucion (confirmar o desestimar con fundamento). Cada operacion verifica
@@ -139,7 +141,8 @@ public class GestionCasosService {
 
     public record EvidenciaVista(Long idCaso, String tipoCaso, String descripcion, String fechaDeteccion,
             GuiaVista guia, VehiculoVista vehiculo, List<PesajeVista> pesajes,
-            List<EventoTrackingVista> eventosTracking, List<PruebaDesvioVista> pruebasDesvio) { }
+            List<EventoTrackingVista> eventosTracking, List<PruebaDesvioVista> pruebasDesvio,
+            List<EvidenciaHabilitacionVista> pruebasHabilitacion) { }
 
     /** Evidencia principal del viaje sin Guía: circulación inferida y expediente asociado. */
     public record CirculacionVista(Long id, Long idCaso, String matricula, String estado,
@@ -252,7 +255,11 @@ public class GestionCasosService {
                                 p.getLatConfirmante(), p.getLonConfirmante(), p.getLatPareja(), p.getLonPareja(),
                                 p.getDistanciaConfirmante(), p.getDistanciaPareja(), p.getUmbralMetros(),
                                 p.getVentanaSegundos(), List.of(p.getRutasSha().split(","))))
-                        .toList());
+                        .toList(),
+                caso.getEvidenciasHabilitacion().stream()
+                        .sorted(Comparator.comparing(EvidenciaHabilitacion::getFechaHora)
+                                .thenComparing(EvidenciaHabilitacion::getOrigen))
+                        .map(EvidenciaHabilitacionVista::de).toList());
         LOG.info(() -> LogFuncionarios.evento("caso.evidencia").correlationId(correlationId).usuario(ci)
                 .campo("caso", idCaso).campo("pesajes", pesajes.size())
                 .campo("eventosTracking", evidencia.eventosTracking().size()).toString());

@@ -23,6 +23,7 @@ import tse.lab.model.EventoPesajes;
 import tse.lab.model.Guia;
 import tse.lab.model.RegistroAuditoriaCaso;
 import tse.lab.model.Vehiculo;
+import tse.lab.model.EvidenciaHabilitacion;
 
 // La fiscalización decide las infracciones; este EJB asocia evidencias en PostgreSQL
 // en una sola transacción por caso y evento. Una misma observación puede respaldar varios casos.
@@ -50,6 +51,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
 
     @Override
     public DatosCaso registrarEvidencia(TipoCasoAutomatico tipoCaso, String idGuia, EventoFiscalizado evento) {
+        if (tipoCaso == TipoCasoAutomatico.VEHICULO_SIN_HABILITACION) {
+            throw new IllegalArgumentException("La habilitación requiere su prueba documental");
+        }
         if (tipoCaso == TipoCasoAutomatico.DESVIO_RUTA) {
             throw new IllegalArgumentException("El desvío requiere su prueba geométrica");
         }
@@ -60,6 +64,18 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
     }
 
     @Override
+    public DatosCaso registrarHabilitacion(String idGuia, EventoFiscalizado evento,
+            EvidenciaHabilitacion prueba) {
+        if (prueba == null || evento == null || evento.getOrigen() == null
+                || !prueba.getMatricula().equals(evento.getMatricula())
+                || !prueba.getFechaHora().equals(evento.getFechaHora()) || !prueba.sinHabilitacion()) {
+            throw new IllegalArgumentException("La prueba documental no acredita la infracción de este evento");
+        }
+        return registrarInterno(TipoCasoAutomatico.VEHICULO_SIN_HABILITACION, idGuia, evento, null,
+                prueba.conOrigen(evento.getOrigen().name()));
+    }
+
+    @Override
     public DatosCaso registrarDesvio(String idGuia, EventoFiscalizado evento, PruebaDesvioRemota prueba) {
         validarPrueba(idGuia, evento, prueba);
         return registrarInterno(TipoCasoAutomatico.DESVIO_RUTA, idGuia, evento, prueba);
@@ -67,6 +83,12 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
 
     private DatosCaso registrarInterno(TipoCasoAutomatico tipoCaso, String idGuia,
             EventoFiscalizado evento, PruebaDesvioRemota prueba) {
+        return registrarInterno(tipoCaso, idGuia, evento, prueba, null);
+    }
+
+    private DatosCaso registrarInterno(TipoCasoAutomatico tipoCaso, String idGuia,
+            EventoFiscalizado evento, PruebaDesvioRemota prueba,
+            EvidenciaHabilitacion habilitacion) {
         if (tipoCaso == null || evento == null || evento.getOrigen() == null
                 || evento.getMatricula() == null || evento.getFechaHora() == null) {
             throw new IllegalArgumentException("Faltan datos del tipo o del evento");
@@ -94,9 +116,10 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         CasoFiscalizacion asociado = casos.buscarConEvidencia(evento.getMatricula(), idGuia,
                 tipoCaso.name(), clave(evento), evento.getOrigen() == OrigenEvento.TRACKING);
         if (asociado != null) {
-            if (prueba != null) {
+            if (prueba != null || habilitacion != null) {
                 asociado = casos.buscarPorIdParaActualizar(asociado.getId());
-                agregarPruebaSiFalta(asociado, evento, prueba);
+                if (prueba != null) agregarPruebaSiFalta(asociado, evento, prueba);
+                if (habilitacion != null) agregarHabilitacionSiFalta(asociado, habilitacion);
             }
             return datos(asociado);
         }
@@ -105,6 +128,7 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
             caso = new CasoFiscalizacion(tipoCaso.getDescripcion(), tipoCaso.name(), vehiculo, guia);
             asociarSiFalta(caso, evento);
             if (prueba != null) agregarPruebaSiFalta(caso, evento, prueba);
+            if (habilitacion != null) agregarHabilitacionSiFalta(caso, habilitacion);
             casos.guardar(caso);
             auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
                     AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA,
@@ -118,12 +142,21 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
             caso = casos.buscarPorIdParaActualizar(caso.getId());
             asociarSiFalta(caso, evento);
             if (prueba != null) agregarPruebaSiFalta(caso, evento, prueba);
+            if (habilitacion != null) agregarHabilitacionSiFalta(caso, habilitacion);
             Long id = caso.getId();
             LOG.info(() -> LogFuncionarios.evento("caso.evidencia_agregada")
                     .correlationId(evento.getCorrelationId()).campo("caso", id)
                     .campo("matricula", evento.getMatricula()).campo("fechaHora", evento.getFechaHora()).toString());
         }
         return datos(caso);
+    }
+
+    private static void agregarHabilitacionSiFalta(CasoFiscalizacion caso,
+            EvidenciaHabilitacion prueba) {
+        boolean existe = caso.getEvidenciasHabilitacion().stream().anyMatch(p ->
+                p.getFechaHora().equals(prueba.getFechaHora()) && p.getOrigen().equals(prueba.getOrigen())
+                        && p.getMatricula().equals(prueba.getMatricula()));
+        if (!existe) caso.getEvidenciasHabilitacion().add(prueba);
     }
 
 

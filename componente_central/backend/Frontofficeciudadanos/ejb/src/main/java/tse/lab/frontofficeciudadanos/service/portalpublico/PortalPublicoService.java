@@ -8,12 +8,15 @@ import java.time.Month;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import jakarta.ejb.EJB;
@@ -22,6 +25,8 @@ import tse.lab.frontofficeciudadanos.data.EmpresaDAO;
 import tse.lab.frontofficeciudadanos.data.ITVDAO;
 import tse.lab.frontofficeciudadanos.data.PermisoCirculacionDAO;
 import tse.lab.frontofficeciudadanos.data.PortalPublicoDAO;
+import tse.lab.frontofficeciudadanos.data.RubroDAO;
+import tse.lab.frontofficeciudadanos.data.TipoCargaDAO;
 import tse.lab.frontofficeciudadanos.data.VehiculoDAO;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
 import tse.lab.frontofficeciudadanos.service.LogCiudadanos;
@@ -32,16 +37,20 @@ import tse.lab.model.Empresa;
 import tse.lab.model.EstadoCaso;
 import tse.lab.model.ITV;
 import tse.lab.model.PermisoCirculacion;
+import tse.lab.model.Rubro;
+import tse.lab.model.TipoCarga;
 import tse.lab.model.Vehiculo;
 
 // Portal publico del frontoffice de ciudadanos (sin login):
-// - Validacion de Permisos de Empresas: un cliente verifica si una transportista esta habilitada y, si quiere,
-//   si un vehiculo es de esa empresa y tiene permiso e ITV vigentes. Son datos de empresas y vehiculos, nunca
-//   de personas (no se muestra el responsable ni los choferes). Una matricula de otra empresa solo dice eso.
-//   Tampoco se dan numeros de la empresa (por ejemplo, cuantos vehiculos tiene): eso es un dato de una sola
-//   empresa y no hace falta para validarla.
+// - Validacion de Permisos de Empresas: un cliente verifica si una transportista esta habilitada, en que rubros
+//   trabaja y, si quiere, si un vehiculo es de esa empresa y tiene permiso e ITV vigentes. Son datos del
+//   registro de empresas y vehiculos, nunca de personas (no se muestra el responsable ni los choferes). Una
+//   matricula de otra empresa solo dice eso. Tampoco se dan numeros de la empresa (por ejemplo, cuantos
+//   vehiculos tiene o cuantos viajes hizo): eso es un dato de una sola empresa y no hace falta para validarla.
 // - Listados de Informacion Publica: estadisticas agregadas con la regla de Agregacion (umbral minimo de
-//   empresas, PORTAL_UMBRAL_EMPRESAS, 3 por defecto y nunca menos de 3).
+//   empresas, PORTAL_UMBRAL_EMPRESAS, 3 por defecto y nunca menos de 3). Las tablas por rubro y por tipo de
+//   carga usan los catalogos precargados: sus nombres no identifican a nadie, asi que cada fila se muestra por
+//   nombre (reservada si no junta el umbral) y tambien las que no tienen datos (en 0).
 @Stateless
 public class PortalPublicoService {
 
@@ -51,8 +60,10 @@ public class PortalPublicoService {
     static final int UMBRAL_MINIMO = 3;
     static final int MAX_RESULTADOS_BUSQUEDA = 10;
     static final int PRIMER_ANIO = 2020;
-    // Clave de la fila que junta los rubros reservados (no choca con un rubro: las claves no llevan "~")
-    static final String OTROS_RUBROS = "~otros";
+    // Clave de la fila que junta los valores que no estan en el catalogo (no choca con uno: las claves no llevan
+    // "~"). No deberia haber, porque las guias se validan contra los catalogos; si los hay (datos viejos de
+    // texto libre), van juntos y sin su nombre, que lo escribio una empresa y podria identificarla.
+    static final String OTROS = "~otros";
 
     @EJB
     private PortalPublicoDAO portal;
@@ -64,6 +75,10 @@ public class PortalPublicoService {
     private PermisoCirculacionDAO permisos;
     @EJB
     private ITVDAO itvs;
+    @EJB
+    private RubroDAO rubros;
+    @EJB
+    private TipoCargaDAO tiposCarga;
 
     private final int umbral;
 
@@ -84,8 +99,9 @@ public class PortalPublicoService {
             Boolean permisoVigente, String itvVence, Boolean itvVigente, boolean habilitado) {
     }
 
+    // rubros: los de la empresa (catalogo precargado), ordenados por nombre
     public record ValidacionEmpresa(Long nroEmpresa, String nombrePublico, String razonSocial, boolean habilitada,
-            ValidacionVehiculo vehiculo, String consultadoEl) {
+            List<String> rubros, ValidacionVehiculo vehiculo, String consultadoEl) {
     }
 
     // valor null cuando no alcanza el umbral
@@ -97,10 +113,12 @@ public class PortalPublicoService {
     public record Indicador(Double valor, boolean reservado) {
     }
 
+    // cargaPorRubro: por rubro del cliente de la guia. empresasPorRubro: empresas habilitadas por rubro de la
+    // empresa (situacion actual; una empresa con varios rubros cuenta en cada uno, asi que no suman el total)
     public record Estadisticas(int anio, List<Integer> aniosDisponibles, int umbralEmpresas, String generadas,
             Valor empresasHabilitadas, Valor vehiculosHabilitados, Valor viajes, Valor kgTransportados,
-            List<FilaPublica> viajesPorMes, List<FilaPublica> cargaPorRubro,
-            List<FilaPublica> infraccionesConfirmadasPorTipo, Indicador infraccionesCada100Viajes,
+            List<FilaPublica> viajesPorMes, List<FilaPublica> cargaPorRubro, List<FilaPublica> cargaPorTipoCarga,
+            List<FilaPublica> empresasPorRubro, List<FilaPublica> infraccionesConfirmadasPorTipo, Indicador infraccionesCada100Viajes,
             Valor casosResueltos, Indicador porcentajeDesestimados, Indicador medianaDiasResolucion) {
     }
 
@@ -134,7 +152,8 @@ public class PortalPublicoService {
                 .campo("habilitada", empresa.isHabilitada() + (vehiculo == null ? "" : " matricula=" + vehiculo.matricula() + " deLaEmpresa=" + vehiculo.deLaEmpresa() + " habilitado=" + vehiculo.habilitado()))
                 .toString());
         return new ValidacionEmpresa(empresa.getNroEmpresa(), empresa.getNombrePublico(), empresa.getRazonSocial(),
-                empresa.isHabilitada(), vehiculo, Instant.now().toString());
+                empresa.isHabilitada(), empresa.getRubros().stream().map(Rubro::getNombre).toList(), vehiculo,
+                Instant.now().toString());
     }
 
     private ValidacionVehiculo validarVehiculo(Empresa empresa, String matricula, LocalDate hoy) {
@@ -193,16 +212,12 @@ public class PortalPublicoService {
             kg += numero(r[3]);
         }
 
-        // Carga por rubro del cliente (texto libre: se agrupa sin distinguir mayusculas ni tildes)
-        Map<String, Fila> porRubro = new LinkedHashMap<>();
-        for (Object[] r : portal.viajesPorEmpresaYRubro(desde, hasta)) {
-            String etiqueta = r[1] == null || ((String) r[1]).isBlank() ? "Sin rubro" : ((String) r[1]).strip();
-            String clave = clave(etiqueta);
-            Fila actual = porRubro.getOrDefault(clave, new Fila(clave, etiqueta, new HashSet<>(), 0, 0));
-            porRubro.put(clave, sumar(actual, (Long) r[0], (Long) r[2], numero(r[3])));
-        }
-        List<Fila> rubros = new ArrayList<>(porRubro.values());
-        rubros.sort((a, b) -> Long.compare(b.kg(), a.kg()));
+        // Carga por rubro del cliente y por tipo de carga, sobre los catalogos precargados
+        List<String> nombresRubros = rubros.listar().stream().map(Rubro::getNombre).toList();
+        List<Fila> cargaPorRubro = porCatalogo(nombresRubros, portal.viajesPorEmpresaYRubro(desde, hasta),
+                "Otros rubros");
+        List<Fila> cargaPorTipo = porCatalogo(tiposCarga.listar().stream().map(TipoCarga::getNombre).toList(),
+                portal.viajesPorEmpresaYTipoCarga(desde, hasta), "Otros tipos de carga");
 
         // Infracciones confirmadas por tipo
         Map<String, Fila> porTipo = new LinkedHashMap<>();
@@ -249,8 +264,9 @@ public class PortalPublicoService {
                 viajesPublicables ? new Valor(viajes, false) : new Valor(null, true),
                 viajesPublicables ? new Valor(kg, false) : new Valor(null, true),
                 Agregacion.proteger(new ArrayList<>(porMes.values()), umbral),
-                // El rubro lo escribe cada empresa y su nombre puede identificarla: los reservados van juntos
-                Agregacion.protegerAgrupando(rubros, umbral, OTROS_RUBROS, "Otros rubros"),
+                ordenadas(Agregacion.proteger(cargaPorRubro, umbral), FilaPublica::kg),
+                ordenadas(Agregacion.proteger(cargaPorTipo, umbral), FilaPublica::kg),
+                ordenadas(Agregacion.protegerPorFila(empresasPorRubro(nombresRubros), umbral), FilaPublica::cantidad),
                 Agregacion.proteger(new ArrayList<>(porTipo.values()), umbral),
                 tasa,
                 resueltosPublicables ? new Valor(resueltos, false) : new Valor(null, true),
@@ -259,9 +275,66 @@ public class PortalPublicoService {
                 resueltos == 0 ? sinDatos : resueltosPublicables ? new Indicador(redondear(mediana(dias)), false) : reservado);
         LOG.info(() -> LogCiudadanos.evento("publico.estadisticas").correlationId(correlationId)
                 .campo("anio", e.anio()).campo("umbral", umbral)
-                .campo("reservadas", (e.viajesPorMes().stream().filter(FilaPublica::reservado).count() + e.cargaPorRubro().stream().filter(FilaPublica::reservado).count() + e.infraccionesConfirmadasPorTipo().stream().filter(FilaPublica::reservado).count()))
+                .campo("reservadas", java.util.stream.Stream.of(e.viajesPorMes(), e.cargaPorRubro(),
+                        e.cargaPorTipoCarga(), e.empresasPorRubro(), e.infraccionesConfirmadasPorTipo())
+                        .flatMap(List::stream).filter(FilaPublica::reservado).count())
                 .toString());
         return e;
+    }
+
+    // Viajes y kg por valor de un catalogo ([nroEmpresa, valor, viajes, kg]): una fila por cada valor del
+    // catalogo, aunque no tenga viajes (en 0). Lo que no esta en el catalogo (o vacio) va a la fila OTROS, solo si
+    // hay. El orden lo pone ordenadas, despues de proteger.
+    private static List<Fila> porCatalogo(List<String> catalogo, List<Object[]> datos, String etiquetaOtros) {
+        Map<String, Fila> porClave = new LinkedHashMap<>();
+        catalogo.forEach(n -> porClave.put(clave(n), new Fila(clave(n), n, new HashSet<>(), 0, 0)));
+        Fila otros = new Fila(OTROS, etiquetaOtros, new HashSet<>(), 0, 0);
+        for (Object[] r : datos) {
+            String valor = (String) r[1];
+            Fila actual = valor == null ? null : porClave.get(clave(valor));
+            if (actual == null) {
+                otros = sumar(otros, (Long) r[0], (Long) r[2], numero(r[3]));
+            } else {
+                porClave.put(actual.clave(), sumar(actual, (Long) r[0], (Long) r[2], numero(r[3])));
+            }
+        }
+        List<Fila> filas = new ArrayList<>(porClave.values());
+        if (otros.cantidad() > 0) {
+            filas.add(otros);
+        }
+        return filas;
+    }
+
+    // Empresas habilitadas de cada rubro del catalogo (situacion actual: no depende del anio)
+    private List<Fila> empresasPorRubro(List<String> catalogo) {
+        Map<String, Set<Long>> porRubro = new HashMap<>();
+        for (Object[] r : portal.rubrosDeEmpresasHabilitadas()) {
+            porRubro.computeIfAbsent(clave((String) r[0]), k -> new HashSet<>()).add((Long) r[1]);
+        }
+        return catalogo.stream().map(n -> {
+            Set<Long> empresasFila = porRubro.getOrDefault(clave(n), Set.of());
+            return new Fila(clave(n), n, empresasFila, empresasFila.size(), 0);
+        }).toList();
+    }
+
+    // De mayor a menor, pero las reservadas van aparte y por nombre: si quedaran en su lugar, las filas vecinas
+    // dirian entre que valores esta lo que se reservo. Despues las filas en 0 y al final OTROS.
+    private static List<FilaPublica> ordenadas(List<FilaPublica> filas, Function<FilaPublica, Long> valor) {
+        return filas.stream()
+                .sorted(Comparator.comparingInt(PortalPublicoService::grupo)
+                        .thenComparingLong(f -> f.reservado() ? 0 : -valor.apply(f))
+                        .thenComparing(FilaPublica::etiqueta))
+                .toList();
+    }
+
+    private static int grupo(FilaPublica f) {
+        if (OTROS.equals(f.clave())) {
+            return 3;
+        }
+        if (f.reservado()) {
+            return 1;
+        }
+        return f.cantidad() > 0 ? 0 : 2;
     }
 
     private static Fila sumar(Fila f, Long nroEmpresa, long cantidad, long kg) {

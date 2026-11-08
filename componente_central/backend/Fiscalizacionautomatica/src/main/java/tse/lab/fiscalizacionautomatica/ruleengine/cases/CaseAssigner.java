@@ -61,6 +61,13 @@ public class CaseAssigner implements Consumer<Detection> {
                     throw new IOException("La situación de desvío carece de prueba geométrica");
                 }
                 caso = cases.registrarDesvio(guia, gps, detection.pruebaDesvio());
+            } else if (situacion == Situation.VEHICLE_WITHOUT_VALID_PERMIT) {
+                if (detection.facts() == null || detection.facts().vehicle() == null
+                        || detection.facts().vehicle().getHabilitacion() == null) {
+                    throw new IOException("La situación de habilitación carece de prueba documental");
+                }
+                caso = cases.registrarHabilitacion(guia, detection.event(),
+                        detection.facts().vehicle().getHabilitacion());
             } else {
                 caso = cases.registrar(situacion.caseType(), guia, detection.event());
             }

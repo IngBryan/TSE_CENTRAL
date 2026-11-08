@@ -60,3 +60,35 @@ export async function confirmarChofer(cedula: string): Promise<RespuestaAlta> {
   if (r.ok) revalidatePath("/empresa/choferes");
   return r;
 }
+
+export type RespuestaBaja = { ok: true } | { ok: false; mensaje: string };
+
+// Quita al chofer de la empresa (baja logica). Se lo puede volver a agregar con "Agregar chofer".
+export async function darDeBajaChofer(cedula: string): Promise<RespuestaBaja> {
+  const sesion = await getSesion();
+  if (!sesion) return { ok: false, mensaje: "Tu sesión venció. Volvé a ingresar con gub.uy." };
+  if (!/^\d{6,8}$/.test(cedula)) return { ok: false, mensaje: "La cédula no es válida." };
+
+  const correlationId = randomUUID();
+  try {
+    const res = await llamarBackend<{ detalle?: string }>(`/empresa/choferes/${cedula}`, {
+      method: "DELETE",
+      correlationId,
+      usuarioCi: sesion.perfil.cedula,
+    });
+    if (res.status === 204) {
+      revalidatePath("/empresa/choferes");
+      return { ok: true };
+    }
+    if (res.status === 409) return { ok: false, mensaje: res.data?.detalle ?? "El chofer tiene un viaje activo." };
+    if (res.status === 404) return { ok: false, mensaje: "La persona ya no es chofer de la empresa." };
+    if (res.status === 403) {
+      return { ok: false, mensaje: `No podés quitar choferes: ${res.data?.detalle ?? "no sos responsable"}.` };
+    }
+    return { ok: false, mensaje: "No se pudo quitar al chofer." };
+  } catch (e) {
+    if (!(e instanceof BackendNoDisponible)) throw e;
+    registrarLog("warn", "choferes", { correlationId }, { detalle: `${e.message}` });
+    return { ok: false, mensaje: "El servicio no está disponible en este momento. Probá de nuevo en unos minutos." };
+  }
+}

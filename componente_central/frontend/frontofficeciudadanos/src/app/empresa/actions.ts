@@ -16,6 +16,8 @@ export type DatosEmpresa = {
   razonSocial: string;
   direccion: string;
   habilitada: boolean;
+  // Los asigna el funcionario del MTOP: el responsable los ve pero no los modifica
+  rubros: string[];
 };
 
 export type EstadoFormulario = {

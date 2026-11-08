@@ -6,14 +6,18 @@ import java.util.regex.Pattern;
 import jakarta.ejb.EJB;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import tse.lab.frontofficeciudadanos.service.ConflictoException;
+import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.frontofficeciudadanos.service.gestionchoferes.AltaChoferService;
 import tse.lab.frontofficeciudadanos.service.NoAutorizadoException;
 
@@ -74,6 +78,29 @@ public class ChoferesResource {
             return Response.ok(altaChofer.confirmar(usuario, body.cedula(), correlationId(req))).build();
         } catch (NoAutorizadoException e) {
             return prohibido(e);
+        }
+    }
+
+    // Quita al chofer de la empresa (baja logica): 204; 404 si no es chofer de la empresa; 409 si tiene un viaje
+    // asignado o en curso. Se lo puede volver a agregar con el alta (consulta + confirmacion).
+    @DELETE
+    @Path("/{cedula}")
+    public Response darDeBaja(@HeaderParam(USUARIO_CI) String usuario, @PathParam("cedula") String cedula,
+            @Context HttpServletRequest req) {
+        if (cedula == null || !CEDULA.matcher(cedula).matches()) {
+            return cedulaInvalida();
+        }
+        try {
+            altaChofer.darDeBaja(usuario, cedula, correlationId(req));
+            return Response.noContent().build();
+        } catch (NoAutorizadoException e) {
+            return prohibido(e);
+        } catch (RecursoNoEncontradoException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "no_encontrado", "detalle", e.getMessage())).build();
+        } catch (ConflictoException e) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", e.getCodigo(), "detalle", e.getMessage())).build();
         }
     }
 

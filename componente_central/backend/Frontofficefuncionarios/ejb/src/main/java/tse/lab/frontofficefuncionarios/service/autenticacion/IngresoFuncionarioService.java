@@ -39,11 +39,22 @@ public class IngresoFuncionarioService {
             String nombres, String apellidos) {
     }
 
+    // Inyeccion por campo: el contenedor EJB crea el bean con el constructor sin argumentos
     @EJB
     private FuncionarioDAO funcionarios;
 
     @Inject
     private ClientePdi clientePdi;
+
+    public IngresoFuncionarioService() {
+        // Lo usa el contenedor
+    }
+
+    // Para los tests
+    IngresoFuncionarioService(FuncionarioDAO funcionarios, ClientePdi clientePdi) {
+        this.funcionarios = funcionarios;
+        this.clientePdi = clientePdi;
+    }
 
     public ResultadoIngreso ingresarConGubUy(String cedula, String email, String correlationId) {
         return ingresar(cedula, email, correlationId, "gubuy");
@@ -56,7 +67,8 @@ public class IngresoFuncionarioService {
 
     private ResultadoIngreso ingresar(String cedula, String email, String correlationId, String via) {
         Funcionario funcionario = funcionarios.buscarPorCi(cedula);
-        if (funcionario == null) {
+        // Inactivo: un administrador le quito el rol (backoffice); se conserva solo por su historial
+        if (funcionario == null || !funcionario.isActivo()) {
             return log(via, correlationId, new ResultadoIngreso(Resultado.NO_ES_FUNCIONARIO, false, cedula, email,
                     null, null));
         }

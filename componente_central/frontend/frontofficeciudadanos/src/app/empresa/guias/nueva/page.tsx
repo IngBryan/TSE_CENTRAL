@@ -5,6 +5,7 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { LocalidadVista } from "@/lib/localidades";
+import { obtenerCatalogos } from "../actions";
 import { NuevaGuia } from "../nueva-guia";
 
 export default async function CrearGuia() {
@@ -24,6 +25,7 @@ export default async function CrearGuia() {
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
   }
+  const { tiposCarga, rubros } = error ? { tiposCarga: [], rubros: [] } : await obtenerCatalogos();
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" });
   return <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
     <Encabezado sesion={sesion} />
@@ -31,7 +33,7 @@ export default async function CrearGuia() {
       <Link href="/empresa/guias" className="text-sm text-zinc-500 hover:underline">← Guías de viaje</Link>
       <h1 className="text-3xl font-semibold">Nueva guía de viaje</h1>
       {error ? <p role="alert" className="text-red-700 dark:text-red-300">{error}</p>
-        : <NuevaGuia hoy={hoy} localidades={localidades} />}
+        : <NuevaGuia hoy={hoy} localidades={localidades} tiposCarga={tiposCarga} rubros={rubros} />}
     </main>
   </div>;
 }

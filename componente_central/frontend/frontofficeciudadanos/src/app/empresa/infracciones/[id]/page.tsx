@@ -1,3 +1,4 @@
+import { EvidenciaHabilitacion } from "@/components/evidencia-habilitacion";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -78,6 +79,9 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
 
       <section className="flex flex-col gap-3">
         <h2 className={titulo}>Evidencia</h2>
+        {i.tipoCaso === "VEHICULO_SIN_HABILITACION" && (
+          <EvidenciaHabilitacion pruebas={detalle.pruebasHabilitacion ?? []} />
+        )}
         <div className={`grid gap-4 sm:grid-cols-2 ${tarjeta}`}>
           <div className="flex flex-col gap-1 text-sm">
             <p className="text-xs uppercase tracking-wide text-zinc-500">Vehículo</p>

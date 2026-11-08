@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
-import { buscarUsuariosDisponibles } from "../actions";
+import { buscarUsuariosDisponibles, obtenerRubros } from "../actions";
 import { CrearEmpresa } from "./crear-empresa";
 
 // CU Gestionar empresas de transporte, FA1: alta de una empresa, con su responsable elegido entre los
@@ -11,7 +11,7 @@ export default async function NuevaEmpresa() {
   const sesion = await getSesion();
   if (!sesion) redirect("/");
   // La primera tanda de usuarios disponibles viene con la pagina; el buscador filtra por cedula
-  const disponibles = await buscarUsuariosDisponibles("");
+  const [disponibles, rubros] = await Promise.all([buscarUsuariosDisponibles(""), obtenerRubros()]);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -25,7 +25,7 @@ export default async function NuevaEmpresa() {
           <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Nueva empresa</h1>
         </div>
 
-        <CrearEmpresa disponibles={disponibles} />
+        <CrearEmpresa disponibles={disponibles} rubros={rubros} />
       </main>
     </div>
   );

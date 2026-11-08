@@ -6,9 +6,16 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.RouteDeviation
 import tse.lab.fiscalizacionautomatica.ruleengine.model.TrackingEvent;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.DatosCaso;
 import tse.lab.frontofficefuncionarios.service.gestioncasos.TipoCasoAutomatico;
+import java.time.Instant;
+import tse.lab.model.EvidenciaHabilitacion;
 
 /** Operación atómica e idempotente por (contexto, tipo, evento) en PostgreSQL. */
 public interface CaseStore {
+    default DatosCaso registrarHabilitacion(String idGuia, VehicleEvent evento,
+            EvidenciaHabilitacion prueba) throws IOException {
+        throw new IOException("El repositorio no implementa evidencias de habilitación");
+    }
+
     /** Registra el evento en el caso abierto adecuado; lo crea si todavía no existe. */
     DatosCaso registrar(TipoCasoAutomatico tipo, String idGuia, VehicleEvent evento) throws IOException;
 
@@ -23,7 +30,7 @@ public interface CaseStore {
         throw new IOException("Repositorio sin seguimiento de circulaciones");
     }
 
-    default void cerrarCirculacionPorGuia(String matricula, java.time.Instant fecha) throws IOException {
+    default void cerrarCirculacionPorGuia(String matricula, Instant fecha) throws IOException {
         // Implementaciones locales de pruebas pueden no gestionar circulaciones.
     }
 

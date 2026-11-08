@@ -5,6 +5,7 @@ import { Encabezado } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { AltaChofer } from "./alta-chofer";
+import { QuitarChofer } from "./quitar-chofer";
 
 type ChoferVista = { cedula: string; primerNombre?: string; primerApellido?: string; estado: string };
 
@@ -64,6 +65,9 @@ export default async function Choferes() {
                       <th className="px-4 py-3 font-medium">Cédula</th>
                       <th className="px-4 py-3 font-medium">Nombre</th>
                       <th className="px-4 py-3 font-medium">Estado</th>
+                      <th className="px-4 py-3 font-medium">
+                        <span className="sr-only">Acciones</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -74,6 +78,12 @@ export default async function Choferes() {
                           {[c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || "—"}
                         </td>
                         <td className="px-4 py-3">{ESTADOS[c.estado] ?? c.estado}</td>
+                        <td className="px-4 py-3 text-right">
+                          <QuitarChofer
+                            cedula={c.cedula}
+                            nombre={[c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || c.cedula}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

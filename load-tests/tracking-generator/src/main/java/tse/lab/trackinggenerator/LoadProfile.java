@@ -37,18 +37,6 @@ sealed interface LoadProfile {
         }
     }
 
-    /**
-     * Seconds the event clocks get ahead of real time over the run: above λ each vehicle sends faster
-     * than every T. The clocks start that far back, so no event is dated in the future.
-     */
-    default double catchUpSeconds(Duration duration) {
-        double total = 0;
-        for (long second = 0; second < duration.toSeconds(); second++) {
-            total += factor(second) - 1;
-        }
-        return total;
-    }
-
     static LoadProfile from(Options options) {
         String name = options.string("profile", "constant");
         return switch (name) {
