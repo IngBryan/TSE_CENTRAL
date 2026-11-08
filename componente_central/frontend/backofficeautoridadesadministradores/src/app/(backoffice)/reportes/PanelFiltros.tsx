@@ -189,17 +189,21 @@ export default function PanelFiltros({
     cargarCatalogos(facetasDeFiltro(respuesta.datos).map((faceta) => faceta.id));
   }
 
+  async function cargarCatalogo(id: string) {
+    const respuesta = await valoresDeFaceta(id).catch(() => ({
+      ok: false as const,
+      mensaje: "No se pudieron cargar los valores del filtro.",
+    }));
+    setCatalogos((actuales) => ({
+      ...actuales,
+      [id]: respuesta.ok ? { valores: respuesta.datos } : { valores: [], error: respuesta.mensaje },
+    }));
+  }
+
   // Removing a KPI can bring back a filter whose values the page did not load
   function cargarCatalogos(ids: string[]) {
     for (const id of ids.filter((faceta) => !catalogos[faceta])) {
-      valoresDeFaceta(id)
-        .catch(() => ({ ok: false as const, mensaje: "No se pudieron cargar los valores del filtro." }))
-        .then((respuesta) =>
-          setCatalogos((actuales) => ({
-            ...actuales,
-            [id]: respuesta.ok ? { valores: respuesta.datos } : { valores: [], error: respuesta.mensaje },
-          }))
-        );
+      void cargarCatalogo(id);
     }
   }
 
