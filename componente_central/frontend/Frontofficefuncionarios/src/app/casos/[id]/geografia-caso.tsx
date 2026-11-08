@@ -76,7 +76,8 @@ async function gpsDelCaso(id: number, signal: AbortSignal) {
     puntos.push(...datos.posiciones);
     faltantes += datos.sinRecuperar;
     total = datos.totalClaves;
-    if (datos.siguienteIndice === null) break;
+    // WildFly omite las propiedades nulas al terminar la paginación.
+    if (datos.siguienteIndice == null) break;
     if (datos.siguienteIndice <= cursor) throw new Error("La paginación GPS no avanzó.");
     cursor = datos.siguienteIndice;
     if (cursor >= MAX_PUNTOS) { incompleto = true; break; }
@@ -249,6 +250,10 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
       </button>
     </div>
     <div className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
+      {esSinGuia && <p className="mb-4 text-zinc-600 dark:text-zinc-400">
+        El caso agrupa los eventos de circulación sin guía del vehículo y puede incluir varios viajes.
+        Las detenciones y los períodos sin GPS no determinan un fin de viaje.
+      </p>}
       {esSinGuia && (circulacion ? <div className="mb-4 grid gap-2 sm:grid-cols-2">
         <p><b>Estado de circulación:</b> {circulacion.estado.replaceAll("_", " ")}</p>
         <p><b>Matrícula:</b> {circulacion.matricula}</p>

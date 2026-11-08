@@ -2,7 +2,6 @@ package tse.lab.frontofficefuncionarios.service.gestioncasos;
 
 import java.time.Duration;
 import java.time.Instant;
-import jakarta.ejb.Schedule;
 import tse.lab.frontofficefuncionarios.data.CirculacionSinGuiaDAO;
 import tse.lab.model.CirculacionSinGuia;
 import tse.lab.model.EstadoCirculacionSinGuia;
@@ -41,8 +40,6 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
 
     // Parámetros de observación del prototipo, NO definiciones legales.
     static final Duration VENTANA_INICIO = Duration.ofSeconds(180);
-    static final Duration DETENCION = Duration.ofMinutes(30);
-    static final Duration SIN_SENAL = Duration.ofMinutes(45);
     static final double MIN_DESPLAZAMIENTO_M = 100;
     static final double MAX_VELOCIDAD_KMH = 160;
 
@@ -133,6 +130,8 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
     /**
      * Gestiona una única circulación por matrícula bajo bloqueo de la fila Vehiculo.
      * El primer GPS es una observación pendiente; el segundo debe confirmar movimiento.
+     * Una vez confirmada, agrupa los viajes sin Guía aunque haya detenciones o períodos sin GPS.
+     * Solo se cierra al pasar a circular con Guía; no se infieren fines de viaje.
      * Casos y claves GPS se escriben atómicamente en PostgreSQL.
      */
     @Override
@@ -169,12 +168,6 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         }
         if (gps.getFechaHora().equals(actual.getUltimaMedicion())) return null;
         Duration intervalo = Duration.between(actual.getUltimaMedicion(), gps.getFechaHora());
-        if (intervalo.compareTo(SIN_SENAL) > 0) {
-            actual.finalizar(MotivoFinCirculacionSinGuia.BRECHA_TEMPORAL, actual.getUltimaMedicion());
-            circulaciones.guardar(new CirculacionSinGuia(vehiculo, gps.getFechaHora(),
-                    gps.getLatitud(), gps.getLongitud(), ahora));
-            return null;
-        }
         if (actual.getEstado() == EstadoCirculacionSinGuia.PENDIENTE_MOVIMIENTO) {
             double distancia = distanciaMetros(actual.getLatitudActual(), actual.getLongitudActual(),
                     gps.getLatitud(), gps.getLongitud());
@@ -213,13 +206,6 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
         if (horasTramo <= 0 || desplazamiento / 1000 / horasTramo > MAX_VELOCIDAD_KMH) return null;
         double distanciaDesdeMovimiento = distanciaMetros(actual.getLatitudMovimiento(),
                 actual.getLongitudMovimiento(), gps.getLatitud(), gps.getLongitud());
-        if (Duration.between(actual.getUltimoMovimiento(), gps.getFechaHora()).compareTo(DETENCION) >= 0
-                && distanciaDesdeMovimiento < MIN_DESPLAZAMIENTO_M) {
-            actual.finalizar(MotivoFinCirculacionSinGuia.DETENCION_PROLONGADA, actual.getUltimoMovimiento());
-            circulaciones.guardar(new CirculacionSinGuia(vehiculo, gps.getFechaHora(),
-                    gps.getLatitud(), gps.getLongitud(), ahora));
-            return null;
-        }
         asociarSiFalta(actual.getCaso(), evento(gps));
         actual.actualizar(gps.getFechaHora(), gps.getLatitud(), gps.getLongitud(), ahora,
                 distanciaDesdeMovimiento >= MIN_DESPLAZAMIENTO_M);
@@ -237,19 +223,6 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
             throw new IllegalStateException("Guía superpuesta con una circulación: requiere conciliación");
         }
         actual.finalizar(MotivoFinCirculacionSinGuia.GUIA_INICIADA, actual.getUltimaMedicion());
-    }
-
-    /** Inactividad de recepción: inferimos el fin en la última medición, no en la hora del cron. */
-    @Schedule(hour = "*", minute = "*/5", persistent = false)
-    public void cerrarSinSenal() {
-        Instant limite = Instant.now().minus(SIN_SENAL);
-        for (String matricula : circulaciones.matriculasInactivas(limite, 100)) {
-            if (circulaciones.bloquearVehiculo(matricula) == null) continue;
-            CirculacionSinGuia actual = circulaciones.actual(matricula);
-            if (actual != null && actual.getUltimaRecepcion().isBefore(limite)) {
-                actual.finalizar(MotivoFinCirculacionSinGuia.SIN_SENAL_GPS, actual.getUltimaMedicion());
-            }
-        }
     }
 
     private boolean existeHistorialPosterior(String matricula, Instant fecha) {

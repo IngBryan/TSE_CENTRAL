@@ -9,9 +9,23 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.RutaReferenciaDAO;
 import tse.lab.model.RutaReferencia;
+import tse.lab.model.Guia;
+import tse.lab.model.GuiaRutaAutorizada;
 
 /** La evidencia se recupera por SHA, no por enlaces de guia que pueden cambiar. */
 class RutasAutorizadasServiceTest {
+    @Test
+    void consultaActualSoloAdmiteLaPrincipalDeGuiasAnteriores() throws Exception {
+        RutaReferencia a = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}", 5000);
+        RutaReferencia b = new RutaReferencia("{\"type\":\"LineString\",\"coordinates\":[[1,1],[2,2]]}", 6000);
+        RutaReferenciaDAO dao = mock(RutaReferenciaDAO.class);
+        when(dao.buscarPorGuia("G1")).thenReturn(List.of(
+                new GuiaRutaAutorizada(new Guia(), a, 1), new GuiaRutaAutorizada(new Guia(), b, 2)));
+        var resultado = servicio(dao).obtenerPorGuia("G1");
+        assertEquals(1, resultado.size());
+        assertEquals(a.getSha256GeoJson(), resultado.getFirst().getSha256());
+    }
+
     private static RutasAutorizadasService servicio(RutaReferenciaDAO dao) throws Exception {
         RutasAutorizadasService servicio = new RutasAutorizadasService();
         Field f = RutasAutorizadasService.class.getDeclaredField("rutas");

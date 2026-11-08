@@ -89,11 +89,11 @@ class RouteDeviationRuleTest {
     }
 
     @Test
-    void estarSobreUnaSegundaRutaAdmitidaNoEsDesvio() throws IOException {
+    void unaAlternativaHistoricaYaNoEvitaElDesvio() throws IOException {
         autorizadas = List.of(ruta(1, RUTA_A), ruta(2, RUTA_B));
         regla = nuevaRegla();
         gps(0, -55.95);
-        assertFalse(regla.appliesTo(gps(10, -55.95), HECHOS));
+        assertTrue(regla.appliesTo(gps(10, -55.95), HECHOS));
     }
 
     @Test

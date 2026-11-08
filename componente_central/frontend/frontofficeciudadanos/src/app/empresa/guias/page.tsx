@@ -5,8 +5,7 @@ import { Encabezado, botonSecundario } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import type { Guia } from "./actions";
-import { NuevaGuia } from "./nueva-guia";
-import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
+import { mostrarLocalidad } from "@/lib/localidades";
 
 function formatoFecha(iso: string) {
   const [a, m, d] = iso.split("-");
@@ -32,7 +31,6 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
 
   let guias: Guia[] | null = null;
   let error: string | null = null;
-  let localidades: LocalidadVista[] = [];
   try {
     const res = await llamarBackend<Guia[] & { detalle?: string }>("/empresa/guias", {
       correlationId: randomUUID(),
@@ -45,16 +43,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
   }
-  try {
-    const res = await llamarBackend<LocalidadVista[]>("/localidades", {
-      correlationId: randomUUID(), usuarioCi: sesion.perfil.cedula,
-    });
-    if (res.status === 200 && Array.isArray(res.data)) localidades = res.data;
-  } catch (e) {
-    if (!(e instanceof BackendNoDisponible)) throw e;
-  }
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
-  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" }); // yyyy-mm-dd
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -70,6 +59,11 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
           </h1>
         </div>
 
+        {typeof params.creada === "string" && (
+          <p role="status" className="rounded-lg bg-green-50 p-4 text-green-900 dark:bg-green-950 dark:text-green-200">
+            Guardamos la guía {params.creada} con su ruta admitida. Ahora podés asignarle vehículo y chofer.
+          </p>
+        )}
         {typeof params.asignada === "string" && (
           <p role="status" className="rounded-lg bg-green-50 p-4 text-green-900 dark:bg-green-950 dark:text-green-200">
             Listo: la guía {params.asignada} quedó asignada.
@@ -82,7 +76,7 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
           </p>
         ) : (
           <>
-            <NuevaGuia hoy={hoy} localidades={localidades} />
+            <Link href="/empresa/guias/nueva" className={`${botonSecundario} self-start`}>Nueva guía</Link>
 
             {guias && guias.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
@@ -101,13 +95,9 @@ export default async function Guias({ searchParams }: PageProps<"/empresa/guias"
                     {guias.map((g) => (
                       <tr key={g.id} className="border-b border-black/5 align-top last:border-0 dark:border-white/10">
                         <td className="px-4 py-3 font-mono text-xs">
-                          {g.estado === "SIN_ASIGNAR" ? (
-                            g.id
-                          ) : (
-                            <Link href={`/empresa/guias/${encodeURIComponent(g.id)}`} className="underline" title="Ver eventos del viaje">
-                              {g.id}
-                            </Link>
-                          )}
+                          <Link href={`/empresa/guias/${encodeURIComponent(g.id)}`} className="underline" title="Ver guía">
+                            {g.id}
+                          </Link>
                         </td>
                         <td className="px-4 py-3 tabular-nums">{formatoFecha(g.fecha)}</td>
                         <td className="px-4 py-3">

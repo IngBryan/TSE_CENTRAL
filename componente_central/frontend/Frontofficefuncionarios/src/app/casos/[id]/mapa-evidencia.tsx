@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Map as MapaGL, NavigationControl, LngLatBounds, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
 import type { FeatureCollection, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -14,13 +15,9 @@ const COLORES_RUTA = ["#16a34a", "#2563eb", "#a855f7"];
 const coordenadaGps = (p: PuntoGpsSeguimiento): Coordenada => [p.longitud, p.latitud];
 const valida = (c: Coordenada): boolean => Number.isFinite(c[0]) && Number.isFinite(c[1])
   && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
+const MapaEvidencia2D = dynamic(() => import("./mapa-evidencia-2d"), { ssr: false });
 
-/** Dos usos excluyentes: la prueba inmutable (rutas por SHA + par de coordenadas)
- * y el seguimiento posterior. No mezcla sus capas en una única vista probatoria. */
-export default function MapaEvidencia({
-  rutas, puntos, pruebas, mostrarRutas = true, mostrarRecorrido = true,
-  enfocar = 0, modoEncuadre = "todo", contexto = "seguimiento",
-}: {
+export type MapaEvidenciaProps = {
   rutas: RutaAutorizada[];
   puntos: PuntoGpsSeguimiento[];
   pruebas: PruebaDesvioVista[];
@@ -29,17 +26,34 @@ export default function MapaEvidencia({
   enfocar?: number;
   modoEncuadre?: "todo" | "confirmacion";
   contexto?: "evidencia" | "seguimiento" | "sin-guia";
-}) {
+};
+
+/** Dos usos excluyentes: la prueba inmutable (rutas por SHA + par de coordenadas)
+ * y el seguimiento posterior. No mezcla sus capas en una única vista probatoria. */
+export default function MapaEvidencia(props: MapaEvidenciaProps) {
+  const { rutas, puntos, pruebas, mostrarRutas = true, mostrarRecorrido = true,
+    enfocar = 0, modoEncuadre = "todo", contexto = "seguimiento" } = props;
   const nodo = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MapaGL | null>(null);
   const vistaInicial = useRef(false);
   const [listo, setListo] = useState(false);
   const [error, setError] = useState(false);
+  const [usar2D, setUsar2D] = useState(() => {
+    try { return document.createElement("canvas").getContext("webgl2") === null; }
+    catch { return true; }
+  });
 
   useEffect(() => {
-    if (!nodo.current) return;
-    const m = new MapaGL({ container: nodo.current, style: ESTILO,
-      center: [-56.2, -33.5], zoom: 6 });
+    if (!nodo.current || usar2D) return;
+    let m: MapaGL;
+    try {
+      m = new MapaGL({ container: nodo.current, style: ESTILO,
+        center: [-56.2, -33.5], zoom: 6 });
+    } catch {
+      // La falta de WebGL no debe impedir consultar el expediente ni su recorrido.
+      queueMicrotask(() => setUsar2D(true));
+      return;
+    }
     mapa.current = m;
     m.addControl(new NavigationControl(), "top-right");
     m.on("load", () => {
@@ -57,7 +71,7 @@ export default function MapaEvidencia({
     });
     m.on("error", () => setError(true));
     return () => { mapa.current = null; m.remove(); };
-  }, []);
+  }, [usar2D]);
 
   useEffect(() => {
     const m = mapa.current;
@@ -105,6 +119,8 @@ export default function MapaEvidencia({
       vistaInicial.current = true;
     }
   }, [listo, rutas, puntos, pruebas, mostrarRutas, mostrarRecorrido, enfocar, modoEncuadre]);
+
+  if (usar2D) return <MapaEvidencia2D {...props} />;
 
   return <div>
     <div ref={nodo} role="img" aria-label={contexto === "evidencia"

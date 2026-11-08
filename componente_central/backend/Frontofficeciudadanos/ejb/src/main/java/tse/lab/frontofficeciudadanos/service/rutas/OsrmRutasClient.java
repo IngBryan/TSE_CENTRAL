@@ -37,7 +37,7 @@ public class OsrmRutasClient {
             throw new RutasException(500, "osrm_configuracion", "OSRM_BASE_URL invalida");
         }
         String ruta = String.format(Locale.ROOT, "/route/v1/driving/%.6f,%.6f;%.6f,%.6f"
-                + "?alternatives=3&overview=full&geometries=geojson&steps=false",
+                + "?alternatives=false&overview=full&geometries=geojson&steps=false",
                 origen.getLongitud(), origen.getLatitud(), destino.getLongitud(), destino.getLatitud());
         URI url = URI.create(base.replaceAll("/+$", "") + ruta);
         HttpRequest req = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(20))

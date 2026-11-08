@@ -607,6 +607,11 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
 - Agregar una situacion = agregar su regla en `Main.createDetector`.
 - Implementadas:
   - Viaje sin guia (`TripWithoutGuideRule`): el vehiculo no tiene guias `ASIGNADA` ni `EN_CURSO`.
+    Una vez confirmado el movimiento GPS, el mismo caso acumula los eventos de circulacion sin guia
+    del vehiculo, incluso si corresponden a varios viajes. Las detenciones, las brechas entre
+    mediciones y la falta de señal GPS no cierran la circulacion ni generan otro caso. La circulacion
+    solo se cierra cuando se observa al vehiculo circulando con una guia; el estado administrativo
+    del expediente se gestiona por separado.
   - Exceso de carga (`OverloadRule`): en un pesaje de un vehiculo con viaje en curso, peso del
     vehiculo + su capacidad de carga declarada < peso medido por la balanza. La carga declarada en la
     guia no se usa. La tolerancia sera configurable (requisito 5); por ahora cualquier exceso cuenta.

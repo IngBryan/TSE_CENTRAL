@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { SelectorLocalidad } from "@/components/selector-localidad";
 import { localidadDeGuia, type LocalidadVista } from "@/lib/localidades";
+import { RutaRecorrido } from "../ruta-recorrido";
+import type { Previsualizacion } from "./rutas/tipos-rutas";
 import {
   cancelarGuia,
   editarGuia,
@@ -22,8 +24,8 @@ const nombre = (c: ChoferResumen) => [c.primerNombre, c.primerApellido].filter(B
 const campo = "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black dark:border-white/20 dark:text-zinc-50";
 const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
 
-// Modificacion de una guia ASIGNADA por el responsable: editar datos, reasignar vehiculo/chofer o
-// cancelar. Se manda la version de la guia que se esta viendo; si cambio entretanto (p. ej. el chofer
+// El responsable puede editar antes de asignar; reasignar y cancelar requieren una guia ASIGNADA.
+// Se manda la version de la guia que se esta viendo; si cambio entretanto (p. ej. el chofer
 // la inicio) el backend responde 409 y se pide recargar.
 export function ModificarGuia({
   guia,
@@ -44,6 +46,7 @@ export function ModificarGuia({
   const [campos, setCampos] = useState<Record<string, string>>({});
   const [confirmar, setConfirmar] = useState(false);
   const [pendiente, iniciar] = useTransition();
+  const [ruta, setRuta] = useState<Previsualizacion | null>(null);
 
   const [datos, setDatos] = useState({
     rubroCliente: guia.rubroCliente,
@@ -57,6 +60,9 @@ export function ModificarGuia({
   const [idChofer, setIdChofer] = useState<number | null>(guia.chofer?.id ?? null);
   const [motivo, setMotivo] = useState("");
   const version = guia.version ?? 0;
+  const cambiaRecorrido = datos.origenId !== (localidadDeGuia(localidades, guia.origenId, guia.origen)?.id ?? null)
+    || datos.destinoId !== (localidadDeGuia(localidades, guia.destinoId, guia.destino)?.id ?? null);
+  const rutaValida = ruta?.origenId === datos.origenId && ruta?.destinoId === datos.destinoId;
 
   const abrir = (m: Modo) => {
     setModo(m);
@@ -84,7 +90,8 @@ export function ModificarGuia({
     if (modo === "editar") {
       const kg = Number(datos.pesoCargaKg);
       enviar(() =>
-        editarGuia(guia.id, version, { ...datos, pesoCargaKg: datos.pesoCargaKg === "" || !Number.isFinite(kg) ? null : Math.trunc(kg) }),
+        editarGuia(guia.id, version, { ...datos, previsualizacionId: cambiaRecorrido && rutaValida ? ruta?.previsualizacionId : undefined,
+          pesoCargaKg: datos.pesoCargaKg === "" || !Number.isFinite(kg) ? null : Math.trunc(kg) }),
       );
     } else if (modo === "reasignar" && idChofer != null) {
       enviar(() => reasignarGuia(guia.id, version, matricula, idChofer));
@@ -102,16 +109,16 @@ export function ModificarGuia({
         <button type="button" onClick={() => abrir("editar")} className={`${botonSecundario} h-9 px-4`}>
           Editar
         </button>
-        <button type="button" onClick={() => abrir("reasignar")} className={`${botonSecundario} h-9 px-4`}>
+        {guia.estado === "ASIGNADA" && <><button type="button" onClick={() => abrir("reasignar")} className={`${botonSecundario} h-9 px-4`}>
           Reasignar
         </button>
         <button type="button" onClick={() => abrir("cancelar")} className={`${botonSecundario} h-9 px-4 text-red-700 dark:text-red-300`}>
           Cancelar guía
-        </button>
+        </button></>}
       </div>
-      <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      {guia.estado === "ASIGNADA" && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
         El chofer puede estar sin conexión con la versión anterior; sus eventos se resolverán según la política de conflictos.
-      </p>
+      </p>}
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
@@ -142,16 +149,22 @@ export function ModificarGuia({
             </label>
           ))}
           <SelectorLocalidad nombre="origenId" etiqueta="Origen" localidades={localidades}
-            valor={datos.origenId} onChange={id => setDatos({ ...datos, origenId: id })}
+            valor={datos.origenId} onChange={id => { setDatos({ ...datos, origenId: id }); setRuta(null); }}
             error={campos.origenId || campos.origen} />
           <SelectorLocalidad nombre="destinoId" etiqueta="Destino" localidades={localidades}
-            valor={datos.destinoId} onChange={id => setDatos({ ...datos, destinoId: id })}
+            valor={datos.destinoId} onChange={id => { setDatos({ ...datos, destinoId: id }); setRuta(null); }}
             error={campos.destinoId || campos.destino} />
           {(datos.origenId === null || datos.destinoId === null) && (
             <p className="sm:col-span-2 text-sm text-amber-800" role="status">
               Esta guía puede ser anterior al catálogo o tener localidades ambiguas. Elegí su origen y destino.
               Valores anteriores: {guia.origen} → {guia.destino}.
             </p>
+          )}
+          {cambiaRecorrido && datos.origenId && datos.destinoId && datos.origenId !== datos.destinoId && (
+            <div className="sm:col-span-2">
+              <RutaRecorrido key={`${datos.origenId}:${datos.destinoId}`} origenId={datos.origenId}
+                destinoId={datos.destinoId} onChange={setRuta} />
+            </div>
           )}
         </div>
       )}
@@ -202,7 +215,8 @@ export function ModificarGuia({
           <button
             type="button"
             disabled={pendiente || (modo === "cancelar" && motivo.trim() === "") ||
-              (modo === "editar" && (datos.origenId === null || datos.destinoId === null || datos.origenId === datos.destinoId))}
+              (modo === "editar" && (datos.origenId === null || datos.destinoId === null || datos.origenId === datos.destinoId
+                || (cambiaRecorrido && !rutaValida)))}
             onClick={() => setConfirmar(true)}
             className={botonGubUy}
           >
@@ -217,7 +231,9 @@ export function ModificarGuia({
       {modo && confirmar && (
         <div className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            {modo === "editar" && "¿Guardar los cambios de la guía? El chofer los verá al sincronizar."}
+            {modo === "editar" && (guia.estado === "ASIGNADA"
+              ? "¿Guardar los cambios de la guía? El chofer los verá al sincronizar."
+              : "¿Guardar los cambios de la guía?")}
             {modo === "reasignar" &&
               "¿Reasignar la guía? Si el chofer anterior registra eventos sin conexión, quedarán en conflicto."}
             {modo === "cancelar" &&

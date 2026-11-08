@@ -1,6 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { RutaRecorrido } from "./ruta-recorrido";
+import type { Previsualizacion } from "./[id]/rutas/tipos-rutas";
 import { botonGubUy, botonSecundario } from "@/components/estilos";
 import { SelectorLocalidad } from "@/components/selector-localidad";
 import type { LocalidadVista } from "@/lib/localidades";
@@ -14,40 +18,18 @@ const CAMPOS = [
 ] as const;
 
 export function NuevaGuia({ hoy, localidades }: { hoy: string; localidades: LocalidadVista[] }) {
-  const [abierto, setAbierto] = useState(false);
+  const router = useRouter();
+  const [ruta, setRuta] = useState<Previsualizacion | null>(null);
   const [origenId, setOrigenId] = useState<number | null>(null);
   const [destinoId, setDestinoId] = useState<number | null>(null);
   const [estado, accion, guardando] = useActionState<EstadoNuevaGuia, FormData>(async (previo, datos) => {
     const r = await crearGuia(previo, datos);
-    if (r.ok) {
-      setAbierto(false);
-      setOrigenId(null);
-      setDestinoId(null);
-    }
+    if (r.ok) router.push(`/empresa/guias?creada=${encodeURIComponent(r.ok)}`);
     return r;
   }, {});
 
-  if (!abierto) {
-    return (
-      <div className="flex flex-col gap-3">
-        {estado.ok && (
-          <p role="status" className="rounded-lg bg-green-50 p-4 text-green-900 dark:bg-green-950 dark:text-green-200">
-            Guardamos la guía {estado.ok}. Ahora la podés asignar a un vehículo y un chofer.
-          </p>
-        )}
-        <button type="button" onClick={() => setAbierto(true)} disabled={localidades.length === 0} className={`${botonGubUy} self-start`}>
-          Nueva guía
-        </button>
-        {localidades.length === 0 && <p role="alert" className="text-sm text-red-700">
-          No se pudo obtener el catálogo de localidades. Recargá la página para crear una guía.
-        </p>}
-      </div>
-    );
-  }
-
   return (
     <form action={accion} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Nueva guía de viaje</h2>
       {estado.error && (
         <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
           {estado.error}
@@ -83,22 +65,27 @@ export function NuevaGuia({ hoy, localidades }: { hoy: string; localidades: Loca
           );
         })}
         <SelectorLocalidad nombre="origenId" etiqueta="Origen" localidades={localidades}
-          valor={origenId ?? ""} onChange={setOrigenId}
+          valor={origenId ?? ""} onChange={id => { setOrigenId(id); setRuta(null); }}
           error={estado.campos?.origenId || estado.campos?.origen} />
         <SelectorLocalidad nombre="destinoId" etiqueta="Destino" localidades={localidades}
-          valor={destinoId ?? ""} onChange={setDestinoId}
+          valor={destinoId ?? ""} onChange={id => { setDestinoId(id); setRuta(null); }}
           error={estado.campos?.destinoId || estado.campos?.destino} />
       </div>
       {origenId !== null && origenId === destinoId && <p role="alert" className="text-sm text-red-700">
         Seleccioná localidades diferentes para origen y destino.
       </p>}
+      {origenId && destinoId && origenId !== destinoId && (
+        <RutaRecorrido key={`${origenId}:${destinoId}`} origenId={origenId} destinoId={destinoId} onChange={setRuta} />
+      )}
+      <input type="hidden" name="previsualizacionId" value={ruta?.previsualizacionId ?? ""} />
+      {localidades.length === 0 && <p role="alert" className="text-sm text-red-700">
+        No se pudo obtener el catálogo de localidades. Recargá la página para crear una guía.
+      </p>}
       <div className="flex gap-3">
-        <button type="submit" disabled={guardando || localidades.length === 0 || (origenId !== null && origenId === destinoId)} className={botonGubUy}>
+        <button type="submit" disabled={guardando || !ruta || ruta.origenId !== origenId || ruta.destinoId !== destinoId} className={botonGubUy}>
           {guardando ? "Guardando…" : "Guardar guía"}
         </button>
-        <button type="button" onClick={() => setAbierto(false)} disabled={guardando} className={botonSecundario}>
-          Cancelar
-        </button>
+        <Link href="/empresa/guias" className={botonSecundario}>Cancelar</Link>
       </div>
     </form>
   );

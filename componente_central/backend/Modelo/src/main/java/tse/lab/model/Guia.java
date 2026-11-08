@@ -17,12 +17,8 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 @Entity
 @Table(name = "guias")
@@ -230,38 +226,25 @@ public class Guia implements Serializable {
     }
 
     /**
-     * Asocia un conjunto de 1 a 3 geometrías preexistentes con esta Guia.
-     * Se permite reemplazarlo solo antes de iniciar el viaje.
-     * La obtencion de geometrías OSRM y su persistencia corresponden a la tarea 2.
+     * Asocia la unica ruta admitida con esta Guia.
+     * Se permite reemplazarla solo antes de iniciar el viaje.
      */
     public void reemplazarRutasAutorizadas(List<RutaReferencia> referencias) {
         if (estado != EstadoGuia.SIN_ASIGNAR && estado != EstadoGuia.ASIGNADA) {
             throw new IllegalStateException("No pueden modificarse rutas de un viaje iniciado o cerrado");
         }
-        if (referencias == null || referencias.isEmpty() || referencias.size() > 3) {
-            throw new IllegalArgumentException("Se requieren entre una y tres rutas autorizadas");
+        if (referencias == null || referencias.size() != 1) {
+            throw new IllegalArgumentException("Se requiere una unica ruta admitida");
         }
-        Set<String> hashes = new HashSet<>();
-        for (RutaReferencia ruta : referencias) {
-            if (ruta == null || !hashes.add(ruta.getSha256GeoJson())) {
-                throw new IllegalArgumentException("No se admiten rutas nulas o duplicadas");
-            }
+        RutaReferencia ruta = referencias.getFirst();
+        if (ruta == null) throw new IllegalArgumentException("La ruta admitida no puede ser nula");
+        String hash = ruta.getSha256GeoJson();
+        rutasAutorizadas.removeIf(a -> !hash.equals(a.getRutaReferencia().getSha256GeoJson()));
+        if (rutasAutorizadas.isEmpty()) {
+            rutasAutorizadas.add(new GuiaRutaAutorizada(this, ruta, 1));
+        } else {
+            rutasAutorizadas.getFirst().reordenar(1);
         }
-        Map<String, GuiaRutaAutorizada> anteriores = new HashMap<>();
-        for (GuiaRutaAutorizada asociacion : rutasAutorizadas) {
-            anteriores.put(asociacion.getRutaReferencia().getSha256GeoJson(), asociacion);
-        }
-        rutasAutorizadas.removeIf(a -> !hashes.contains(a.getRutaReferencia().getSha256GeoJson()));
-        for (int i = 0; i < referencias.size(); i++) {
-            RutaReferencia ruta = referencias.get(i);
-            GuiaRutaAutorizada existente = anteriores.get(ruta.getSha256GeoJson());
-            if (existente == null) {
-                rutasAutorizadas.add(new GuiaRutaAutorizada(this, ruta, i + 1));
-            } else {
-                existente.reordenar(i + 1);
-            }
-        }
-        rutasAutorizadas.sort((a, b) -> Integer.compare(a.getNumeroAlternativa(), b.getNumeroAlternativa()));
     }
 
     public Long getVersion() {

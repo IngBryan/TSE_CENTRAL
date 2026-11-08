@@ -7,7 +7,7 @@ test("el error por localidades distintas es comprensible", () => {
 });
 
 test("una previsualización vencida invita a repetir la búsqueda", () => {
-  assert.match(mensajeErrorRutas(409, { error: "rutas_actualizadas" }), /Volvé a buscarlas/);
+  assert.match(mensajeErrorRutas(409, { error: "rutas_actualizadas" }), /Volvé a calcularla/);
 });
 
 test("problemas del servicio de rutas no muestran detalles internos", () => {

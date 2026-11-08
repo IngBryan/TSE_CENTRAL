@@ -25,7 +25,7 @@ import tse.lab.frontofficeciudadanos.service.rutas.DatosRutaAutorizada;
 
 /**
  * Confirma un desvío solo cuando dos muestras temporalmente consecutivas de la MISMA Guía
- * superan la distancia máxima a TODAS las rutas permitidas y están separadas como máximo
+ * superan la distancia máxima a la unica ruta admitida y están separadas como máximo
  * por la ventana de confirmación. Se usa la fecha de medición del GPS, nunca receivedAt.
  * La evaluación devuelve además una instantánea probatoria para el expediente (4C).
  */
@@ -90,8 +90,8 @@ public final class RouteDeviationRule implements SituationRule {
         if (autorizadas == null || autorizadas.isEmpty()) {
             return Optional.empty(); // No se inventa un corredor de referencia.
         }
-        CorredorRutas corredor = new CorredorRutas(autorizadas);
-        double distanciaPrincipal = corredor.distanciaMinimaMetros(gps.latitude(), gps.longitude());
+        CorredorRutas corredor = new CorredorRutas(autorizadas.getFirst());
+        double distanciaPrincipal = corredor.distanciaMetros(gps.latitude(), gps.longitude());
         if (distanciaPrincipal <= umbralMetros) {
             return Optional.empty();
         }
@@ -129,13 +129,13 @@ public final class RouteDeviationRule implements SituationRule {
             pareja = ordenadas.get(indice + 1);
         }
         if (pareja == null) return Optional.empty();
-        List<String> hashes = autorizadas.stream().map(DatosRutaAutorizada::getSha256).toList();
-        if (hashes.stream().anyMatch(h -> h == null || h.isBlank())) {
+        String hash = autorizadas.getFirst().getSha256();
+        if (hash == null || hash.isBlank()) {
             throw new IOException("La ruta autorizada no tiene hash de referencia");
         }
         return Optional.of(new PruebaDesvio(gps, pareja, distanciaPrincipal,
-                corredor.distanciaMinimaMetros(pareja.latitude(), pareja.longitude()),
-                umbralMetros, ventana.toSeconds(), List.copyOf(hashes)));
+                corredor.distanciaMetros(pareja.latitude(), pareja.longitude()),
+                umbralMetros, ventana.toSeconds(), List.of(hash)));
     }
 
     private boolean confirmarPar(TrackingEvent actual, TrackingEvent otra, String idGuia,
@@ -143,6 +143,6 @@ public final class RouteDeviationRule implements SituationRule {
         Duration diferencia = Duration.between(actual.timestamp(), otra.timestamp()).abs();
         return !diferencia.isZero() && diferencia.compareTo(ventana) <= 0
                 && AsociadorGpsGuia.resolver(otra, ventanas).correspondeA(idGuia)
-                && corredor.distanciaMinimaMetros(otra.latitude(), otra.longitude()) > umbralMetros;
+                && corredor.distanciaMetros(otra.latitude(), otra.longitude()) > umbralMetros;
     }
 }
