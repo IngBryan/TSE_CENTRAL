@@ -11,6 +11,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Period;
+import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.ReportLog;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Selection;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.TableAlias;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.facets.Facet;
@@ -88,12 +89,15 @@ public abstract class BaseQueryKpi extends Kpi {
                             : " ORDER BY kpiValue DESC");
         }
 
+        bind(parameters, jpql.toString(), period);
         Query query = em.createQuery(jpql.toString());
-        bind(query, jpql.toString(), period);
         parameters.forEach(query::setParameter);
+        long start = System.nanoTime();
+        List<?> result = query.getResultList();
+        ReportLog.query(id(), jpql.toString(), parameters, result.size(), start);
 
         List<KpiValue> values = new ArrayList<>();
-        for (Object row : query.getResultList()) {
+        for (Object row : result) {
             Object[] columns = groups.isEmpty() ? new Object[] { row } : (Object[]) row;
             Number measure = (Number) columns[columns.length - 1];
             FacetValue group = grouping == null ? null : grouping.key(groupLink, columns);
@@ -104,12 +108,12 @@ public abstract class BaseQueryKpi extends Kpi {
 
     // The period the query uses: :from and :to when it limits rows to it. A KPI with other parameters of its own
     // binds them too
-    protected void bind(Query query, String jpql, Period period) {
+    protected void bind(Map<String, Object> parameters, String jpql, Period period) {
         if (jpql.contains(":from")) {
-            query.setParameter("from", period.from());
+            parameters.put("from", period.from());
         }
         if (jpql.contains(":to")) {
-            query.setParameter("to", period.to());
+            parameters.put("to", period.to());
         }
     }
 

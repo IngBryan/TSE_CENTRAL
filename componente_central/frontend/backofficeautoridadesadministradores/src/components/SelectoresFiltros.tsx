@@ -339,8 +339,3 @@ export function SelectorValores({ nombre, valores, seleccion, onCambiar }: Selec
     />
   );
 }
-
-// The name of a value by its id; the id when the list does not have it
-export function nombreValor(valores: { id: string; name: string }[]): (id: string) => string {
-  return (id) => valores.find((v) => v.id === id)?.name ?? id;
-}

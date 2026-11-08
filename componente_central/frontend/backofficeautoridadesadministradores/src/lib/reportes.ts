@@ -59,6 +59,12 @@ export function seleccionesDe(selecciones: Selecciones, facetas: readonly string
   return Object.fromEntries(Object.entries(selecciones).filter(([faceta]) => facetas.includes(faceta)));
 }
 
+// The name of a value by its id; the id when the list does not have it. Not in a client module: the pages
+// use it on the server
+export function nombreValor(valores: { id: string; name: string }[]): (id: string) => string {
+  return (id) => valores.find((v) => v.id === id)?.name ?? id;
+}
+
 // "Todos", "Salto, Rivera", "Todos menos Salto", "Soja, Trigo (sin Arena)"; long lists become a count
 export function textoSeleccion(seleccion: Seleccion | undefined, nombre: (valor: string) => string): string {
   if (seleccionVacia(seleccion)) return "Todos";

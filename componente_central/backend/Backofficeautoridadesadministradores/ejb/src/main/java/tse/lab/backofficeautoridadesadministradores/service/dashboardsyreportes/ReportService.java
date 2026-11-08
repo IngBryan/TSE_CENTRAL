@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
@@ -31,6 +33,7 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.Kpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.KpiValue;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.Kpis;
+import tse.lab.log.LogEstructurado;
 
 /**
  * Calculates a report: each KPI grouped by the facet, over the period and, when a measure needs it, over the
@@ -41,6 +44,7 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 @Stateless
 public class ReportService {
 
+    private static final Logger LOG = Logger.getLogger(ReportService.class.getName());
     private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59);
 
     @PersistenceContext(unitName = "backofficeautoridadesadministradoresPersistenceUnit")
@@ -99,6 +103,43 @@ public class ReportService {
     }
 
     public ReportResult load(ReportRequest request) {
+        return load(request, null, null);
+    }
+
+    // Logs the report ("reporte.cargado", or "reporte.invalido" when it cannot be calculated) and each of its queries
+    // under the correlation id and user of the request
+    public ReportResult load(ReportRequest request, String correlationId, String user) {
+        long start = System.nanoTime();
+        return ReportLog.within(correlationId, user, () -> {
+            try {
+                ReportResult result = calculate(request);
+                LOG.info(() -> describe(ReportLog.event("reporte.cargado"), request)
+                        .roundtripSeconds(LogEstructurado.segundosDesde(start))
+                        .campo("filas", result.rows().size())
+                        .campo("consultas", ReportLog.queries())
+                        .toString());
+                return result;
+            } catch (InvalidReportException e) {
+                LOG.warning(() -> describe(ReportLog.event("reporte.invalido"), request)
+                        .nivel(Level.WARNING)
+                        .campo("motivo", e.getMessage())
+                        .toString());
+                throw e;
+            }
+        });
+    }
+
+    private static LogEstructurado describe(LogEstructurado event, ReportRequest request) {
+        return request == null
+                ? event
+                : event.campo("kpis", request.kpis())
+                        .campo("periodo", request.period())
+                        .campo("comparativo", request.comparison())
+                        .campo("agrupacion", request.groupBy())
+                        .campo("filtros", request.filters());
+    }
+
+    private ReportResult calculate(ReportRequest request) {
         if (request == null || request.kpis() == null || request.kpis().isEmpty()) {
             throw new InvalidReportException("A report needs at least one KPI");
         }

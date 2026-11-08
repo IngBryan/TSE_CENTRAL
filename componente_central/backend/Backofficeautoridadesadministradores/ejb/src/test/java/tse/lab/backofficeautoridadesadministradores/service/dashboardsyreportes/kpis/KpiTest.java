@@ -31,6 +31,8 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.EnabledVehiclesKpi;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.kpis.simple.TripsKpi;
 import tse.lab.model.CasoFiscalizacion;
+import tse.lab.model.Empresa;
+import tse.lab.model.Rubro;
 import tse.lab.model.Vehiculo;
 
 // The KPI queries against H2, on ReportTestData
@@ -149,6 +151,25 @@ class KpiTest {
                 values(new EnabledVehiclesKpi(), Facets.YEAR, Map.of(Facets.COMPANY, soloObras)));
         assertEquals(List.of(new FacetValue("1", "Empresa 1"), new FacetValue("2", "Empresa 2"),
                 new FacetValue("3", "Empresa 3")), Facets.COMPANY.values(em));
+    }
+
+    // Excluding a rubro leaves out the companies that work in it, even when they work in another one too; the first
+    // company works in both rubros here
+    @Test
+    void excludesTheWholeCompanyOfAnExcludedRubro() {
+        em.getTransaction().begin();
+        em.find(Empresa.class, 1L).setRubros(List.of(em.find(Rubro.class, 1L), em.find(Rubro.class, 2L)));
+        em.getTransaction().commit();
+        em.clear();
+
+        Selection sinAgro = new Selection(List.of(), List.of("1"));
+        assertEquals(Map.of("2026", 1.0), values(new EnabledCompaniesKpi(), Facets.YEAR, Map.of(Facets.CATEGORY, sinAgro)));
+        assertEquals(Map.of("2026", 1.0), values(new EnabledVehiclesKpi(), Facets.YEAR, Map.of(Facets.CATEGORY, sinAgro)));
+        assertEquals(Map.of("Construcción", 1.0),
+                values(new EnabledCompaniesKpi(), Facets.CATEGORY, Map.of(Facets.CATEGORY, sinAgro)));
+
+        Selection soloAgro = new Selection(List.of("1"), List.of());
+        assertEquals(Map.of("2026", 1.0), values(new EnabledCompaniesKpi(), Facets.YEAR, Map.of(Facets.CATEGORY, soloAgro)));
     }
 
     // The cases of the test are all of overload; one of another kind reads as its code

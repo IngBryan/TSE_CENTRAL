@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.ejb.EJB;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -34,6 +35,9 @@ public class ReportsResource {
 
     @Context
     private SecurityContext seguridad;
+
+    @Context
+    private HttpServletRequest req;
 
     // The KPIs a report can ask for, with their id and name
     @GET
@@ -100,7 +104,9 @@ public class ReportsResource {
         }
 
         try {
-            return Response.ok(reports.load(request)).build();
+            String correlationId = req == null ? null : (String) req.getAttribute(CorrelacionFilter.CORRELATION_ID);
+            String usuario = seguridad.getUserPrincipal().getName();
+            return Response.ok(reports.load(request, correlationId, usuario)).build();
         } catch (InvalidReportException e) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(Map.of("error", "report_invalid", "detalle", e.getMessage()))

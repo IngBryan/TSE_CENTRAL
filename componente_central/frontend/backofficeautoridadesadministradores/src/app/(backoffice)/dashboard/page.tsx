@@ -17,12 +17,22 @@ import {
   type FiltrosDashboard,
 } from "@/lib/reportes";
 import { cargarReporte, facetasDeKpis, listarKpis, valoresFaceta } from "@/lib/reportes-backend";
-import { esIdKpi, KPIS, type IdKpi } from "@/lib/reportes-kpis";
+import { consultaReporte, esIdKpi, KPIS, type IdKpi } from "@/lib/reportes-kpis";
 import { pedidoReporte } from "@/lib/reportes-tabla";
 import BarraDashboard from "./BarraDashboard";
 
 // The facet of the backend the dashboard filters by
 const RUBRO = "category";
+// The grouping of each card; the number cards only use the total, so any grouping does
+const AGRUPACION = {
+  empresas: "year",
+  vehiculos: "year",
+  tasa: "year",
+  viajes: "month",
+  toneladas: "category",
+  infracciones: "caseType",
+} as const satisfies Partial<Record<IdKpi, string>>;
+
 // The facet the table of indicators groups by
 const EMPRESA = "company";
 // Grouped by company each company only counts itself: the backend allows it, but it says nothing in this table
@@ -46,7 +56,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const comparacion = rangoComparacion(filtros.comparar, periodo, filtros.rangoComparar);
   const compara = comparacion !== null;
 
-  // One call per KPI, each with its own grouping; the number cards only use the total, so any grouping does
+  // One call per KPI, each with its own grouping
   const cargar = (id: IdKpi, agrupacion: string) =>
     cargarReporte(
       pedidoReporte(
@@ -59,11 +69,19 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   const medidas = compara ? ["current" as const, "previous" as const] : ["current" as const];
 
+  // Each card leads to its KPIs as a report, with the same grouping, period, comparison and filters; there the
+  // change shows too
+  const enReportes = (ids: IdKpi[], agrupacion: string) =>
+    `/reportes?${consultaFiltros(filtros)}&${consultaReporte({
+      kpis: ids.map((id) => ({ id, medidas: compara ? ["current", "previous", "growth"] : ["current"] })),
+      agrupacion,
+    })}`;
+
   // Every indicator the backend can group by company, side by side in one table: one call, since they share the
   // grouping
   async function porEmpresa() {
     const kpis = await listarKpis();
-    if (!kpis.ok) return { ok: false as const, mensaje: kpis.mensaje };
+    if (!kpis.ok) return { ok: false as const, mensaje: kpis.mensaje, kpis: [] };
     const conocidos = kpis.datos.filter((kpi) => esIdKpi(kpi.id) && !FUERA_DE_LA_TABLA.includes(kpi.id));
     const facetas = await Promise.all(conocidos.map((kpi) => facetasDeKpis([kpi.id])));
     const compatibles = conocidos.filter((_, i) => {
@@ -77,20 +95,23 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       formato: KPIS[kpi.id as IdKpi].formato,
       mejorSiBaja: KPIS[kpi.id as IdKpi].mejorSiBaja,
     }));
-    if (compatibles.length === 0) return { ok: true as const, tabla: { encabezado: "Empresa", columnas, filas: [] } };
-    const reporte = { kpis: compatibles.map((kpi) => ({ id: kpi.id as IdKpi, medidas })), agrupacion: EMPRESA };
+    const ids = compatibles.map((kpi) => kpi.id as IdKpi);
+    if (ids.length === 0) {
+      return { ok: true as const, tabla: { encabezado: "Empresa", columnas, filas: [] }, kpis: ids };
+    }
+    const reporte = { kpis: ids.map((id) => ({ id, medidas })), agrupacion: EMPRESA };
     const respuesta = await cargarReporte(pedidoReporte(reporte, periodo, comparacion, filtros));
-    return tablaDashboard(respuesta, "Empresa", columnas, compara);
+    return { ...tablaDashboard(respuesta, "Empresa", columnas, compara), kpis: ids };
   }
 
   const [rubros, empresas, vehiculos, tasa, viajes, toneladas, infracciones, tabla] = await Promise.all([
     valoresFaceta(RUBRO),
-    cargar("empresas", "year"),
-    cargar("vehiculos", "year"),
-    cargar("tasa", "year"),
-    cargar("viajes", "month"),
-    cargar("toneladas", "category"),
-    cargar("infracciones", "caseType"),
+    cargar("empresas", AGRUPACION.empresas),
+    cargar("vehiculos", AGRUPACION.vehiculos),
+    cargar("tasa", AGRUPACION.tasa),
+    cargar("viajes", AGRUPACION.viajes),
+    cargar("toneladas", AGRUPACION.toneladas),
+    cargar("infracciones", AGRUPACION.infracciones),
     porEmpresa(),
   ]);
   const valores = rubros.ok ? rubros.datos : [];
@@ -130,23 +151,41 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Kpi titulo="Empresas habilitadas" icono={Building2} {...datos(empresas)} />
-        <Kpi titulo="Vehículos habilitados" icono={Truck} {...datos(vehiculos)} />
+        <Kpi
+          titulo="Empresas habilitadas"
+          icono={Building2}
+          href={enReportes(["empresas"], AGRUPACION.empresas)}
+          {...datos(empresas)}
+        />
+        <Kpi
+          titulo="Vehículos habilitados"
+          icono={Truck}
+          href={enReportes(["vehiculos"], AGRUPACION.vehiculos)}
+          {...datos(vehiculos)}
+        />
         <Kpi
           titulo="Tasa de casos cerrados sobre detectados"
           icono={BadgeCheck}
           formato="porcentaje"
+          href={enReportes(["tasa"], AGRUPACION.tasa)}
           {...datos(tasa)}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Kpi tipo="columnas" titulo="Viajes realizados por mes" icono={Route} {...datos(viajes)} />
+        <Kpi
+          tipo="columnas"
+          titulo="Viajes realizados por mes"
+          icono={Route}
+          href={enReportes(["viajes"], AGRUPACION.viajes)}
+          {...datos(viajes)}
+        />
         <Kpi
           tipo="columnas"
           titulo="Volumen de carga transportado por rubro"
           icono={Package}
           formato="toneladas"
+          href={enReportes(["toneladas"], AGRUPACION.toneladas)}
           {...datos(toneladas)}
         />
         <Kpi
@@ -154,6 +193,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           titulo="Infracciones detectadas por tipo"
           icono={ShieldAlert}
           mejorSiBaja
+          href={enReportes(["infracciones"], AGRUPACION.infracciones)}
           {...datos(infracciones)}
         />
       </div>
@@ -163,6 +203,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         titulo="Indicadores por empresa"
         icono={Table2}
         valor={null}
+        href={tabla.kpis.length ? enReportes(tabla.kpis, EMPRESA) : undefined}
         {...(tabla.ok ? { tabla: tabla.tabla } : { error: tabla.mensaje })}
       />
     </div>

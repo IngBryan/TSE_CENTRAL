@@ -3,6 +3,8 @@ package tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jakarta.persistence.EntityManager;
 
@@ -21,8 +23,15 @@ public abstract class Facet {
      * How a row reaches the facet: the joins it needs and the expressions of the value's id and name. They are
      * written with {t} for the alias the KPI gives the table; the joins are LEFT, so a row without the value (a
      * case without a trip) stays and falls in a group without value.
+     *
+     * exclusion is filled in by resolve(): the condition that leaves out the rows of the table that reach an
+     * excluded value, with :values for them.
      */
-    public record Link(List<String> joins, String id, String name) {
+    public record Link(List<String> joins, String id, String name, String exclusion) {
+
+        public Link(List<String> joins, String id, String name) {
+            this(joins, id, name, null);
+        }
 
         public static Link of(String expression) {
             return new Link(List.of(), expression, expression);
@@ -30,9 +39,12 @@ public abstract class Facet {
 
         Link forAlias(String alias) {
             return new Link(joins.stream().map(join -> join.replace("{t}", alias)).toList(),
-                    id.replace("{t}", alias), name.replace("{t}", alias));
+                    id.replace("{t}", alias), name.replace("{t}", alias), exclusion);
         }
     }
+
+    private static final String SUBQUERY = "Excluded";
+    private static final Pattern DECLARED_ALIAS = Pattern.compile("JOIN\\s+\\S+\\s+(\\w+)");
 
     private final String id;
     private final String name;
@@ -61,10 +73,46 @@ public abstract class Facet {
         for (TableAlias table : tables) {
             Link link = links.get(table.table());
             if (link != null) {
-                return link.forAlias(table.alias());
+                Link resolved = link.forAlias(table.alias());
+                return new Link(resolved.joins(), resolved.id(), resolved.name(), exclusion(link, table));
             }
         }
         return null;
+    }
+
+    /**
+     * Excluding leaves out whole rows of the table, not rows of its joins: a company that works in an excluded rubro
+     * is out even if it works in others too. The rows that reach an excluded value come from a subquery with the
+     * same joins, under aliases of their own; a row of a joined table that is not there (a case without a trip) has
+     * no value, so it stays.
+     */
+    private static String exclusion(Link link, TableAlias table) {
+        String row = table.alias() + SUBQUERY;
+        List<String> joins = link.joins().stream().map(join -> join.replace("{t}", row)).toList();
+        String value = link.id().replace("{t}", row);
+        for (String alias : declaredAliases(link.joins())) {
+            String word = "\\b" + alias + "\\b";
+            String renamed = alias + SUBQUERY;
+            joins = joins.stream().map(join -> join.replaceAll(word, renamed)).toList();
+            value = value.replaceAll(word, renamed);
+        }
+
+        String excluded = "SELECT " + row + " FROM " + table.table().entity() + " " + row
+                + (joins.isEmpty() ? "" : " " + String.join(" ", joins)) + " WHERE " + value + " IN :values";
+        String condition = table.alias() + " NOT IN (" + excluded + ")";
+        return table.join() == null ? condition : "(" + table.alias() + " IS NULL OR " + condition + ")";
+    }
+
+    // "LEFT JOIN {t}.rubros category" and "LEFT JOIN Rubro category ON ..." declare "category"
+    private static List<String> declaredAliases(List<String> joins) {
+        List<String> aliases = new ArrayList<>();
+        for (String join : joins) {
+            Matcher declared = DECLARED_ALIAS.matcher(join);
+            if (declared.find()) {
+                aliases.add(declared.group(1));
+            }
+        }
+        return aliases;
     }
 
     // The expressions a KPI is grouped by: the id, and the name when it is another column
@@ -90,7 +138,7 @@ public abstract class Facet {
             parameters.put(id + "Included", parameterValues(selection.include()));
         }
         if (!selection.exclude().isEmpty()) {
-            conditions.add("(" + link.id() + " IS NULL OR " + link.id() + " NOT IN :" + id + "Excluded)");
+            conditions.add(link.exclusion().replace(":values", ":" + id + "Excluded"));
             parameters.put(id + "Excluded", parameterValues(selection.exclude()));
         }
         return conditions;

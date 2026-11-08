@@ -3,13 +3,18 @@ package tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -177,6 +182,46 @@ class ReportServiceTest {
                 service.values("category"));
         assertThrows(InvalidReportException.class, () -> service.values("month"));
         assertThrows(FacetNotFoundException.class, () -> service.values("color"));
+    }
+
+    // Each query with its JPQL and parameters, then the report, all under the correlation id of the request
+    @Test
+    void logsEveryQueryAndTheReport() {
+        List<String> lines = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                lines.add(record.getMessage());
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger queries = Logger.getLogger(ReportLog.class.getName());
+        Logger reports = Logger.getLogger(ReportService.class.getName());
+        queries.addHandler(handler);
+        reports.addHandler(handler);
+        try {
+            service.load(request(List.of(new KpiRequest("viajes", List.of("current"))), null, "month", Map.of()),
+                    "corr-1", "88888888");
+        } finally {
+            queries.removeHandler(handler);
+            reports.removeHandler(handler);
+        }
+
+        List<String> consultas = lines.stream().filter(line -> line.contains("\"evento\":\"reporte.consulta\"")).toList();
+        assertEquals(2, consultas.size());
+        assertTrue(consultas.get(0).contains("\"correlationId\":\"corr-1\""));
+        assertTrue(consultas.get(0).contains("\"usuario\":\"88888888\""));
+        assertTrue(consultas.get(0).contains("SELECT EXTRACT(YEAR FROM g.fecha)"));
+        assertTrue(consultas.get(0).contains("from=2026-10-01"));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("\"evento\":\"reporte.cargado\"")
+                && line.contains("\"consultas\":2") && line.contains("\"filas\":2")));
     }
 
     private void assertInvalid(ReportRequest request) {

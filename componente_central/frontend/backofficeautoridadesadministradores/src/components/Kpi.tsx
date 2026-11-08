@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, Minus, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -25,6 +26,8 @@ type Props = {
   icono?: LucideIcon;
   // Why the KPI could not be loaded, shown in place of its value
   error?: string;
+  // Where the card leads when it is clicked: the same KPI as a report
+  href?: string;
 };
 
 const NUMERO = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 1 });
@@ -208,11 +211,12 @@ export default function Kpi({
   tabla,
   icono: Icono,
   error,
+  href,
 }: Props) {
   const hayComparativo = valor !== null && comparativo !== null && comparativo !== undefined;
 
-  return (
-    <Card className="shadow-sm transition-shadow [--card-spacing:--spacing(5)] hover:shadow-md">
+  const tarjeta = (
+    <Card className="h-full shadow-sm transition-shadow [--card-spacing:--spacing(5)] hover:shadow-md">
       <CardHeader>
         <CardDescription className="font-medium">{titulo}</CardDescription>
         {Icono && (
@@ -253,5 +257,17 @@ export default function Kpi({
         )}
       </CardContent>
     </Card>
+  );
+
+  return href ? (
+    <Link
+      href={href}
+      title="Ver en reportes"
+      className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {tarjeta}
+    </Link>
+  ) : (
+    tarjeta
   );
 }

@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Period;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Selection;
@@ -54,10 +53,10 @@ public abstract class SnapshotKpi extends BaseQueryKpi {
     }
 
     @Override
-    protected void bind(Query query, String jpql, Period period) {
-        super.bind(query, jpql, period);
+    protected void bind(Map<String, Object> parameters, String jpql, Period period) {
+        super.bind(parameters, jpql, period);
         if (jpql.contains(":day")) {
-            query.setParameter("day", period.to());
+            parameters.put("day", period.to());
         }
     }
 }

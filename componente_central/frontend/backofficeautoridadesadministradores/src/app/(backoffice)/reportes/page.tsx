@@ -1,13 +1,13 @@
 import type { CSSProperties } from "react";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { nombreValor } from "@/components/SelectoresFiltros";
 import { requerirRol } from "@/lib/backoffice-sesion";
 import { cargarReporte, facetasDeKpis, listarKpis, valoresFaceta } from "@/lib/reportes-backend";
 import {
   consultaFiltros,
   hoyEnUruguay,
   leerFiltros,
+  nombreValor,
   PERIODOS,
   rangoComparacion,
   rangoPeriodo,

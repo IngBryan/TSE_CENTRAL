@@ -6,7 +6,6 @@ import { useRef, useState, type ReactNode } from "react";
 
 import {
   aRango,
-  nombreValor,
   Opciones,
   OpcionesPeriodo,
   SelectorComparativo,
@@ -28,7 +27,14 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { COMPARATIVOS, seleccionesDe, textoRango, textoSeleccion, type FiltrosDashboard } from "@/lib/reportes";
+import {
+  COMPARATIVOS,
+  nombreValor,
+  seleccionesDe,
+  textoRango,
+  textoSeleccion,
+  type FiltrosDashboard,
+} from "@/lib/reportes";
 import type { FacetaDisponible } from "@/lib/reportes-backend";
 import {
   agrupacionPermitida,

@@ -54,7 +54,7 @@ class ReportsResourceTest {
     @Test
     void loadsTheReport() {
         ReportResult result = new ReportResult("month", List.of(), Map.of());
-        when(reports.load(REQUEST)).thenReturn(result);
+        when(reports.load(REQUEST, null, "88888888")).thenReturn(result);
 
         Response response = resource.load(REQUEST);
 
@@ -64,7 +64,7 @@ class ReportsResourceTest {
 
     @Test
     void anInvalidReportIsA400WithItsDetail() {
-        when(reports.load(REQUEST)).thenThrow(new InvalidReportException("Unknown KPI: ventas"));
+        when(reports.load(REQUEST, null, "88888888")).thenThrow(new InvalidReportException("Unknown KPI: ventas"));
 
         Response response = resource.load(REQUEST);
 
