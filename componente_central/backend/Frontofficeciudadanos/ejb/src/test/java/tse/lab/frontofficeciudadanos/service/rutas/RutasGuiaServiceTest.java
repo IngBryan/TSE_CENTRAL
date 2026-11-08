@@ -6,11 +6,14 @@ import static org.mockito.Mockito.*;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.data.GuiaDAO;
 import tse.lab.frontofficeciudadanos.data.LocalidadDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
+import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
+import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.RecursoNoEncontradoException;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService;
 import tse.lab.frontofficeciudadanos.service.gestiondeguiasyviajes.GuiasService.EdicionGuia;
@@ -184,6 +187,68 @@ class RutasGuiaServiceTest {
 
         assertSame(fallo, assertThrows(IllegalStateException.class,
                 () -> servicio.confirmar("ci", "G1", 1L, 2L, TOKEN, "t")));
+    }
+
+    @Test
+    void solicitudesSinDatosSeValidanSinConsultarElEnrutador() throws Exception {
+        var altaInvalida = new DatosInvalidosException(Map.of("rubroCliente", "Obligatorio"));
+        when(viajes.crear("ci", null, "t")).thenThrow(altaInvalida);
+        assertSame(altaInvalida, assertThrows(DatosInvalidosException.class,
+                () -> servicio.crearGuia("ci", null, "t")));
+
+        var edicionInvalida = new ConflictoException("GUIA_DESACTUALIZADA", "Falta la version");
+        when(viajes.editarConRuta("ci", "G1", null, null, "t")).thenThrow(edicionInvalida);
+        assertSame(edicionInvalida, assertThrows(ConflictoException.class,
+                () -> servicio.editarGuia("ci", "G1", null, "t")));
+        verifyNoInteractions(planificador, geometrias);
+    }
+
+    @Test
+    void editarConLosNombresOriginalesSinIdsNoExigeRecalcularLaRuta() throws Exception {
+        var datos = new EdicionGuia("Agro", "Granos", 2000L, "2026-11-08",
+                "Origen", "Destino", null, null, 0L, null);
+
+        servicio.editarGuia("ci", "G1", datos, "t");
+
+        verify(viajes).editarConRuta("ci", "G1", datos, null, "t");
+        verifyNoInteractions(planificador, geometrias);
+    }
+
+    @Test
+    void cambiarElOrigenEntregaLaNuevaRutaALaEdicion() throws Exception {
+        preview(3L, 2L);
+        var datos = new EdicionGuia("Agro", "Granos", 1000L, "2026-11-08",
+                null, null, 3L, 2L, 0L, TOKEN);
+
+        servicio.editarGuia("ci", "G1", datos, "t");
+
+        verify(viajes).editarConRuta("ci", "G1", datos, List.of(9L), "t");
+    }
+
+    @Test
+    void cambiarElNombreDelOrigenODestinoNoEvitaLaPrevisualizacion() {
+        for (var datos : List.of(
+                new EdicionGuia("Agro", "Granos", 1000L, "2026-11-08",
+                        "Otro origen", "Destino", null, null, 0L, null),
+                new EdicionGuia("Agro", "Granos", 1000L, "2026-11-08",
+                        "Origen", "Otro destino", null, null, 0L, null))) {
+            assertEquals("previsualizacion_requerida", assertThrows(RutasException.class,
+                    () -> servicio.editarGuia("ci", "G1", datos, "t")).codigo());
+        }
+        verifyNoInteractions(viajes, planificador, geometrias);
+    }
+
+    @Test
+    void unaLocalidadHistoricaSinCorrespondenciaNoReutilizaLaRuta() throws Exception {
+        Field origen = Guia.class.getDeclaredField("origenLocalidad");
+        origen.setAccessible(true);
+        origen.set(guia, null);
+        when(localidades.buscarUnicaPorNombre("Origen")).thenReturn(null);
+
+        assertEquals("previsualizacion_requerida", assertThrows(RutasException.class,
+                () -> servicio.editarGuia("ci", "G1", edicion(2L, null), "t")).codigo());
+
+        verifyNoInteractions(viajes, planificador, geometrias);
     }
 
     private void previewConfirmacion() {
