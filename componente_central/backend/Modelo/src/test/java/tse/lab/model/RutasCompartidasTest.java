@@ -39,14 +39,16 @@ class RutasCompartidasTest {
     }
 
     @Test
-    void lasAlternativasSonDistintasYSePuedenReordenarAntesDeIniciar() {
+    void soloPermiteUnaRutaYSePuedeReemplazarAntesDeIniciar() {
         Guia guia = guia("G4");
         RutaReferencia rutaA = new RutaReferencia(GEO_A, 40000);
         RutaReferencia rutaB = new RutaReferencia(GEO_B, 50000);
-        guia.reemplazarRutasAutorizadas(List.of(rutaA, rutaB));
+        guia.reemplazarRutasAutorizadas(List.of(rutaA));
+        assertThrows(IllegalArgumentException.class,
+                () -> guia.reemplazarRutasAutorizadas(List.of(rutaA, rutaB)));
         assertThrows(IllegalArgumentException.class,
                 () -> guia.reemplazarRutasAutorizadas(List.of(rutaA, rutaA)));
-        guia.reemplazarRutasAutorizadas(List.of(rutaB, rutaA));
+        guia.reemplazarRutasAutorizadas(List.of(rutaB));
         assertSame(rutaB, guia.getRutasAutorizadas().get(0).getRutaReferencia());
         assertEquals(1, guia.getRutasAutorizadas().get(0).getNumeroAlternativa());
         assertThrows(UnsupportedOperationException.class,

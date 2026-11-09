@@ -14,22 +14,22 @@ class CorredorRutasTest {
         return new DatosRutaAutorizada(1L, 1, "hash", 100_000, geometria);
     }
     private static CorredorRutas corredor(String geometria) throws IOException {
-        return new CorredorRutas(List.of(ruta(geometria)));
+        return new CorredorRutas(ruta(geometria));
     }
     @Test
     void puntoSobreUnaRutaTieneDistanciaCero() throws IOException {
         var c = corredor("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
-        assertEquals(0, c.distanciaMinimaMetros(-34.25, -56), 0.001);
+        assertEquals(0, c.distanciaMetros(-34.25, -56), 0.001);
     }
     @Test
     void lasDistanciasEnWgs84SeMidenEnMetrosNoGrados() throws IOException {
         var c = corredor("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
-        assertTrue(c.distanciaMinimaMetros(-34.25, -55.97) > 2000);
+        assertTrue(c.distanciaMetros(-34.25, -55.97) > 2000);
     }
     @Test
     void puntoCercaDelSegmentoYLejosDeLosExtremosTieneDistanciaCorta() throws IOException {
         var c = corredor("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
-        assertTrue(c.distanciaMinimaMetros(-34.25, -55.99) < 2000);
+        assertTrue(c.distanciaMetros(-34.25, -55.99) < 2000);
     }
     @Test
     void validaGeometriaCorrupta() {
@@ -38,13 +38,11 @@ class CorredorRutasTest {
 
     @Test
     void anAuthorizedRouteIsRequired() {
-        assertThrows(IllegalArgumentException.class, () -> new CorredorRutas(null));
-        assertThrows(IllegalArgumentException.class, () -> new CorredorRutas(List.of()));
+        assertThrows(IOException.class, () -> new CorredorRutas(null));
     }
 
     @Test
     void aRouteWithoutGeometryFails() {
-        assertThrows(IOException.class, () -> new CorredorRutas(java.util.Collections.singletonList(null)));
         assertThrows(IOException.class, () -> corredor(null));
         assertThrows(IOException.class, () -> corredor("{"));
     }
@@ -63,19 +61,12 @@ class CorredorRutasTest {
     void aGpsOutsideWgs84IsRejected() throws IOException {
         var c = corredor("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}");
 
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(Double.NaN, -56));
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, Double.NaN));
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-91, -56));
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(91, -56));
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, -181));
-        assertThrows(IllegalArgumentException.class, () -> c.distanciaMinimaMetros(-34, 181));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(Double.NaN, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(-34, Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(-91, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(91, -56));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(-34, -181));
+        assertThrows(IllegalArgumentException.class, () -> c.distanciaMetros(-34, 181));
     }
 
-    @Test
-    void theDistanceIsToTheNearestRoute() throws IOException {
-        var c = new CorredorRutas(List.of(ruta("{\"type\":\"LineString\",\"coordinates\":[[-56,-34.5],[-56,-34]]}"),
-                ruta("{\"type\":\"LineString\",\"coordinates\":[[-55,-34.5],[-55,-34]]}")));
-
-        assertEquals(0, c.distanciaMinimaMetros(-34.25, -55), 0.001);
-    }
 }

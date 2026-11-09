@@ -643,6 +643,10 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
   pendiente para reintento.
 - Viaje sin guia (`TripWithoutGuideRule`): GPS sin Guia asociada a la fecha del evento. La creacion
   del expediente exige movimiento confirmado mediante el seguimiento de circulaciones.
+  Una vez confirmado, el mismo caso acumula los eventos del vehiculo aunque correspondan a varios
+  viajes. Las detenciones, las brechas entre mediciones y la falta de señal GPS no cierran la
+  circulacion ni generan otro caso. Solo se cierra cuando se observa al vehiculo circulando con Guia;
+  el estado administrativo del expediente se gestiona por separado.
 - Exceso de carga (`OverloadRule`): un pesaje con Guia asociada supera el peso del vehiculo mas su
   capacidad de carga declarada. La carga de la Guia no se usa; por ahora cualquier exceso cuenta.
 - **Vehiculo sin habilitacion vigente** (`VehicleWithoutValidPermitRule`): se evalua tanto GPS como
@@ -658,8 +662,9 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
     (`VIGENTE`, `VENCIDO`, `AUN_NO_VIGENTE` o `SIN_REGISTRO`) en el detalle del expediente/infraccion.
   - Alcance temporal: se usan los documentos registrados al procesar el evento. No se reconstruyen
     permisos reemplazados antes de su primera evaluacion; este cambio no agrega historial de permisos.
-- Desvio de ruta (`RouteDeviationRule`): compara mediciones GPS con las rutas autorizadas de la Guia
-  y conserva la prueba geometrica al confirmarse, cuando la regla esta habilitada.
+- Desvio de ruta (`RouteDeviationRule`): compara mediciones GPS con la unica ruta admitida de la Guia,
+  seleccionada por menor duracion al crearla. Conserva la prueba geometrica al confirmar el desvio,
+  cuando la regla esta habilitada.
 - La regla de habilitacion se registra en los tres modos: consumidor GPS, poller de pesajes y
   deteccion manual. Los GPS se evaluan en `TrackingDetectionWorker`; los pesajes, en
   `PendingWeighingsDetection`.

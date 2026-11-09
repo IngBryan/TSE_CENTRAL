@@ -1,4 +1,4 @@
-import { mostrarLocalidad, type LocalidadVista } from "@/lib/localidades";
+import { mostrarLocalidad } from "@/lib/localidades";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -17,24 +17,19 @@ export default async function Asignar({ params }: PageProps<"/empresa/guias/[id]
   const { id } = await params;
 
   let opciones: Opciones | null = null;
-  let localidades: LocalidadVista[] = [];
   let error: string | null = null;
   try {
     const datosPeticion = {
       correlationId: randomUUID(),
       usuarioCi: sesion.perfil.cedula,
     };
-    const [res, localidadesRes] = await Promise.all([
-      llamarBackend<Opciones & { detalle?: string }>(`/empresa/guias/${encodeURIComponent(id)}/asignacion`, datosPeticion),
-      llamarBackend<LocalidadVista[]>("/localidades", datosPeticion),
-    ]);
+    const res = await llamarBackend<Opciones & { detalle?: string }>(
+      `/empresa/guias/${encodeURIComponent(id)}/asignacion`, datosPeticion);
     if (res.status === 200) opciones = res.data;
     else if (res.status === 409) error = res.data?.detalle ?? "La guía ya está asignada.";
     else if (res.status === 404) error = "La guía no existe.";
     else if (res.status === 403) error = `No podés asignar guías: ${res.data?.detalle ?? "no sos responsable de una empresa"}.`;
     else error = "No se pudieron obtener los datos de la guía.";
-    if (localidadesRes.status === 200 && Array.isArray(localidadesRes.data)) localidades = localidadesRes.data;
-    else error ??= "No se pudo obtener el catálogo de localidades para elegir las rutas.";
   } catch (e) {
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
@@ -68,7 +63,7 @@ export default async function Asignar({ params }: PageProps<"/empresa/guias/[id]
             {error}
           </p>
         ) : (
-          <AsignarViaje guia={opciones.guia} vehiculos={opciones.vehiculos} choferes={opciones.choferes} localidades={localidades} />
+          <AsignarViaje guia={opciones.guia} vehiculos={opciones.vehiculos} choferes={opciones.choferes} />
         )}
       </main>
     </div>

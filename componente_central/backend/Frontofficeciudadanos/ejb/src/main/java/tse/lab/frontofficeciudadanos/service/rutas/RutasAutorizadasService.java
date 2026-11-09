@@ -20,7 +20,9 @@ public class RutasAutorizadasService implements RutasAutorizadasRemote {
     @Override
     public List<DatosRutaAutorizada> obtenerPorGuia(String idGuia) {
         if (idGuia == null || idGuia.isBlank()) return List.of();
-        return rutas.buscarPorGuia(idGuia).stream().map(gr -> {
+        // Las guias anteriores ya estaban ordenadas por duracion: conservar solo la principal.
+        // Las evidencias historicas siguen consultando todas sus geometrías por huella.
+        return rutas.buscarPorGuia(idGuia).stream().limit(1).map(gr -> {
             var ruta = gr.getRutaReferencia();
             return new DatosRutaAutorizada(ruta.getId(), gr.getNumeroAlternativa(),
                     ruta.getSha256GeoJson(), ruta.getDistanciaMetros(), ruta.getGeometriaGeoJson());

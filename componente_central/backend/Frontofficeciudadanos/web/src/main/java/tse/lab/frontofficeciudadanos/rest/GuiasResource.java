@@ -34,10 +34,7 @@ import tse.lab.frontofficeciudadanos.service.rutas.RutasException;
 @Produces(MediaType.APPLICATION_JSON)
 public class GuiasResource {
 
-    public record RutasRequest(Long origenId, Long destinoId, String previsualizacionId) {
-    }
-
-    public record AsignacionRequest(String matricula, Long idChofer, RutasRequest rutas) {
+    public record AsignacionRequest(String matricula, Long idChofer) {
     }
 
     @EJB
@@ -71,7 +68,7 @@ public class GuiasResource {
     @POST
     public Response crear(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, NuevaGuia datos,
             @Context HttpServletRequest req) {
-        return ejecutar(() -> guias.crear(usuario, datos, correlationId(req)));
+        return ejecutar(() -> rutas.crearGuia(usuario, datos, correlationId(req)));
     }
 
     @GET
@@ -85,22 +82,17 @@ public class GuiasResource {
     @Path("/{id}/asignacion")
     public Response asignar(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @PathParam("id") String id,
             AsignacionRequest body, @Context HttpServletRequest req) {
-        if (body != null && body.rutas() != null) {
-            RutasRequest seleccion = body.rutas();
-            return ejecutar(() -> rutas.asignarViaje(usuario, id, body.matricula(), body.idChofer(),
-                    seleccion.origenId(), seleccion.destinoId(), seleccion.previsualizacionId(), correlationId(req)));
-        }
         return ejecutar(() -> guias.asignar(usuario, id, body == null ? null : body.matricula(),
                 body == null ? null : body.idChofer(), correlationId(req)));
     }
 
-    // Modificacion de una guia ASIGNADA (409 GUIA_NO_MODIFICABLE si no; 409 GUIA_DESACTUALIZADA si la
+    // Edicion de una guia SIN_ASIGNAR o ASIGNADA (409 GUIA_NO_MODIFICABLE si no; GUIA_DESACTUALIZADA si la
     // version del body no es la actual). Cada cambio queda en la linea de tiempo de la guia.
     @PUT
     @Path("/{id}")
     public Response editar(@HeaderParam(ChoferesResource.USUARIO_CI) String usuario, @PathParam("id") String id,
             EdicionGuia body, @Context HttpServletRequest req) {
-        return ejecutar(() -> guias.editar(usuario, id, body, correlationId(req)));
+        return ejecutar(() -> rutas.editarGuia(usuario, id, body, correlationId(req)));
     }
 
     @POST

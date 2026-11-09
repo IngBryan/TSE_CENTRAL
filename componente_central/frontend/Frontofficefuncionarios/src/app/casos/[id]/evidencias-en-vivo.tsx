@@ -15,8 +15,8 @@ const normalizar = (datos: Snapshot): Snapshot => ({
 });
 const hashSnapshot = (datos: Snapshot) => JSON.stringify(datos);
 
-/** Una sola consulta periódica actualiza los eventos y el mapa, sin recargar el expediente ni
- * alterar la paginación, la confirmación seleccionada o las acciones administrativas. */
+/** Actualiza las evidencias y el mapa sin recargar el expediente ni alterar
+ * la confirmación seleccionada o las acciones administrativas. */
 export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso, circulacion, eventosIniciales, pruebasIniciales }: {
   id: number;
   tipo: string;
@@ -36,6 +36,7 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
   const ultimaActualizacionMapa = useRef(0);
   const datosActuales = useRef<Snapshot>(normalizar({ eventosTracking: eventosIniciales, pruebasDesvio: pruebasIniciales }));
   const esGeografico = ["DESVIO_RUTA", "DESVIO_DE_RUTA", "VIAJE_SIN_GUIA", "SIN_GUIA"].includes(tipo);
+  const esSinGuia = tipo === "VIAJE_SIN_GUIA" || tipo === "SIN_GUIA";
   const finalizado = estadoCaso === "CONFIRMADA" || estadoCaso === "DESESTIMADA";
 
   useEffect(() => {
@@ -66,8 +67,9 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
           datosActuales.current = siguiente;
           setDatos(siguiente);
           if (cantidadNueva > 0) setNuevos(n => n + cantidadNueva);
-          // La trayectoria se consulta menos frecuentemente que los eventos y solo si llegó información.
-          if (esGeografico && cantidadNueva > 0 && Date.now() - ultimaActualizacionMapa.current >= MAPA_INTERVALO_MS) {
+          // Sin guía, el mapa es la vista principal de los GPS: actualizarlo con cada novedad.
+          if (esGeografico && cantidadNueva > 0 &&
+              (esSinGuia || Date.now() - ultimaActualizacionMapa.current >= MAPA_INTERVALO_MS)) {
             ultimaActualizacionMapa.current = Date.now();
             setRevisionMapa(n => n + 1);
           }
@@ -90,7 +92,7 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
       enVuelo.current?.abort();
       enVuelo.current = null;
     };
-  }, [id, activo, finalizado, esGeografico]);
+  }, [id, activo, finalizado, esGeografico, esSinGuia]);
 
   return <>
     <section className="flex flex-col gap-3">
@@ -107,10 +109,12 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
       {error && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
         No se pudieron consultar novedades ({error}). Se conservan los registros cargados y se reintentará automáticamente.
       </p>}
-      {tipo !== "DESVIO_RUTA" && tipo !== "DESVIO_DE_RUTA" && <EventosTrackingPaginados eventos={datos.eventosTracking} />}
+      {!esGeografico && <EventosTrackingPaginados eventos={datos.eventosTracking} />}
     </section>
     {esGeografico && <GeografiaCaso id={id} tipo={tipo} guiaId={guiaId} fechaDeteccion={fechaDeteccion}
-      pruebas={datos.pruebasDesvio} circulacion={circulacion} revisionDatos={revisionMapa}
+      pruebas={datos.pruebasDesvio}
+      circulacion={circulacion ? { ...circulacion, cantidadClavesGps: datos.eventosTracking.length } : null}
+      revisionDatos={revisionMapa}
       actualizacionActiva={activo && !finalizado} />}
   </>;
 }

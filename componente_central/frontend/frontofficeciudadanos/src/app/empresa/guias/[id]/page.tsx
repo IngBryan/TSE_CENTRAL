@@ -109,8 +109,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
       errorRutas = true;
     }
   }
-  if (datos?.guia.estado === "ASIGNADA") {
-    // Solo una guia ASIGNADA se edita: es la que necesita los catalogos y las localidades
+  if (datos && (datos.guia.estado === "ASIGNADA" || datos.guia.estado === "SIN_ASIGNAR")) {
     catalogos = await obtenerCatalogos();
     try {
       const res = await llamarBackend<LocalidadVista[]>("/localidades", {
@@ -170,24 +169,24 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
 
             <section aria-labelledby="rutas-autorizadas-titulo" className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="rutas-autorizadas-titulo" className="text-lg font-semibold">Rutas autorizadas</h2>
+                <h2 id="rutas-autorizadas-titulo" className="text-lg font-semibold">Ruta admitida</h2>
                 <Link href={`/empresa/guias/${encodeURIComponent(id)}/rutas`}
                   className="rounded-lg bg-[#0068b3] px-4 py-2 font-medium text-white hover:bg-[#005596]">
                   {datos.guia.estado === "SIN_ASIGNAR" || datos.guia.estado === "ASIGNADA"
-                    ? "Consultar o autorizar rutas" : "Ver rutas en el mapa"}
+                    ? "Consultar ruta admitida" : "Ver ruta en el mapa"}
                 </Link>
               </div>
               {errorRutas ? (
                 <p role="status" className="mt-3 text-amber-800 dark:text-amber-200">
-                  No pudimos consultar las rutas de esta guía. Podés volver a intentarlo desde la pantalla de rutas.
+                  No pudimos consultar la ruta de esta guía. Podés volver a intentarlo desde la pantalla de ruta.
                 </p>
               ) : rutasAutorizadas.length === 0 ? (
-                <p className="mt-3 text-zinc-600 dark:text-zinc-400">Esta guía todavía no tiene rutas autorizadas.</p>
+                <p className="mt-3 text-zinc-600 dark:text-zinc-400">Esta guía todavía no tiene ruta admitida.</p>
               ) : (
                 <ol className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {[...rutasAutorizadas].sort((a, b) => a.alternativa - b.alternativa).map(r => (
+                  {rutasAutorizadas.slice(0, 1).map(r => (
                     <li key={r.idRuta} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-                      <span className="font-medium">Alternativa {r.alternativa}</span>
+                      <span className="font-medium">Ruta admitida</span>
                       <span className="ml-2 text-zinc-600 dark:text-zinc-400">
                         {(r.distanciaMetros / 1000).toLocaleString("es-UY", { maximumFractionDigits: 1 })} km
                       </span>
@@ -197,7 +196,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
               )}
             </section>
 
-            {datos.guia.estado === "ASIGNADA" && (
+            {(datos.guia.estado === "ASIGNADA" || datos.guia.estado === "SIN_ASIGNAR") && (
               <ModificarGuia
                 guia={datos.guia}
                 vehiculos={datos.vehiculos}
@@ -209,6 +208,8 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
               />
             )}
 
+            {datos.guia.estado === "SIN_ASIGNAR" && <Link href={`/empresa/guias/${encodeURIComponent(id)}/asignar`}
+              className="self-start rounded-lg bg-[#0068b3] px-4 py-2 font-medium text-white">Asignar vehículo y chofer</Link>}
             <section className="flex flex-col gap-3">
               <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Línea de tiempo del viaje</h2>
               {conflictos > 0 && (

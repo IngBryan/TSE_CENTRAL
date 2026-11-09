@@ -249,22 +249,58 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void cierreYReinicioCreanExpedientesIndependientesAunqueElPrimeroSigaNotificado() {
+    void unaBrechaEntreMedicionesNoSeparaViajesSinGuiaEnDistintosCasos() {
         DatosCaso primero = iniciarCirculacion();
         enTx(() -> servicio.notificarCaso(primero.getId(), "c-1"));
         Instant tarde = T1.plusSeconds(3600);
-        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.8, -56.0))));
-        DatosCaso segundo = enTx(() -> servicio.registrarCirculacionSinGuia(
+        DatosCaso retorno = enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.8, -56.0)));
+        DatosCaso siguiente = enTx(() -> servicio.registrarCirculacionSinGuia(
                 gps(tarde.plusSeconds(10), -34.8, -55.998)));
-        assertNotEquals(primero.getId(), segundo.getId());
-        assertEquals(EstadoCirculacionSinGuia.FINALIZADA, circulacion(primero.getId()).getEstado());
-        assertEquals(MotivoFinCirculacionSinGuia.BRECHA_TEMPORAL,
-                circulacion(primero.getId()).getMotivoFin());
-        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(segundo.getId()).getEstado());
-        assertEquals(2, caso(primero.getId()).getClavesEventosTracking().size());
-        assertEquals(2, caso(segundo.getId()).getClavesEventosTracking().size());
+        assertEquals(primero.getId(), retorno.getId());
+        assertEquals(primero.getId(), siguiente.getId());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(primero.getId()).getEstado());
+        assertNull(circulacion(primero.getId()).getMotivoFin());
+        assertNull(circulacion(primero.getId()).getFechaFin());
+        assertEquals(4, caso(primero.getId()).getClavesEventosTracking().size());
+        assertEquals(1, enTx(() -> servicio.casosAbiertos("SBC1234")).size());
+        // Una medicion atrasada dentro de la antigua brecha pertenece al mismo caso.
+        assertEquals(primero.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(T1.plusSeconds(1800), -34.85, -56.05))).getId());
+        // Reentregar una evidencia ya asociada no la duplica.
         assertEquals(primero.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
                 gps(T2, -34.9, -56.098))).getId());
+        assertEquals(5, caso(primero.getId()).getClavesEventosTracking().size());
+    }
+
+    @Test
+    void variosViajesTrasDiasSinGpsSiguenAcumulandoEvidenciaEnElMismoCaso() {
+        DatosCaso creado = iniciarCirculacion();
+        for (int dia = 1; dia <= 3; dia++) {
+            Instant salida = T1.plusSeconds(dia * 86400L);
+            assertEquals(creado.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                    gps(salida, -34.9, -56.1))).getId());
+            assertEquals(creado.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                    gps(salida.plusSeconds(10), -34.9, -56.098))).getId());
+        }
+        assertEquals(8, caso(creado.getId()).getClavesEventosTracking().size());
+        CirculacionSinGuia actual = circulacion(creado.getId());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, actual.getEstado());
+        assertEquals(T1, actual.getFechaInicio());
+        assertEquals(T2.plusSeconds(3 * 86400L), actual.getUltimaMedicion());
+        assertNull(actual.getFechaFin());
+        assertEquals(1L, em.createQuery("SELECT count(c) FROM CirculacionSinGuia c", Long.class).getSingleResult());
+    }
+
+    @Test
+    void laVentanaParaConfirmarElMovimientoInicialSeConserva() {
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1))));
+        Instant tarde = T1.plusSeconds(86400);
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.8, -56.0))));
+        assertEquals(List.of(), enTx(() -> servicio.casosAbiertos("SBC1234")));
+        DatosCaso creado = enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(tarde.plusSeconds(10), -34.8, -55.998)));
+        assertEquals(2, caso(creado.getId()).getClavesEventosTracking().size());
+        assertEquals(tarde, circulacion(creado.getId()).getFechaInicio());
     }
 
     @Test
@@ -287,6 +323,23 @@ class CasosAutomaticosServiceTest {
         });
         DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1)));
         assertEquals(primero.getId(), repetido.getId());
+    }
+
+    @Test
+    void nuevosViajesSinGuiaSeAgreganAlMismoCasoAunqueEsteEnDescargo() {
+        DatosCaso primero = iniciarCirculacion();
+        enTx(() -> {
+            CasoFiscalizacion c = em.find(CasoFiscalizacion.class, primero.getId());
+            c.cambiarEstado(EstadoCaso.NOTIFICADA);
+            c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            return null;
+        });
+        DatosCaso siguiente = enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(T1.plusSeconds(86400), -34.8, -56.0)));
+        assertEquals(primero.getId(), siguiente.getId());
+        assertEquals("EN_DESCARGO", siguiente.getEstado());
+        assertEquals(3, caso(primero.getId()).getClavesEventosTracking().size());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(primero.getId()).getEstado());
     }
 
     @Test
@@ -352,14 +405,18 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void detencionProlongadaFinalizaCirculacionPeroNoCaso() {
+    void detencionProlongadaYReanudacionConservanElMismoCaso() {
         DatosCaso creado = iniciarCirculacion();
-        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(
-                gps(T2.plusSeconds(30 * 60), -34.9, -56.098))));
-        assertEquals(EstadoCirculacionSinGuia.FINALIZADA, circulacion(creado.getId()).getEstado());
-        assertEquals(MotivoFinCirculacionSinGuia.DETENCION_PROLONGADA,
-                circulacion(creado.getId()).getMotivoFin());
-        assertEquals(T2, circulacion(creado.getId()).getFechaFin());
+        Instant detencion = T2.plusSeconds(30 * 60);
+        assertEquals(creado.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(detencion, -34.9, -56.098))).getId());
+        assertEquals(creado.getId(), enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(detencion.plusSeconds(10), -34.9, -56.096))).getId());
+        CirculacionSinGuia actual = circulacion(creado.getId());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, actual.getEstado());
+        assertNull(actual.getMotivoFin());
+        assertNull(actual.getFechaFin());
+        assertEquals(4, caso(creado.getId()).getClavesEventosTracking().size());
         assertEquals(EstadoCaso.DETECTADA, caso(creado.getId()).getEstado());
     }
 
@@ -371,6 +428,19 @@ class CasosAutomaticosServiceTest {
         assertEquals(MotivoFinCirculacionSinGuia.GUIA_INICIADA,
                 circulacion(creado.getId()).getMotivoFin());
         assertEquals(EstadoCaso.DETECTADA, caso(creado.getId()).getEstado());
+    }
+
+    @Test
+    void circularDeNuevoSinGuiaTrasUnPeriodoConGuiaIniciaOtroCaso() {
+        DatosCaso primero = iniciarCirculacion();
+        enTx(() -> { servicio.cerrarCirculacionPorGuia("SBC1234", T2.plusSeconds(5)); return null; });
+        Instant siguiente = T1.plusSeconds(86400);
+        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(siguiente, -34.9, -56.1))));
+        DatosCaso nuevo = enTx(() -> servicio.registrarCirculacionSinGuia(
+                gps(siguiente.plusSeconds(10), -34.9, -56.098)));
+        assertNotEquals(primero.getId(), nuevo.getId());
+        assertEquals(MotivoFinCirculacionSinGuia.GUIA_INICIADA, circulacion(primero.getId()).getMotivoFin());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(nuevo.getId()).getEstado());
     }
 
     @Test
@@ -552,14 +622,18 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void aLongGapStartsAnotherCirculation() {
-        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1))));
-        assertNull(enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1.plusSeconds(46 * 60), -34.9, -56.09))));
+    void aLongGapKeepsTheActiveCirculationAndItsCase() {
+        DatosCaso creado = iniciarCirculacion();
+        Instant tarde = T2.plusSeconds(46 * 60);
 
-        List<CirculacionSinGuia> lista = circulaciones();
-        assertEquals(2, lista.size());
-        assertEquals(MotivoFinCirculacionSinGuia.BRECHA_TEMPORAL, lista.get(0).getMotivoFin());
-        assertEquals(EstadoCirculacionSinGuia.PENDIENTE_MOVIMIENTO, lista.get(1).getEstado());
+        DatosCaso asociado = enTx(() -> servicio.registrarCirculacionSinGuia(gps(tarde, -34.9, -56.09)));
+
+        assertEquals(creado.getId(), asociado.getId());
+        assertEquals(1, circulaciones().size());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(creado.getId()).getEstado());
+        assertNull(circulacion(creado.getId()).getMotivoFin());
+        assertNull(circulacion(creado.getId()).getFechaFin());
+        assertEquals(3, caso(creado.getId()).getClavesEventosTracking().size());
     }
 
     @Test
@@ -636,32 +710,22 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
-    void withoutSignalTheCirculationEndsAtItsLastMeasure() {
+    void resumingAfterDaysWithoutSignalKeepsTheCase() {
         DatosCaso creado = iniciarCirculacion();
-        Instant vieja = Instant.now().minus(CasosAutomaticosService.SIN_SENAL).minusSeconds(60);
+        Instant vieja = Instant.now().minusSeconds(3 * 24 * 60 * 60);
         enTx(() -> em.createQuery("UPDATE CirculacionSinGuia c SET c.ultimaRecepcion = :fecha")
                 .setParameter("fecha", vieja).executeUpdate());
         em.clear();
+        Instant regreso = T2.plusSeconds(3 * 24 * 60 * 60);
 
-        enTx(() -> {
-            servicio.cerrarSinSenal();
-            return null;
-        });
+        DatosCaso asociado = enTx(() -> servicio.registrarCirculacionSinGuia(gps(regreso, -34.9, -56.09)));
 
-        assertEquals(MotivoFinCirculacionSinGuia.SIN_SENAL_GPS, circulacion(creado.getId()).getMotivoFin());
-        assertEquals(T2, circulacion(creado.getId()).getFechaFin());
-    }
-
-    @Test
-    void aRecentCirculationIsNotClosed() {
-        DatosCaso creado = iniciarCirculacion();
-
-        enTx(() -> {
-            servicio.cerrarSinSenal();
-            return null;
-        });
-
+        assertEquals(creado.getId(), asociado.getId());
+        assertEquals(1, circulaciones().size());
         assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(creado.getId()).getEstado());
+        assertNull(circulacion(creado.getId()).getFechaFin());
+        assertNull(circulacion(creado.getId()).getMotivoFin());
+        assertEquals(3, caso(creado.getId()).getClavesEventosTracking().size());
     }
 
     @Test
