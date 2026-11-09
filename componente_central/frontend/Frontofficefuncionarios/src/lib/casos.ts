@@ -125,7 +125,7 @@ export type PaginaGpsCaso = {
   idCaso: number;
   totalClaves: number;
   indiceDesde: number;
-  siguienteIndice: number | null;
+  siguienteIndice?: number | null;
   sinRecuperar: number;
   posiciones: import("@/lib/seguimiento").PuntoGpsSeguimiento[];
 };

@@ -55,6 +55,7 @@ class OsrmRutasClientTest {
     void asksForTheRouteWithLongitudeFirst() {
         List<OsrmRutasClient.Candidata> rutas = cliente.obtener(base + "//", ORIGEN, DESTINO);
 
+        assertTrue(pedido.contains("alternatives=false"), pedido);
         assertEquals(1, rutas.size());
         assertEquals(10000, rutas.getFirst().distanciaMetros());
         assertTrue(pedido.startsWith("/route/v1/driving/-58.030000,-33.250000;-58.210000,-33.530000?"), pedido);

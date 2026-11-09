@@ -90,7 +90,7 @@ public class GuiasService {
     // rubroCliente y tipoCarga: el nombre de uno de sus catalogos (ver rubros y tiposCarga).
     // Nuevas pantallas envian IDs de localidad. Se admiten nombres solo para clientes antiguos y si son univocos.
     public record NuevaGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha,
-            String origen, String destino, Long origenId, Long destinoId) {
+            String origen, String destino, Long origenId, Long destinoId, String previsualizacionId) {
     }
 
     // Solo primer nombre y primer apellido del chofer (Ley 18.331)
@@ -106,9 +106,9 @@ public class GuiasService {
             Long origenId, Long destinoId, String origenDepartamento, String destinoDepartamento) {
     }
 
-    // Modificacion de una guia ASIGNADA por el responsable. version: control de concurrencia.
+    // Edicion antes del inicio del viaje. version: control de concurrencia.
     public record EdicionGuia(String rubroCliente, String tipoCarga, Long pesoCargaKg, String fecha, String origen,
-            String destino, Long origenId, Long destinoId, Long version) {
+            String destino, Long origenId, Long destinoId, Long version, String previsualizacionId) {
     }
 
     public record Reasignacion(String matricula, Long idChofer, Long version) {
@@ -169,6 +169,15 @@ public class GuiasService {
         return vista(guia);
     }
 
+    // El alta y su ruta se confirman en la misma transaccion, despues de consultar OSRM.
+    public GuiaVista crearConRuta(String ciResponsable, NuevaGuia datos, List<Long> idsRutas, String correlationId)
+            throws NoAutorizadoException, DatosInvalidosException, RecursoNoEncontradoException {
+        GuiaVista creada = crear(ciResponsable, datos, correlationId);
+        asignacionRutas.asociar(ciResponsable, creada.id(), datos.origenId(), datos.destinoId(), idsRutas, correlationId);
+        guias.sincronizar();
+        return vista(guias.buscarPorId(creada.id()));
+    }
+
     // CU-07 pasos 1 a 5: la guia elegida, los vehiculos y los choferes habilitados de la empresa.
     public OpcionesAsignacion opcionesAsignacion(String ciResponsable, String idGuia, String correlationId)
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException {
@@ -181,14 +190,6 @@ public class GuiasService {
                 .map(this::resumen)
                 .toList();
         return new OpcionesAsignacion(vista(guia), vs, cs);
-    }
-
-    // Una sola transaccion: si falla cualquier validacion, no quedan rutas ni recursos asignados.
-    public GuiaVista asignarConRutas(String ciResponsable, String idGuia, String matricula, Long idChofer,
-            Long origenId, Long destinoId, List<Long> idsRutas, String correlationId)
-            throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
-        asignacionRutas.asociar(ciResponsable, idGuia, origenId, destinoId, idsRutas, correlationId);
-        return asignar(ciResponsable, idGuia, matricula, idChofer, correlationId);
     }
 
     // CU-07 pasos 8 y 9: el responsable confirmo; se registra la asignacion y la guia pasa a ASIGNADA.
@@ -220,8 +221,8 @@ public class GuiasService {
         return vista(guia);
     }
 
-    // ===== Modificacion de guias por el responsable (solo ASIGNADA) =====
-    // Una guia solo se modifica mientras esta ASIGNADA: el chofer todavia no la inicio. Puede estar sin
+    // ===== Modificacion de guias por el responsable =====
+    // La edicion permite SIN_ASIGNAR y ASIGNADA; reasignar y cancelar requieren ASIGNADA. Puede estar sin
     // conexion con la version anterior en el telefono; sus eventos se resuelven con la politica de
     // conflictos (TSE_MOVIL/docs/adr/0002): la edicion sube el @Version y el movil recibe
     // guiaModificada; tras una reasignacion o cancelacion sus eventos quedan CONFLICTO.
@@ -229,8 +230,14 @@ public class GuiasService {
     // Edita los datos de la guia (mismas reglas que el alta).
     public GuiaVista editar(String ciResponsable, String idGuia, EdicionGuia datos, String correlationId)
             throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
+        return editarConRuta(ciResponsable, idGuia, datos, null, correlationId);
+    }
+
+    public GuiaVista editarConRuta(String ciResponsable, String idGuia, EdicionGuia datos,
+            List<Long> idsRutas, String correlationId)
+            throws NoAutorizadoException, RecursoNoEncontradoException, ConflictoException, DatosInvalidosException {
         Empresa empresa = autorizacion.empresaDelResponsable(ciResponsable, true, correlationId);
-        Guia guia = guiaModificable(empresa, idGuia, datos == null ? null : datos.version());
+        Guia guia = guiaModificable(empresa, idGuia, datos == null ? null : datos.version(), true);
         DatosValidos d = validar(datos.rubroCliente(), datos.tipoCarga(), datos.pesoCargaKg(), datos.fecha(),
                 datos.origen(), datos.destino(), datos.origenId(), datos.destinoId(), guia);
 
@@ -252,6 +259,10 @@ public class GuiasService {
         guia.setFecha(d.fecha());
         guia.setOrigenLocalidad(d.localidadOrigen());
         guia.setDestinoLocalidad(d.localidadDestino());
+        if (idsRutas != null) {
+            asignacionRutas.asociar(ciResponsable, idGuia, d.localidadOrigen().getId(),
+                    d.localidadDestino().getId(), idsRutas, correlationId);
+        }
         return registrarModificacion(guia, TipoModificacionGuia.EDICION, ciResponsable, cambios, null, correlationId);
     }
 
@@ -294,13 +305,19 @@ public class GuiasService {
     // Bloquea la guia (los eventos del movil sobre la misma guia esperan) y controla estado y version.
     private Guia guiaModificable(Empresa empresa, String idGuia, Long version)
             throws RecursoNoEncontradoException, ConflictoException {
+        return guiaModificable(empresa, idGuia, version, false);
+    }
+
+    private Guia guiaModificable(Empresa empresa, String idGuia, Long version, boolean permitirSinAsignar)
+            throws RecursoNoEncontradoException, ConflictoException {
         Guia guia = idGuia == null ? null : guias.buscarPorIdParaActualizar(idGuia);
         if (guia == null || !esDe(guia.getEmpresa(), empresa)) {
             throw new RecursoNoEncontradoException("No existe la guia " + idGuia + " en la empresa");
         }
-        if (guia.getEstado() != EstadoGuia.ASIGNADA) {
-            throw new ConflictoException("GUIA_NO_MODIFICABLE", "Solo se puede modificar una guía asignada que el "
-                    + "chofer todavía no inició (estado actual: " + guia.getEstado() + ").");
+        if (guia.getEstado() != EstadoGuia.ASIGNADA
+                && !(permitirSinAsignar && guia.getEstado() == EstadoGuia.SIN_ASIGNAR)) {
+            throw new ConflictoException("GUIA_NO_MODIFICABLE", "La guía no se puede modificar en su estado actual: "
+                    + guia.getEstado() + ".");
         }
         if (version == null || !version.equals(guia.getVersion())) {
             throw new ConflictoException("GUIA_DESACTUALIZADA", "La guía cambió mientras la estabas modificando "

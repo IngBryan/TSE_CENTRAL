@@ -1,9 +1,7 @@
 package tse.lab.frontofficeciudadanos.service.rutas;
 
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.ejb.TransactionAttribute;
@@ -12,7 +10,7 @@ import tse.lab.frontofficeciudadanos.data.LocalidadDAO;
 import tse.lab.model.Localidad;
 import tse.lab.model.RutaReferencia;
 
-/** Seleccion automatica academica: principal + alternativas <= 25% de duracion, hasta 3 geometrías. */
+/** La unica ruta admitida es la de menor duracion devuelta por OSRM. */
 @Stateless
 @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
 public class PrevisualizacionRutasService {
@@ -41,17 +39,9 @@ public class PrevisualizacionRutasService {
         if (candidatas == null || candidatas.isEmpty()) {
             throw new RutasException(422, "sin_ruta_vial", "No se obtuvieron rutas");
         }
-        double minimo = candidatas.stream().mapToDouble(OsrmRutasClient.Candidata::duracionSegundos)
-                .min().orElseThrow();
-        Set<String> huellas = new HashSet<>();
         List<OsrmRutasClient.Candidata> seleccionadas = candidatas.stream()
                 .sorted(Comparator.comparingDouble(OsrmRutasClient.Candidata::duracionSegundos))
-                .filter(c -> c.duracionSegundos() <= minimo * 1.25)
-                .filter(c -> huellas.add(RutaReferencia.calcularHuella(c.geoJsonCanonico())))
-                .limit(3).toList();
-        if (seleccionadas.isEmpty()) {
-            throw new RutasException(422, "sin_ruta_vial", "Ninguna ruta cumple la politica");
-        }
+                .limit(1).toList();
         List<RutaVista> rutas = java.util.stream.IntStream.range(0, seleccionadas.size())
                 .mapToObj(i -> {
                     var r = seleccionadas.get(i);

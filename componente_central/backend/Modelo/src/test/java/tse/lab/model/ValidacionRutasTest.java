@@ -7,15 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Collections;
 import org.junit.jupiter.api.Test;
 
 class ValidacionRutasTest {
     private static final String GEO_A = "{\"type\":\"LineString\",\"coordinates\":[[-58.0,-33.0],[-58.2,-33.2]]}";
     private static final String GEO_B = "{\"type\":\"LineString\",\"coordinates\":[[-58.0,-33.0],[-58.3,-33.3]]}";
-    private static final String GEO_C = "{\"type\":\"LineString\",\"coordinates\":[[-58.0,-33.0],[-58.4,-33.4]]}";
-    private static final String GEO_D = "{\"type\":\"LineString\",\"coordinates\":[[-58.0,-33.0],[-58.5,-33.5]]}";
 
     private static Guia guia() {
         return new Guia("G1", "Agro", 20000L, LocalDate.of(2026, 10, 31), "Mercedes", "Nueva Palmira", new Empresa());
@@ -92,27 +90,27 @@ class ValidacionRutasTest {
     }
 
     @Test
-    void aGuideTakesBetweenOneAndThreeRoutes() {
+    void aGuideRequiresExactlyOneRoute() {
         Guia guia = guia();
-        List<RutaReferencia> cuatro = List.of(ruta(GEO_A), ruta(GEO_B), ruta(GEO_C), ruta(GEO_D));
+        List<RutaReferencia> dos = List.of(ruta(GEO_A), ruta(GEO_B));
 
         assertThrows(IllegalArgumentException.class, () -> guia.reemplazarRutasAutorizadas(null));
         assertThrows(IllegalArgumentException.class, () -> guia.reemplazarRutasAutorizadas(List.of()));
-        assertThrows(IllegalArgumentException.class, () -> guia.reemplazarRutasAutorizadas(cuatro));
+        assertThrows(IllegalArgumentException.class, () -> guia.reemplazarRutasAutorizadas(dos));
         assertThrows(IllegalArgumentException.class,
-                () -> guia.reemplazarRutasAutorizadas(Arrays.asList(ruta(GEO_A), null)));
+                () -> guia.reemplazarRutasAutorizadas(Collections.singletonList(null)));
         assertTrue(guia.getRutasAutorizadas().isEmpty());
     }
 
     @Test
-    void replacingKeepsOnlyTheNewRoutes() {
+    void replacingKeepsOnlyTheNewRoute() {
         Guia guia = guia();
         RutaReferencia b = ruta(GEO_B);
-        guia.reemplazarRutasAutorizadas(List.of(ruta(GEO_A), b));
+        guia.reemplazarRutasAutorizadas(List.of(ruta(GEO_A)));
 
-        guia.reemplazarRutasAutorizadas(List.of(b, ruta(GEO_C)));
+        guia.reemplazarRutasAutorizadas(List.of(b));
 
-        assertEquals(List.of(GEO_B, GEO_C), guia.getRutasAutorizadas().stream()
+        assertEquals(List.of(GEO_B), guia.getRutasAutorizadas().stream()
                 .map(r -> r.getRutaReferencia().getGeometriaGeoJson()).toList());
     }
 

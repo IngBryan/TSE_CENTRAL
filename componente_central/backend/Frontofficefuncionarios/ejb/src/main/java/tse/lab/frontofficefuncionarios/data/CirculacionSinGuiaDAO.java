@@ -5,7 +5,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
-import java.util.List;
 import tse.lab.model.CirculacionSinGuia;
 import tse.lab.model.EstadoCirculacionSinGuia;
 import tse.lab.model.Vehiculo;
@@ -41,12 +40,6 @@ public class CirculacionSinGuiaDAO {
                 .setParameter("activa", EstadoCirculacionSinGuia.ACTIVA)
                 .setParameter("fin", EstadoCirculacionSinGuia.FINALIZADA)
                 .setMaxResults(1).getResultStream().findFirst().orElse(null);
-    }
-    public List<String> matriculasInactivas(Instant limite, int maximo) {
-        return em.createQuery("SELECT c.vehiculo.matricula FROM CirculacionSinGuia c WHERE"
-                + " c.estado <> :fin AND c.ultimaRecepcion < :limite ORDER BY c.ultimaRecepcion", String.class)
-                .setParameter("fin", EstadoCirculacionSinGuia.FINALIZADA)
-                .setParameter("limite", limite).setMaxResults(maximo).getResultList();
     }
     public boolean hayEpisodioPosterior(String matricula, Instant fecha) {
         return !em.createQuery("SELECT c.id FROM CirculacionSinGuia c WHERE c.vehiculo.matricula = :m"

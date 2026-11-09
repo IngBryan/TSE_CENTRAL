@@ -8,7 +8,6 @@ import type { RutaAsignada, RutaVista } from "./tipos-rutas";
 
 setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString());
 const ESTILO = "https://tiles.openfreemap.org/styles/liberty";
-const COLORES = ["#16a34a", "#2563eb", "#a855f7"];
 const VACIO: FeatureCollection = { type: "FeatureCollection", features: [] };
 type RutaMapeable = { alternativa: number; geoJson?: string; geometriaGeoJson?: string };
 
@@ -28,7 +27,6 @@ function coordenadas(texto?: string): [number, number][] | null {
 
 type PropsMapa = {
   rutas: (RutaVista | RutaAsignada)[];
-  visible: number | null;
 };
 
 // El mapa es una ayuda visual: un navegador sin soporte grafico no debe impedir asignar el viaje.
@@ -41,7 +39,7 @@ class LimiteMapa extends Component<{ children: ReactNode }, { fallo: boolean }> 
 
   render() {
     if (this.state.fallo) return <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-      No se pudo mostrar el mapa en este navegador. Las alternativas calculadas siguen disponibles para revisar y confirmar.
+      No se pudo mostrar el mapa en este navegador. Los datos de la ruta siguen disponibles para revisar y confirmar.
     </p>;
     return this.props.children;
   }
@@ -51,7 +49,7 @@ export default function MapaRutas(props: PropsMapa) {
   return <LimiteMapa><ContenidoMapa {...props} /></LimiteMapa>;
 }
 
-function ContenidoMapa({ rutas, visible }: PropsMapa) {
+function ContenidoMapa({ rutas }: PropsMapa) {
   const nodo = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MapaGL | null>(null);
   const [listo, setListo] = useState(false);
@@ -75,12 +73,11 @@ function ContenidoMapa({ rutas, visible }: PropsMapa) {
   useEffect(() => {
     const m = mapa.current;
     if (!m || !listo) return;
-    const lineas = rutas.flatMap((ruta) => {
-      if (visible !== null && ruta.alternativa !== visible) return [];
+    const lineas = rutas.slice(0, 1).flatMap((ruta) => {
       const r = ruta as RutaMapeable;
       const coords = coordenadas(r.geoJson ?? r.geometriaGeoJson);
       return coords ? [{ type: "Feature" as const,
-        properties: { color: COLORES[(ruta.alternativa - 1) % COLORES.length] },
+        properties: { color: "#16a34a" },
         geometry: { type: "LineString" as const, coordinates: coords } }] : [];
     });
     const coleccion: FeatureCollection<LineString> = { type: "FeatureCollection", features: lineas };
@@ -89,10 +86,10 @@ function ContenidoMapa({ rutas, visible }: PropsMapa) {
     const todos = lineas.flatMap(l => l.geometry.coordinates);
     todos.forEach(coord => bounds.extend([coord[0], coord[1]]));
     if (todos.length) m.fitBounds(bounds, { padding: 45, maxZoom: 12, duration: 0 });
-  }, [rutas, visible, listo]);
+  }, [rutas, listo]);
 
   return <div>
-    <div ref={nodo} role="img" aria-label="Mapa de las alternativas de ruta vial"
+    <div ref={nodo} role="img" aria-label="Mapa de la ruta admitida"
       className="h-[340px] rounded-xl border border-zinc-200 sm:h-[450px] dark:border-zinc-800" />
     {error && <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
       No se pudo cargar completamente el mapa base. Revisá la conexión con el proveedor cartográfico.

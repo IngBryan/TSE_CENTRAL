@@ -60,27 +60,26 @@ class OsrmRutasTest {
     }
 
     @Test
-    void seleccionaRutasPor25PorCientoYNoPorOrdenDeRespuesta() {
+    void seleccionaSoloLaRutaDeMenorDuracionAunqueNoSeaLaPrimera() {
         var p = PrevisualizacionRutasService.seleccionar(7L, 8L,
                 List.of(candidata(C, 920), candidata(B, 700), candidata(A, 600)));
-        assertEquals(2, p.rutas().size());
+        assertEquals(1, p.rutas().size());
         assertEquals(normalizar(A), p.rutas().get(0).geoJson());
-        assertEquals(normalizar(B), p.rutas().get(1).geoJson());
     }
 
     @Test
-    void deduplicaGeometriasCanonicas() {
+    void noConservaAlternativasNiGeometriasDuplicadas() {
         var p = PrevisualizacionRutasService.seleccionar(7L, 8L,
                 List.of(candidata(A, 600), candidata(A, 650), candidata(B, 700)));
-        assertEquals(2, p.rutas().size());
+        assertEquals(1, p.rutas().size());
         assertEquals(RutaReferencia.calcularHuella(normalizar(A)), p.rutas().get(0).sha256());
     }
 
     @Test
-    void noSuperaTresAlternativas() {
+    void conservaUnaSolaRutaAunqueTodasTenganDuracionesSimilares() {
         var p = PrevisualizacionRutasService.seleccionar(7L, 8L,
                 List.of(candidata(A, 600), candidata(B, 601), candidata(C, 602), candidata(D, 603)));
-        assertEquals(3, p.rutas().size());
+        assertEquals(1, p.rutas().size());
     }
 
     @Test
