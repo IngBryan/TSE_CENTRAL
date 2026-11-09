@@ -1,10 +1,23 @@
 {
-  "vhosts": [{ "name": "/" }],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
   "exchanges": [
     {
       "name": "tracking",
       "vhost": "/",
       "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "fiscalizacion.config",
+      "vhost": "/",
+      "type": "fanout",
       "durable": true,
       "auto_delete": false,
       "internal": false,
@@ -17,7 +30,9 @@
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
-      "arguments": { "x-queue-type": "classic" }
+      "arguments": {
+        "x-queue-type": "classic"
+      }
     }
   ],
   "bindings": [

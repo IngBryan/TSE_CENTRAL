@@ -30,6 +30,8 @@ public interface TrackingEventDAO {
      */
     List<TrackingEvent> findByLicensePlateBetween(String matricula, Instant desde, Instant hasta, int limit);
 
+    default long fijarRevisionReglas(TrackingEvent event, long revision) { return revision; }
+
     /** Marks the event as evaluated by the detection. */
     void markDetected(TrackingEvent event);
 

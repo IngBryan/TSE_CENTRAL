@@ -168,6 +168,22 @@ class CaseAssignerTest {
         assertThrows(UncheckedIOException.class,
                 () -> asignador.accept(sinGuia(gps(0), Situation.ROUTE_DEVIATION)));
     }
+    @Test void laEvidenciaDeCargaConservaLaRevisionYElPesoBaseSinDesbordar() throws Exception {
+        var repositorio=org.mockito.Mockito.mock(CaseStore.class);
+        var evento=new tse.lab.fiscalizacionautomatica.ruleengine.model.Weighing(1,1,"SBC1234",gps(0).timestamp(),50000);
+        var vehiculo=new DatosVehiculo("SBC1234",1L,Integer.MAX_VALUE,Integer.MAX_VALUE,null);
+        var hechos=new VehicleFacts(vehiculo,List.of());
+        var config=tse.lab.reglas.ConfiguracionReglas.inicial();
+        new CaseAssigner(repositorio).accept(new Detection(evento,hechos,List.of(Situation.OVERLOAD),
+                ResultadoAsociacionGpsGuia.asociado("G1"),null,config));
+        org.mockito.Mockito.verify(repositorio).registrarConReglas(TipoCasoAutomatico.EXCESO_CARGA,"G1",evento,config,4294967294L);
+        asignador.accept(new Detection(evento,hechos,List.of(Situation.OVERLOAD),
+                ResultadoAsociacionGpsGuia.asociado("G1"),null,config));
+        assertEquals(TipoCasoAutomatico.EXCESO_CARGA,store.casos.getFirst().tipo());
+        assertEquals(List.of(evento),store.casos.getFirst().evidencias());
+    }
+
+
 
     @Test
     void anAssociatedGpsClosesTheCirculationEvenWithoutSituations() {

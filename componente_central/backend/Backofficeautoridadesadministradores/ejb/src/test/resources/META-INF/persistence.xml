@@ -25,6 +25,9 @@
         <class>tse.lab.model.Funcionario</class>
         <class>tse.lab.model.RegistroAuditoriaCaso</class>
         <class>tse.lab.model.NodoTracking</class>
+        <class>tse.lab.model.RevisionReglas</class>
+        <class>tse.lab.model.ReglasVigentes</class>
+
         <class>tse.lab.model.UsuarioBackoffice</class>
         <class>tse.lab.model.Administrador</class>
         <class>tse.lab.model.Autoridad</class>

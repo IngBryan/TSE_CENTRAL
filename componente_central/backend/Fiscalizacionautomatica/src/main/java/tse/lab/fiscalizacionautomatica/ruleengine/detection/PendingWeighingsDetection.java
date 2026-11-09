@@ -37,7 +37,8 @@ public class PendingWeighingsDetection {
         int failed = 0;
         for (Weighing weighing : weighingDAO.findPending(BATCH)) {
             try {
-                onDetected.accept(detector.detect(weighing));
+                long revision=weighingDAO.fijarRevisionReglas(weighing, detector.revisionActual());
+                onDetected.accept(detector.detect(weighing, revision));
                 weighingDAO.markDetected(weighing);
             } catch (IOException | RuntimeException e) {
                 failed++;

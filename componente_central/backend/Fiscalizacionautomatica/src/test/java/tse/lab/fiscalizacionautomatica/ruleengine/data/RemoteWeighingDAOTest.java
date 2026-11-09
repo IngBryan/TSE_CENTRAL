@@ -64,4 +64,11 @@ class RemoteWeighingDAOTest {
 
         verify(context).close();
     }
+    @Test void usaLaRevisionQueYaHabiaFijadoElServidor() throws IOException {
+        when(remote.fijarRevisionReglas("SBC1234",T1,5)).thenReturn(2L);
+        assertEquals(2,dao.fijarRevisionReglas(WEIGHING,5));
+        when(remote.fijarRevisionReglas("SBC1234",T1,5)).thenThrow(new EJBException("sin servidor"));
+        assertThrows(IOException.class,()->dao.fijarRevisionReglas(WEIGHING,5));
+    }
+
 }

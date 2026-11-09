@@ -14,12 +14,23 @@ public final class EventoFiscalizado implements Serializable {
     private final OrigenEvento origen;
     // Para seguir el evento en los logs; no es parte de su identidad
     private final String correlationId;
+    private final Long revisionReglas;
+    private final Long pesoBaseKg;
+    public Long getRevisionReglas() { return revisionReglas; }
+    public Long getPesoBaseKg() { return pesoBaseKg; }
 
     public EventoFiscalizado(String matricula, Instant fechaHora, OrigenEvento origen) {
         this(matricula, fechaHora, origen, null);
     }
 
     public EventoFiscalizado(String matricula, Instant fechaHora, OrigenEvento origen, String correlationId) {
+        this(matricula, fechaHora, origen, correlationId, null, null);
+    }
+
+    public EventoFiscalizado(String matricula, Instant fechaHora, OrigenEvento origen, String correlationId,
+            Long revisionReglas, Long pesoBaseKg) {
+        this.revisionReglas=revisionReglas;
+        this.pesoBaseKg=pesoBaseKg;
         this.matricula = matricula;
         this.fechaHora = fechaHora;
         this.origen = origen;

@@ -98,6 +98,11 @@ public class CasoFiscalizacion implements Serializable {
                     "id_caso", "matricula", "fecha_hora", "origen" }))
     private List<EvidenciaHabilitacion> evidenciasHabilitacion = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name="casos_evidencias_reglas", joinColumns=@JoinColumn(name="id_caso"),
+        uniqueConstraints=@UniqueConstraint(columnNames={"id_caso", "matricula", "fecha_hora", "origen"}))
+    private List<EvidenciaReglas> evidenciasReglas = new ArrayList<>();
+
     public CasoFiscalizacion() {
     }
 
@@ -194,6 +199,8 @@ public class CasoFiscalizacion implements Serializable {
     public List<EvidenciaGeometricaDesvio> getEvidenciasDesvio() {
         return evidenciasDesvio;
     }
+
+    public List<EvidenciaReglas> getEvidenciasReglas() { return evidenciasReglas; }
 
     public List<EvidenciaHabilitacion> getEvidenciasHabilitacion() {
         return evidenciasHabilitacion;

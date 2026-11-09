@@ -39,6 +39,15 @@ class OverloadRuleTest {
     }
 
     @Test
+    void toleranciaConfigurableRespetaLaIgualdadYElMargenMayor() {
+        var c=new tse.lab.reglas.ConfiguracionReglas(2,new java.math.BigDecimal("2"),500,2000,30,
+                "2026-11-07T00:00:00Z","admin","x",true);
+        assertFalse(rule.excedePeso(weighing(34169),WITH_TRIP,c));
+        assertFalse(rule.excedePeso(weighing(34170),WITH_TRIP,c));
+        assertTrue(rule.excedePeso(weighing(34171),WITH_TRIP,c));
+    }
+
+    @Test
     void onlyAppliesToWeighingsOfAVehicleWithAnActiveTrip() {
         assertFalse(rule.appliesTo(weighing(40_000), new VehicleFacts(VEHICLE, List.of())));
         assertFalse(rule.appliesTo(new TrackingEvent("msg-1", 7, 2, "STU5678", -34.9, -56.1, NOW), WITH_TRIP));

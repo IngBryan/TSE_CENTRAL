@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   Network,
+  Settings,
   Truck,
   Users,
   type LucideIcon,
@@ -36,6 +37,7 @@ const ENTRADAS: { ruta: string; nombre: string; icono: LucideIcon }[] = [
   { ruta: "/dashboard", nombre: "Dashboards", icono: LayoutDashboard },
   { ruta: "/reportes", nombre: "Reportes", icono: FileText },
   { ruta: "/nodos-perifericos", nombre: "Nodos periféricos", icono: Network },
+  { ruta: "/reglas-fiscalizacion", nombre: "Reglas de fiscalización", icono: Settings },
   { ruta: "/usuarios", nombre: "Usuarios", icono: Users },
 ];
 

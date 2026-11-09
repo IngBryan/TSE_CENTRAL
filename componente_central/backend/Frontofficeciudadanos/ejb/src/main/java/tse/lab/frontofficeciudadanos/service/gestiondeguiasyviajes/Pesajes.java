@@ -13,5 +13,7 @@ public interface Pesajes {
     // Pesajes pendientes de deteccion, del mas viejo al mas nuevo
     List<DatosPesaje> listarPendientes(int limite);
 
+    long fijarRevisionReglas(String matricula, Instant fechaHora, long revision);
+
     void marcarDetectado(String matricula, Instant fechaHora);
 }

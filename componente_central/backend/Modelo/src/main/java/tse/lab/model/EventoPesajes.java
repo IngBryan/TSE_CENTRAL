@@ -36,6 +36,13 @@ public class EventoPesajes implements Serializable {
 
     // false al guardarlo; la fiscalizacion automatica lo marca cuando lo evaluo
     private boolean detectado;
+    @Column(name="revision_reglas")
+    private Long revisionReglas;
+    public long fijarRevisionReglas(long revision) {
+        if (revision < 1) throw new IllegalArgumentException("Revisión inválida");
+        if (revisionReglas == null) revisionReglas=revision;
+        return revisionReglas;
+    }
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_nodo_balanza", nullable = false)

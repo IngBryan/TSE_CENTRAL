@@ -6,6 +6,7 @@ export const RUTA_CERRAR_SESION = "/sesion/cerrar";
 // Each protected section and the roles that may open it; proxy.ts and the pages read this same table
 export const RUTAS_PROTEGIDAS: readonly { prefijo: string; roles: readonly Rol[] }[] = [
   { prefijo: "/nodos-perifericos", roles: ["ADMINISTRADOR"] },
+  { prefijo: "/reglas-fiscalizacion", roles: ["ADMINISTRADOR"] },
   { prefijo: "/usuarios", roles: ["ADMINISTRADOR"] },
   { prefijo: "/dashboard", roles: ["AUTORIDAD"] },
   { prefijo: "/reportes", roles: ["AUTORIDAD"] },

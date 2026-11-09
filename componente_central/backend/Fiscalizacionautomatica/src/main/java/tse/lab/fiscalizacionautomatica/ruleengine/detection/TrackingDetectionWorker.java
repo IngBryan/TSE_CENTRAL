@@ -83,7 +83,8 @@ public class TrackingDetectionWorker implements AutoCloseable {
 
     void detect(TrackingEvent event) {
         try {
-            onDetected.accept(detector.detect(event));
+            long revision=dao.fijarRevisionReglas(event, detector.revisionActual());
+            onDetected.accept(detector.detect(event, revision));
             dao.markDetected(event);
         } catch (IOException | RuntimeException e) {
             LogFiscalizacion.error(LogFiscalizacion.evento("tracking.no_evaluado").correlationId(event.correlationId())

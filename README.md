@@ -523,6 +523,46 @@ en varios modos, segun el argumento:
   `MONGO_AUTH_DB`, igual que el consumidor) y del EJB remoto (`WILDFLY_URL`, `EJB_USER`,
   `EJB_PASSWORD`).
 
+**Configuración de reglas (Backoffice, administradores):**
+
+- En `/backoffice/reglas-fiscalizacion` se configuran la tolerancia de carga (0 a 20 %, hasta
+  dos decimales), margen absoluto (0 a 5000 kg), distancia de desvío (1 a 10000 m) y ventana
+  de confirmación (1 a 600 s). Son cotas técnicas del prototipo. El límite de carga es
+  `peso + capacidad + max(margenKg, (peso + capacidad) * porcentaje / 100)`; igualarlo no infringe.
+  La pantalla incluye fundamento, autor, fecha, historial de las últimas 20 revisiones y
+  conflictos de edición. Viaje sin Guía y habilitación conservan sus criterios actuales.
+- La autorización de administrador se comprueba también en el EJB de gestión. La API del
+  Backoffice ofrece `GET/PUT /reglas-fiscalizacion` y `GET /reglas-fiscalizacion/historial`.
+  El PUT exige `revisionBase`, los cuatro parámetros y `fundamento`.
+- Las revisiones se guardan en PostgreSQL (`reglas_fiscalizacion_revisiones`, referencia en
+  `reglas_fiscalizacion_vigente`). Las pendientes de publicación funcionan como outbox:
+  cada 5 s el Backoffice publica por el exchange durable **`fiscalizacion.config` (fanout)**,
+  con publisher confirms y reintentos. Varios WildFly se coordinan mediante bloqueo de fila.
+  Una publicación sin consumidores es válida: nuevas instancias cargan la vigente por EJB.
+- Cada JVM de fiscalización crea una cola exclusiva, efímera y de nombre generado, enlazada al
+  exchange, en un canal separado del tracking. Todas las instancias reciben cada cambio.
+  El snapshot se reemplaza de forma atómica y solo avanza de revisión. Se carga por EJB antes
+  de detectar, después de recuperar la conexión y cada 60 s como reconciliación. Si un refresco
+  falla, se sigue con la última configuración válida. La propagación es eventual: «Publicada»
+  acredita el envío al broker, no la aplicación simultánea en todos los procesos.
+- El poller y la detección manual cargan la vigente al empezar. GPS y pesajes fijan su revisión
+  antes de evaluar; los reintentos recuperan la misma revisión. Los cambios no reprocesan eventos
+  ya evaluados. La evidencia de carga/desvío conserva la revisión por caso, evento y origen
+  (`casos_evidencias_reglas`), y la de carga también la base en kg; la revisión conserva el margen.
+- Desvío queda registrado siempre: se retira `ROUTE_DEVIATION_ENABLED`. Los parámetros se cambian
+  desde el Backoffice, sin reiniciar el daemon. La cantidad de muestras de confirmación sigue en dos.
+- **Bases existentes:** ejecutar primero
+  `componente_central/backend/Frontofficeciudadanos/ejb/src/main/resources/META-INF/migracion-reglas-fiscalizacion.sql`.
+  Para bases generadas desde JPA, la precarga ya incluye la revisión inicial (0 %, 0 kg, 2000 m,
+  30 s). Recompilar y desplegar Modelo, los tres EAR, el daemon y el frontend de Backoffice juntos,
+  porque cambian contratos EJB. Las credenciales Rabbit de WildFly ya están en Compose/Kubernetes;
+  deben permitir declarar el exchange y, para el daemon, declarar/enlazar/consumir sus colas efímeras.
+  El exchange se declara idempotentemente en ejecución, también en Kubernetes.
+- Prueba de broadcast con un broker **descartable** en `localhost:5673` (guest/guest):
+  `REGLAS_RABBIT_INTEGRATION=true mvn -f componente_central/backend/Fiscalizacionautomatica/pom.xml -Dtest=BroadcastReglasTest test`.
+  Comprueba dos suscriptores activos y el bootstrap de un tercero. Sin esa variable se omite
+  únicamente esta prueba de integración.
+
 **Viajes en curso (EJB remoto de Frontofficeciudadanos):**
 
 Para saber si un vehiculo tiene guia, fiscalizacion llama por EJB remoto a `ViajesEnCursoService`
@@ -980,7 +1020,8 @@ consume; no hay respuesta ni cola de retorno. Cada mensaje lo procesa un unico c
   `rabbitmq/definitions.json`. Un hook `post_start` del servicio los importa con
   `rabbitmqctl import_definitions` en cada arranque (es idempotente). No se cargan en el boot
   porque en ese caso RabbitMQ no crea el usuario de `RABBITMQ_USER`. Las apps no declaran
-  colas: solo publican o consumen.
+  colas de tracking: solo publican o consumen. La configuración de reglas agrega colas
+  efímeras por JVM y declara su exchange fanout idempotentemente.
 - **Cambiar la topologia:** la importacion solo **crea lo que falta**; no modifica ni borra
   objetos existentes (y no da error). Para agregar algo alcanza con editar el archivo y correr
   `docker compose up -d --force-recreate rabbitmq`. Para cambiar una propiedad de algo que ya

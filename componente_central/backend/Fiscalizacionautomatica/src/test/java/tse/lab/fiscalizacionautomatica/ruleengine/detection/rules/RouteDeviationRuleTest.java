@@ -92,6 +92,19 @@ class RouteDeviationRuleTest {
     }
 
     @Test
+    void nuevosParametrosCambianLaDistanciaYLaVentanaSinRecrearElProceso() throws IOException {
+        gps(0,-55.95);
+        TrackingEvent segundo=gps(40,-55.95);
+        assertFalse(regla.evaluar(segundo,HECHOS).isPresent());
+        var amplia=new tse.lab.reglas.ConfiguracionReglas(2,java.math.BigDecimal.ZERO,0,2000,60,
+                "2026-11-07T00:00:00Z","admin","x",true);
+        assertTrue(regla.evaluar(segundo,HECHOS,amplia).isPresent());
+        var corredor=new tse.lab.reglas.ConfiguracionReglas(3,java.math.BigDecimal.ZERO,0,10000,60,
+                "2026-11-07T00:00:00Z","admin","x",true);
+        assertFalse(regla.evaluar(segundo,HECHOS,corredor).isPresent());
+    }
+
+    @Test
     void posicionCercaDeLaRutaNoConfirma() throws IOException {
         gps(0, -56);
         assertFalse(regla.appliesTo(gps(10, -56.001), HECHOS));

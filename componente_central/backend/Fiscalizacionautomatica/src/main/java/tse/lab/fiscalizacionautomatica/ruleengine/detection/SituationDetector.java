@@ -1,6 +1,8 @@
 package tse.lab.fiscalizacionautomatica.ruleengine.detection;
 
 import java.io.IOException;
+import tse.lab.fiscalizacionautomatica.ruleengine.config.ReglasSource;
+import tse.lab.reglas.ConfiguracionReglas;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -15,6 +17,7 @@ import tse.lab.fiscalizacionautomatica.ruleengine.trips.ResultadoAsociacionGpsGu
 
 /** Detecta todas las situaciones aplicables y adjunta la asociación temporal a la Guía. */
 public class SituationDetector {
+    private final ReglasSource configuracion;
     private final VehicleFactsSource factsSource;
     private final List<SituationRule> rules;
     private final ContextoEventoSource contextoSource;
@@ -26,12 +29,26 @@ public class SituationDetector {
 
     public SituationDetector(VehicleFactsSource factsSource, List<SituationRule> rules,
             ContextoEventoSource contextoSource) {
+        this(factsSource, rules, contextoSource,
+                ReglasSource.fija(ConfiguracionReglas.inicial()));
+    }
+
+    public SituationDetector(VehicleFactsSource factsSource, List<SituationRule> rules,
+            ContextoEventoSource contextoSource, ReglasSource configuracion) {
+        this.configuracion = configuracion;
         this.factsSource = factsSource;
         this.rules = rules.stream().sorted(Comparator.comparing(SituationRule::situation)).toList();
         this.contextoSource = contextoSource;
     }
 
+    public long revisionActual() throws IOException { return configuracion.actual().getRevision(); }
+
     public Detection detect(VehicleEvent event) throws IOException {
+        return detect(event, revisionActual());
+    }
+
+    public Detection detect(VehicleEvent event, long revision) throws IOException {
+        var snapshot = configuracion.revision(revision);
         Optional<VehicleFacts> facts = factsSource.find(event.licensePlate(), event.timestamp());
         if (facts.isEmpty()) {
             return new Detection(event, null, List.of());
@@ -52,9 +69,11 @@ public class SituationDetector {
                         && contexto.estado() == ResultadoAsociacionGpsGuia.Estado.SIN_GUIA;
             } else if (contexto != null && rule instanceof OverloadRule overload) {
                 applies = contexto.estado() == ResultadoAsociacionGpsGuia.Estado.ASOCIADO
-                        && overload.excedePeso(event, facts.get());
+                        && overload.excedePeso(event, facts.get(), snapshot);
+            } else if (rule instanceof OverloadRule overload) {
+                applies = facts.get().hasActiveTrip() && overload.excedePeso(event, facts.get(), snapshot);
             } else if (rule instanceof RouteDeviationRule desvio) {
-                var resultado = desvio.evaluar(event, facts.get());
+                var resultado = desvio.evaluar(event, facts.get(), snapshot);
                 applies = resultado.isPresent();
                 if (applies) pruebaDesvio = resultado.orElseThrow();
             } else {
@@ -64,6 +83,6 @@ public class SituationDetector {
                 situations.add(rule.situation());
             }
         }
-        return new Detection(event, facts.get(), List.copyOf(situations), contexto, pruebaDesvio);
+        return new Detection(event, facts.get(), List.copyOf(situations), contexto, pruebaDesvio, snapshot);
     }
 }

@@ -92,6 +92,18 @@ class CasosAutomaticosServiceTest {
     }
 
     @Test
+    void conservaRevisionYPesoBaseDeLaEvidenciaAnteUnReintento() {
+        var e=new EventoFiscalizado("SBC1234",T1,OrigenEvento.PESAJE,"c",2L,33500L);
+        DatosCaso caso=enTx(()->servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA,"GV-1",e));
+        var repetido=new EventoFiscalizado("SBC1234",T1,OrigenEvento.PESAJE,"c",3L,34000L);
+        enTx(()->servicio.registrarEvidencia(TipoCasoAutomatico.EXCESO_CARGA,"GV-1",repetido));
+        var evidencias=caso(caso.getId()).getEvidenciasReglas();
+        assertEquals(1,evidencias.size());
+        assertEquals(2,evidencias.getFirst().getRevision());
+        assertEquals(33500L,evidencias.getFirst().getPesoBaseKg());
+    }
+
+    @Test
     void conservaPruebaDocumentalPorEventoYOrigenSinDuplicarTrasElDescargo() {
         var prueba = sinDocumentos(T1);
         DatosCaso creado = enTx(() -> servicio.registrarHabilitacion("GV-1", TRACKING_T1, prueba));

@@ -60,7 +60,7 @@ public class CaseAssigner implements Consumer<Detection> {
                 if (!(detection.event() instanceof TrackingEvent gps) || detection.pruebaDesvio() == null) {
                     throw new IOException("La situación de desvío carece de prueba geométrica");
                 }
-                caso = cases.registrarDesvio(guia, gps, detection.pruebaDesvio());
+                caso = cases.registrarDesvioConReglas(guia, gps, detection.pruebaDesvio(), detection.configuracion());
             } else if (situacion == Situation.VEHICLE_WITHOUT_VALID_PERMIT) {
                 if (detection.facts() == null || detection.facts().vehicle() == null
                         || detection.facts().vehicle().getHabilitacion() == null) {
@@ -69,7 +69,9 @@ public class CaseAssigner implements Consumer<Detection> {
                 caso = cases.registrarHabilitacion(guia, detection.event(),
                         detection.facts().vehicle().getHabilitacion());
             } else {
-                caso = cases.registrar(situacion.caseType(), guia, detection.event());
+                long pesoBase = (long) detection.facts().vehicle().getPesoKg()
+                        + detection.facts().vehicle().getCapacidadCargaKg();
+                caso = cases.registrarConReglas(situacion.caseType(), guia, detection.event(), detection.configuracion(), pesoBase);
             }
             if (caso != null) log("caso.registrado", caso, detection.event());
             if (caso != null && DETECTADA.equals(caso.getEstado())) {

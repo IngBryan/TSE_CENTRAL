@@ -24,6 +24,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.bson.Document;
+import tse.lab.fiscalizacionautomatica.ruleengine.config.EstadoReglas;
+import tse.lab.fiscalizacionautomatica.ruleengine.config.ReglasClient;
+import tse.lab.fiscalizacionautomatica.ruleengine.config.ReglasSource;
+import tse.lab.fiscalizacionautomatica.ruleengine.config.SuscripcionReglas;
 import tse.lab.fiscalizacionautomatica.ruleengine.cases.CaseAssigner;
 import tse.lab.fiscalizacionautomatica.ruleengine.cases.RemoteCaseStore;
 import tse.lab.fiscalizacionautomatica.ruleengine.data.MongoScalesMetadataDAO;
@@ -33,7 +37,6 @@ import tse.lab.fiscalizacionautomatica.ruleengine.detection.PendingWeighingsDete
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationDetector;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.SituationRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.TrackingDetectionWorker;
-import tse.lab.fiscalizacionautomatica.ruleengine.detection.VehicleFactsSource;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.OverloadRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.VehicleWithoutValidPermitRule;
 import tse.lab.fiscalizacionautomatica.ruleengine.detection.rules.TripWithoutGuideRule;
@@ -101,7 +104,6 @@ public class Main {
         String user = System.getenv("EJB_USER");
         String password = System.getenv("EJB_PASSWORD");
 
-        boolean desvioHabilitado = Boolean.parseBoolean(env("ROUTE_DEVIATION_ENABLED", "false"));
         CountDownLatch stopRequested = new CountDownLatch(1);
         CountDownLatch stopped = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -118,8 +120,8 @@ public class Main {
                 RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
                 RemoteIntervalosGuiasGpsSource intervalos =
                         new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password);
-                RemoteRutasAutorizadasSource rutas = desvioHabilitado
-                        ? new RemoteRutasAutorizadasSource(wildFlyUrl(), user, password) : null) {
+                RemoteRutasAutorizadasSource rutas = new RemoteRutasAutorizadasSource(wildFlyUrl(), user, password);
+                ReglasClient reglasClient = new ReglasClient(wildFlyUrl(), user, password)) {
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             if (!waitForMongo(database, stopRequested) || !waitForActiveGps(activeGps, stopRequested)) {
                 return; // stopped while waiting
@@ -132,35 +134,35 @@ public class Main {
             ConnectionFactory factory = createRabbitConnectionFactory();
             List<SituationRule> reglas = new java.util.ArrayList<>(List.of(
                     new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()));
-            // La regla puede evaluarse en pruebas; en producción se habilita una vez
-            // integrado el agrupamiento y las evidencias de 4B/4C.
-            if (desvioHabilitado) {
-                reglas.add(new RouteDeviationRule(intervalos, rutas, dao));
-            }
-            try (TrackingDetectionWorker detection = new TrackingDetectionWorker(new SituationDetector(facts, reglas, new ContextoEventoSource(intervalos)), dao,
-                    new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE);
-                    Connection connection = connectToRabbit(factory, stopRequested)) {
-                if (connection == null) {
-                    return; // stopped while waiting
-                }
-                detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
+            reglas.add(new RouteDeviationRule(intervalos, rutas, dao));
+            EstadoReglas estadoReglas = new EstadoReglas(reglasClient::revision);
+            try (Connection connection = connectToRabbit(factory, stopRequested)) {
+                if (connection == null) return;
+                try (SuscripcionReglas suscripcion = new SuscripcionReglas(connection, reglasClient, estadoReglas);
+                        TrackingDetectionWorker detection = new TrackingDetectionWorker(
+                            new SituationDetector(facts, reglas, new ContextoEventoSource(intervalos), estadoReglas), dao,
+                            new CaseAssigner(cases), Clock.systemUTC(), DETECTION_LANES, DETECTION_QUEUE_PER_LANE)) {
+                    suscripcion.cargarInicial(stopRequested);
+                    if (stopRequested.getCount() == 0) return;
+                    detection.recoverPendingEvery(PENDING_RECOVERY_PERIOD, PENDING_RECOVERY_AFTER);
 
-                // A saved event is a successful communication with its GPS
-                TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
-                    gpsCommunications.record(event.gpsId());
-                    detection.submit(event);
-                });
-                for (int i = 0; i < CONSUMER_CHANNELS; i++) {
-                    new TrackingConsumer(connection.createChannel(), receiver).start();
-                }
-                LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_iniciado").campo("cola", TrackingConsumer.QUEUE)
-                        .campo("rabbitmq", factory.getHost() + ":" + factory.getPort())
-                        .campo("canales", CONSUMER_CHANNELS).campo("coleccion", database.getName() + "."
-                                + MongoTrackingEventDAO.COLLECTION)
-                        .campo("gpsActivos", activeGps.size()));
+                    // A saved event is a successful communication with its GPS
+                    TrackingEventReceiver receiver = new TrackingEventReceiver(dao, activeGps::isActive, event -> {
+                        gpsCommunications.record(event.gpsId());
+                        detection.submit(event);
+                    });
+                    for (int i = 0; i < CONSUMER_CHANNELS; i++) {
+                        new TrackingConsumer(connection.createChannel(), receiver).start();
+                    }
+                    LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_iniciado").campo("cola", TrackingConsumer.QUEUE)
+                            .campo("rabbitmq", factory.getHost() + ":" + factory.getPort())
+                            .campo("canales", CONSUMER_CHANNELS).campo("coleccion", database.getName() + "."
+                                    + MongoTrackingEventDAO.COLLECTION)
+                            .campo("gpsActivos", activeGps.size()));
 
-                stopRequested.await();
-                LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_detenido"));
+                    stopRequested.await();
+                    LogFiscalizacion.info(LogFiscalizacion.evento("tracking.consumidor_detenido"));
+                }
             }
         } finally {
             stopped.countDown();
@@ -241,8 +243,11 @@ public class Main {
         RemoteWeighingDAO weighingDAO = new RemoteWeighingDAO(wildFlyUrl(), user, password);
         VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), user, password);
         RemoteCaseStore cases = new RemoteCaseStore(wildFlyUrl(), user, password);
+        ReglasClient reglasClient = new ReglasClient(wildFlyUrl(), user, password);
         RemoteIntervalosGuiasGpsSource intervalos =
                 new RemoteIntervalosGuiasGpsSource(wildFlyUrl(), user, password)) {
+            EstadoReglas estadoReglas = new EstadoReglas(reglasClient::revision);
+            estadoReglas.aplicar(reglasClient.vigente());
             MongoDatabase database = mongo.getDatabase(env("MONGO_DB", "main_db"));
             ScalesApiClient api = new ScalesApiClient(url, balanzas.clientId(),
                     System.getenv("BALANZAS_CLIENT_SECRET"), Clock.systemUTC());
@@ -258,7 +263,10 @@ public class Main {
             reportScaleCommunications(nodes, result);
 
             // Also the ones left pending by previous runs
-            int notEvaluated = new PendingWeighingsDetection(createDetector(facts, new ContextoEventoSource(intervalos)), weighingDAO,
+            SituationDetector detector = new SituationDetector(facts,
+                    List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()),
+                    new ContextoEventoSource(intervalos), estadoReglas);
+            int notEvaluated = new PendingWeighingsDetection(detector, weighingDAO,
                     new CaseAssigner(cases)).detectPending();
             if (notEvaluated > 0) {
                 LogFiscalizacion.error(LogFiscalizacion.evento("pesajes.no_evaluados").campo("cantidad", notEvaluated));
@@ -292,15 +300,6 @@ public class Main {
         }
     }
 
-    /** The situations that are detected; adding a situation means adding its rule here. */
-    private static SituationDetector createDetector(VehicleFactsSource facts) {
-        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()));
-    }
-
-    private static SituationDetector createDetector(VehicleFactsSource facts, ContextoEventoSource contexto) {
-        return new SituationDetector(facts, List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()), contexto);
-    }
-
     /**
      * Manual test of the detection against WildFly: evaluates an event of the vehicle at this moment
      * (default LICENSE_PLATE) and prints what the central knows about it and the situations that apply.
@@ -309,12 +308,15 @@ public class Main {
         requireEnv("EJB_USER", "EJB_PASSWORD");
 
         try (VehicleFactsClient facts = new VehicleFactsClient(wildFlyUrl(), System.getenv("EJB_USER"),
-                System.getenv("EJB_PASSWORD"))) {
+                System.getenv("EJB_PASSWORD"));
+                ReglasClient reglasClient = new ReglasClient(wildFlyUrl(), System.getenv("EJB_USER"), System.getenv("EJB_PASSWORD"))) {
             LogFiscalizacion.info(LogFiscalizacion.evento("deteccion_manual.hechos").campo("matricula", licensePlate)
                     .campo("hechos", facts.find(licensePlate).map(Object::toString).orElse("not registered")));
             TrackingEvent event = new TrackingEvent("manual", 0, 0, licensePlate, 0, 0, Instant.now());
             LogFiscalizacion.info(LogFiscalizacion.evento("deteccion_manual.situaciones").campo("matricula", licensePlate)
-                    .campo("situaciones", createDetector(facts).detect(event).situations()));
+                    .campo("situaciones", new SituationDetector(facts,
+                            List.of(new TripWithoutGuideRule(), new OverloadRule(), new VehicleWithoutValidPermitRule()),
+                            null, ReglasSource.fija(reglasClient.vigente())).detect(event).situations()));
             return 0;
         } catch (IOException e) {
             LogFiscalizacion.error(LogFiscalizacion.evento("deteccion_manual.fallida").error(e));

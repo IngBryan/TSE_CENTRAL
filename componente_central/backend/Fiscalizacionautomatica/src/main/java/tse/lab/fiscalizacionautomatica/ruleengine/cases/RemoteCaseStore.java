@@ -59,6 +59,18 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
     @Override
     public DatosCaso registrarDesvio(String idGuia, TrackingEvent evento, PruebaDesvio prueba)
             throws IOException {
+        return registrarDesvioConReglas(idGuia, evento, prueba, null);
+    }
+
+    @Override
+    public DatosCaso registrarConReglas(TipoCasoAutomatico tipo, String guia, VehicleEvent evento,
+            tse.lab.reglas.ConfiguracionReglas config, long pesoBaseKg) throws IOException {
+        return call(() -> cases.registrarEvidencia(tipo, guia, conReglas(evento, config, pesoBaseKg)));
+    }
+
+    @Override
+    public DatosCaso registrarDesvioConReglas(String idGuia, TrackingEvent evento, PruebaDesvio prueba,
+            tse.lab.reglas.ConfiguracionReglas config) throws IOException {
         if (prueba == null || !prueba.confirmante().equals(evento)) {
             throw new IOException("La prueba no corresponde al GPS que se registra");
         }
@@ -67,7 +79,7 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
                 evento.latitude(), evento.longitude(), pareja.latitude(), pareja.longitude(),
                 prueba.distanciaConfirmanteMetros(), prueba.distanciaParejaMetros(),
                 prueba.umbralMetros(), prueba.ventanaMaximaSegundos(), prueba.hashesRutas());
-        return call(() -> cases.registrarDesvio(idGuia, toEventoFiscalizado(evento), remota));
+        return call(() -> cases.registrarDesvio(idGuia, conReglas(evento, config, null), remota));
     }
 
     @Override
@@ -94,6 +106,12 @@ public class RemoteCaseStore implements CaseStore, AutoCloseable {
             // or a failure reading the answer
             throw new IOException("Remote call to CasosAutomaticosService failed", e);
         }
+    }
+
+    private static EventoFiscalizado conReglas(VehicleEvent evento, tse.lab.reglas.ConfiguracionReglas config, Long base) {
+        var original=toEventoFiscalizado(evento);
+        return new EventoFiscalizado(original.getMatricula(), original.getFechaHora(), original.getOrigen(),
+                original.getCorrelationId(), config==null ? null : config.getRevision(), base);
     }
 
     static EventoFiscalizado toEventoFiscalizado(VehicleEvent event) {

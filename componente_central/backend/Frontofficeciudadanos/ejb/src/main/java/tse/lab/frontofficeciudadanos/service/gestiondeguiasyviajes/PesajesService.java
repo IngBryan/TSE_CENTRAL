@@ -53,6 +53,13 @@ public class PesajesService implements PesajesRemote {
     }
 
     @Override
+    public long fijarRevisionReglas(String matricula, Instant fechaHora, long revision) {
+        EventoPesajes p=pesajes.buscarParaActualizar(new ClaveEvento(matricula,fechaHora));
+        if (p==null) throw new IllegalArgumentException("Pesaje inexistente");
+        return p.fijarRevisionReglas(revision);
+    }
+
+    @Override
     public void marcarDetectado(String matricula, Instant fechaHora) {
         EventoPesajes pesaje = pesajes.buscar(new ClaveEvento(matricula, fechaHora));
         if (pesaje != null) {
