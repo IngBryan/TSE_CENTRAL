@@ -21,6 +21,11 @@ public abstract class UsuarioBackoffice implements Serializable {
     @Column(nullable = false)
     private String contrasena;
 
+    // La contrasena la definio un administrador (alta o cambio de rol): hasta que el usuario ponga
+    // la suya, el backoffice solo le deja cambiarla. Con default: los INSERT sin la columna quedan en false.
+    @Column(name = "debe_cambiar_contrasena", columnDefinition = "boolean default false not null")
+    private boolean debeCambiarContrasena;
+
     public UsuarioBackoffice() {
     }
 
@@ -43,6 +48,14 @@ public abstract class UsuarioBackoffice implements Serializable {
 
     public void setContrasena(String contrasena) {
         this.contrasena = contrasena;
+    }
+
+    public boolean isDebeCambiarContrasena() {
+        return debeCambiarContrasena;
+    }
+
+    public void setDebeCambiarContrasena(boolean debeCambiarContrasena) {
+        this.debeCambiarContrasena = debeCambiarContrasena;
     }
 }
 

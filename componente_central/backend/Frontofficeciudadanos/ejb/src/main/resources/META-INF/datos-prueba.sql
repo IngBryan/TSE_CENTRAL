@@ -165,6 +165,9 @@ INSERT INTO administradores (ci) VALUES ('99999999');
 -- Se reutiliza el hash de prueba existente solo dentro del entorno de desarrollo.
 INSERT INTO usuarios_backoffice (ci, contrasena) SELECT '88888888', contrasena FROM usuarios_backoffice WHERE ci = '99999999';
 INSERT INTO autoridades (ci) VALUES ('88888888');
+-- DEMO: autoridad recien dada de alta, con el cambio de contrasena obligatorio pendiente (misma contrasena de prueba).
+INSERT INTO usuarios_backoffice (ci, contrasena, debe_cambiar_contrasena) SELECT '77777777', contrasena, TRUE FROM usuarios_backoffice WHERE ci = '99999999';
+INSERT INTO autoridades (ci) VALUES ('77777777');
 -- Frontoffice de funcionarios (CU Gestionar casos de fiscalizacion): el integrante de gub.uy testing tambien es
 -- funcionario, y hay casos de fiscalizacion en distintos estados hasta que la fiscalizacion automatica los genere.
 INSERT INTO funcionarios (ci, email) VALUES ('54074380', 'funcionario.prueba@mtop.gub.uy');

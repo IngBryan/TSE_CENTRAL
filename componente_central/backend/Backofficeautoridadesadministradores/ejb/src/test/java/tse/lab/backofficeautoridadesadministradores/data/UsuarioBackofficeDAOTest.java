@@ -1,7 +1,9 @@
 package tse.lab.backofficeautoridadesadministradores.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
+import tse.lab.backofficeautoridadesadministradores.service.autenticacion.CuentaBackoffice;
 import tse.lab.model.Administrador;
 import tse.lab.model.Autoridad;
 
@@ -35,7 +38,9 @@ class UsuarioBackofficeDAOTest {
 
         em.getTransaction().begin();
         em.persist(new Administrador(ADMINISTRADOR, "hash"));
-        em.persist(new Autoridad(AUTORIDAD, "hash"));
+        Autoridad autoridad = new Autoridad(AUTORIDAD, "hash");
+        autoridad.setDebeCambiarContrasena(true);
+        em.persist(autoridad);
         em.getTransaction().commit();
         em.clear();
     }
@@ -47,9 +52,48 @@ class UsuarioBackofficeDAOTest {
     }
 
     @Test
-    void devuelveElRolSegunElSubtipo() {
-        assertEquals("ADMINISTRADOR", usuarios.buscarRol(ADMINISTRADOR));
-        assertEquals("AUTORIDAD", usuarios.buscarRol(AUTORIDAD));
-        assertNull(usuarios.buscarRol("99999999"));
+    void devuelveElRolSegunElSubtipoYElCambioPendiente() {
+        assertEquals(new CuentaBackoffice(ADMINISTRADOR, "ADMINISTRADOR", false), usuarios.buscarCuenta(ADMINISTRADOR));
+        assertEquals(new CuentaBackoffice(AUTORIDAD, "AUTORIDAD", true), usuarios.buscarCuenta(AUTORIDAD));
+        assertNull(usuarios.buscarCuenta("99999999"));
+    }
+
+    @Test
+    void actualizaLaContrasenaSiElHashAnteriorCoincideYLiberaElCambioPendiente() {
+        em.getTransaction().begin();
+        boolean actualizada = usuarios.actualizarContrasena(AUTORIDAD, "hash", "hash-nuevo");
+        em.getTransaction().commit();
+        em.clear();
+
+        assertTrue(actualizada);
+        assertEquals("hash-nuevo", usuarios.buscarPorCi(AUTORIDAD).getContrasena());
+        assertEquals("hash", usuarios.buscarPorCi(ADMINISTRADOR).getContrasena());
+        assertEquals(new CuentaBackoffice(AUTORIDAD, "AUTORIDAD", false), usuarios.buscarCuenta(AUTORIDAD));
+    }
+
+    // Como datos-prueba.sql y las bases migradas: un INSERT sin la columna no queda obligado
+    @Test
+    void sinIndicarloNoTieneElCambioPendiente() {
+        em.getTransaction().begin();
+        em.createNativeQuery("INSERT INTO usuarios_backoffice (ci, contrasena) VALUES ('66666666', 'hash')")
+                .executeUpdate();
+        em.createNativeQuery("INSERT INTO autoridades (ci) VALUES ('66666666')").executeUpdate();
+        em.getTransaction().commit();
+        em.clear();
+
+        assertFalse(usuarios.buscarCuenta("66666666").debeCambiarContrasena());
+    }
+
+    @Test
+    void noActualizaSiOtroCambioYaReemplazoElHash() {
+        em.getTransaction().begin();
+        boolean actualizada = usuarios.actualizarContrasena(ADMINISTRADOR, "otro-hash", "hash-nuevo");
+        boolean inexistente = usuarios.actualizarContrasena("99999999", "hash", "hash-nuevo");
+        em.getTransaction().commit();
+        em.clear();
+
+        assertFalse(actualizada);
+        assertFalse(inexistente);
+        assertEquals("hash", usuarios.buscarPorCi(ADMINISTRADOR).getContrasena());
     }
 }

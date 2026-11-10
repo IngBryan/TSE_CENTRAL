@@ -2,14 +2,14 @@ import { Truck } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { consultarIdentidad } from "@/lib/backoffice-sesion";
-import { inicioPorRol } from "@/lib/rutas";
+import { destinoTrasLogin } from "@/lib/rutas";
 import FormularioLogin from "./FormularioLogin";
 
 export default async function LoginPage() {
   const identidad = await consultarIdentidad();
 
   if (identidad) {
-    redirect(inicioPorRol(identidad.rol));
+    redirect(destinoTrasLogin(identidad));
   }
 
   return (

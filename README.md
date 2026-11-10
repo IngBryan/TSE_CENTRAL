@@ -966,6 +966,16 @@ ocultar algo en pantalla no protege nada si la API lo devuelve.
   `PUT /api/usuarios/{ci}/rol` reemplaza el rol de un funcionario, administrador o autoridad por otro de esos tres (pide
   contrasena o email si el rol nuevo los necesita). Un funcionario que deja de serlo queda inactivo (`funcionarios.activo`):
   conserva su historial pero no puede ingresar. El rol del backoffice se lee de la base en cada pedido, no del token.
+  `PUT /api/auth/contrasena` (`{contrasenaActual, contrasenaNueva}`) cambia la contrasena propia de un administrador o
+  autoridad (204; 400 `datos_invalidos` o `contrasena_actual_incorrecta`). **Cambio obligatorio en el primer ingreso:**
+  la contrasena que define un administrador (alta, o funcionario que pasa a administrador/autoridad) deja la columna
+  `usuarios_backoffice.debe_cambiar_contrasena` en true. Mientras siga asi, el login y `GET /api/auth/me` devuelven
+  `"debeCambiarContrasena": true` y cualquier otro endpoint responde 403 `cambio_contrasena_requerido`
+  (`CambioContrasenaPendienteFilter`); solo quedan `auth/me`, `auth/contrasena` y `auth/logout`. Se lee de la base en
+  cada pedido: al cambiarla, el mismo token sigue andando sin el bloqueo. Datos de prueba: la autoridad `77777777`
+  (misma contrasena que `99999999`) tiene el cambio pendiente. **Bases existentes:** ejecutar
+  `componente_central/backend/Frontofficeciudadanos/ejb/src/main/resources/META-INF/migracion-cambio-contrasena-obligatorio.sql`
+  (los usuarios que ya existen no quedan obligados).
   `DELETE /api/usuarios/{ci}` le quita todos esos roles: borra al administrador o autoridad y deja inactivo al funcionario
   (no toca sus roles de chofer o responsable). Un administrador no puede cambiar su rol ni eliminarse a si mismo. No incluye fecha de nacimiento, `sub` de gub.uy ni contrasena. Quien lo
   consulto queda en el log `http.request`.

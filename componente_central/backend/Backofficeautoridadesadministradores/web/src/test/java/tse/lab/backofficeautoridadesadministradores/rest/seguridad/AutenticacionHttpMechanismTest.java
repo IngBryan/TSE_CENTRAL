@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.AutenticacionBackofficeService;
+import tse.lab.backofficeautoridadesadministradores.service.autenticacion.CuentaBackoffice;
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
 
 class AutenticacionHttpMechanismTest {
@@ -160,11 +161,7 @@ class AutenticacionHttpMechanismTest {
 
         when(servicio.autenticar("99999999", "ClaveValida"))
                 .thenReturn(Optional.of(
-                        new IdentidadBackoffice(
-                                "99999999",
-                                "ADMINISTRADOR"
-                        )
-                ));
+                        new CuentaBackoffice("99999999", "ADMINISTRADOR", false)));
 
         when(contexto.notifyContainerAboutLogin(
                 "99999999",
@@ -191,11 +188,7 @@ class AutenticacionHttpMechanismTest {
 
         when(servicio.autenticar("87654321", "ClaveValida"))
                 .thenReturn(Optional.of(
-                        new IdentidadBackoffice(
-                                "87654321",
-                                "AUTORIDAD"
-                        )
-                ));
+                        new CuentaBackoffice("87654321", "AUTORIDAD", false)));
 
         when(contexto.notifyContainerAboutLogin(
                 "87654321",
@@ -219,7 +212,7 @@ class AutenticacionHttpMechanismTest {
         String token = BackofficeToken.issue(
                 new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
         requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.of("ADMINISTRADOR"));
+        when(servicio.cuentaActual("99999999")).thenReturn(Optional.of(new CuentaBackoffice("99999999", "ADMINISTRADOR", false)));
         when(contexto.notifyContainerAboutLogin("99999999", Set.of("ADMINISTRADOR")))
                 .thenReturn(AuthenticationStatus.SUCCESS);
 
@@ -233,7 +226,7 @@ class AutenticacionHttpMechanismTest {
         String token = BackofficeToken.issue(
                 new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
         requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.of("AUTORIDAD"));
+        when(servicio.cuentaActual("99999999")).thenReturn(Optional.of(new CuentaBackoffice("99999999", "AUTORIDAD", false)));
         when(contexto.notifyContainerAboutLogin("99999999", Set.of("AUTORIDAD")))
                 .thenReturn(AuthenticationStatus.SUCCESS);
 
@@ -246,7 +239,7 @@ class AutenticacionHttpMechanismTest {
         String token = BackofficeToken.issue(
                 new IdentidadBackoffice("99999999", "ADMINISTRADOR"), SECRET, Instant.now());
         requestWithAuthorization("Bearer " + token);
-        when(servicio.rolActual("99999999")).thenReturn(Optional.empty());
+        when(servicio.cuentaActual("99999999")).thenReturn(Optional.empty());
 
         assertEquals(AuthenticationStatus.NOT_DONE, mecanismo.validateRequest(solicitud, respuesta, contexto));
         verify(contexto, never()).notifyContainerAboutLogin(anyString(), anySet());
@@ -278,5 +271,37 @@ class AutenticacionHttpMechanismTest {
 
         assertEquals(AuthenticationStatus.NOT_DONE, mecanismo.validateRequest(solicitud, respuesta, contexto));
         verify(contexto, never()).notifyContainerAboutLogin(anyString(), anySet());
+    }
+
+    private static final Set<String> AUTORIDAD_PENDIENTE =
+            Set.of("AUTORIDAD", AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE);
+
+    @Test
+    void elLoginConElCambioDeContrasenaPendienteAgregaElGrupo() throws Exception {
+        configurarCredenciales("87654321", "ClaveInicial");
+        when(servicio.autenticar("87654321", "ClaveInicial"))
+                .thenReturn(Optional.of(new CuentaBackoffice("87654321", "AUTORIDAD", true)));
+        when(contexto.notifyContainerAboutLogin("87654321", AUTORIDAD_PENDIENTE))
+                .thenReturn(AuthenticationStatus.SUCCESS);
+
+        assertEquals(AuthenticationStatus.SUCCESS, mecanismo.validateRequest(solicitud, respuesta, contexto));
+        verify(contexto).notifyContainerAboutLogin("87654321", AUTORIDAD_PENDIENTE);
+    }
+
+    @Test
+    void elCambioPendienteSeLeeDeLaBaseEnCadaPedido() throws Exception {
+        String token = BackofficeToken.issue(
+                new IdentidadBackoffice("87654321", "AUTORIDAD"), SECRET, Instant.now());
+        requestWithAuthorization("Bearer " + token);
+        when(servicio.cuentaActual("87654321"))
+                .thenReturn(Optional.of(new CuentaBackoffice("87654321", "AUTORIDAD", true)))
+                // Ya la cambió: el mismo token, sin el grupo
+                .thenReturn(Optional.of(new CuentaBackoffice("87654321", "AUTORIDAD", false)));
+
+        mecanismo.validateRequest(solicitud, respuesta, contexto);
+        mecanismo.validateRequest(solicitud, respuesta, contexto);
+
+        verify(contexto).notifyContainerAboutLogin("87654321", AUTORIDAD_PENDIENTE);
+        verify(contexto).notifyContainerAboutLogin("87654321", Set.of("AUTORIDAD"));
     }
 }

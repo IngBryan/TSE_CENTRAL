@@ -12,7 +12,7 @@ import {
   urlBackend,
   wildFlyAuthorization,
 } from "@/lib/backoffice-sesion";
-import { esRol, inicioPorRol, type Rol } from "@/lib/rutas";
+import { destinoTrasLogin, esRol, type Rol } from "@/lib/rutas";
 
 export type EstadoLogin = {
   estado: "inicial" | "error";
@@ -42,6 +42,7 @@ export async function iniciarSesionAction(
   let sesion: string;
   let duracionSesion: number;
   let rol: Rol;
+  let debeCambiarContrasena: boolean;
 
   try {
     const respuesta = await fetchBackend(urlBackend("auth/login"), {
@@ -131,6 +132,8 @@ export async function iniciarSesionAction(
     }
 
     rol = identidad.rol;
+    debeCambiarContrasena =
+      "debeCambiarContrasena" in identidad && identidad.debeCambiarContrasena === true;
   } catch {
     return {
       estado: "error",
@@ -147,7 +150,8 @@ export async function iniciarSesionAction(
     maxAge: duracionSesion,
   });
 
-  redirect(inicioPorRol(rol));
+  // Con la contraseña inicial que le dio un administrador, lo primero es cambiarla
+  redirect(destinoTrasLogin({ rol, debeCambiarContrasena }));
 }
 
 export async function cerrarSesionAction(): Promise<void> {

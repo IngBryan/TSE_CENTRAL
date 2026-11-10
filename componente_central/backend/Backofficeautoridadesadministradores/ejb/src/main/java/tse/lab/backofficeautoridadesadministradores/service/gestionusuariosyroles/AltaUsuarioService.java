@@ -7,9 +7,6 @@ import jakarta.ejb.Stateless;
 
 import tse.lab.backofficeautoridadesadministradores.data.UsuarioDAO;
 import tse.lab.backofficeautoridadesadministradores.service.LogBackoffice;
-import tse.lab.backofficeautoridadesadministradores.service.autenticacion.Contrasenas;
-import tse.lab.model.Administrador;
-import tse.lab.model.Autoridad;
 import tse.lab.model.Funcionario;
 
 /**
@@ -18,7 +15,8 @@ import tse.lab.model.Funcionario;
  * caso de uso con sus reglas (CU-02 y la gestión de empresas).
  *
  * Administradores y autoridades entran con cédula y contraseña; la
- * contraseña inicial la define el administrador y se guarda hasheada. Los
+ * contraseña inicial la define el administrador, se guarda hasheada y el
+ * usuario tiene que cambiarla en su primer ingreso. Los
  * funcionarios entran con gub.uy, así que solo se registran cédula y email.
  */
 @Stateless
@@ -70,10 +68,8 @@ public class AltaUsuarioService {
         sinRolInterno(cedula, rol, funcionario);
 
         switch (rol) {
-            case ADMINISTRADOR -> usuarios.guardar(
-                    new Administrador(cedula, Contrasenas.generarHash(contrasena)));
-            case AUTORIDAD -> usuarios.guardar(
-                    new Autoridad(cedula, Contrasenas.generarHash(contrasena)));
+            case ADMINISTRADOR, AUTORIDAD -> usuarios.guardar(
+                    ContrasenaInicial.nuevoUsuario(rol, cedula, contrasena));
             case FUNCIONARIO -> crearFuncionario(cedula, correo, funcionario);
             default -> throw new IllegalStateException("Tipo no admitido: " + rol);
         }

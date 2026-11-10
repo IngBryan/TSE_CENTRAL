@@ -4,6 +4,7 @@ package tse.lab.backofficeautoridadesadministradores.rest;
 import java.time.Instant;
 import java.util.Map;
 
+import jakarta.ejb.EJB;
 import jakarta.inject.Inject;
 import jakarta.security.enterprise.AuthenticationStatus;
 import jakarta.security.enterprise.authentication.mechanism.http.AuthenticationParameters;
@@ -14,14 +15,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import tse.lab.backofficeautoridadesadministradores.rest.seguridad.AutenticacionHttpMechanism;
 import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioContrasenaService;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.ContrasenaActualIncorrectaException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioNoEncontradoException;
 
 @Path("/auth")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -50,11 +57,19 @@ public class AutenticacionResource {
     @Context
     private jakarta.ws.rs.core.SecurityContext seguridadRest;
 
+    @EJB
+    private CambioContrasenaService cambioContrasena;
+
     private byte[] tokenSecret = BackofficeToken.configuredSecret();
 
     public record Credenciales(
             String ci,
             String contrasena) {
+    }
+
+    public record CambioContrasenaRequest(
+            String contrasenaActual,
+            String contrasenaNueva) {
     }
 
     @POST
@@ -108,9 +123,12 @@ public class AutenticacionResource {
                 tokenSecret,
                 Instant.now());
 
+        // Con el cambio de contraseña pendiente, el token solo abre /auth/me, /auth/contrasena y /auth/logout
         return Response.ok(Map.of(
                 "token", token,
-                "expiraEn", BackofficeToken.LIFETIME_S)).build();
+                "expiraEn", BackofficeToken.LIFETIME_S,
+                "debeCambiarContrasena",
+                seguridad.isCallerInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE))).build();
     }
 
     @GET
@@ -137,7 +155,49 @@ public class AutenticacionResource {
 
         return Response.ok(Map.of(
                 "ci", seguridadRest.getUserPrincipal().getName(),
-                "rol", rol)).build();
+                "rol", rol,
+                "debeCambiarContrasena",
+                seguridadRest.isUserInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE))).build();
+    }
+
+    /**
+     * Cambia la contraseña del usuario logueado (administrador o autoridad). Responde 204, 400 si la nueva no es
+     * válida o la actual no es correcta (no 401: el usuario sigue logueado), 401/403 sin sesión o sin rol, o 404
+     * si la cédula dejó de ser usuario del backoffice.
+     */
+    @PUT
+    @Path("/contrasena")
+    public Response cambiarContrasena(CambioContrasenaRequest datos) {
+        Response acceso = AccesoPorRol.verificar(seguridadRest, "ADMINISTRADOR", "AUTORIDAD");
+        if (acceso != null) {
+            return acceso;
+        }
+        if (datos == null) {
+            return error(Response.Status.BAD_REQUEST, "datos_invalidos", "El cuerpo es obligatorio");
+        }
+
+        try {
+            cambioContrasena.cambiar(
+                    seguridadRest.getUserPrincipal().getName(),
+                    datos.contrasenaActual(),
+                    datos.contrasenaNueva());
+            return Response.noContent().build();
+
+        } catch (DatosUsuarioInvalidosException e) {
+            return error(Response.Status.BAD_REQUEST, "datos_invalidos", e.getMessage());
+
+        } catch (ContrasenaActualIncorrectaException e) {
+            return error(Response.Status.BAD_REQUEST, "contrasena_actual_incorrecta", e.getMessage());
+
+        } catch (UsuarioNoEncontradoException e) {
+            return error(Response.Status.NOT_FOUND, "usuario_no_encontrado", e.getMessage());
+        }
+    }
+
+    private static Response error(Response.Status estado, String codigo, String detalle) {
+        return Response.status(estado)
+                .entity(Map.of("error", codigo, "detalle", detalle))
+                .build();
     }
 
     /** There is no session to close in the server: the client discards its token. */
