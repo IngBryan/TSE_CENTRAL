@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>tse.lab.pruebas</groupId>
+    <artifactId>pruebas-casos-fiscalizacion</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <!-- Reactor para compilar las dependencias locales desde este checkout. -->
+    <modules>
+        <module>../componente_central/backend/Modelo</module>
+        <module>../componente_central/backend/AdaptadorPdi</module>
+        <module>../componente_central/backend/Frontofficeciudadanos</module>
+        <module>../componente_central/backend/Frontofficefuncionarios</module>
+    </modules>
+</project>

@@ -18,6 +18,8 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
@@ -202,15 +204,28 @@ class CasosAutomaticosServiceTest {
         assertEquals(EstadoCaso.NOTIFICADA, cambio.getEstadoNuevo());
     }
 
-    @Test
-    void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
-        DatosCaso creado = iniciarCirculacion();
+    @ParameterizedTest(name = "CL-G12: notificar nuevamente desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = "DETECTADA", mode = EnumSource.Mode.EXCLUDE)
+    void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada(EstadoCaso estado) {
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
         enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
+        enTx(() -> {
+            var c = em.find(CasoFiscalizacion.class, creado.getId());
+            if (estado != EstadoCaso.NOTIFICADA) c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            if (estado.esFinal()) c.cambiarEstado(estado);
+            return null;
+        });
+        var registrosPrevios = auditoria(creado.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
 
-        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
+        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "repetida"));
 
-        assertEquals("NOTIFICADA", otraVez.getEstado());
-        assertEquals(2, auditoria(creado.getId()).size());
+        assertEquals(creado.getId(), otraVez.getId());
+        assertEquals(estado.name(), otraVez.getEstado());
+        assertEquals(estado, caso(creado.getId()).getEstado());
+        assertEquals(1, caso(creado.getId()).getEventosPesajes().size());
+        assertEquals(registrosPrevios,
+                auditoria(creado.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
     }
 
     @Test

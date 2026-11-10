@@ -20,6 +20,11 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import tse.lab.frontofficeciudadanos.data.CasoFiscalizacionDAO;
 import tse.lab.frontofficeciudadanos.data.NoOpTransactions;
@@ -182,12 +187,14 @@ class InfraccionesServiceTest {
         em.getTransaction().begin();
         servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Primero"), "t");
         em.getTransaction().commit();
+        var original = estadoGuardado(notificado);
 
         em.getTransaction().begin();
         ConflictoException e = assertThrows(ConflictoException.class,
                 () -> servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Segundo"), "t"));
         em.getTransaction().rollback();
         assertEquals("DESCARGO_YA_PRESENTADO", e.getCodigo());
+        assertEquals(original, estadoGuardado(notificado));
     }
 
     @Test
@@ -322,24 +329,108 @@ class InfraccionesServiceTest {
         assertEquals(registroDescargo, ultimoRegistro(notificado).getId());
     }
 
+    @ParameterizedTest(name = "CL-P08: plazo de {0} días, fecha {1}, admite {2}")
+    @CsvSource({
+            "3, 2026-11-04T23:59:59, true",
+            "3, 2026-11-05T00:00:00, false",
+            "15, 2026-11-16T23:59:59, true",
+            "15, 2026-11-17T00:00:00, false"
+    })
+    void elPlazoConfiguradoSeAplicaAlDescargoYAlVencimiento(int dias, String fecha, boolean admite) throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(dias, enUruguay(fecha));
+        var resumen = servicio.listar(RESPONSABLE, "t").getFirst();
+        assertEquals(dias == 3 ? "2026-11-04" : "2026-11-16", resumen.venceDescargo());
+        assertEquals(admite, resumen.admiteDescargo());
+        assertEquals(admite ? List.of() : List.of(notificado), servicio.casosConPlazoVencido());
+        em.getTransaction().begin();
+        if (admite) {
+            assertEquals("EN_DESCARGO", servicio.presentarDescargo(RESPONSABLE, notificado,
+                    new NuevoDescargo("A tiempo"), "t").infraccion().estado());
+        } else {
+            assertEquals("PLAZO_VENCIDO", assertThrows(ConflictoException.class,
+                    () -> servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Tarde"), "t")).getCodigo());
+            assertTrue(servicio.vencerPlazo(notificado, "vencimiento"));
+        }
+        em.getTransaction().commit();
+        em.clear();
+        var caso = em.find(CasoFiscalizacion.class, notificado);
+        assertEquals(EstadoCaso.EN_DESCARGO, caso.getEstado());
+        assertEquals(admite, caso.getDescargo() != null);
+    }
+
+    @ParameterizedTest(name = "CL-G05: presentar descargo desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = { "CONFIRMADA", "DESESTIMADA" })
+    void unCasoFinalSinDescargoNoSeReabre(EstadoCaso estado) {
+        prepararEstado(detectado, estado);
+        var original = estadoGuardado(detectado);
+        em.getTransaction().begin();
+        var e = assertThrows(ConflictoException.class, () -> servicio.presentarDescargo(RESPONSABLE, detectado,
+                new NuevoDescargo("Intento tardío"), "t"));
+        em.getTransaction().rollback();
+        assertEquals("TRANSICION_NO_PERMITIDA", e.getCodigo());
+        assertEquals(original, estadoGuardado(detectado));
+    }
+
+    @ParameterizedTest(name = "CL-G13: no vencer desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = "NOTIFICADA", mode = EnumSource.Mode.EXCLUDE)
+    void elVencimientoNoModificaOtrosEstados(EstadoCaso estado) throws Exception {
+        prepararEstado(detectado, estado);
+        servicio = conPlazo(10, enUruguay("2099-01-01T00:00:00"));
+        var original = estadoGuardado(detectado);
+        em.getTransaction().begin();
+        assertFalse(servicio.vencerPlazo(detectado, "t"));
+        em.getTransaction().commit();
+        assertEquals(original, estadoGuardado(detectado));
+    }
+
     @Test
-    void elDescargoVacioOMuyLargoEsInvalido() {
+    void elVencimientoIgnoraUnCasoInexistente() throws Exception {
+        var original = estadoGuardado(notificado);
+        em.getTransaction().begin();
+        assertFalse(servicio.vencerPlazo(Long.MAX_VALUE, "t"));
+        em.getTransaction().commit();
+        assertEquals(original, estadoGuardado(notificado));
+    }
+
+    @ParameterizedTest(name = "CL-G11: descargo vacío o en blanco")
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    void elDescargoVacioEsInvalido(String texto) {
+        assertDescargoInvalido(new NuevoDescargo(texto));
+    }
+
+    @Test
+    void elDescargoMuyLargoEsInvalido() {
+        assertDescargoInvalido(new NuevoDescargo("x".repeat(Descargo.MAX_DESCRIPCION + 1)));
+    }
+
+    @Test
+    void elDescargoSinDatosEsInvalido() {
+        assertDescargoInvalido(null);
+    }
+
+    private void assertDescargoInvalido(NuevoDescargo datos) {
+        var original = estadoGuardado(notificado);
         em.getTransaction().begin();
         assertThrows(DatosInvalidosException.class,
-                () -> servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("   "), "t"));
-        assertThrows(DatosInvalidosException.class, () -> servicio.presentarDescargo(RESPONSABLE, notificado,
-                new NuevoDescargo("x".repeat(Descargo.MAX_DESCRIPCION + 1)), "t"));
+                () -> servicio.presentarDescargo(RESPONSABLE, notificado, datos, "t"));
         em.getTransaction().rollback();
+        assertEquals(original, estadoGuardado(notificado));
     }
 
     @Test
     void losCasosDeOtraEmpresaOSinNotificarNoExisten() {
         assertThrows(RecursoNoEncontradoException.class, () -> servicio.detalle(RESPONSABLE, deOtraEmpresa, "t"));
         assertThrows(RecursoNoEncontradoException.class, () -> servicio.detalle(RESPONSABLE, detectado, "t"));
-        em.getTransaction().begin();
-        assertThrows(RecursoNoEncontradoException.class, () -> servicio.presentarDescargo(RESPONSABLE,
-                deOtraEmpresa, new NuevoDescargo("No es mio"), "t"));
-        em.getTransaction().rollback();
+        for (Long id : List.of(deOtraEmpresa, detectado)) {
+            var original = estadoGuardado(id);
+            em.getTransaction().begin();
+            assertThrows(RecursoNoEncontradoException.class, () -> servicio.presentarDescargo(RESPONSABLE,
+                    id, new NuevoDescargo("No corresponde"), "t"));
+            em.getTransaction().rollback();
+            assertEquals(original, estadoGuardado(id));
+        }
     }
 
     @Test
@@ -353,6 +444,29 @@ class InfraccionesServiceTest {
         em.clear();
         assertTrue(em.find(CasoFiscalizacion.class, notificado).isNotificacionVista());
         assertFalse(servicio.listar(RESPONSABLE, "t").get(0).nueva());
+    }
+
+    private record EstadoGuardado(EstadoCaso estado, Long descargo, String textoDescargo, List<Long> auditoria) { }
+
+    private EstadoGuardado estadoGuardado(Long id) {
+        em.clear();
+        var caso = em.find(CasoFiscalizacion.class, id);
+        var d = caso.getDescargo();
+        var registros = em.createQuery("SELECT r.id FROM RegistroAuditoriaCaso r WHERE r.idCaso = :id ORDER BY r.id",
+                Long.class).setParameter("id", id).getResultList();
+        return new EstadoGuardado(caso.getEstado(), d == null ? null : d.getId(),
+                d == null ? null : d.getDescripcion(), registros);
+    }
+
+    // Preparación de una condición inicial para una regla local; los recorridos completos usan los servicios.
+    private void prepararEstado(Long id, EstadoCaso estado) {
+        em.getTransaction().begin();
+        var caso = em.find(CasoFiscalizacion.class, id);
+        if (estado != EstadoCaso.DETECTADA) caso.cambiarEstado(EstadoCaso.NOTIFICADA);
+        if (estado == EstadoCaso.EN_DESCARGO || estado.esFinal()) caso.cambiarEstado(EstadoCaso.EN_DESCARGO);
+        if (estado.esFinal()) caso.cambiarEstado(estado);
+        em.getTransaction().commit();
+        em.clear();
     }
 
     // Caso creado por la fiscalizacion automatica; notificado = ademas se le notifico a la empresa
