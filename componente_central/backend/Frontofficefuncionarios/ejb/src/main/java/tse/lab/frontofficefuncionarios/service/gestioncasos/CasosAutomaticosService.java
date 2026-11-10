@@ -177,7 +177,8 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
      * Gestiona una única circulación por matrícula bajo bloqueo de la fila Vehiculo.
      * El primer GPS es una observación pendiente; el segundo debe confirmar movimiento.
      * Una vez confirmada, agrupa los viajes sin Guía aunque haya detenciones o períodos sin GPS.
-     * Solo se cierra al pasar a circular con Guía; no se infieren fines de viaje.
+     * Si el caso está resuelto, el siguiente GPS válido inicia otro expediente.
+     * También se cierra al pasar a circular con Guía; no se infieren fines de viaje.
      * Casos y claves GPS se escriben atómicamente en PostgreSQL.
      */
     @Override
@@ -228,21 +229,9 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                 actual.reiniciarPendiente(gps.getFechaHora(), gps.getLatitud(), gps.getLongitud(), ahora);
                 return null;
             }
-            CasoFiscalizacion caso = new CasoFiscalizacion(TipoCasoAutomatico.VIAJE_SIN_GUIA.getDescripcion(),
-                    TipoCasoAutomatico.VIAJE_SIN_GUIA.name(), vehiculo, null);
-            caso.getClavesEventosTracking().add(new ClaveEvento(gps.getMatricula(), actual.getFechaInicio()));
-            asociarSiFalta(caso, evento(gps));
-            casos.guardar(caso);
-            casos.flush();
-            actual.confirmar(caso, gps.getFechaHora(), gps.getLatitud(), gps.getLongitud(), ahora);
-            auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
-                    AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA,
+            return crearCasoSinGuia(actual, gps, ahora,
                     "Circulación sin Guía inferida por desplazamiento GPS entre "
-                            + actual.getFechaInicio() + " y " + gps.getFechaHora(), null));
-            LOG.info(() -> LogFuncionarios.evento("circulacion.confirmada")
-                    .campo("caso", caso.getId()).campo("matricula", gps.getMatricula())
-                    .campo("fechaHora", gps.getFechaHora()).toString());
-            return datos(caso);
+                            + actual.getFechaInicio() + " y " + gps.getFechaHora());
         }
         // Un salto incompatible con el transporte se conserva en Mongo, pero no se
         // agrega como trayectoria probatoria de esta circulación.
@@ -250,12 +239,42 @@ public class CasosAutomaticosService implements CasosAutomaticosRemote {
                 gps.getLatitud(), gps.getLongitud());
         double horasTramo = intervalo.toMillis() / 3_600_000.0;
         if (horasTramo <= 0 || desplazamiento / 1000 / horasTramo > MAX_VELOCIDAD_KMH) return null;
+        if (actual.getCaso().getEstado().esFinal()) {
+            Long casoAnterior = actual.getCaso().getId();
+            actual.finalizar(MotivoFinCirculacionSinGuia.CASO_RESUELTO, actual.getUltimaMedicion());
+            // Liberar el índice de circulación vigente antes del INSERT del nuevo período.
+            casos.flush();
+            var nueva = new CirculacionSinGuia(vehiculo, gps.getFechaHora(),
+                    gps.getLatitud(), gps.getLongitud(), ahora);
+            circulaciones.guardar(nueva);
+            // El movimiento ya fue confirmado: no esperar otro GPS ni copiar evidencia del caso resuelto.
+            return crearCasoSinGuia(nueva, gps, ahora,
+                    "Circulación sin Guía observada en " + gps.getFechaHora()
+                            + " después de la resolución del caso " + casoAnterior);
+        }
         double distanciaDesdeMovimiento = distanciaMetros(actual.getLatitudMovimiento(),
                 actual.getLongitudMovimiento(), gps.getLatitud(), gps.getLongitud());
         asociarSiFalta(actual.getCaso(), evento(gps));
         actual.actualizar(gps.getFechaHora(), gps.getLatitud(), gps.getLongitud(), ahora,
                 distanciaDesdeMovimiento >= MIN_DESPLAZAMIENTO_M);
         return datos(actual.getCaso());
+    }
+
+    private DatosCaso crearCasoSinGuia(CirculacionSinGuia circulacion, PosicionSinGuiaRemota gps,
+            Instant ahora, String fundamento) {
+        CasoFiscalizacion caso = new CasoFiscalizacion(TipoCasoAutomatico.VIAJE_SIN_GUIA.getDescripcion(),
+                TipoCasoAutomatico.VIAJE_SIN_GUIA.name(), circulacion.getVehiculo(), null);
+        caso.getClavesEventosTracking().add(new ClaveEvento(gps.getMatricula(), circulacion.getFechaInicio()));
+        asociarSiFalta(caso, evento(gps));
+        casos.guardar(caso);
+        casos.flush();
+        circulacion.confirmar(caso, gps.getFechaHora(), gps.getLatitud(), gps.getLongitud(), ahora);
+        auditoria.registrar(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
+                AccionAuditoriaCaso.CREACION, null, EstadoCaso.DETECTADA, fundamento, null));
+        LOG.info(() -> LogFuncionarios.evento("circulacion.confirmada")
+                .campo("caso", caso.getId()).campo("matricula", gps.getMatricula())
+                .campo("fechaHora", gps.getFechaHora()).toString());
+        return datos(caso);
     }
 
     @Override
