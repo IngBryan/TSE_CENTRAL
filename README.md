@@ -643,10 +643,14 @@ GPS 1), por eso `idExterno` es unico por `tipo` en `nodos_perifericos` y no pued
   pendiente para reintento.
 - Viaje sin guia (`TripWithoutGuideRule`): GPS sin Guia asociada a la fecha del evento. La creacion
   del expediente exige movimiento confirmado mediante el seguimiento de circulaciones.
-  Una vez confirmado, el mismo caso acumula los eventos del vehiculo aunque correspondan a varios
-  viajes. Las detenciones, las brechas entre mediciones y la falta de señal GPS no cierran la
-  circulacion ni generan otro caso. Solo se cierra cuando se observa al vehiculo circulando con Guia;
-  el estado administrativo del expediente se gestiona por separado.
+  Una vez confirmado, el mismo caso acumula los eventos del vehiculo mientras no este resuelto,
+  incluido `EN_DESCARGO`, aunque correspondan a varios viajes. Las detenciones, las brechas entre
+  mediciones y la falta de señal GPS no cierran la
+  circulacion ni generan otro caso. Si el caso esta `CONFIRMADA` o `DESESTIMADA`, el siguiente GPS
+  nuevo valido sin Guia inicia otro caso, incluso si continua el mismo viaje. Se conserva el periodo
+  anterior con motivo `CASO_RESUELTO`, sin copiar su evidencia al nuevo caso. Reentregar un GPS ya
+  registrado conserva su caso original y no crea otro. La circulacion tambien se cierra al observar
+  al vehiculo circulando con Guia; ese cierre no resuelve administrativamente el expediente.
 - Exceso de carga (`OverloadRule`): un pesaje con Guia asociada supera el peso del vehiculo mas su
   capacidad de carga declarada. La carga de la Guia no se usa; por ahora cualquier exceso cuenta.
 - **Vehiculo sin habilitacion vigente** (`VehicleWithoutValidPermitRule`): se evalua tanto GPS como
