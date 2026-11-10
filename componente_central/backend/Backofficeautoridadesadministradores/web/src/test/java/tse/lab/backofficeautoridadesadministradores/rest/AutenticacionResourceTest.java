@@ -24,6 +24,10 @@ import jakarta.ws.rs.core.Response;
 
 import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioContrasenaService;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.ContrasenaActualIncorrectaException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.DatosUsuarioInvalidosException;
+import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.UsuarioNoEncontradoException;
 
 class AutenticacionResourceTest {
 
@@ -294,5 +298,98 @@ class AutenticacionResourceTest {
 
         verify(solicitud).logout();
         verify(solicitud, never()).getSession(anyBoolean());
+    }
+
+    private CambioContrasenaService logueadoParaCambiarContrasena(String ci, String rol) throws Exception {
+        CambioContrasenaService servicio = mock(CambioContrasenaService.class);
+        inyectar("cambioContrasena", servicio);
+        when(seguridadRest.getUserPrincipal()).thenReturn(() -> ci);
+        when(seguridadRest.isUserInRole(rol)).thenReturn(true);
+        return servicio;
+    }
+
+    private static final AutenticacionResource.CambioContrasenaRequest CAMBIO =
+            new AutenticacionResource.CambioContrasenaRequest("Clave-actual-2026", "Clave-nueva-2026!");
+
+    @Test
+    void cambiarContrasenaDeUnAdministradorDevuelve204() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("99999999", "ADMINISTRADOR");
+
+        Response respuesta = recurso.cambiarContrasena(CAMBIO);
+
+        assertEquals(204, respuesta.getStatus());
+        verify(servicio).cambiar("99999999", "Clave-actual-2026", "Clave-nueva-2026!");
+    }
+
+    @Test
+    void cambiarContrasenaDeUnaAutoridadUsaLaCedulaDelToken() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("87654321", "AUTORIDAD");
+
+        assertEquals(204, recurso.cambiarContrasena(CAMBIO).getStatus());
+        verify(servicio).cambiar("87654321", "Clave-actual-2026", "Clave-nueva-2026!");
+    }
+
+    @Test
+    void cambiarContrasenaSinAutenticacionDevuelve401() throws Exception {
+        CambioContrasenaService servicio = mock(CambioContrasenaService.class);
+        inyectar("cambioContrasena", servicio);
+        when(seguridadRest.getUserPrincipal()).thenReturn(null);
+
+        assertEquals(401, recurso.cambiarContrasena(CAMBIO).getStatus());
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void cambiarContrasenaSinRolDevuelve403() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("11111111", "CHOFER");
+
+        assertEquals(403, recurso.cambiarContrasena(CAMBIO).getStatus());
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void cambiarContrasenaSinCuerpoDevuelve400() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("99999999", "ADMINISTRADOR");
+
+        Response respuesta = recurso.cambiarContrasena(null);
+
+        assertEquals(400, respuesta.getStatus());
+        assertEquals("datos_invalidos", ((Map<?, ?>) respuesta.getEntity()).get("error"));
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void cambiarContrasenaConLaActualIncorrectaDevuelve400SinCerrarLaSesion() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("99999999", "ADMINISTRADOR");
+        doThrow(new ContrasenaActualIncorrectaException("La contraseña actual no es correcta"))
+                .when(servicio).cambiar(any(), any(), any());
+
+        Response respuesta = recurso.cambiarContrasena(CAMBIO);
+
+        assertEquals(400, respuesta.getStatus());
+        assertEquals("contrasena_actual_incorrecta", ((Map<?, ?>) respuesta.getEntity()).get("error"));
+    }
+
+    @Test
+    void cambiarContrasenaConLaNuevaInvalidaDevuelve400ConDetalle() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("99999999", "ADMINISTRADOR");
+        doThrow(new DatosUsuarioInvalidosException("La contraseña tiene que tener entre 12 y 128 caracteres"))
+                .when(servicio).cambiar(any(), any(), any());
+
+        Response respuesta = recurso.cambiarContrasena(CAMBIO);
+
+        assertEquals(400, respuesta.getStatus());
+        Map<?, ?> error = (Map<?, ?>) respuesta.getEntity();
+        assertEquals("datos_invalidos", error.get("error"));
+        assertEquals("La contraseña tiene que tener entre 12 y 128 caracteres", error.get("detalle"));
+    }
+
+    @Test
+    void cambiarContrasenaDeUnUsuarioQueYaNoExisteDevuelve404() throws Exception {
+        CambioContrasenaService servicio = logueadoParaCambiarContrasena("99999999", "ADMINISTRADOR");
+        doThrow(new UsuarioNoEncontradoException("La cédula no es usuario del backoffice"))
+                .when(servicio).cambiar(any(), any(), any());
+
+        assertEquals(404, recurso.cambiarContrasena(CAMBIO).getStatus());
     }
 }

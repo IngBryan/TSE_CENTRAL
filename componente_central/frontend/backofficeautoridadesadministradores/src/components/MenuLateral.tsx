@@ -2,6 +2,7 @@
 
 import {
   FileText,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Network,
@@ -30,7 +31,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { inicioPorRol, rolesPermitidos, type Rol } from "@/lib/rutas";
+import { inicioPorRol, rolesPermitidos, RUTA_CUENTA, type Rol } from "@/lib/rutas";
 
 // Each role only sees the entries that RUTAS_PROTEGIDAS lets it open
 const ENTRADAS: { ruta: string; nombre: string; icono: LucideIcon }[] = [
@@ -120,6 +121,16 @@ export default function MenuLateral({ ci, rol }: { ci: string; rol: Rol }) {
             </div>
           </SidebarMenuItem>
           <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={esActual(ruta, RUTA_CUENTA)}
+              tooltip="Cambiar contraseña"
+              render={<Link href={RUTA_CUENTA} />}
+            >
+              <KeyRound />
+              <span>Cambiar contraseña</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <form action={cerrarSesionAction}>
               <SidebarMenuButton type="submit" tooltip="Cerrar sesión">
                 <LogOut />
@@ -138,7 +149,9 @@ export default function MenuLateral({ ci, rol }: { ci: string; rol: Rol }) {
 // Top bar of the content: the button that folds the menu (Ctrl+B) and where you are
 export function BarraSuperior() {
   const ruta = usePathname();
-  const seccion = ENTRADAS.find((e) => esActual(ruta, e.ruta))?.nombre;
+  const seccion = esActual(ruta, RUTA_CUENTA)
+    ? "Mi cuenta"
+    : ENTRADAS.find((e) => esActual(ruta, e.ruta))?.nombre;
 
   return (
     <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur print:hidden">

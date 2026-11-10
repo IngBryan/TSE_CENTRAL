@@ -1,7 +1,9 @@
 package tse.lab.backofficeautoridadesadministradores.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 
@@ -51,5 +53,31 @@ class UsuarioBackofficeDAOTest {
         assertEquals("ADMINISTRADOR", usuarios.buscarRol(ADMINISTRADOR));
         assertEquals("AUTORIDAD", usuarios.buscarRol(AUTORIDAD));
         assertNull(usuarios.buscarRol("99999999"));
+    }
+
+    @Test
+    void actualizaLaContrasenaSiElHashAnteriorCoincide() {
+        em.getTransaction().begin();
+        boolean actualizada = usuarios.actualizarContrasena(AUTORIDAD, "hash", "hash-nuevo");
+        em.getTransaction().commit();
+        em.clear();
+
+        assertTrue(actualizada);
+        assertEquals("hash-nuevo", usuarios.buscarPorCi(AUTORIDAD).getContrasena());
+        assertEquals("hash", usuarios.buscarPorCi(ADMINISTRADOR).getContrasena());
+        assertEquals("AUTORIDAD", usuarios.buscarRol(AUTORIDAD));
+    }
+
+    @Test
+    void noActualizaSiOtroCambioYaReemplazoElHash() {
+        em.getTransaction().begin();
+        boolean actualizada = usuarios.actualizarContrasena(ADMINISTRADOR, "otro-hash", "hash-nuevo");
+        boolean inexistente = usuarios.actualizarContrasena("99999999", "hash", "hash-nuevo");
+        em.getTransaction().commit();
+        em.clear();
+
+        assertFalse(actualizada);
+        assertFalse(inexistente);
+        assertEquals("hash", usuarios.buscarPorCi(ADMINISTRADOR).getContrasena());
     }
 }

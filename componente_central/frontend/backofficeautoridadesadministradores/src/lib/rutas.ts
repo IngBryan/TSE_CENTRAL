@@ -3,6 +3,9 @@ export type Rol = "ADMINISTRADOR" | "AUTORIDAD";
 // Handled entirely by proxy.ts: drops the session cookie and goes to the login
 export const RUTA_CERRAR_SESION = "/sesion/cerrar";
 
+// The account of the logged-in user (change password); every role has one
+export const RUTA_CUENTA = "/cuenta";
+
 // Each protected section and the roles that may open it; proxy.ts and the pages read this same table
 export const RUTAS_PROTEGIDAS: readonly { prefijo: string; roles: readonly Rol[] }[] = [
   { prefijo: "/nodos-perifericos", roles: ["ADMINISTRADOR"] },
@@ -10,6 +13,7 @@ export const RUTAS_PROTEGIDAS: readonly { prefijo: string; roles: readonly Rol[]
   { prefijo: "/usuarios", roles: ["ADMINISTRADOR"] },
   { prefijo: "/dashboard", roles: ["AUTORIDAD"] },
   { prefijo: "/reportes", roles: ["AUTORIDAD"] },
+  { prefijo: RUTA_CUENTA, roles: ["ADMINISTRADOR", "AUTORIDAD"] },
 ];
 
 const INICIO_POR_ROL: Record<Rol, string> = {

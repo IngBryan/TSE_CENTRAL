@@ -1,6 +1,7 @@
 
 import type {
   AltaUsuario,
+  CambioContrasena,
   CambioRol,
   FiltrosUsuarios,
   PaginaUsuarios,
@@ -181,6 +182,25 @@ export async function cambiarRol(
     // 400 datos, 404 no es usuario interno, 409 ya tiene el rol o es el propio
     conDetalle: [400, 404, 409],
     generico: () => "No se pudo cambiar el rol.",
+  });
+
+  return resultado.ok ? { ok: true } : resultado;
+}
+
+/**
+ * Cambia la contraseña del usuario logueado (la cédula sale del token).
+ */
+export async function cambiarContrasena(
+  datos: CambioContrasena
+): Promise<ResultadoAlta> {
+  const resultado = await pedir({
+    ruta: "auth/contrasena",
+    method: "PUT",
+    cuerpo: datos,
+    sinPermisos: "No tenés permisos para cambiar la contraseña.",
+    // 400 la nueva no es válida o la actual no es correcta, 404 ya no es usuario del backoffice
+    conDetalle: [400, 404],
+    generico: () => "No se pudo cambiar la contraseña.",
   });
 
   return resultado.ok ? { ok: true } : resultado;

@@ -77,6 +77,12 @@ export type CambioRol = {
   email?: string;
 };
 
+// Cambio de la contraseña propia (CambioContrasenaService)
+export type CambioContrasena = {
+  contrasenaActual: string;
+  contrasenaNueva: string;
+};
+
 export type FiltrosUsuarios = {
   rol: RolUsuario | null;
   ci: string;

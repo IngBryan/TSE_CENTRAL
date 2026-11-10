@@ -52,5 +52,20 @@ public class UsuarioBackofficeDAO {
                 .findFirst()
                 .orElse(null);
     }
+
+    /**
+     * Reemplaza el hash de la contraseña solo si todavía es el anterior: si
+     * otro cambio se confirmó entre la lectura y este update, no lo pisa.
+     *
+     * @return true si se actualizó
+     */
+    public boolean actualizarContrasena(String ci, String hashAnterior, String hashNuevo) {
+        return em.createNativeQuery(
+                "UPDATE usuarios_backoffice SET contrasena = ?1 WHERE ci = ?2 AND contrasena = ?3")
+                .setParameter(1, hashNuevo)
+                .setParameter(2, ci)
+                .setParameter(3, hashAnterior)
+                .executeUpdate() > 0;
+    }
 }
 
