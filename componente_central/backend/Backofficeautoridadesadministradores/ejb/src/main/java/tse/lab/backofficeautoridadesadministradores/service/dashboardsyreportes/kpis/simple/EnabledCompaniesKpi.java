@@ -5,7 +5,8 @@ import java.util.List;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.Table;
 import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.TableAlias;
 
-// Companies enabled on the day. The model keeps no date of the enablement, so for now every day gives today's
+// Companies registered by the end of the period and enabled. The model keeps no date of the enablement itself: a
+// company enabled or disabled later counts as it is today from its registration on
 public class EnabledCompaniesKpi extends SnapshotKpi {
 
     public EnabledCompaniesKpi() {
@@ -25,6 +26,6 @@ public class EnabledCompaniesKpi extends SnapshotKpi {
 
     @Override
     protected String condition(String day) {
-        return "e.habilitada = TRUE";
+        return "e.habilitada = TRUE AND e.fechaAlta <= " + day;
     }
 }

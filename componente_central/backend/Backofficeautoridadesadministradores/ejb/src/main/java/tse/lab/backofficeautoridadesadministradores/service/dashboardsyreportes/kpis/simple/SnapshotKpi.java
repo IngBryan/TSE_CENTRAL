@@ -14,8 +14,8 @@ import tse.lab.backofficeautoridadesadministradores.service.dashboardsyreportes.
 
 /**
  * A picture on a day rather than events in a period: what there is on that day (vehicles enabled, companies
- * enabled). Its condition takes the day it is evaluated on: grouped by time, the last day of each day, week,
- * month or year of the period, one query each; grouped by another facet, the last day of the period.
+ * enabled). It ignores the start of the period and is limited by its end, :to: grouped by time, the end of each day,
+ * week, month or year of the period, one query each; grouped by another facet, the end of the period.
  */
 public abstract class SnapshotKpi extends BaseQueryKpi {
 
@@ -28,7 +28,7 @@ public abstract class SnapshotKpi extends BaseQueryKpi {
 
     @Override
     protected final String condition() {
-        return condition(":day");
+        return condition(":to");
     }
 
     // Time has no link to its table: it is the day it is evaluated on
@@ -50,13 +50,5 @@ public abstract class SnapshotKpi extends BaseQueryKpi {
     private double onLastDay(EntityManager em, Bucket bucket, Map<Facet, Selection> filters) {
         List<KpiValue> total = super.compute(em, bucket.period(), null, filters);
         return total.isEmpty() ? 0 : total.get(0).value();
-    }
-
-    @Override
-    protected void bind(Map<String, Object> parameters, String jpql, Period period) {
-        super.bind(parameters, jpql, period);
-        if (jpql.contains(":day")) {
-            parameters.put("day", period.to());
-        }
     }
 }

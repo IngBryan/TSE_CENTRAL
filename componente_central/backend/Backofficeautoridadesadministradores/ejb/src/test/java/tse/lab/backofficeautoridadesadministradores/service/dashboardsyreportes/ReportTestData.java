@@ -20,7 +20,7 @@ import tse.lab.model.Vehiculo;
 
 /**
  * The data the KPI and report tests run on: three finished trips from October 1 to November 7, 2026, one in
- * progress and one a year before; a case for each finished trip; two enabled companies and a disabled one.
+ * progress and one a year before; a case for each finished trip; two enabled companies and a disabled one, registered on January 1.
  */
 public final class ReportTestData {
 
@@ -75,6 +75,7 @@ public final class ReportTestData {
     private Empresa empresa(Long nro, boolean habilitada, Rubro rubro) {
         Empresa empresa = new Empresa(nro, "Empresa " + nro, "Empresa " + nro + " SA", "Dirección " + nro, null);
         empresa.setHabilitada(habilitada);
+        empresa.setFechaAlta(LocalDate.of(2026, 1, 1));
         empresa.setRubros(List.of(rubro));
         em.persist(empresa);
         return empresa;

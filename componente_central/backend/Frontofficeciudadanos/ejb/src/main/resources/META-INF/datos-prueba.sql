@@ -15,9 +15,9 @@ INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (7,
 INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (8, 'Nueva Palmira', 'Colonia', -33.87031, -58.41176);
 INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (13, 'Dolores', 'Soriano', -33.53009, -58.21701);
 -- Empresa habilitada; la alta real la hace un funcionario del MTOP (frontoffice de funcionarios).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (1, 'Transportes del Este', 'Transportes del Este S.A.', 'Ruta 8 km 29, Pando, Canelones', true, CURRENT_DATE - 400, 0);
 -- DEMO / Empresas: contraste con empresa no habilitada (sin identidad gub.uy artificial).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (2, 'Logistica del Litoral', 'Logistica del Litoral S.R.L.', 'Ruta 3 km 390, Paysandu', false , 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (2, 'Logistica del Litoral', 'Logistica del Litoral S.R.L.', 'Ruta 3 km 390, Paysandu', false , CURRENT_DATE - 300, 0);
 -- Ciudadanos que tienen un rol. Quedan pendientes sin cuenta gub.uy: su primer ingreso los vincula y valida
 -- contra la PDI (CU-01 FA2). Los roles (responsables, choferes) los referencian por ci.
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('54074380', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
@@ -207,9 +207,9 @@ INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNue
 -- DEMO / Portal publico: tres empresas habilitadas mas, con un vehiculo habilitado y viajes FINALIZADOS cada una,
 -- para que las estadisticas publicas junten el umbral de 3 empresas. Construccion es solo de la empresa 5: se
 -- reserva, y con ella el rubro mas chico de los visibles (supresion complementaria): las dos van sumadas en "Otros rubros".
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (3, 'Fletes del Norte', 'Fletes del Norte S.A.', 'Ruta 5 km 498, Rivera', true, 0);
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (4, 'Cargas del Sur', 'Cargas del Sur S.R.L.', 'Camino Maldonado 7500, Montevideo', true, 0);
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (5, 'Transporte Oriental', 'Transporte Oriental S.A.', 'Ruta 1 km 67, San Jose', true, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (3, 'Fletes del Norte', 'Fletes del Norte S.A.', 'Ruta 5 km 498, Rivera', true, CURRENT_DATE - 200, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (4, 'Cargas del Sur', 'Cargas del Sur S.R.L.', 'Camino Maldonado 7500, Montevideo', true, CURRENT_DATE - 150, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (5, 'Transporte Oriental', 'Transporte Oriental S.A.', 'Ruta 1 km 67, San Jose', true, CURRENT_DATE - 100, 0);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SEM3001', 'Scania', 'G 410', 8800, 26000, true, 3);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SEM4001', 'Volvo', 'FM 440', 9100, 27000, true, 4);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SEM5001', 'Iveco', 'S-Way', 8700, 25000, true, 5);
@@ -223,7 +223,7 @@ INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) VALUES (CURRENT_DATE
 -- DEMO / Fiscalizacion de habilitaciones (frontoffice de funcionarios): la empresa 6 tiene un vehiculo en cada
 -- estado del permiso y la ITV. Sin viajes ni GPS: no cambia las estadisticas del portal ni genera casos.
 -- Al dia: 3 habilitados (2 por vencer), 4 no habilitados y 1 dado de baja.
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (6, 'Fletes del Centro', 'Fletes del Centro S.A.', 'Ruta 5 km 183, Durazno', true, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (6, 'Fletes del Centro', 'Fletes del Centro S.A.', 'Ruta 5 km 183, Durazno', true, CURRENT_DATE - 30, 0);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1001', 'Volvo', 'FH 540', 9400, 27000, true, 6);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1002', 'Scania', 'R 500', 9200, 26000, true, 6);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) VALUES ('SFH1003', 'Iveco', 'S-Way', 8700, 25000, true, 6);
@@ -273,7 +273,7 @@ INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNue
 -- Tracking load test fleet (load-tests/tracking-generator): 500 vehicles LT00001..LT00500 of company 900, each with
 -- valid permit and ITV, an EN_CURSO guide (so its events don't open trip-without-guide cases) and its own active GPS,
 -- id_externo 100001..100500 (LT00001 = GPS 100001).
-INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, version) VALUES (900, 'Prueba de carga', 'Prueba de carga S.A.', 'Ruta 1 km 0, Montevideo', true, 0);
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) VALUES (900, 'Prueba de carga', 'Prueba de carga S.A.', 'Ruta 1 km 0, Montevideo', true, CURRENT_DATE - 7, 0);
 INSERT INTO ciudadanos (ci, estado, creado) VALUES ('90000000', 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP);
 INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) VALUES ('90000000', 900, 'HABILITADO', CURRENT_TIMESTAMP);
 INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) SELECT 'LT' || LPAD(n::text, 5, '0'), 'Scania', 'R 450', 9000, 26000, true, 900 FROM generate_series(1, 500) AS n;

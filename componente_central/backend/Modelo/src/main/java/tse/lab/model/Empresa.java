@@ -1,6 +1,8 @@
 package tse.lab.model;
 
 import java.io.Serializable;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
@@ -11,6 +13,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -29,6 +32,8 @@ public class Empresa implements Serializable {
     private String direccion;
     // La habilita un funcionario del MTOP; solo una empresa habilitada puede dar de alta choferes (CU-02)
     private boolean habilitada;
+    // The day it was registered in the system, Uruguay time: before it, the company did not exist for the reports
+    private LocalDate fechaAlta;
     @OneToOne(mappedBy = "empresa", cascade = { CascadeType.PERSIST, CascadeType.MERGE }) // lo defini como one to one,
                                                                                           // comenten si les parece
     private Responsable responsable;
@@ -91,6 +96,22 @@ public class Empresa implements Serializable {
 
     public void setHabilitada(boolean habilitada) {
         this.habilitada = habilitada;
+    }
+
+    public LocalDate getFechaAlta() {
+        return fechaAlta;
+    }
+
+    public void setFechaAlta(LocalDate fechaAlta) {
+        this.fechaAlta = fechaAlta;
+    }
+
+    // Every way of registering a company stamps the day, unless it brings its own (seed data, tests)
+    @PrePersist
+    void registrarAlta() {
+        if (fechaAlta == null) {
+            fechaAlta = LocalDate.now(ZoneId.of("America/Montevideo"));
+        }
     }
 
     public Responsable getResponsable() {

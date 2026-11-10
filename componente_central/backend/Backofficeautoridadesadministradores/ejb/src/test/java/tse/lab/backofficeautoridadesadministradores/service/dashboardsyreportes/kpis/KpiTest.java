@@ -155,6 +155,23 @@ class KpiTest {
                 new FacetValue("3", "Empresa 3")), Facets.COMPANY.values(em));
     }
 
+    // A company counts from the day it was registered on: a period that ends before it does not see it
+    @Test
+    void countsCompaniesFromTheirRegistration() {
+        em.getTransaction().begin();
+        em.find(Empresa.class, 2L).setFechaAlta(LocalDate.of(2026, 10, 15));
+        em.getTransaction().commit();
+        em.clear();
+
+        Period alrededorDelAlta = new Period(LocalDate.of(2026, 10, 14), LocalDate.of(2026, 10, 16));
+        assertEquals(List.of(1.0, 2.0, 2.0), new EnabledCompaniesKpi()
+                .calculate(em, alrededorDelAlta, Facets.DAY, Map.of()).stream().map(KpiValue::value).toList());
+        assertEquals(1.0, new EnabledCompaniesKpi().total(em, new Period(LocalDate.of(2024, 1, 1),
+                LocalDate.of(2026, 10, 14)), Map.of()));
+        assertEquals(0.0, new EnabledCompaniesKpi().total(em, new Period(LocalDate.of(2024, 1, 1),
+                LocalDate.of(2024, 12, 31)), Map.of()));
+    }
+
     // A dismissed case is closed but not a confirmed infraction: the rate counts only the confirmed ones
     @Test
     void ratesOnlyTheConfirmedInfractions() {
