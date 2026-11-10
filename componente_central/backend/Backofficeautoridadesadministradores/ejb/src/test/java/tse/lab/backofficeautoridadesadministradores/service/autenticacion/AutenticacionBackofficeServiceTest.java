@@ -37,12 +37,11 @@ class AutenticacionBackofficeServiceTest {
         }
 
         @Override
-        public String buscarRol(String ci) {
+        public CuentaBackoffice buscarCuenta(String ci) {
             UsuarioBackoffice u = datos.get(ci);
-            if (u instanceof Administrador) {
-                return "ADMINISTRADOR";
-            }
-            return u instanceof Autoridad ? "AUTORIDAD" : null;
+            String rol = u instanceof Administrador ? "ADMINISTRADOR"
+                    : u instanceof Autoridad ? "AUTORIDAD" : null;
+            return rol == null ? null : new CuentaBackoffice(ci, rol, u.isDebeCambiarContrasena());
         }
     }
 
@@ -116,14 +115,34 @@ class AutenticacionBackofficeServiceTest {
     }
 
     @Test
-    void elRolActualEsElDeLaBase() {
+    void laCuentaActualEsLaDeLaBase() {
         dao.datos.put("12345678", new Administrador("12345678", hash));
         dao.datos.put("87654321", new Autoridad("87654321", hash));
 
-        assertEquals(Optional.of("ADMINISTRADOR"), servicio.rolActual("12345678"));
-        assertEquals(Optional.of("AUTORIDAD"), servicio.rolActual("87654321"));
-        assertEquals(Optional.empty(), servicio.rolActual("99999999"));
-        assertEquals(Optional.empty(), servicio.rolActual(null));
-        assertEquals(Optional.empty(), servicio.rolActual(" "));
+        assertEquals(Optional.of(new CuentaBackoffice("12345678", "ADMINISTRADOR", false)),
+                servicio.cuentaActual("12345678"));
+        assertEquals(Optional.of(new CuentaBackoffice("87654321", "AUTORIDAD", false)),
+                servicio.cuentaActual("87654321"));
+        assertEquals(Optional.empty(), servicio.cuentaActual("99999999"));
+        assertEquals(Optional.empty(), servicio.cuentaActual(null));
+        assertEquals(Optional.empty(), servicio.cuentaActual(" "));
+    }
+
+    @Test
+    void elLoginInformaElCambioDeContrasenaPendiente() {
+        Autoridad nueva = new Autoridad("87654321", hash);
+        nueva.setDebeCambiarContrasena(true);
+        dao.datos.put("87654321", nueva);
+        dao.datos.put("12345678", new Administrador("12345678", hash));
+
+        assertTrue(servicio.autenticar("87654321", CLAVE).orElseThrow().debeCambiarContrasena());
+        assertFalse(servicio.autenticar("12345678", CLAVE).orElseThrow().debeCambiarContrasena());
+        assertTrue(servicio.cuentaActual("87654321").orElseThrow().debeCambiarContrasena());
+    }
+
+    @Test
+    void laIdentidadDelTokenNoLlevaElCambioPendiente() {
+        assertEquals(new IdentidadBackoffice("87654321", "AUTORIDAD"),
+                new CuentaBackoffice("87654321", "AUTORIDAD", true).identidad());
     }
 }

@@ -91,15 +91,16 @@ class AltaUsuarioServiceTest {
         assertEquals("12345678", administrador.getCi());
         assertNotEquals(CONTRASENA, administrador.getContrasena());
         assertTrue(Contrasenas.verificar(CONTRASENA, administrador.getContrasena()));
+        assertTrue(administrador.isDebeCambiarContrasena());
         assertEquals(1, usuarios.bloqueos);
     }
 
     @Test
-    void creaUnaAutoridad() {
+    void creaUnaAutoridadQueTieneQueCambiarLaContrasena() {
         UsuarioCreado creado = servicio.crear("99999999", "autoridad", "1234567", CONTRASENA, null);
 
         assertEquals(RolUsuario.AUTORIDAD, creado.rol());
-        assertInstanceOf(Autoridad.class, unicoGuardado());
+        assertTrue(assertInstanceOf(Autoridad.class, unicoGuardado()).isDebeCambiarContrasena());
     }
 
     @Test

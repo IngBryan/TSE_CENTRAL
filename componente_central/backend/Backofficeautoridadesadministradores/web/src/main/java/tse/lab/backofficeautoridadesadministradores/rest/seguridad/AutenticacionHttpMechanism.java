@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.AutenticacionBackofficeService;
+import tse.lab.backofficeautoridadesadministradores.service.autenticacion.CuentaBackoffice;
 
 /**
  * Integrates the backoffice authentication with the HTTP security of the Jakarta EE container, without a
@@ -24,6 +25,12 @@ import tse.lab.backofficeautoridadesadministradores.service.autenticacion.Autent
 @ApplicationScoped
 public class AutenticacionHttpMechanism
         implements HttpAuthenticationMechanism {
+
+    /**
+     * Grupo que se agrega junto al rol mientras el usuario no cambie la contraseña que le dio un
+     * administrador. CambioContrasenaPendienteFilter le bloquea la API, salvo cambiarla.
+     */
+    public static final String CAMBIO_CONTRASENA_PENDIENTE = "CAMBIO_CONTRASENA_PENDIENTE";
 
     private static final String BEARER = "Bearer ";
 
@@ -50,25 +57,18 @@ public class AutenticacionHttpMechanism
             return contexto.responseUnauthorized();
         }
 
-        var identidad = servicio.autenticar(
+        return servicio.autenticar(
                 datos.getCaller(),
-                datos.getPasswordAsString());
-
-        if (identidad.isEmpty()) {
-            return contexto.responseUnauthorized();
-        }
-
-        var usuario = identidad.get();
-
-        return contexto.notifyContainerAboutLogin(
-                usuario.ci(),
-                Set.of(usuario.rol()));
+                datos.getPasswordAsString())
+                .map(cuenta -> login(contexto, cuenta))
+                .orElseGet(contexto::responseUnauthorized);
     }
 
     /**
-     * Without a valid token the request goes on unauthenticated: the resources answer 401. The role comes from the
-     * database, not from the token: an administrator may have changed it (or removed the user) after the login, and
-     * the change applies from the next request on instead of when the token expires.
+     * Sin un token válido el pedido sigue sin autenticar: los recursos responden 401. El rol y el cambio de
+     * contraseña pendiente salen de la base, no del token: después del login un administrador puede haber
+     * cambiado el rol (o quitado al usuario), o el usuario puede haber cambiado la contraseña, y eso vale
+     * desde el pedido siguiente en vez de cuando vence el token.
      */
     private AuthenticationStatus fromToken(HttpServletRequest request, HttpMessageContext contexto) {
         String header = request.getHeader("Authorization");
@@ -76,8 +76,16 @@ public class AutenticacionHttpMechanism
             return contexto.doNothing();
         }
         return BackofficeToken.verify(header.substring(BEARER.length()), tokenSecret, Instant.now())
-                .flatMap(identity -> servicio.rolActual(identity.ci())
-                        .map(rol -> contexto.notifyContainerAboutLogin(identity.ci(), Set.of(rol))))
+                .flatMap(identity -> servicio.cuentaActual(identity.ci()))
+                .map(cuenta -> login(contexto, cuenta))
                 .orElseGet(contexto::doNothing);
+    }
+
+    private static AuthenticationStatus login(HttpMessageContext contexto, CuentaBackoffice cuenta) {
+        return contexto.notifyContainerAboutLogin(
+                cuenta.ci(),
+                cuenta.debeCambiarContrasena()
+                        ? Set.of(cuenta.rol(), CAMBIO_CONTRASENA_PENDIENTE)
+                        : Set.of(cuenta.rol()));
     }
 }

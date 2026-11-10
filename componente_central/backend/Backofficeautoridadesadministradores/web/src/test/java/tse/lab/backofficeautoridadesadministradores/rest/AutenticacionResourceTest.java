@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.core.Response;
 
+import tse.lab.backofficeautoridadesadministradores.rest.seguridad.AutenticacionHttpMechanism;
 import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioContrasenaService;
@@ -102,6 +103,7 @@ class AutenticacionResourceTest {
                 new IdentidadBackoffice("99999999", "ADMINISTRADOR"),
                 BackofficeToken.verify((String) cuerpo.get("token"), SECRET, Instant.now()).orElseThrow());
         assertEquals(BackofficeToken.LIFETIME_S, cuerpo.get("expiraEn"));
+        assertEquals(false, cuerpo.get("debeCambiarContrasena"));
         // No session: nothing is stored in WildFly
         verify(solicitud, never()).getSession(anyBoolean());
 
@@ -270,6 +272,33 @@ class AutenticacionResourceTest {
 
         assertEquals("AUTORIDAD",
                 identidad.get("rol"));
+    }
+
+    @Test
+    void elLoginInformaQueHayQueCambiarLaContrasenaYElTokenNoLoLleva() {
+        loggedInAs("87654321", "AUTORIDAD");
+        when(seguridadJakarta.isCallerInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE))
+                .thenReturn(true);
+
+        Map<?, ?> cuerpo = (Map<?, ?>) recurso.login(
+                new AutenticacionResource.Credenciales("87654321", "ClaveInicial")).getEntity();
+
+        assertEquals(true, cuerpo.get("debeCambiarContrasena"));
+        assertEquals(
+                new IdentidadBackoffice("87654321", "AUTORIDAD"),
+                BackofficeToken.verify((String) cuerpo.get("token"), SECRET, Instant.now()).orElseThrow());
+    }
+
+    @Test
+    void consultarIdentidadInformaElCambioDeContrasenaPendiente() {
+        when(seguridadRest.getUserPrincipal()).thenReturn(() -> "87654321");
+        when(seguridadRest.isUserInRole("AUTORIDAD")).thenReturn(true);
+        when(seguridadRest.isUserInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE)).thenReturn(true);
+
+        Map<?, ?> identidad = (Map<?, ?>) recurso.usuarioActual().getEntity();
+
+        assertEquals(true, identidad.get("debeCambiarContrasena"));
+        assertEquals("AUTORIDAD", identidad.get("rol"));
     }
 
     @Test

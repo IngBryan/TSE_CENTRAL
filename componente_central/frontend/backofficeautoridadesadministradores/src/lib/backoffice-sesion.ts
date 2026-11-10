@@ -4,7 +4,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { registrarLog, segundosDesde } from "./log";
-import { esRol, inicioPorRol, RUTA_CERRAR_SESION, type Rol } from "./rutas";
+import {
+  esRol,
+  inicioPorRol,
+  RUTA_CAMBIO_OBLIGATORIO,
+  RUTA_CERRAR_SESION,
+  type Rol,
+} from "./rutas";
 import { NOMBRE_COOKIE_SESION } from "./token";
 
 export { NOMBRE_COOKIE_SESION, RUTA_COOKIE_SESION } from "./token";
@@ -12,6 +18,8 @@ export { NOMBRE_COOKIE_SESION, RUTA_COOKIE_SESION } from "./token";
 export type IdentidadBackoffice = {
   ci: string;
   rol: Rol;
+  // Todavía no cambió la contraseña inicial que le dio un administrador: WildFly le bloquea todo lo demás
+  debeCambiarContrasena: boolean;
 };
 
 export function urlBackend(ruta: string): string {
@@ -110,7 +118,12 @@ export async function consultarIdentidad():
       return null;
     }
 
-    return { ci: datos.ci, rol: datos.rol };
+    return {
+      ci: datos.ci,
+      rol: datos.rol,
+      debeCambiarContrasena:
+        "debeCambiarContrasena" in datos && datos.debeCambiarContrasena === true,
+    };
   } catch {
     return null;
   }
@@ -122,6 +135,11 @@ export async function requerirRol(...roles: Rol[]): Promise<IdentidadBackoffice>
 
   if (!identidad) {
     redirect(RUTA_CERRAR_SESION);
+  }
+
+  // No viaja en el token (WildFly lo lee de la base en cada pedido): proxy.ts no puede mandar acá
+  if (identidad.debeCambiarContrasena) {
+    redirect(RUTA_CAMBIO_OBLIGATORIO);
   }
 
   if (!roles.includes(identidad.rol)) {

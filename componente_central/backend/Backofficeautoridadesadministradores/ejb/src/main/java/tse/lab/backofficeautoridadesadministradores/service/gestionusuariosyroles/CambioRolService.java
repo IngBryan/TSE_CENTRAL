@@ -9,9 +9,6 @@ import jakarta.ejb.Stateless;
 
 import tse.lab.backofficeautoridadesadministradores.data.UsuarioDAO;
 import tse.lab.backofficeautoridadesadministradores.service.LogBackoffice;
-import tse.lab.backofficeautoridadesadministradores.service.autenticacion.Contrasenas;
-import tse.lab.model.Administrador;
-import tse.lab.model.Autoridad;
 import tse.lab.model.Funcionario;
 
 /*
@@ -143,10 +140,7 @@ public class CambioRolService {
         if (rolBackoffice == null) {
             // Se valida antes de calcular el hash, que es costoso
             ValidacionUsuario.contrasena(contrasena);
-            String hash = Contrasenas.generarHash(contrasena);
-            usuarios.guardar(nuevo == RolUsuario.ADMINISTRADOR
-                    ? new Administrador(cedula, hash)
-                    : new Autoridad(cedula, hash));
+            usuarios.guardar(ContrasenaInicial.nuevoUsuario(nuevo, cedula, contrasena));
         } else if (rolBackoffice != nuevo) {
             usuarios.cambiarRolBackoffice(cedula, rolBackoffice, nuevo);
         }

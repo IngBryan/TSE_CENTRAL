@@ -11,6 +11,11 @@
         <role-name>AUTORIDAD</role-name>
     </security-role>
 
+    <!-- Junto al rol mientras no se cambie la contraseña inicial: CambioContrasenaPendienteFilter -->
+    <security-role>
+        <role-name>CAMBIO_CONTRASENA_PENDIENTE</role-name>
+    </security-role>
+
     <session-config>
         <session-timeout>30</session-timeout>
 

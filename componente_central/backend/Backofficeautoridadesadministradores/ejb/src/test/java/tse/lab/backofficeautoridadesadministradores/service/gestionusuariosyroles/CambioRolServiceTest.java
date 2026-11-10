@@ -138,6 +138,8 @@ class CambioRolServiceTest {
         assertFalse(f.isActivo());
         Administrador admin = assertInstanceOf(Administrador.class, usuarios.backoffice.get(CI));
         assertTrue(Contrasenas.verificar(CONTRASENA, admin.getContrasena()));
+        // La contraseña la eligió el administrador que hizo el cambio
+        assertTrue(admin.isDebeCambiarContrasena());
     }
 
     @Test

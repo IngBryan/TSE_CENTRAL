@@ -22,6 +22,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import tse.lab.backofficeautoridadesadministradores.rest.seguridad.AutenticacionHttpMechanism;
 import tse.lab.backofficeautoridadesadministradores.rest.seguridad.BackofficeToken;
 import tse.lab.backofficeautoridadesadministradores.service.autenticacion.IdentidadBackoffice;
 import tse.lab.backofficeautoridadesadministradores.service.gestionusuariosyroles.CambioContrasenaService;
@@ -122,9 +123,12 @@ public class AutenticacionResource {
                 tokenSecret,
                 Instant.now());
 
+        // Con el cambio de contraseña pendiente, el token solo abre /auth/me, /auth/contrasena y /auth/logout
         return Response.ok(Map.of(
                 "token", token,
-                "expiraEn", BackofficeToken.LIFETIME_S)).build();
+                "expiraEn", BackofficeToken.LIFETIME_S,
+                "debeCambiarContrasena",
+                seguridad.isCallerInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE))).build();
     }
 
     @GET
@@ -151,7 +155,9 @@ public class AutenticacionResource {
 
         return Response.ok(Map.of(
                 "ci", seguridadRest.getUserPrincipal().getName(),
-                "rol", rol)).build();
+                "rol", rol,
+                "debeCambiarContrasena",
+                seguridadRest.isUserInRole(AutenticacionHttpMechanism.CAMBIO_CONTRASENA_PENDIENTE))).build();
     }
 
     /**

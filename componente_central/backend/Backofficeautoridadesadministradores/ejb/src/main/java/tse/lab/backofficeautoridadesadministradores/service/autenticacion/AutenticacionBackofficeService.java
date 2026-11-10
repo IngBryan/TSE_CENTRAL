@@ -23,10 +23,10 @@ public class AutenticacionBackofficeService {
     /**
      * Autentica un usuario por cédula y contraseña.
      *
-     * @return identidad autenticada, o vacío si las
-     *         credenciales no son válidas.
+     * @return la cuenta autenticada (con su rol y si tiene pendiente el cambio
+     *         de contraseña), o vacío si las credenciales no son válidas.
      */
-    public Optional<IdentidadBackoffice> autenticar(
+    public Optional<CuentaBackoffice> autenticar(
             String ci,
             String contrasena) {
 
@@ -52,21 +52,23 @@ public class AutenticacionBackofficeService {
         }
 
         return rolDe(usuario)
-                .map(rol -> new IdentidadBackoffice(usuario.getCi(), rol));
+                .map(rol -> new CuentaBackoffice(
+                        usuario.getCi(), rol, usuario.isDebeCambiarContrasena()));
     }
 
     /**
-     * El rol vigente de un usuario ya autenticado por su token. Un
-     * administrador puede haberle cambiado el rol (o quitado) después de
-     * emitido el token: este es el que vale.
+     * La cuenta vigente de un usuario ya autenticado por su token. Un
+     * administrador puede haberle cambiado el rol (o quitado), y el usuario
+     * puede haber hecho el cambio de contraseña obligatorio, después de
+     * emitido el token: esto es lo que vale.
      *
-     * @return ADMINISTRADOR, AUTORIDAD o vacío si ya no es usuario del backoffice
+     * @return la cuenta, o vacío si ya no es usuario del backoffice
      */
-    public Optional<String> rolActual(String ci) {
+    public Optional<CuentaBackoffice> cuentaActual(String ci) {
         if (ci == null || ci.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(usuarios.buscarRol(ci));
+        return Optional.ofNullable(usuarios.buscarCuenta(ci));
     }
 
     private static Optional<String> rolDe(UsuarioBackoffice usuario) {
