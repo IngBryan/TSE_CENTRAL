@@ -327,17 +327,54 @@ class CasosAutomaticosServiceTest {
                 servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1)));
     }
 
-    @Test
-    void reprocesarEventoDeCasoResueltoNoAbreOtroCaso() {
+    @ParameterizedTest(name = "TR-C01: reentrega de GPS desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = { "EN_DESCARGO", "CONFIRMADA", "DESESTIMADA" })
+    void reprocesarGpsConservaSuCasoInclusoSiEstaResuelto(EstadoCaso estado) {
         DatosCaso primero = iniciarCirculacion();
+        enTx(() -> servicio.notificarCaso(primero.getId(), "notificacion"));
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, primero.getId());
-            c.cambiarEstado(EstadoCaso.NOTIFICADA);
             c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            if (estado.esFinal()) c.cambiarEstado(estado);
             return null;
         });
+        var claves = List.copyOf(caso(primero.getId()).getClavesEventosTracking());
+        var registros = auditoria(primero.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
         DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1)));
         assertEquals(primero.getId(), repetido.getId());
+        assertEquals(estado.name(), repetido.getEstado());
+        assertEquals(claves, caso(primero.getId()).getClavesEventosTracking());
+        assertEquals(registros, auditoria(primero.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
+        assertEquals(1L, em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c", Long.class).getSingleResult());
+    }
+
+    @ParameterizedTest(name = "TR-C02: GPS nuevo después de {0}")
+    @EnumSource(value = EstadoCaso.class, names = { "CONFIRMADA", "DESESTIMADA" })
+    void gpsNuevoTrasResolucionCreaOtroCasoYLaReentregaConservaElAnterior(EstadoCaso estado) {
+        DatosCaso anterior = iniciarCirculacion();
+        enTx(() -> servicio.notificarCaso(anterior.getId(), "notificacion"));
+        enTx(() -> {
+            var c = em.find(CasoFiscalizacion.class, anterior.getId());
+            c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            c.cambiarEstado(estado);
+            return null;
+        });
+        var evidenciaAnterior = List.copyOf(caso(anterior.getId()).getClavesEventosTracking());
+        var auditoriaAnterior = auditoria(anterior.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
+        Instant siguiente = T2.plusSeconds(10);
+        var nuevo = enTx(() -> servicio.registrarCirculacionSinGuia(gps(siguiente, -34.9, -56.096)));
+        assertNotEquals(anterior.getId(), nuevo.getId());
+        assertEquals("DETECTADA", nuevo.getEstado());
+        assertEquals(List.of(new ClaveEvento("SBC1234", siguiente)), caso(nuevo.getId()).getClavesEventosTracking());
+        assertEquals(MotivoFinCirculacionSinGuia.CASO_RESUELTO, circulacion(anterior.getId()).getMotivoFin());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(nuevo.getId()).getEstado());
+
+        var repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.9, -56.098)));
+        assertEquals(anterior.getId(), repetido.getId());
+        assertEquals(estado, caso(anterior.getId()).getEstado());
+        assertEquals(evidenciaAnterior, caso(anterior.getId()).getClavesEventosTracking());
+        assertEquals(auditoriaAnterior, auditoria(anterior.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
+        assertEquals(2L, em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c", Long.class).getSingleResult());
     }
 
     @Test

@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.LongPredicate;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -63,6 +67,34 @@ class TrackingEventReceiverTest {
     void sameLicensePlateAndTimeIsTheSameEventEvenWithAnotherExternalId() {
         assertEquals(Result.SAVED, receiver.receive("msg-1", bytes(MESSAGE)));
         assertEquals(Result.DUPLICATE, receiver.receive("msg-2", bytes(MESSAGE.replace("\"id\": 7", "\"id\": 8"))));
+        assertEquals(1, dao.events().size());
+        assertEquals(1, toDetect.size());
+        assertEquals("msg-1", dao.events().getFirst().messageId());
+        assertEquals(7L, dao.events().getFirst().externalId());
+    }
+
+    @Test
+    void dosReceptoresConcurrentesDespachanUnaSolaVezElMismoHecho() throws Exception {
+        var enviados = new CopyOnWriteArrayList<TrackingEvent>();
+        var primero = new TrackingEventReceiver(dao, ANY_GPS, enviados::add);
+        var segundo = new TrackingEventReceiver(dao, ANY_GPS, enviados::add);
+        var inicio = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var a = pool.submit(() -> {
+                if (!inicio.await(5, TimeUnit.SECONDS)) throw new AssertionError("Inicio no liberado");
+                return primero.receive("msg-1", bytes(MESSAGE));
+            });
+            var b = pool.submit(() -> {
+                if (!inicio.await(5, TimeUnit.SECONDS)) throw new AssertionError("Inicio no liberado");
+                return segundo.receive("msg-2", bytes(MESSAGE.replace("\"id\": 7", "\"id\": 8")));
+            });
+            inicio.countDown();
+            var resultados = List.of(a.get(5, TimeUnit.SECONDS), b.get(5, TimeUnit.SECONDS));
+            assertEquals(1L, resultados.stream().filter(r -> r == Result.SAVED).count());
+            assertEquals(1L, resultados.stream().filter(r -> r == Result.DUPLICATE).count());
+        }
+        assertEquals(1, dao.events().size());
+        assertEquals(dao.events(), enviados);
     }
 
     @Test

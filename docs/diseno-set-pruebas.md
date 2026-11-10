@@ -1,8 +1,8 @@
 # Diseño del set de pruebas
 
-Fecha de revisión: 10 de noviembre de 2026. Rama: `test/reformulacion-pruebas`, base `a8d2605`.
+Fecha de revisión: 10 de noviembre de 2026. Rama: `test/pruebas-servicios-casosfisc-tracking-mobile`, base `a8d2605`.
 
-Estado: implementado el ciclo de vida administrativo. La sección 5 describe las pruebas y su ejecución. Tracking y sincronización móvil continúan pendientes de implementación. Este documento no acredita el 80 % global de cobertura.
+Estado: implementados el ciclo de vida administrativo y el bloque de tracking con el alcance de pruebas unitarias y de servicios con H2 acordado. Las secciones 5 y 6 describen las pruebas y su ejecución. La sincronización móvil continúa pendiente. Este documento no acredita el 80 % global de cobertura.
 
 ## 1. Objetivo y fuente de los resultados esperados
 
@@ -225,8 +225,8 @@ Las pruebas del modelo no necesitan base de datos. Las pruebas del job pueden us
 
 ### 4.7. Observaciones que no se deben convertir en resultados esperados por accidente
 
-- `CasosAutomaticosServiceTest.reprocesarEventoDeCasoResueltoNoAbreOtroCaso` prepara `EN_DESCARGO`, no un estado final. Su nombre no acredita que cubra un caso realmente resuelto; debe reformularse en el bloque de tracking.
-- `CaseAssignerTest.eventoReprocesadoTrasCerrarCasoNoAbreOtro` usa un falso que considera `EN_DESCARGO` cerrado y espera otro caso ante un GPS nuevo. Contradice la decisión confirmada para `VIAJE_SIN_GUIA`; debe reformularse en el bloque de tracking.
+- La prueba que llamaba «resuelto» a un caso preparado en `EN_DESCARGO` se reformuló en `CasosAutomaticosServiceTest.reprocesarGpsConservaSuCasoInclusoSiEstaResuelto`: ahora verifica `EN_DESCARGO` y los dos estados finales, con persistencia real sobre H2.
+- Se retiró de `CaseAssignerTest` el `FakeStore` que trataba `EN_DESCARGO` como cierre. Esa clase prueba la orquestación mediante Mockito; la acumulación, las reentregas y la separación después de una resolución se comprueban en `CasosAutomaticosServiceTest`, usando el servicio y sus DAOs reales.
 - Las consultas de casos de funcionarios revisadas escriben logs; la resolución inserta un `RegistroAuditoriaCaso`. La letra habla de toda acción del funcionario. La cobertura de la resolución no permite declarar cubierta automáticamente la auditoría de las consultas. Esa diferencia queda identificada para acordar su alcance antes de fijar una prueba sobre ella.
 - La suite de recorridos administrativos, al invocar explícitamente la notificación, no demuestra por sí sola que el motor la desencadene automáticamente ni que el procesamiento sea asincrónico. Esas garantías se verifican en la coordinación de fiscalización y en el bloque de eventos.
 - El fallback actual a la fecha de detección cuando falta la auditoría de notificación tiene una prueba propia. No sustituye la comprobación de que una notificación normal genere su registro y que el plazo se cuente desde él.
@@ -307,7 +307,7 @@ La dependencia adicional del EJB completo de Ciudadanos tiene alcance `test` en 
 
 Los tests de servicios usan bases H2 temporales en memoria con creación y eliminación de tablas. El callback de logging de auditoría posterior al commit usa un doble al no existir JTA; las filas de auditoría sí se persisten y se consultan realmente. Los rechazos que necesitan rollback lo ejecutan mediante las transacciones locales del soporte de pruebas.
 
-Se ejecuta toda `CasosAutomaticosServiceTest` como regresión del servicio modificado, incluyendo pruebas previas de GPS, circulación y evidencias. Su reformulación corresponde al bloque de tracking y permanece pendiente en esta etapa.
+En la primera etapa se ejecutó toda `CasosAutomaticosServiceTest` como regresión del servicio modificado, incluyendo pruebas previas de GPS, circulación y evidencias. La sección 6 registra la reformulación posterior del bloque de tracking y las comprobaciones agregadas en esa clase.
 
 Tampoco se acreditan con esta ejecución la entrega de mensajes, la sincronización móvil, la asincronía real, el disparo del temporizador, la concurrencia en PostgreSQL ni las transacciones de WildFly. La diferencia sobre auditoría de consultas sigue identificada; el ciclo implementado comprueba las acciones que cambian el caso.
 
@@ -326,3 +326,76 @@ El 10/11/2026 se ejecutó mediante Maven `clean verify` la selección de seis cl
 | **Total** | **137** | Incluye pruebas anteriores; no son 137 pruebas nuevas. |
 
 Los informes JUnit se generan en `target/surefire-reports` de Modelo y de los EJB de Ciudadanos y Funcionarios. Los informes JaCoCo generados por esta selección no constituyen una medición global del sistema. La cobertura global se evaluará con el alcance completo del set.
+
+## 6. Tracking: procesamiento, reintentos e idempotencia
+
+### 6.1. Alcance acordado
+
+Se utilizan JUnit, Mockito, el almacenamiento en memoria ya existente para las pruebas de tracking y H2 para las operaciones persistidas de casos. No se agregan Testcontainers, servidores ni scripts de ejecución. El requisito de idempotencia se distribuye entre recepción, procesamiento y operaciones sobre los casos; una prueba del asignador no pretende demostrar el comportamiento de una base de datos.
+
+La identidad del hecho es matrícula y fecha de medición. El identificador del mensaje y el identificador externo se conservan para trazabilidad, pero cambiarlos no convierte un GPS repetido en un hecho nuevo. Otro instante de medición sí representa otro evento aunque reutilice un identificador externo.
+
+### 6.2. Matriz de escenarios y pruebas
+
+| ID | Escenario y resultado esperado | Pruebas que lo demuestran |
+| --- | --- | --- |
+| TR-R01 | Evento válido: conserva campos, instante de medición y se entrega a detección. | `TrackingEventReceiverTest.savesEventWithMessageDataAndHandsItToTheDetection`, `readsDatesInUruguayTime`. |
+| TR-R02 | Reentrega con igual matrícula e instante: se conserva el original y se despacha una sola vez, incluso si cambian los identificadores de transporte. | `TrackingEventReceiverTest.discardsRedeliveryOfSameEventWithoutDetectingItAgain`, `sameLicensePlateAndTimeIsTheSameEventEvenWithAnotherExternalId`, `externalIdDoesNotIdentifyEvent`. |
+| TR-R03 | Dos receptores concurrentes para el mismo hecho: un resultado guardado, otro duplicado y un único despacho. | `TrackingEventReceiverTest.dosReceptoresConcurrentesDespachanUnaSolaVezElMismoHecho`. El DAO de esta prueba es el doble concurrente en memoria. |
+| TR-F01 | Se guarda el evento y falla el despacho. La reentrega resulta duplicada; la recuperación encuentra el pendiente original y lo procesa. | `TrackingDetectionWorkerTest.guardadoAntesDeFallarElDespachoSeRecuperaAunqueLaReentregaSeaDuplicada`. Usa receptor y worker reales, con DAO en memoria. |
+| TR-F02 | Falla la asignación o la marca final: el evento no se marca detectado. Otro worker lo recupera y procesa conservando su identidad. | `TrackingDetectionWorkerTest.falloDeProcesamientoSeReintentaSinPerderLaIdentidad`, dos ejecuciones. |
+| TR-F03 | Cola llena: el evento rechazado por la cola permanece pendiente y se procesa al recuperar. | `TrackingDetectionWorkerTest.colaLlenaDejaElEventoPendienteYLaRecuperacionLoProcesa`. |
+| TR-F04 | Falla la consulta de pendientes: la siguiente recuperación sigue funcionando. | `TrackingDetectionWorkerTest.falloAlConsultarPendientesNoImpideLaSiguienteRecuperacion`. |
+| TR-Q01 | Mientras un evento está en curso, otra entrega o la recuperación no lo encolan nuevamente en ese worker. | `TrackingDetectionWorkerTest.eventoEnCursoNoSeEncolaOtraVezPorEntregaNiPorRecuperacion`. La clave incluye matrícula e instante, no el identificador de transporte. |
+| TR-P01 | Un evento tiene varias infracciones: se solicitan todas. Si falla una después de otra notificada, el reintento vuelve a registrar y notifica únicamente lo pendiente. | `CaseAssignerTest.eventoPuedeRespaldarDistintasInfracciones`, `reintentoTrasFalloParcialCompletaSituacionPendiente`. Las pruebas del servicio con H2 comprueban por separado que repetir el registro conserve casos y evidencias. |
+| TR-P02 | La notificación falla: el asignador propaga el error para que el evento permanezca pendiente y pueda reintentarse. | `CaseAssignerTest.falloDeNotificacionSePropagaParaReintentar`. |
+| TR-N01 | Solo se solicita notificación si el servicio devuelve `DETECTADA`; se respetan los otros cuatro estados y la circulación todavía pendiente de movimiento. | `CaseAssignerTest.soloNotificaCasosDetectados`, cinco ejecuciones, y `unaCirculacionPendienteNoSeNotifica`. |
+| TR-C01 | Reprocesar un GPS conserva su caso, evidencia y auditoría, incluso en `EN_DESCARGO`, `CONFIRMADA` o `DESESTIMADA`. | `CasosAutomaticosServiceTest.reprocesarGpsConservaSuCasoInclusoSiEstaResuelto`, tres ejecuciones sobre H2. |
+| TR-C02 | Un GPS nuevo válido después de cualquiera de las dos resoluciones crea otro caso. Repetir un GPS anterior sigue devolviendo el caso anterior. | `CasosAutomaticosServiceTest.gpsNuevoTrasResolucionCreaOtroCasoYLaReentregaConservaElAnterior`, dos ejecuciones sobre H2. Verifica claves separadas, estados, auditoría anterior y períodos de circulación. |
+| TR-C03 | Mientras el caso sin Guía no esté resuelto, los GPS nuevos siguen acumulándose, incluso entre viajes y estando en descargo. El mismo GPS puede respaldar infracciones diferentes sin repetirse dentro de cada caso. | Pruebas conservadas de `CasosAutomaticosServiceTest`: `variosViajesTrasDiasSinGpsSiguenAcumulandoEvidenciaEnElMismoCaso`, `nuevosViajesSinGuiaSeAgreganAlMismoCasoAunqueEsteEnDescargo`, `variasInfraccionesCompartenGpsSinDuplicarloEnCadaCaso`. |
+| TR-T01 | El historial y el desvío usan el tiempo de medición y la Guía histórica, no el orden de recepción ni solo el estado actual del viaje. | Pruebas conservadas de `HistorialGpsServiceTest`, `ContextoEventoSourceTest` y `RouteDeviationRuleTest`. |
+| TR-M01 | El DAO solicita índice único por matrícula/instante e índice parcial de pendientes; distingue duplicado de otros errores al guardar individualmente o en lotes. | `MongoTrackingEventDAOTest.solicitaIndiceUnicoPorHechoEIndiceParcialDePendientes`, `unDuplicadoEnInsercionIndividualSeInformaSinOcultarOtrosErrores` y pruebas de lotes conservadas. La colección MongoDB es un mock. |
+| TR-A01 | El consumidor confirma mensajes guardados o duplicados, descarta inválidos y solicita reencolar el lote cuando falla la recepción. | Ocho pruebas conservadas de `TrackingConsumerTest`, usando un canal RabbitMQ simulado. |
+
+### 6.3. Criterio de reformulación
+
+El antiguo `FakeStore` del asignador contenía una segunda implementación de las reglas de casos y una interpretación desactualizada de `EN_DESCARGO`. Se eliminó. `CaseAssignerTest` comprueba ahora las operaciones y los argumentos solicitados al servicio, los errores propagados y cuándo notifica. Las pruebas de servicio con H2 comprueban la identidad del caso y su evidencia guardada.
+
+Los fallos del worker se provocan en puntos definidos. La ejecución concurrente se coordina con latches y esperas acotadas; no utiliza `Thread.sleep`. La prueba de saturación mantiene una evaluación bloqueada, llena la cola y comprueba que el evento restante se recupere después.
+
+No se cambian reglas de producción para que una prueba pase. En las pruebas locales de reentrega se prepara un caso en el estado que interesa; los recorridos de la sección 5 ya comprueban la llegada a los estados finales mediante las operaciones de negocio.
+
+### 6.4. Ejecución y límites
+
+Las clases se descubren con el Maven habitual de Fiscalización y Funcionarios y se ejecutan en sus pipelines existentes. Para repetir la selección del bloque desde la raíz del checkout:
+
+```bash
+mvn -B -f pruebas/pom.xml \
+    -pl :fiscalizacionautomatica,:frontofficefuncionarios-ejb -am \
+    -Dtest=TrackingDetectionWorkerTest,TrackingEventReceiverTest,TrackingConsumerTest,CaseAssignerTest,MongoTrackingEventDAOTest,CasosAutomaticosServiceTest,HistorialGpsServiceTest,ContextoEventoSourceTest,RouteDeviationRuleTest \
+    -Dsurefire.failIfNoSpecifiedTests=false \
+    verify
+```
+
+La idempotencia se verifica como contrato de la lógica y como resultado persistido de las operaciones de casos sobre H2. Los mocks del driver verifican qué se solicita a MongoDB y cómo se interpretan sus errores; no ejecutan un índice real. La prueba del receptor concurrente usa un DAO en memoria y la del worker comprueba exclusión de un evento dentro de una instancia. No constituyen una prueba de concurrencia entre pods sobre MongoDB/PostgreSQL ni de redelivery de un broker real. Se mantiene ese límite sin ampliar la infraestructura de pruebas, según lo acordado.
+
+La sincronización móvil permanece como el siguiente bloque pendiente. El porcentaje aproximado del 80 % corresponde al conjunto de la lógica y no se deduce de esta selección de pruebas.
+
+### 6.5. Resultado verificado del bloque de tracking
+
+El 10/11/2026 se repitió la selección de la sección 6.4 con Java 24 y Maven 3.6.3, agregando `-o` para utilizar las dependencias ya descargadas. Resultado: **BUILD SUCCESS**, 159 ejecuciones, cero fallos, cero errores y cero omitidas.
+
+| Clase | Ejecuciones |
+| --- | ---: |
+| `TrackingEventReceiverTest` | 19 |
+| `TrackingConsumerTest` | 8 |
+| `MongoTrackingEventDAOTest` | 10 |
+| `TrackingDetectionWorkerTest` | 11 |
+| `CaseAssignerTest` | 19 |
+| `HistorialGpsServiceTest` | 5 |
+| `ContextoEventoSourceTest` | 5 |
+| `RouteDeviationRuleTest` | 25 |
+| `CasosAutomaticosServiceTest` | 57 |
+| **Total** | **159** |
+
+Incluye pruebas conservadas, reformuladas y agregadas; no son 159 pruebas nuevas. Parte de la selección se solapa con la primera etapa: los totales de las dos ejecuciones no se suman como pruebas distintas. La clase de casos pasó de 53 a 57 ejecuciones por las combinaciones de reentrega y GPS nuevo posteriores a la resolución.

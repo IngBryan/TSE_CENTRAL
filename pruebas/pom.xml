@@ -13,5 +13,7 @@
         <module>../componente_central/backend/AdaptadorPdi</module>
         <module>../componente_central/backend/Frontofficeciudadanos</module>
         <module>../componente_central/backend/Frontofficefuncionarios</module>
+        <module>../componente_central/backend/Backofficeautoridadesadministradores</module>
+        <module>../componente_central/backend/Fiscalizacionautomatica</module>
     </modules>
 </project>

@@ -10,12 +10,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mongodb.MongoBulkWriteException;
+import com.mongodb.MongoWriteException;
+import com.mongodb.WriteError;
 import com.mongodb.ServerAddress;
 import com.mongodb.bulk.BulkWriteError;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.InsertManyOptions;
+import com.mongodb.client.model.IndexOptions;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -102,6 +105,32 @@ class MongoTrackingEventDAOTest {
         assertEquals(List.of(), dao().saveAll(List.of()));
 
         verify(collection, never()).insertMany(anyList(), any(InsertManyOptions.class));
+    }
+
+    @Test
+    void solicitaIndiceUnicoPorHechoEIndiceParcialDePendientes() {
+        dao().createIndexes();
+        var claves = ArgumentCaptor.forClass(org.bson.conversions.Bson.class);
+        var opciones = ArgumentCaptor.forClass(IndexOptions.class);
+        org.mockito.Mockito.verify(collection, org.mockito.Mockito.times(2)).createIndex(claves.capture(), opciones.capture());
+        var codecs = com.mongodb.MongoClientSettings.getDefaultCodecRegistry();
+        assertEquals(BsonDocument.parse("{licensePlate:1,timestamp:1}"),
+                claves.getAllValues().get(0).toBsonDocument(Document.class, codecs));
+        assertEquals(Boolean.TRUE, opciones.getAllValues().get(0).isUnique());
+        assertEquals(BsonDocument.parse("{receivedAt:1}"),
+                claves.getAllValues().get(1).toBsonDocument(Document.class, codecs));
+        assertEquals(BsonDocument.parse("{detected:false}"),
+                opciones.getAllValues().get(1).getPartialFilterExpression().toBsonDocument(Document.class, codecs));
+    }
+
+    @Test
+    void unDuplicadoEnInsercionIndividualSeInformaSinOcultarOtrosErrores() {
+        var duplicado = new MongoWriteException(new WriteError(11000, "Duplicado", new BsonDocument()), new ServerAddress());
+        var otroError = new MongoWriteException(new WriteError(2, "Datos inválidos", new BsonDocument()), new ServerAddress());
+        when(collection.insertOne(any(Document.class))).thenThrow(duplicado).thenThrow(otroError);
+        var repositorio = dao();
+        assertEquals(false, repositorio.save(EVENT));
+        assertEquals(otroError, assertThrows(MongoWriteException.class, () -> repositorio.save(EVENT)));
     }
     @Test
     void fijarRevisionConservaLaGanadoraYNoSobrescribeAlReprocesar() {
