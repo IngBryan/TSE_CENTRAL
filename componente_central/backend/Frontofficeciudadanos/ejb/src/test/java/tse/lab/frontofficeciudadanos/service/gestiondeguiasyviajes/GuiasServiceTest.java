@@ -17,6 +17,7 @@ import jakarta.persistence.Persistence;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
@@ -43,6 +44,8 @@ import tse.lab.frontofficeciudadanos.service.rutas.AsignacionRutasService;
 import tse.lab.frontofficeciudadanos.service.rutas.RutasException;
 import tse.lab.model.Chofer;
 import tse.lab.model.Empresa;
+import tse.lab.model.EventoViaje;
+import tse.lab.model.ResultadoEventoViaje;
 import tse.lab.model.EstadoChofer;
 import tse.lab.model.EstadoGuia;
 import tse.lab.model.EstadoValidacion;
@@ -520,6 +523,7 @@ class GuiasServiceTest {
 
     // Integrado con la app movil: el chofer estaba sin conexion con la version anterior de la guia
     @Test
+    @DisplayName("MO-06: edición, reasignación y cancelación mientras el chofer está offline")
     void modificacionesDelResponsableYEventosDelChoferSinConexion() throws Exception {
         ViajesChoferService movil = movil();
         Long otroChofer = otroChoferHabilitado();
@@ -533,6 +537,10 @@ class GuiasServiceTest {
         assertEquals("APLICADO", r1.resultado());
         assertTrue(r1.guiaModificada());
         assertEquals("Salto", r1.guia().destino());
+        em.clear();
+        assertEquals("Salto", em.find(Guia.class, g1.id()).getDestino());
+        assertEquals(EstadoGuia.EN_CURSO, em.find(Guia.class, g1.id()).getEstado());
+        assertEquals(ResultadoEventoViaje.APLICADO, em.find(EventoViaje.class, r1.idEvento()).getResultado());
 
         // 2. Reasignar a otro chofer -> el evento del chofer anterior queda CONFLICTO / GUIA_REASIGNADA
         GuiaVista g2 = asignada();
@@ -544,6 +552,10 @@ class GuiasServiceTest {
         assertEquals("GUIA_REASIGNADA", r2.codigo());
         assertNull(r2.guia());
         assertEquals("ASIGNADA", servicio.eventos(RESPONSABLE, g2.id(), "t").guia().estado());
+        em.clear();
+        assertEquals(otroChofer, em.find(Guia.class, g2.id()).getChofer().getId());
+        assertEquals(ResultadoEventoViaje.CONFLICTO, em.find(EventoViaje.class, r2.idEvento()).getResultado());
+        assertEquals("GUIA_REASIGNADA", em.find(EventoViaje.class, r2.idEvento()).getCodigo());
 
         // 3. Cancelar -> el evento queda CONFLICTO / GUIA_CANCELADA y la guia sale de la app
         GuiaVista g3 = asignada();
@@ -553,6 +565,10 @@ class GuiasServiceTest {
         assertEquals("CONFLICTO", r3.resultado());
         assertEquals("GUIA_CANCELADA", r3.codigo());
         assertTrue(movil.viajes("56087406", "t").stream().noneMatch(v -> v.id().equals(g3.id())));
+        em.clear();
+        assertEquals(EstadoGuia.CANCELADA, em.find(Guia.class, g3.id()).getEstado());
+        assertEquals(ResultadoEventoViaje.CONFLICTO, em.find(EventoViaje.class, r3.idEvento()).getResultado());
+        assertEquals("GUIA_CANCELADA", em.find(EventoViaje.class, r3.idEvento()).getCodigo());
 
         // la linea de tiempo de la guia tiene la cancelacion y el evento en conflicto
         GuiasService.GuiaConEventos detalle = servicio.eventos(RESPONSABLE, g3.id(), "t");

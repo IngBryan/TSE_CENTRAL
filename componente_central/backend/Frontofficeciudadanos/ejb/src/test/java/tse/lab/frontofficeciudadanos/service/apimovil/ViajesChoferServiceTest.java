@@ -19,6 +19,7 @@ import jakarta.persistence.Persistence;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import tse.lab.frontofficeciudadanos.data.ChoferDAO;
@@ -119,6 +120,7 @@ class ViajesChoferServiceTest {
     }
 
     @Test
+    @DisplayName("MO-05: el mismo UUID conserva el evento y una única transición en central")
     void inicioPasaAEnCursoYElReenvioDevuelveElResultadoOriginalSinTocarLaGuia() throws Exception {
         String id = UUID.randomUUID().toString();
         ResultadoEvento r = enTx(() -> servicio.registrarEvento(CHOFER, evento(id, "GV-1", "INICIO"), "t"));
@@ -128,21 +130,41 @@ class ViajesChoferServiceTest {
 
         ResultadoEvento reenvio = enTx(() -> servicio.registrarEvento(CHOFER, evento(id.toUpperCase(), "GV-1", "INICIO"), "t"));
         assertTrue(reenvio.duplicado());
+        assertEquals(r.idEvento(), reenvio.idEvento());
+        assertEquals(r.idGuia(), reenvio.idGuia());
+        assertEquals(r.tipo(), reenvio.tipo());
+        assertEquals("APLICADO", reenvio.resultado());
+        assertEquals(r.codigo(), reenvio.codigo());
+        assertEquals(r.detalle(), reenvio.detalle());
         assertEquals(r.estadoGuia(), reenvio.estadoGuia());
         assertEquals(r.version(), reenvio.version());
         assertEquals(r.recibido(), reenvio.recibido());
         em.clear();
+        assertEquals(EstadoGuia.EN_CURSO, em.find(Guia.class, "GV-1").getEstado());
         assertEquals(1L, em.find(Guia.class, "GV-1").getVersion());
-        assertEquals(1, new EventoViajeDAOConEm().buscarPorGuia("GV-1").size());
+        var guardados = new EventoViajeDAOConEm().buscarPorGuia("GV-1");
+        assertEquals(1, guardados.size());
+        assertEquals(id, guardados.getFirst().getIdEvento());
+        assertEquals(TipoEventoViaje.INICIO, guardados.getFirst().getTipo());
+        assertEquals(CHOFER, guardados.getFirst().getCiChofer());
+        assertEquals("2026-10-12T00:30:00Z", guardados.getFirst().getFechaHoraDispositivo().toString());
+        assertEquals(r.recibido(), guardados.getFirst().getFechaRecepcion().toString());
         assertTrue(servicio.resultadoExistente(CHOFER, id).duplicado());
         assertNull(servicio.resultadoExistente("33333333", id)); // otro chofer no ve el evento
     }
 
     @Test
+    @DisplayName("MO-03: central conserva los cinco eventos y la evidencia del recorrido")
     void cicloCompletoDelViaje() throws Exception {
         assertEquals("EN_CURSO", registrar("GV-1", "INICIO").estadoGuia());
         assertEquals("EN_CURSO", registrar("GV-1", "CARGA_PARCIAL").estadoGuia());
         assertEquals("EN_CURSO", registrar("GV-1", "DESCARGA_PARCIAL").estadoGuia());
+        String incidente = UUID.randomUUID().toString();
+        var registrado = enTx(() -> servicio.registrarEvento(CHOFER,
+                new NuevoEvento(incidente, "GV-1", "INCIDENTE", HORA, "Pinchadura", -34.9, -56.1,
+                        Base64.getEncoder().encodeToString(JPEG), 1L), "t"));
+        assertEquals("APLICADO", registrado.resultado());
+        assertEquals("EN_CURSO", registrado.estadoGuia());
         ResultadoEvento fin = registrar("GV-1", "FIN");
         assertEquals("APLICADO", fin.resultado());
         assertEquals("FINALIZADA", fin.estadoGuia());
@@ -151,6 +173,18 @@ class ViajesChoferServiceTest {
         assertEquals(List.of("GV-2"), servicio.viajes(CHOFER, "t").stream().map(ViajeVista::id).toList());
         em.clear();
         assertEquals(EstadoGuia.FINALIZADA, em.find(Guia.class, "GV-1").getEstado());
+        var guardados = new EventoViajeDAOConEm().buscarPorGuia("GV-1");
+        assertEquals(5, guardados.size());
+        assertEquals(5L, guardados.stream().map(EventoViaje::getIdEvento).distinct().count());
+        assertEquals(List.of(TipoEventoViaje.INICIO, TipoEventoViaje.CARGA_PARCIAL,
+                TipoEventoViaje.DESCARGA_PARCIAL, TipoEventoViaje.INCIDENTE, TipoEventoViaje.FIN),
+                guardados.stream().map(EventoViaje::getTipo).toList());
+        assertTrue(guardados.stream().allMatch(e -> e.getResultado() == ResultadoEventoViaje.APLICADO));
+        var evidencia = em.find(EventoViaje.class, incidente);
+        assertEquals("Pinchadura", evidencia.getDescripcion());
+        assertEquals(-34.9, evidencia.getLatitud());
+        assertEquals(-56.1, evidencia.getLongitud());
+        assertArrayEquals(JPEG, evidencia.getFoto());
     }
 
     // Politica de conflictos, caso 3: el efecto ya estaba aplicado -> se acepta sin cambios
