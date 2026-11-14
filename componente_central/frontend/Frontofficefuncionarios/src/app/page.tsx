@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { Encabezado, botonPrimario, botonSecundario } from "@/components/encabezado";
-import { loginTestingHabilitado } from "@/lib/auth/config";
+import { Encabezado, botonPrimario } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -17,7 +16,7 @@ const MENSAJES: Record<string, string> = {
   cedula_invalida: "Ingresá una cédula de 6 a 8 dígitos, sin puntos ni guion.",
 };
 
-// Inicio del frontoffice de funcionarios: ingreso con gub.uy (y, si LOGIN_TESTING=true, con cedula). Con
+// Inicio del frontoffice de funcionarios: ingreso con gub.uy (el de testing va por URL: /auth/testing?cedula=...). Con
 // sesion, la pantalla de trabajo es la bandeja de casos de fiscalizacion. Tambien recibe la vuelta de ID
 // Uruguay: la redirect URI registrada es la raiz de la app.
 export default async function Home({ searchParams }: PageProps<"/">) {
@@ -59,31 +58,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             Ingresar con gub.uy
           </a>
         </section>
-
-        {loginTestingHabilitado() && (
-          <form
-            method="post"
-            action={`${BASE_PATH}/auth/testing`}
-            className="flex flex-col gap-3 rounded-lg border border-dashed border-amber-500 p-4 text-sm"
-          >
-            <p className="text-amber-800 dark:text-amber-300">Modo testing</p>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 font-medium text-zinc-700 dark:text-zinc-300">
-                Cédula
-                <input
-                  name="cedula"
-                  inputMode="numeric"
-                  pattern="\d{6,8}"
-                  required
-                  className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal dark:border-white/20"
-                />
-              </label>
-              <button type="submit" className={botonSecundario}>
-                Ingresar (testing)
-              </button>
-            </div>
-          </form>
-        )}
       </main>
     </div>
   );

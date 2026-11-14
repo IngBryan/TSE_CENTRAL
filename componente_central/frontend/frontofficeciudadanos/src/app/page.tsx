@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Encabezado, botonGubUy, botonSecundario } from "@/components/encabezado";
-import { loginTestingHabilitado } from "@/lib/auth/config";
+import { Encabezado, botonGubUy } from "@/components/encabezado";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -85,30 +84,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <a href={`${BASE_PATH}/auth/login`} className={`${botonGubUy} h-12 self-start px-6 text-base`}>
               Ingresar con gub.uy
             </a>
-          )}
-          {!sesion && loginTestingHabilitado() && (
-            <form
-              method="post"
-              action={`${BASE_PATH}/auth/testing`}
-              className="flex flex-col gap-3 rounded-lg border border-dashed border-amber-500 p-4 text-sm"
-            >
-              <p className="text-amber-800 dark:text-amber-300">Modo testing</p>
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col gap-1 font-medium text-zinc-700 dark:text-zinc-300">
-                  Cédula
-                  <input
-                    name="cedula"
-                    inputMode="numeric"
-                    pattern="\d{6,8}"
-                    required
-                    className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal dark:border-white/20"
-                  />
-                </label>
-                <button type="submit" className={botonSecundario}>
-                  Ingresar (testing)
-                </button>
-              </div>
-            </form>
           )}
         </section>
 
