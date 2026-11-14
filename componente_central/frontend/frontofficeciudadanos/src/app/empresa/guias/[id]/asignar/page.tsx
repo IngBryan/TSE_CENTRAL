@@ -41,17 +41,17 @@ export default async function Asignar({ params }: PageProps<"/empresa/guias/[id]
     error = "La empresa no tiene choferes habilitados. Agregá uno en Choferes (si está pendiente de validación, todavía no se le pueden asignar viajes).";
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/empresa/guias" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/empresa/guias" className="text-sm text-muted-foreground hover:underline">
             ← Guías de viaje
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Asignar viaje</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Asignar viaje</h1>
           {opciones && (
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-muted-foreground">
               Guía <span className="font-mono text-sm">{opciones.guia.id}</span>: {mostrarLocalidad(opciones.guia.origen, opciones.guia.origenDepartamento)} → {mostrarLocalidad(opciones.guia.destino, opciones.guia.destinoDepartamento)},{" "}
               {opciones.guia.pesoCargaKg.toLocaleString("es-UY")} kg ({[opciones.guia.rubroCliente, opciones.guia.tipoCarga].filter(Boolean).join(", ")})
             </p>

@@ -132,20 +132,20 @@ export function SeguimientoViaje({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Recorrido del vehículo</h2>
-        <span className="text-xs text-zinc-500">
+        <h2 className="text-lg font-semibold text-foreground">Recorrido del vehículo</h2>
+        <span className="text-xs text-muted-foreground">
           {actualizacionAutomatica ? "Actualización automática cada 15 s" : "Recorrido histórico"}
         </span>
       </div>
-      <div className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
+      <div className="rounded-xl border bg-card p-5 text-sm shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-4">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={mostrarRecorrido} onChange={(e) => setMostrarRecorrido(e.target.checked)} />
             <span>Recorrido GPS ({posiciones.length} posiciones)</span>
           </label>
-          <button type="button" className="rounded-lg border px-3 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+          <button type="button" className="rounded-lg border px-3 py-1 text-xs hover:bg-accent disabled:opacity-50"
             disabled={!ultimaMostrada} onClick={() => setCentrar((x) => x + 1)}>Centrar última posición</button>
-          <button type="button" className="rounded-lg border px-3 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+          <button type="button" className="rounded-lg border px-3 py-1 text-xs hover:bg-accent disabled:opacity-50"
             disabled={!posiciones.length} onClick={() => setCentrarRecorrido(x => x + 1)}>
             Ver recorrido completo
           </button>
@@ -153,13 +153,13 @@ export function SeguimientoViaje({
         <MapaSeguimiento posiciones={posiciones} ultima={ultimaMostrada}
           mostrarRecorrido={mostrarRecorrido} centrar={centrar}
           centrarRecorrido={centrarRecorrido} />
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span><span className="font-semibold text-orange-600">┄┄</span> Recorrido del vehículo</span>
         </div>
-        {cargando && <p className="mt-3 text-zinc-500">Cargando trayectoria GPS…</p>}
-        {!cargando && posiciones.length === 0 && !errorGps && <p className="mt-1 text-zinc-500">No hay posiciones de Tracking asociadas inequívocamente a esta Guía.</p>}
-        {posiciones.length > 0 && <p className="mt-2 text-xs text-zinc-500">Primera posición registrada: {tiempo(posiciones[0].fechaHora)}.</p>}
-        {ultimaMostrada && <p className="mt-2 text-xs text-zinc-500">Última posición registrada: {tiempo(ultimaMostrada.fechaHora)}. No confirma que el GPS siga conectado.</p>}
+        {cargando && <p className="mt-3 text-muted-foreground">Cargando trayectoria GPS…</p>}
+        {!cargando && posiciones.length === 0 && !errorGps && <p className="mt-1 text-muted-foreground">No hay posiciones de Tracking asociadas inequívocamente a esta Guía.</p>}
+        {posiciones.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Primera posición registrada: {tiempo(posiciones[0].fechaHora)}.</p>}
+        {ultimaMostrada && <p className="mt-2 text-xs text-muted-foreground">Última posición registrada: {tiempo(ultimaMostrada.fechaHora)}. No confirma que el GPS siga conectado.</p>}
         {incompleto && <p className="mt-2 text-amber-800 dark:text-amber-300">El recorrido supera el límite de {MAX_PUNTOS.toLocaleString("es-UY")} posiciones cargadas. La vista es parcial.</p>}
         {errorGps && <p role="alert" className="mt-2 text-red-700 dark:text-red-300">GPS: {errorGps}</p>}
       </div>

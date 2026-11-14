@@ -14,9 +14,9 @@ export function PresentarDescargo({ idCaso, vence }: { idCaso: number; vence: st
   const [largo, setLargo] = useState(0);
 
   return (
-    <form action={accion} className="flex flex-col gap-3 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Presentar descargo</h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+    <form action={accion} className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Presentar descargo</h2>
+      <p className="text-sm text-muted-foreground">
         Explicá por qué la empresa no está de acuerdo con la infracción. Lo revisa un funcionario del MTOP antes de
         resolver el caso. Se puede presentar una sola vez. Plazo: hasta el {vence} inclusive.
       </p>
@@ -25,7 +25,7 @@ export function PresentarDescargo({ idCaso, vence }: { idCaso: number; vence: st
           {estado.error}
         </p>
       )}
-      <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground/80">
         Descargo
         <textarea
           name="descripcion"
@@ -35,9 +35,9 @@ export function PresentarDescargo({ idCaso, vence }: { idCaso: number; vence: st
           defaultValue={estado.texto ?? ""}
           onChange={(e) => setLargo(e.target.value.length)}
           aria-invalid={estado.campo ? true : undefined}
-          className="rounded-lg border border-black/15 bg-transparent p-3 text-base font-normal dark:border-white/20"
+          className="rounded-lg border border-input bg-transparent p-3 text-base font-normal"
         />
-        <span className="flex justify-between text-xs font-normal text-zinc-500">
+        <span className="flex justify-between text-xs font-normal text-muted-foreground">
           <span className="text-red-700 dark:text-red-300">{estado.campo}</span>
           <span>
             {largo}/{MAX_DESCARGO}

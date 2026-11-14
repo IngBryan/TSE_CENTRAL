@@ -7,8 +7,8 @@ import { modificarEmpresa, type ResultadoRubros } from "../actions";
 import { ElegirRubros } from "../elegir-rubros";
 
 const entrada =
-  "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:text-zinc-50";
-const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground disabled:opacity-60";
+const etiqueta = "flex flex-col gap-1 text-sm font-medium text-foreground/80";
 
 // FA3: el funcionario ve los datos actuales, los modifica y confirma. Las reglas (obligatorios, largo
 // maximo) las valida el backend; aca solo se limita el largo para no mandar algo que va a rechazar.
@@ -71,9 +71,9 @@ export function ModificarEmpresa({
     campos[n] && <span className="text-xs font-normal text-red-700 dark:text-red-300">{campos[n]}</span>;
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Modificar la empresa</h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+    <form onSubmit={enviar} className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Modificar la empresa</h2>
+      <p className="text-sm text-muted-foreground">
         El número de empresa ({empresa.nroEmpresa}) no se puede modificar.
       </p>
 
@@ -130,7 +130,7 @@ export function ModificarEmpresa({
         error={campos.rubros}
       />
 
-      <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex items-start gap-2 text-sm text-foreground/80">
         <input
           type="checkbox"
           checked={datos.habilitada}
@@ -140,7 +140,7 @@ export function ModificarEmpresa({
         />
         <span>
           <span className="font-medium">Empresa habilitada</span>
-          <span className="block text-zinc-500">
+          <span className="block text-muted-foreground">
             {sePuedeHabilitar
               ? "Solo una empresa habilitada puede dar de alta choferes."
               : "Para habilitarla, primero asociale un responsable."}

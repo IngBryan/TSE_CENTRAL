@@ -3,7 +3,7 @@
 import type { ResultadoRubros } from "./actions";
 
 const entrada =
-  "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:bg-zinc-950 dark:text-zinc-50";
+  "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground disabled:opacity-60";
 
 // Seleccion de los rubros de la empresa (alta y modificacion): se elige de una lista desplegable y cada
 // rubro elegido se agrega abajo (y deja de estar en la lista); con la x se quita. El catalogo es precargado
@@ -28,7 +28,7 @@ export function ElegirRubros({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor="rubros" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label htmlFor="rubros" className="text-sm font-medium text-foreground/80">
         Rubros
       </label>
       {!catalogo.ok ? (
@@ -67,7 +67,7 @@ export function ElegirRubros({
           {seleccionados.map((r) => (
             <li
               key={r.id}
-              className="flex items-center gap-1 rounded-full bg-zinc-100 py-1 pl-3 pr-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+              className="flex items-center gap-1 rounded-full bg-muted py-1 pl-3 pr-1 text-sm text-foreground"
             >
               {r.nombre}
               <button
@@ -75,7 +75,7 @@ export function ElegirRubros({
                 disabled={deshabilitado}
                 onClick={() => onCambiar(elegidos.filter((id) => id !== r.id))}
                 aria-label={`Quitar ${r.nombre}`}
-                className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200 hover:text-black disabled:opacity-60 dark:hover:bg-zinc-700 dark:hover:text-white"
+                className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
               >
                 ×
               </button>
@@ -83,9 +83,9 @@ export function ElegirRubros({
           ))}
         </ul>
       ) : (
-        catalogo.ok && <span className="text-sm text-zinc-500">Sin rubros elegidos.</span>
+        catalogo.ok && <span className="text-sm text-muted-foreground">Sin rubros elegidos.</span>
       )}
-      <span className="text-xs font-normal text-zinc-500">Podés elegir varios. Son opcionales.</span>
+      <span className="text-xs font-normal text-muted-foreground">Podés elegir varios. Son opcionales.</span>
       {error && <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>}
     </div>
   );

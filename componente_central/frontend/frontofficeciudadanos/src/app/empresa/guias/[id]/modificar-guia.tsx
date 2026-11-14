@@ -24,8 +24,8 @@ type Modo = "editar" | "reasignar" | "cancelar" | null;
 
 const nombre = (c: ChoferResumen) => [c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || c.cedula;
 
-const campo = "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black dark:border-white/20 dark:text-zinc-50";
-const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const campo = "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground";
+const etiqueta = "flex flex-col gap-1 text-sm font-medium text-foreground/80";
 
 // El responsable puede editar antes de asignar; reasignar y cancelar requieren una guia ASIGNADA.
 // Se manda la version de la guia que se esta viendo; si cambio entretanto (p. ej. el chofer
@@ -115,9 +115,9 @@ export function ModificarGuia({
   const errorCampo = (n: string) => campos[n] && <span className="text-xs font-normal text-red-700 dark:text-red-300">{campos[n]}</span>;
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-lg font-semibold text-black dark:text-zinc-50">Modificar guía</h2>
+        <h2 className="mr-auto text-lg font-semibold text-foreground">Modificar guía</h2>
         <button type="button" onClick={() => abrir("editar")} className={`${botonSecundario} h-9 px-4`}>
           Editar
         </button>
@@ -155,7 +155,7 @@ export function ModificarGuia({
                 <select
                   value={datos[n]}
                   onChange={(e) => setDatos({ ...datos, [n]: e.target.value })}
-                  className={`${campo} dark:bg-zinc-950`}
+                  className={`${campo}`}
                 >
                   <OpcionesCatalogo
                     items={opciones[n] ?? []}
@@ -237,7 +237,7 @@ export function ModificarGuia({
             maxLength={500}
             rows={3}
             onChange={(e) => setMotivo(e.target.value)}
-            className="rounded-lg border border-black/15 bg-transparent p-3 text-base font-normal text-black dark:border-white/20 dark:text-zinc-50"
+            className="rounded-lg border border-input bg-transparent p-3 text-base font-normal text-foreground"
           />
           {errorCampo("motivo")}
         </label>
@@ -262,8 +262,8 @@ export function ModificarGuia({
       )}
 
       {modo && confirmar && (
-        <div className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+          <p className="text-sm text-foreground/80">
             {modo === "editar" && (guia.estado === "ASIGNADA"
               ? "¿Guardar los cambios de la guía? El chofer los verá al sincronizar."
               : "¿Guardar los cambios de la guía?")}

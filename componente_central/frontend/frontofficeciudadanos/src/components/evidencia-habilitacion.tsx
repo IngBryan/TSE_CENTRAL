@@ -10,16 +10,16 @@ const ESTADOS: Record<EstadoDocumentoHabilitacion, string> = {
 
 export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion[] }) {
   return (
-    <div className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
-      <h3 className="font-medium text-black dark:text-zinc-50">Permiso de circulación e ITV</h3>
-      <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+    <div className="rounded-xl border bg-card p-6 text-sm shadow-sm">
+      <h3 className="font-medium text-foreground">Permiso de circulación e ITV</h3>
+      <p className="mt-1 text-muted-foreground">
         Documentos considerados a la fecha del evento. La falta de registro o de vigencia de cualquiera de los dos origina la infracción.
       </p>
       {pruebas.length === 0 ? (
-        <p className="mt-3 text-zinc-600 dark:text-zinc-400">Este caso no tiene una evaluación documental registrada.</p>
+        <p className="mt-3 text-muted-foreground">Este caso no tiene una evaluación documental registrada.</p>
       ) : <div className="mt-4 flex flex-col gap-4">
         {pruebas.map((p) => (
-          <div key={`${p.origen}-${p.fechaHora}`} className="border-t border-black/10 pt-4 dark:border-white/10">
+          <div key={`${p.origen}-${p.fechaHora}`} className="border-t border-border pt-4">
             <p className="mb-3 font-medium">{fechaHora(p.fechaHora)} · {p.origen === "PESAJE" ? "Pesaje" : "GPS"}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Documento titulo="Permiso nacional de circulación" estado={p.estadoPermiso}

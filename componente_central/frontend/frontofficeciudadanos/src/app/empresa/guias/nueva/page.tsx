@@ -27,10 +27,10 @@ export default async function CrearGuia() {
   }
   const { tiposCarga, rubros } = error ? { tiposCarga: [], rubros: [] } : await obtenerCatalogos();
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Montevideo" });
-  return <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+  return <div className="flex flex-1 flex-col bg-background font-sans">
     <Encabezado sesion={sesion} />
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
-      <Link href="/empresa/guias" className="text-sm text-zinc-500 hover:underline">← Guías de viaje</Link>
+      <Link href="/empresa/guias" className="text-sm text-muted-foreground hover:underline">← Guías de viaje</Link>
       <h1 className="text-3xl font-semibold">Nueva guía de viaje</h1>
       {error ? <p role="alert" className="text-red-700 dark:text-red-300">{error}</p>
         : <NuevaGuia hoy={hoy} localidades={localidades} tiposCarga={tiposCarga} rubros={rubros} />}

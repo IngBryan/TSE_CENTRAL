@@ -30,15 +30,15 @@ export default async function Vehiculos() {
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/mi-cuenta" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/mi-cuenta" className="text-sm text-muted-foreground hover:underline">
             ← Mi cuenta
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Vehículos{empresa ? ` de ${empresa}` : ""}
           </h1>
         </div>
@@ -52,9 +52,9 @@ export default async function Vehiculos() {
             <NuevoVehiculo />
 
             {vehiculos && vehiculos.length > 0 ? (
-              <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+              <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-black/5 text-zinc-500 dark:border-white/10">
+                  <thead className="border-b border-border text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Matrícula</th>
                       <th className="px-4 py-3 font-medium">Vehículo</th>
@@ -68,7 +68,7 @@ export default async function Vehiculos() {
                     {vehiculos.map((v) => (
                       <tr
                         key={v.matricula}
-                        className={`border-b border-black/5 align-top last:border-0 dark:border-white/10 ${v.activo ? "" : "text-zinc-500"}`}
+                        className={`border-b border-border align-top last:border-0 ${v.activo ? "" : "text-muted-foreground"}`}
                       >
                         <td className="px-4 py-3 font-mono">
                           <Link href={`/empresa/vehiculos/${encodeURIComponent(v.matricula)}`} className="underline">
@@ -80,7 +80,7 @@ export default async function Vehiculos() {
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
                           {v.peso.toLocaleString("es-UY")} kg
-                          <span className="block text-xs text-zinc-500">carga {v.capacidadCargaKg.toLocaleString("es-UY")} kg</span>
+                          <span className="block text-xs text-muted-foreground">carga {v.capacidadCargaKg.toLocaleString("es-UY")} kg</span>
                         </td>
                         <td className="px-4 py-3">
                           <EstadoPermiso vehiculo={v} />
@@ -97,7 +97,7 @@ export default async function Vehiculos() {
                 </table>
               </div>
             ) : (
-              <p className="text-zinc-600 dark:text-zinc-400">Todavía no hay vehículos en la empresa.</p>
+              <p className="text-muted-foreground">Todavía no hay vehículos en la empresa.</p>
             )}
           </>
         )}

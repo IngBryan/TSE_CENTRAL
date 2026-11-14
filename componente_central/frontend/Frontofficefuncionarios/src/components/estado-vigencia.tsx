@@ -28,8 +28,8 @@ export function EstadoPeriodo({ periodo }: { periodo: PeriodoVista }) {
     <span
       className={
         periodo.estado === "VIGENTE"
-          ? "text-zinc-600 dark:text-zinc-400"
-          : "text-zinc-800 dark:text-zinc-200"
+          ? "text-muted-foreground"
+          : "text-foreground"
       }
     >
       <Indicador punto={PUNTO_DOCUMENTO[periodo.estado]}>
@@ -49,8 +49,8 @@ export function EstadoVehiculoIndicador({
     <span
       className={
         estado === "DADO_DE_BAJA"
-          ? "text-zinc-500"
-          : "text-zinc-800 dark:text-zinc-200"
+          ? "text-muted-foreground"
+          : "text-foreground"
       }
     >
       <Indicador punto={PUNTO_VEHICULO[estado]}>

@@ -16,7 +16,7 @@ export function FormularioEmpresa({ empresa }: { empresa: DatosEmpresa }) {
   const valores = estado.valores ?? empresa;
 
   return (
-    <form action={accion} className="flex flex-col gap-5 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+    <form action={accion} className="flex flex-col gap-5 rounded-xl border bg-card p-6 shadow-sm">
       {estado.ok && (
         <p role="status" className="rounded-lg bg-green-50 p-4 text-green-900 dark:bg-green-950 dark:text-green-200">
           Guardamos los datos de la empresa.
@@ -29,21 +29,21 @@ export function FormularioEmpresa({ empresa }: { empresa: DatosEmpresa }) {
       )}
 
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Nro. de empresa</span>
-        <span className="tabular-nums text-black dark:text-zinc-50">{empresa.nroEmpresa}</span>
-        <span className="text-xs text-zinc-500">Lo asigna el MTOP y no se puede modificar.</span>
+        <span className="text-sm font-medium text-foreground/80">Nro. de empresa</span>
+        <span className="tabular-nums text-foreground">{empresa.nroEmpresa}</span>
+        <span className="text-xs text-muted-foreground">Lo asigna el MTOP y no se puede modificar.</span>
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Rubros</span>
+        <span className="text-sm font-medium text-foreground/80">Rubros</span>
         <Etiquetas valores={empresa.rubros} vacio="Sin rubros asignados." />
-        <span className="text-xs text-zinc-500">Los asigna el MTOP y no se pueden modificar.</span>
+        <span className="text-xs text-muted-foreground">Los asigna el MTOP y no se pueden modificar.</span>
       </div>
 
       {CAMPOS.map((c) => {
         const error = estado.campos?.[c.nombre];
         return (
-          <label key={c.nombre} className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label key={c.nombre} className="flex flex-col gap-1 text-sm font-medium text-foreground/80">
             {c.etiqueta}
             <input
               // key: al guardar se re-monta con el valor que devolvio el backend (ya normalizado)
@@ -53,8 +53,8 @@ export function FormularioEmpresa({ empresa }: { empresa: DatosEmpresa }) {
               maxLength={c.max}
               required
               aria-invalid={error ? true : undefined}
-              className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
-                error ? "border-red-500" : "border-black/15 dark:border-white/20"
+              className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-foreground ${
+                error ? "border-red-500" : "border-input"
               }`}
             />
             {error && <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>}

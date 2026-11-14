@@ -10,9 +10,9 @@ import { fecha, type PeriodoVista, type VehiculoDetalle } from "@/lib/vehiculos"
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
-const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
-const titulo = "text-base font-semibold text-black dark:text-zinc-50";
-const dato = "text-zinc-500";
+const tarjeta = "rounded-xl border bg-card p-6 text-sm shadow-sm";
+const titulo = "text-base font-semibold text-foreground";
+const dato = "text-muted-foreground";
 
 // CU Fiscalizacion de los permisos y estado de los vehiculos: un vehiculo de la empresa con su permiso
 // nacional de circulacion y el historial de sus ITV. Que quien consulta sea funcionario lo controla el
@@ -54,7 +54,7 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresas/[
   return (
     <Pagina sesion={sesion} nro={nro} matricula={v.matricula} detalle={res.data}>
       <section className={`flex flex-col gap-6 ${tarjeta}`}>
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-muted-foreground">
           {[v.marca, v.modelo].filter(Boolean).join(" ") || "Sin marca ni modelo registrados"}
           {" · "}
           {v.estado === "HABILITADO"
@@ -72,11 +72,11 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresas/[
       {itvs.length > 1 && (
         <section className={`flex flex-col gap-2 ${tarjeta}`}>
           <h2 className={titulo}>Historial de ITV</h2>
-          <ul className="flex flex-col divide-y divide-black/5 dark:divide-white/10">
+          <ul className="flex flex-col divide-y divide-border">
             {itvs.map((i, n) => (
               <li key={`${i.hasta}-${n}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="text-zinc-700 dark:text-zinc-300">{rango(i)}</span>
-                {i.estado === "VENCIDO" ? <span className="text-zinc-500">Vencida</span> : <EstadoPeriodo periodo={i} />}
+                <span className="text-foreground/80">{rango(i)}</span>
+                {i.estado === "VENCIDO" ? <span className="text-muted-foreground">Vencida</span> : <EstadoPeriodo periodo={i} />}
               </li>
             ))}
           </ul>
@@ -127,21 +127,21 @@ function Pagina({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href={`/empresas/${nro}#vehiculos`} className="text-sm text-zinc-500 hover:underline">
+          <Link href={`/empresas/${nro}#vehiculos`} className="text-sm text-muted-foreground hover:underline">
             ← Vehículos de la empresa N° {nro}
           </Link>
           <div className="flex flex-wrap items-center gap-4">
-            <h1 className="font-mono text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+            <h1 className="font-mono text-3xl font-semibold tracking-tight text-foreground">
               {matricula}
             </h1>
             {detalle && <EstadoVehiculoIndicador estado={detalle.vehiculo.estado} />}
           </div>
-          {detalle && <p className="text-xs text-zinc-500">Vigencia al {fecha(detalle.fecha)}</p>}
+          {detalle && <p className="text-xs text-muted-foreground">Vigencia al {fecha(detalle.fecha)}</p>}
         </div>
 
         {error ? (

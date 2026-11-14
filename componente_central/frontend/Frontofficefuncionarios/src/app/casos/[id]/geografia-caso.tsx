@@ -241,16 +241,16 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
     : esSinGuia && puntos.length > 0;
   return <section className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
+      <h2 className="text-lg font-semibold text-foreground">
         {esDesvio ? "Evidencia y seguimiento del desvío" : "Circulación detectada sin Guía"}
       </h2>
       <button type="button" onClick={() => setRecarga(x => x + 1)}
-        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        className="rounded-lg border border-input px-3 py-1.5 text-xs hover:bg-accent">
         Recargar datos del mapa
       </button>
     </div>
-    <div className="rounded-2xl bg-white p-5 text-sm shadow-sm dark:bg-zinc-950">
-      {esSinGuia && <p className="mb-4 text-zinc-600 dark:text-zinc-400">
+    <div className="rounded-xl border bg-card p-5 text-sm shadow-sm">
+      {esSinGuia && <p className="mb-4 text-muted-foreground">
         El caso agrupa los eventos de circulación sin guía del vehículo y puede incluir varios viajes.
         Las detenciones y los períodos sin GPS no determinan un fin de viaje.
       </p>}
@@ -268,50 +268,50 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
         Este expediente no tiene circulación persistida consultable.
       </p>)}
       {esDesvio && <div className="mb-4 space-y-3">
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-muted-foreground">
           La evidencia registrada al confirmar un desvío no cambia cuando llegan nuevas mediciones.
           El seguimiento y el recorrido operativo son vistas de contexto: nunca reemplazan las confirmaciones archivadas.
         </p>
-        <div className="grid gap-3 rounded-xl bg-zinc-50 p-3 sm:grid-cols-3 dark:bg-zinc-900">
-          <p><span className="block text-xs text-zinc-500">Confirmaciones archivadas</span>
+        <div className="grid gap-3 rounded-xl bg-background p-3 sm:grid-cols-3">
+          <p><span className="block text-xs text-muted-foreground">Confirmaciones archivadas</span>
             <b>{pruebas.length.toLocaleString("es-UY")}</b></p>
-          <p><span className="block text-xs text-zinc-500">Mayor separación registrada</span>
+          <p><span className="block text-xs text-muted-foreground">Mayor separación registrada</span>
             <b>{mayorSeparacion === null ? "-" : metros(mayorSeparacion)}</b></p>
-          <p><span className="block text-xs text-zinc-500">Posiciones posteriores a la primera confirmación</span>
+          <p><span className="block text-xs text-muted-foreground">Posiciones posteriores a la primera confirmación</span>
             <b>{posteriores.length.toLocaleString("es-UY")}</b></p>
         </div>
         <div role="tablist" aria-label="Vistas geográficas del caso" className="flex flex-wrap gap-2">
           <button type="button" role="tab" aria-selected={vista === "evidencia"}
             onClick={() => { setVista("evidencia"); verTodo(); }}
-            className={`rounded-lg border px-3 py-2 text-sm ${vista === "evidencia" ? "border-orange-600 bg-orange-50 font-semibold text-orange-900 dark:bg-orange-950 dark:text-orange-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "evidencia" ? "border-orange-600 bg-orange-50 font-semibold text-orange-900 dark:bg-orange-950 dark:text-orange-200" : "hover:bg-accent"}`}>
             Evidencia registrada
           </button>
           <button type="button" role="tab" aria-selected={vista === "posterior"}
             onClick={() => { setVista("posterior"); verTodo(); }}
-            className={`rounded-lg border px-3 py-2 text-sm ${vista === "posterior" ? "border-sky-600 bg-sky-50 font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "posterior" ? "border-sky-600 bg-sky-50 font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200" : "hover:bg-accent"}`}>
             Seguimiento posterior
           </button>
           <button type="button" role="tab" aria-selected={vista === "completo"}
             onClick={() => { setVista("completo"); verTodo(); }}
-            className={`rounded-lg border px-3 py-2 text-sm ${vista === "completo" ? "border-slate-600 bg-slate-50 font-semibold text-slate-900 dark:bg-slate-900 dark:text-slate-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}>
+            className={`rounded-lg border px-3 py-2 text-sm ${vista === "completo" ? "border-slate-600 bg-slate-50 font-semibold text-foreground dark:bg-slate-900 dark:text-slate-200" : "hover:bg-accent"}`}>
             Recorrido completo
           </button>
         </div>
         {vista === "evidencia" && (pruebaActual ? <div className="rounded-xl border border-orange-200 p-3 dark:border-orange-900" aria-live="polite">
           <p className="font-medium">Confirmación archivada {indiceActual + 1} de {pruebas.length}</p>
-          <p className="mt-1 text-xs text-zinc-500">Registrada: {fechaHora(pruebaActual.fechaHora)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Registrada: {fechaHora(pruebaActual.fechaHora)}</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            <p><span className="block text-zinc-500">Primera posición (amarilla)</span>
+            <p><span className="block text-muted-foreground">Primera posición (amarilla)</span>
               <b>{metros(pruebaActual.distanciaParejaMetros)}</b> de las rutas evaluadas</p>
-            <p><span className="block text-zinc-500">Segunda posición (roja)</span>
+            <p><span className="block text-muted-foreground">Segunda posición (roja)</span>
               <b>{metros(pruebaActual.distanciaConfirmanteMetros)}</b> de las rutas evaluadas</p>
           </div>
-          <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-xs text-muted-foreground">
             Límite configurado: {metros(pruebaActual.umbralMetros)}.
             Intervalo entre mediciones: {Math.round((Date.parse(pruebaActual.fechaHora) - Date.parse(pruebaActual.fechaPareja)) / 1000)} s
             (máximo {pruebaActual.ventanaMaximaSegundos} s).
           </p>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             Rutas históricas verificadas: {pruebaVerificada.rutas.length} de {new Set(pruebaActual.hashesRutas).size}.
           </p>
           {pruebaVerificada.faltantes > 0 && <p className="mt-2 text-amber-700 dark:text-amber-300" role="status">
@@ -321,13 +321,13 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
         </div> : <p>No hay confirmaciones geométricas persistidas para este expediente.</p>)}
         {vista === "posterior" && <div className="rounded-xl border border-sky-200 p-3 text-sm dark:border-sky-900">
           <p className="font-medium">Circulación posterior a la primera confirmación GPS</p>
-          {referenciaGps ? <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+          {referenciaGps ? <p className="mt-1 text-muted-foreground">
             Referencia operativa: <b>{fechaHora(referenciaGps)}</b> (primera confirmación archivada).
             Solo se muestran posiciones GPS estrictamente posteriores a ese instante y dentro del período de la Guía.
           </p> : <p className="mt-1 text-amber-700 dark:text-amber-300">
             Sin confirmación GPS válida no se puede delimitar el seguimiento posterior.
           </p>}
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             Apertura administrativa del caso: {fechaHora(fechaDeteccion)}. Esta fecha NO se usa para dividir el recorrido GPS.
             Algunas de estas mediciones también pueden integrar otras confirmaciones archivadas.
             Las rutas de esta vista son las actualmente autorizadas, no las rutas históricas de la evidencia.
@@ -336,14 +336,14 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
         </div>}
         {vista === "completo" && <div className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
           <p className="font-medium">Recorrido operativo completo del viaje</p>
-          <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-1 text-muted-foreground">
             {puntos.length.toLocaleString("es-UY")} posiciones GPS consultadas para la Guía, anteriores y posteriores a la primera confirmación.
             Son contexto operativo: <b>no sustituyen las confirmaciones probatorias archivadas</b>.
             Las rutas dibujadas son las autorizadas actualmente.
           </p>
         </div>}
       </div>}
-      {cargando && <p role="status" className="py-4 text-zinc-500">Cargando información geográfica…</p>}
+      {cargando && <p role="status" className="py-4 text-muted-foreground">Cargando información geográfica…</p>}
       {error && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950 dark:text-amber-300">{error}</p>}
       {aviso && <p role="status" className="mb-3 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Historial parcial: {aviso}</p>}
       {mapaVisible ? <>
@@ -359,7 +359,7 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
             <span>{vista === "posterior" ? `Posiciones posteriores (${posteriores.length})` : `Recorrido GPS completo (${puntos.length})`}</span>
           </label>}
           <button type="button" onClick={verTodo}
-            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900">
+            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-accent">
             Ajustar mapa al contenido
           </button>
           {guiaId && <Link className="text-xs text-sky-700 underline dark:text-sky-300"
@@ -373,7 +373,7 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
           mostrarRutas={!esDesvio || mostrarRutas}
           mostrarRecorrido={esDesvio && vista === "evidencia" ? false : !esDesvio || mostrarRecorrido}
           enfocar={revisionFoco} modoEncuadre={modoEncuadre} />
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-muted-foreground">
           {esDesvio && vista === "evidencia"
             ? "La prueba está fijada en el expediente: amarillo y rojo señalan las dos mediciones utilizadas en esta confirmación. Las rutas se resuelven por sus huellas históricas, no por la selección vigente."
             : esDesvio
@@ -382,19 +382,19 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
                 : "Naranja discontinuo: recorrido GPS completo de la Guía. No sustituye la evidencia archivada. Verde/azul/violeta: rutas autorizadas actualmente."
               : `GPS del expediente: ${puntos.length}. Verde: primera posición; rojo: última posición observada.`}
         </p>
-        {esDesvio && vista === "posterior" && posteriores.length === 0 && !aviso && <p className="mt-2 text-xs text-zinc-500">
+        {esDesvio && vista === "posterior" && posteriores.length === 0 && !aviso && <p className="mt-2 text-xs text-muted-foreground">
           No se recuperaron GPS posteriores a la primera confirmación dentro del intervalo de la Guía.
           Podés consultar el recorrido completo en la otra pestaña, sin incorporarlo a la evidencia.
         </p>}
-      </> : !cargando && !error && <p className="py-4 text-zinc-500">
+      </> : !cargando && !error && <p className="py-4 text-muted-foreground">
         {esDesvio && vista === "posterior" ? "Todavía no hay posiciones posteriores ni rutas actuales para representar." : "No hay coordenadas disponibles para mostrar."}
       </p>}
       {esDesvio && vista === "evidencia" && pruebas.length > 0 && <div className="mt-5">
         <h3 className="mb-2 font-medium">Historial de confirmaciones ({pruebas.length})</h3>
-        <p className="mb-2 text-xs text-zinc-500">Seleccioná una fila para localizar sus dos posiciones en el mapa.</p>
+        <p className="mb-2 text-xs text-muted-foreground">Seleccioná una fila para localizar sus dos posiciones en el mapa.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="border-b border-black/10 text-zinc-500 dark:border-white/10">
+            <thead className="border-b border-border text-muted-foreground">
               <tr><th className="py-2 pr-2 font-medium">N.º</th>
                 <th className="py-2 pr-2 font-medium">Hora</th>
                 <th className="py-2 pr-2 text-right font-medium">Separación</th>
@@ -402,7 +402,7 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
             </thead>
             <tbody>{pruebas.slice(paginaInicio, paginaInicio + CONFIRMACIONES_POR_PAGINA).map((prueba, i) => {
               const indice = paginaInicio + i;
-              return <tr key={`${indice}-${prueba.fechaHora}`} className={`border-b border-black/5 dark:border-white/10 ${indice === indiceActual ? "bg-orange-50 dark:bg-orange-950/30" : ""}`}>
+              return <tr key={`${indice}-${prueba.fechaHora}`} className={`border-b border-border ${indice === indiceActual ? "bg-orange-50 dark:bg-orange-950/30" : ""}`}>
                 <td className="py-2 pr-2">{indice + 1}</td>
                 <td className="py-2 pr-2 tabular-nums">{fechaHora(prueba.fechaHora)}</td>
                 <td className="py-2 pr-2 text-right tabular-nums">{metros(prueba.distanciaConfirmanteMetros)}</td>
@@ -416,7 +416,7 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
           </table>
         </div>
         <nav className="mt-3 flex flex-wrap items-center justify-between gap-2" aria-label="Paginación de confirmaciones geométricas">
-          <span className="text-xs text-zinc-500">Página {paginaActual} de {totalPaginas}</span>
+          <span className="text-xs text-muted-foreground">Página {paginaActual} de {totalPaginas}</span>
           <div className="flex gap-2">
             <button type="button" disabled={paginaActual === 1} onClick={() => cambiarPagina(paginaActual - 1)}
               className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40">Anterior</button>

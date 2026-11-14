@@ -129,7 +129,7 @@ export default function MapaSeguimiento({
 
   return (
     <div className="relative">
-      <div ref={contenedor} className="h-[370px] w-full overflow-hidden rounded-xl border border-black/10 dark:border-white/10 sm:h-[480px]" aria-label="Mapa del recorrido GPS efectuado por el vehículo" role="img" />
+      <div ref={contenedor} className="h-[370px] w-full overflow-hidden rounded-xl border border-border sm:h-[480px]" aria-label="Mapa del recorrido GPS efectuado por el vehículo" role="img" />
       {error && (
         <p role="alert" className="mt-2 text-sm text-amber-800 dark:text-amber-300">
           No se pudo cargar completamente el mapa base. Revisá la conectividad con el proveedor de mapas.

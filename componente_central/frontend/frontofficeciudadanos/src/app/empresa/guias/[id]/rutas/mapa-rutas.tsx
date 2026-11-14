@@ -90,7 +90,7 @@ function ContenidoMapa({ rutas }: PropsMapa) {
 
   return <div>
     <div ref={nodo} role="img" aria-label="Mapa de la ruta admitida"
-      className="h-[340px] rounded-xl border border-zinc-200 sm:h-[450px] dark:border-zinc-800" />
+      className="h-[340px] rounded-xl border border-border sm:h-[450px]" />
     {error && <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
       No se pudo cargar completamente el mapa base. Revisá la conexión con el proveedor cartográfico.
     </p>}

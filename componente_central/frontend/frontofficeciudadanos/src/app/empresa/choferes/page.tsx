@@ -36,15 +36,15 @@ export default async function Choferes() {
   const empresa = sesion.perfil.roles?.find((r) => r.rol === "RESPONSABLE")?.empresa;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/mi-cuenta" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/mi-cuenta" className="text-sm text-muted-foreground hover:underline">
             ← Mi cuenta
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Choferes{empresa ? ` de ${empresa}` : ""}
           </h1>
         </div>
@@ -58,9 +58,9 @@ export default async function Choferes() {
             <AltaChofer />
 
             {choferes && choferes.length > 0 ? (
-              <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+              <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-black/5 text-zinc-500 dark:border-white/10">
+                  <thead className="border-b border-border text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Cédula</th>
                       <th className="px-4 py-3 font-medium">Nombre</th>
@@ -72,7 +72,7 @@ export default async function Choferes() {
                   </thead>
                   <tbody>
                     {choferes.map((c) => (
-                      <tr key={c.cedula} className="border-b border-black/5 last:border-0 dark:border-white/10">
+                      <tr key={c.cedula} className="border-b border-border last:border-0">
                         <td className="px-4 py-3 tabular-nums">{c.cedula}</td>
                         <td className="px-4 py-3">
                           {[c.primerNombre, c.primerApellido].filter(Boolean).join(" ") || "—"}
@@ -90,7 +90,7 @@ export default async function Choferes() {
                 </table>
               </div>
             ) : (
-              <p className="text-zinc-600 dark:text-zinc-400">Todavía no hay choferes en la empresa.</p>
+              <p className="text-muted-foreground">Todavía no hay choferes en la empresa.</p>
             )}
           </>
         )}
