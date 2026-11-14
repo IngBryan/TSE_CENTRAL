@@ -38,13 +38,13 @@ export default async function RutasGuia({ params }: PageProps<"/empresa/guias/[i
     if (!(e instanceof BackendNoDisponible)) throw e;
     error = "El servicio de rutas no está disponible en este momento. Volvé a intentar más tarde.";
   }
-  return <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+  return <div className="flex flex-1 flex-col bg-background font-sans">
     <Encabezado sesion={sesion} />
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
       <div className="space-y-2">
-        <Link className="text-sm text-zinc-500 underline" href={`/empresa/guias/${encodeURIComponent(id)}`}>← Volver al detalle de la guía</Link>
+        <Link className="text-sm text-muted-foreground underline" href={`/empresa/guias/${encodeURIComponent(id)}`}>← Volver al detalle de la guía</Link>
         <h1 className="text-2xl font-semibold">Ruta admitida</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Guía <span className="font-mono">{id}</span>. Consultá la ruta admitida para este viaje.
           Esta pantalla no modifica el origen o el destino que figuran en la guía.
         </p>

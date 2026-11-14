@@ -8,8 +8,8 @@ import { ElegirResponsable } from "../elegir-responsable";
 import { ElegirRubros } from "../elegir-rubros";
 
 const entrada =
-  "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:text-zinc-50";
-const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground disabled:opacity-60";
+const etiqueta = "flex flex-col gap-1 text-sm font-medium text-foreground/80";
 
 // FA1: el funcionario ingresa los datos de la empresa, elige (opcionalmente) su responsable entre los
 // usuarios disponibles y confirma. Las reglas las valida el backend; si sale bien, la action redirige
@@ -83,8 +83,8 @@ export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUs
         </p>
       )}
 
-      <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Datos de la empresa</h2>
+      <section className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">Datos de la empresa</h2>
 
         <label className={etiqueta}>
           Número de empresa
@@ -97,7 +97,7 @@ export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUs
             onChange={(e) => cambiar("nroEmpresa", e.target.value.replace(/\D/g, ""))}
             className={`${entrada} max-w-48`}
           />
-          <span className="text-xs font-normal text-zinc-500">Lo asigna el MTOP y no se puede modificar después.</span>
+          <span className="text-xs font-normal text-muted-foreground">Lo asigna el MTOP y no se puede modificar después.</span>
           {errorCampo("nroEmpresa")}
         </label>
 
@@ -148,7 +148,7 @@ export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUs
           error={campos.rubros}
         />
 
-        <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex items-start gap-2 text-sm text-foreground/80">
           <input
             type="checkbox"
             checked={datos.habilitada && responsable !== null}
@@ -158,7 +158,7 @@ export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUs
           />
           <span>
             <span className="font-medium">Empresa habilitada</span>
-            <span className="block text-zinc-500">
+            <span className="block text-muted-foreground">
               {responsable
                 ? "Solo una empresa habilitada puede dar de alta choferes."
                 : "Para habilitarla, elegí primero su responsable."}
@@ -188,8 +188,8 @@ export function CrearEmpresa({ disponibles, rubros }: { disponibles: ResultadoUs
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/15 dark:bg-zinc-950">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <div className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+          <p className="text-sm text-foreground/80">
             ¿Registrar la empresa N° {datos.nroEmpresa} &quot;{datos.nombrePublico.trim()}&quot;
             {responsable
               ? ` con ${nombreUsuario(responsable)} (C.I. ${responsable.ci}) como responsable`

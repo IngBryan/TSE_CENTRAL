@@ -40,15 +40,15 @@ export function AsignarViaje({ guia, vehiculos, choferes }: {
 
   const opcion = (activa: boolean) =>
     `flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${
-      activa ? "border-[#0068b3] bg-[#0068b3]/5" : "border-black/10 dark:border-white/15"
+      activa ? "border-primary bg-primary/5" : "border-border"
     }`;
 
   // Paso 7: el sistema muestra las selecciones elegidas
   if (resumen && vehiculo && chofer) {
     return (
-      <div className="flex flex-col gap-5 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Confirmá la asignación</h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-zinc-700 dark:text-zinc-300">
+      <div className="flex flex-col gap-5 rounded-xl border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">Confirmá la asignación</h2>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-foreground/80">
           <dt className="font-medium">Guía</dt>
           <dd>
             {guia.id} · {mostrarLocalidad(guia.origen, guia.origenDepartamento)} → {mostrarLocalidad(guia.destino, guia.destinoDepartamento)}
@@ -68,7 +68,7 @@ export function AsignarViaje({ guia, vehiculos, choferes }: {
             {vehiculo.capacidadCargaKg.toLocaleString("es-UY")} kg).
           </p>
         )}
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Al confirmar, se asignarán el vehículo y el chofer a esta guía.
         </p>
         <div className="flex flex-wrap gap-3">
@@ -96,27 +96,27 @@ export function AsignarViaje({ guia, vehiculos, choferes }: {
       )}
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">1. Elegí el vehículo</legend>
+        <legend className="mb-2 text-lg font-semibold text-foreground">1. Elegí el vehículo</legend>
         {vehiculos.map((v) => (
           <label key={v.matricula} className={opcion(matricula === v.matricula)}>
             <input type="radio" name="vehiculo" aria-label={`${v.matricula} ${v.marca} ${v.modelo}`} checked={matricula === v.matricula} onChange={() => setMatricula(v.matricula)} />
             <span className="flex-1">
               <strong>{v.matricula}</strong> · {v.marca} {v.modelo}
             </span>
-            <span className="text-sm tabular-nums text-zinc-500">hasta {v.capacidadCargaKg.toLocaleString("es-UY")} kg</span>
+            <span className="text-sm tabular-nums text-muted-foreground">hasta {v.capacidadCargaKg.toLocaleString("es-UY")} kg</span>
           </label>
         ))}
       </fieldset>
 
       <fieldset className="flex flex-col gap-2" disabled={!matricula}>
-        <legend className={`mb-2 text-lg font-semibold ${matricula ? "text-black dark:text-zinc-50" : "text-zinc-400"}`}>
+        <legend className={`mb-2 text-lg font-semibold ${matricula ? "text-foreground" : "text-muted-foreground/70"}`}>
           2. Elegí el chofer
         </legend>
         {choferes.map((c) => (
           <label key={c.id} className={`${opcion(idChofer === c.id)} ${matricula ? "" : "opacity-50"}`}>
             <input type="radio" name="chofer" aria-label={nombre(c)} checked={idChofer === c.id} onChange={() => setIdChofer(c.id)} />
             <span className="flex-1">{nombre(c)}</span>
-            <span className="text-sm tabular-nums text-zinc-500">C.I. {c.cedula}</span>
+            <span className="text-sm tabular-nums text-muted-foreground">C.I. {c.cedula}</span>
           </label>
         ))}
       </fieldset>

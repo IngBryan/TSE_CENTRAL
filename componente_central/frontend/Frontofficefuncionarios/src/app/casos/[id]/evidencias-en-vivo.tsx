@@ -96,13 +96,13 @@ export function EvidenciasEnVivo({ id, tipo, guiaId, fechaDeteccion, estadoCaso,
 
   return <>
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span role="status" aria-live="polite">
           {finalizado ? "Caso resuelto: eventos históricos" : activo ? "Eventos en vivo · actualización automática cada 5 s" : "Actualización automática pausada"}
           {nuevos > 0 ? ` · ${nuevos} registros nuevos desde que abriste esta pantalla` : ""}
         </span>
         {!finalizado && <button type="button" onClick={() => setActivo(v => !v)}
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900">
+          className="rounded-lg border border-input px-3 py-1.5 hover:bg-accent">
           {activo ? "Pausar actualización" : "Reanudar actualización"}
         </button>}
       </div>

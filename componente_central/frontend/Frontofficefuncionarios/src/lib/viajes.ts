@@ -107,7 +107,7 @@ export const ESTADOS_VIAJE: Record<EstadoViaje, string> = {
 export const COLOR_ESTADO_VIAJE: Record<EstadoViaje, string> = {
   ASIGNADA: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
   EN_CURSO: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
-  FINALIZADA: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200",
+  FINALIZADA: "bg-muted text-foreground",
 };
 
 export const TIPOS_EVENTO: Record<TipoEvento, string> = {

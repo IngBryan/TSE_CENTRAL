@@ -42,7 +42,7 @@ export function NuevaGuia({
   }, {});
 
   return (
-    <form action={accion} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+    <form action={accion} className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
       {estado.error && (
         <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
           {estado.error}
@@ -52,7 +52,7 @@ export function NuevaGuia({
         {CAMPOS.map((c) => {
           const error = estado.campos?.[c.nombre];
           return (
-            <label key={c.nombre} className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label key={c.nombre} className="flex flex-col gap-1 text-sm font-medium text-foreground/80">
               {c.etiqueta}
               {c.tipo === "select" ? (
                 <select
@@ -62,8 +62,8 @@ export function NuevaGuia({
                   defaultValue={estado.valores?.[c.nombre] ?? ""}
                   required
                   aria-invalid={error ? true : undefined}
-                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:bg-zinc-950 dark:text-zinc-50 ${
-                    error ? "border-red-500" : "border-black/15 dark:border-white/20"
+                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-foreground ${
+                    error ? "border-red-500" : "border-input"
                   }`}
                 >
                   <OpcionesCatalogo items={opciones[c.nombre]} vacio={c.vacio} />
@@ -77,8 +77,8 @@ export function NuevaGuia({
                   min={c.tipo === "number" ? 1 : c.tipo === "date" ? hoy : undefined}
                   step={c.tipo === "number" ? 1 : undefined}
                   aria-invalid={error ? true : undefined}
-                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
-                    error ? "border-red-500" : "border-black/15 dark:border-white/20"
+                  className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-foreground ${
+                    error ? "border-red-500" : "border-input"
                   }`}
                 />
               )}

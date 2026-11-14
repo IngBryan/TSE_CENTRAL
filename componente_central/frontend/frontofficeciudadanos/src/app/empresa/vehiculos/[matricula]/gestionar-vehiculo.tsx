@@ -7,8 +7,8 @@ import { agregarItv, darDeBaja, editarVehiculo, registrarPermiso, type Resultado
 
 type Modo = "editar" | "permiso" | "itv" | "baja" | null;
 
-const campo = "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black dark:border-white/20 dark:text-zinc-50";
-const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const campo = "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground";
+const etiqueta = "flex flex-col gap-1 text-sm font-medium text-foreground/80";
 
 // Acciones sobre un vehiculo activo: editar sus datos (no la matricula), registrar o reemplazar el
 // permiso de circulacion, agregar una ITV y darlo de baja (logica, con confirmacion).
@@ -66,9 +66,9 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
   const errorCampo = (n: string) => campos[n] && <span className="text-xs font-normal text-red-700 dark:text-red-300">{campos[n]}</span>;
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-lg font-semibold text-black dark:text-zinc-50">Gestionar vehículo</h2>
+        <h2 className="mr-auto text-lg font-semibold text-foreground">Gestionar vehículo</h2>
         <button type="button" onClick={() => abrir("editar")} className={`${botonSecundario} h-9 px-4`}>
           Editar datos
         </button>
@@ -149,7 +149,7 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
             {errorCampo("fechaVencimiento")}
           </label>
           {vehiculo.permiso && (
-            <p className="text-xs text-zinc-500 sm:col-span-3">
+            <p className="text-xs text-muted-foreground sm:col-span-3">
               El vehículo tiene un solo permiso: lo que guardes reemplaza al actual ({vehiculo.permiso.nro}).
             </p>
           )}
@@ -183,7 +183,7 @@ export function GestionarVehiculo({ vehiculo }: { vehiculo: Vehiculo }) {
       )}
 
       {modo === "baja" && (
-        <p className="rounded-lg border border-black/10 p-4 text-sm text-zinc-700 dark:border-white/15 dark:text-zinc-300">
+        <p className="rounded-lg border border-border p-4 text-sm text-foreground/80">
           ¿Dar de baja el vehículo {vehiculo.matricula}? No se podrá asignar a nuevos viajes ni modificar, pero se conserva
           su historial. No se puede dar de baja si tiene viajes asignados o en curso.
         </p>

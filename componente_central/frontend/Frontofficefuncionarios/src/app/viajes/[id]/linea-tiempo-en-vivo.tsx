@@ -78,27 +78,27 @@ export function LineaTiempoEnVivo({ id, estadoInicial, eventosIniciales, modific
   const visibles = linea.slice((paginaActual - 1) * TAMANIO, paginaActual * TAMANIO);
   return (
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Línea de tiempo</h2>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
+        <h2 className="text-lg font-semibold text-foreground">Línea de tiempo</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span role="status" aria-live="polite">{estado === "FINALIZADA" ? "Historial del viaje" : activo ? "Actualización automática cada 5 s" : "Actualización pausada"}
             {nuevos > 0 ? ` · ${nuevos} entradas nuevas` : ""}</span>
           {estado !== "FINALIZADA" && <button type="button" onClick={() => setActivo(a => !a)}
-            className="rounded-lg border px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+            className="rounded-lg border px-3 py-1.5 hover:bg-accent">
             {activo ? "Pausar" : "Reanudar"}</button>}
         </div>
         {error && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">
           No se pudo consultar novedades ({error}); se conservan los eventos anteriores.
         </p>}
         {linea.length === 0 ? (
-          <p className="text-zinc-600 dark:text-zinc-400">El chofer no registró eventos en este viaje.</p>
+          <p className="text-muted-foreground">El chofer no registró eventos en este viaje.</p>
         ) : (
           <ol className="flex flex-col gap-3">
             {visibles.map(({ evento: e, modificacion: m }, i) =>
               m ? (
-                <li key={`mod-${m.fecha}-${i}`} className="rounded-xl border-l-4 border-[#0068b3] bg-white p-4 text-sm shadow-sm dark:bg-zinc-950">
+                <li key={`mod-${m.fecha}-${i}`} className="rounded-xl border-l-4 border-primary bg-card p-4 text-sm shadow-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium text-black dark:text-zinc-50">{MODIFICACIONES[m.tipo] ?? m.tipo}</span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="font-medium text-foreground">{MODIFICACIONES[m.tipo] ?? m.tipo}</span>
+                    <span className="text-xs text-muted-foreground">
                       {fechaHora(m.fecha)} · responsable C.I. {m.ciResponsable}
                     </span>
                   </div>
@@ -108,18 +108,18 @@ export function LineaTiempoEnVivo({ id, estadoInicial, eventosIniciales, modific
               ) : e ? (
                 <li
                   key={e.idEvento}
-                  className={`rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-zinc-950 ${
+                  className={`rounded-xl border bg-card p-4 text-sm shadow-sm ${
                     e.resultado === "CONFLICTO" ? "border-l-4 border-amber-500" : ""
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium text-black dark:text-zinc-50">{TIPOS_EVENTO[e.tipo] ?? e.tipo}</span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="font-medium text-foreground">{TIPOS_EVENTO[e.tipo] ?? e.tipo}</span>
+                    <span className="text-xs text-muted-foreground">
                       Ocurrió {fechaHora(e.fechaHoraDispositivo)} · recibido {fechaHora(e.fechaRecepcion)}
                     </span>
                   </div>
                   {e.descripcion && <p className="mt-1 whitespace-pre-line">{e.descripcion}</p>}
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Chofer: {nombreChofer(e.chofer)}
                     {e.latitud != null && e.longitud != null && (
                       <>
@@ -140,7 +140,7 @@ export function LineaTiempoEnVivo({ id, estadoInicial, eventosIniciales, modific
                       En conflicto: {e.detalle ?? e.codigo}. No cambió el estado de la guía.
                     </p>
                   )}
-                  {e.resultado === "SIN_EFECTO" && <p className="mt-2 text-zinc-500">Sin efecto: {e.detalle ?? e.codigo}</p>}
+                  {e.resultado === "SIN_EFECTO" && <p className="mt-2 text-muted-foreground">Sin efecto: {e.detalle ?? e.codigo}</p>}
                   {e.conFoto && (
                     // La sirve el route handler de esta app (el navegador no tiene la API key): lleva el basePath
                     // eslint-disable-next-line @next/next/no-img-element

@@ -30,18 +30,18 @@ export default async function Infracciones() {
   const pendientes = infracciones?.filter((i) => i.admiteDescargo).length ?? 0;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/mi-cuenta" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/mi-cuenta" className="text-sm text-muted-foreground hover:underline">
             ← Mi cuenta
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Infracciones{empresa ? ` de ${empresa}` : ""}
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
+          <p className="text-muted-foreground">
             Casos de fiscalización detectados sobre los vehículos y viajes de la empresa. Podés ver la evidencia y
             presentar un descargo dentro del plazo.
           </p>
@@ -60,9 +60,9 @@ export default async function Infracciones() {
                   : `Tenés ${pendientes} infracciones a las que todavía les podés presentar un descargo.`}
               </p>
             )}
-            <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+            <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-black/5 text-zinc-500 dark:border-white/10">
+                <thead className="border-b border-border text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">N°</th>
                     <th className="px-4 py-3 font-medium">Infracción</th>
@@ -73,7 +73,7 @@ export default async function Infracciones() {
                 </thead>
                 <tbody>
                   {infracciones.map((i) => (
-                    <tr key={i.id} className="border-b border-black/5 align-top last:border-0 dark:border-white/10">
+                    <tr key={i.id} className="border-b border-border align-top last:border-0">
                       <td className="px-4 py-3">
                         <Link href={`/empresa/infracciones/${i.id}`} className="font-medium underline">
                           {i.id}
@@ -84,9 +84,9 @@ export default async function Infracciones() {
                           {tipoInfraccion(i.tipoCaso)}
                         </Link>
                         {i.nueva && (
-                          <span className="ml-2 rounded-full bg-[#0068b3] px-2 py-0.5 text-xs font-medium text-white">Nueva</span>
+                          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">Nueva</span>
                         )}
-                        {i.descripcion && <p className="line-clamp-1 text-xs text-zinc-500">{i.descripcion}</p>}
+                        {i.descripcion && <p className="line-clamp-1 text-xs text-muted-foreground">{i.descripcion}</p>}
                       </td>
                       <td className="px-4 py-3 font-mono">{i.matricula ?? "-"}</td>
                       <td className="whitespace-nowrap px-4 py-3">{fechaHora(i.fechaDeteccion)}</td>
@@ -96,10 +96,10 @@ export default async function Infracciones() {
                             {ESTADOS[i.estado].texto}
                           </span>
                           {i.admiteDescargo && (
-                            <span className="whitespace-nowrap text-xs text-zinc-500">descargo hasta el {fecha(i.venceDescargo)}</span>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">descargo hasta el {fecha(i.venceDescargo)}</span>
                           )}
                           {i.estado === "NOTIFICADA" && !i.admiteDescargo && (
-                            <span className="whitespace-nowrap text-xs text-zinc-500">plazo de descargo vencido</span>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">plazo de descargo vencido</span>
                           )}
                         </div>
                       </td>
@@ -110,7 +110,7 @@ export default async function Infracciones() {
             </div>
           </>
         ) : (
-          <p className="text-zinc-600 dark:text-zinc-400">La empresa no tiene infracciones notificadas.</p>
+          <p className="text-muted-foreground">La empresa no tiene infracciones notificadas.</p>
         )}
       </main>
     </div>

@@ -101,8 +101,8 @@ export function AltaChofer() {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Agregar chofer</h2>
+    <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Agregar chofer</h2>
 
       {aviso && (
         <p role={aviso.tipo === "error" ? "alert" : "status"} className={`rounded-lg p-4 ${ESTILO_AVISO[aviso.tipo]}`}>
@@ -112,7 +112,7 @@ export function AltaChofer() {
 
       {aConfirmar ? (
         <div className="flex flex-col gap-4">
-          <p className="text-zinc-700 dark:text-zinc-300">
+          <p className="text-foreground/80">
             La cédula <strong>{aConfirmar.cedula}</strong> corresponde a <strong>{aConfirmar.nombre}</strong>. ¿Es la
             persona que querés dar de alta como chofer?
           </p>
@@ -127,7 +127,7 @@ export function AltaChofer() {
         </div>
       ) : (
         <form onSubmit={consultar} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-1 flex-col gap-1 text-sm font-medium text-foreground/80">
             Cédula del chofer
             <input
               name="cedula"
@@ -137,7 +137,7 @@ export function AltaChofer() {
               value={cedula}
               onChange={(e) => setCedula(e.target.value)}
               required
-              className="h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base dark:border-white/20"
+              className="h-10 rounded-lg border border-input bg-transparent px-3 text-base"
             />
           </label>
           <button type="submit" disabled={pendiente} className={botonGubUy}>

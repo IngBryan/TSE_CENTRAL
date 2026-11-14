@@ -24,7 +24,7 @@ export function SelectorRutas({ guia, localidades, iniciales }: {
   const [ocupado, iniciar] = useTransition();
   const editable = guia.estado === "SIN_ASIGNAR" || guia.estado === "ASIGNADA";
 
-  return <section className="flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm dark:bg-zinc-950">
+  return <section className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
     {error && <p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
     {exito && <p role="status" className="text-green-800 dark:text-green-200">Ruta admitida guardada.</p>}
     {calculando && origen && destino ? <>

@@ -131,15 +131,15 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
   const conflictos = datos?.eventos.filter((e) => e.resultado === "CONFLICTO").length ?? 0;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/empresa/guias" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/empresa/guias" className="text-sm text-muted-foreground hover:underline">
             ← Guías de viaje
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Guía <span className="font-mono">{id}</span>
           </h1>
         </div>
@@ -150,28 +150,28 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
           </p>
         ) : (
           <>
-            <section className="grid gap-x-6 gap-y-2 rounded-2xl bg-white p-6 text-sm shadow-sm sm:grid-cols-2 dark:bg-zinc-950">
-              <p><span className="text-zinc-500">Estado:</span> {ESTADOS[datos.guia.estado] ?? datos.guia.estado}</p>
-              <p><span className="text-zinc-500">Fecha:</span> {datos.guia.fecha.split("-").reverse().join("/")}</p>
-              <p><span className="text-zinc-500">Recorrido:</span> {mostrarLocalidad(datos.guia.origen, datos.guia.origenDepartamento)} → {mostrarLocalidad(datos.guia.destino, datos.guia.destinoDepartamento)}</p>
+            <section className="grid gap-x-6 gap-y-2 rounded-xl border bg-card p-6 text-sm shadow-sm sm:grid-cols-2">
+              <p><span className="text-muted-foreground">Estado:</span> {ESTADOS[datos.guia.estado] ?? datos.guia.estado}</p>
+              <p><span className="text-muted-foreground">Fecha:</span> {datos.guia.fecha.split("-").reverse().join("/")}</p>
+              <p><span className="text-muted-foreground">Recorrido:</span> {mostrarLocalidad(datos.guia.origen, datos.guia.origenDepartamento)} → {mostrarLocalidad(datos.guia.destino, datos.guia.destinoDepartamento)}</p>
               <p>
-                <span className="text-zinc-500">Carga:</span> {datos.guia.pesoCargaKg.toLocaleString("es-UY")} kg
+                <span className="text-muted-foreground">Carga:</span> {datos.guia.pesoCargaKg.toLocaleString("es-UY")} kg
                 {datos.guia.tipoCarga ? ` · ${datos.guia.tipoCarga}` : ""}
               </p>
-              <p><span className="text-zinc-500">Rubro:</span> {datos.guia.rubroCliente}</p>
+              <p><span className="text-muted-foreground">Rubro:</span> {datos.guia.rubroCliente}</p>
               <p>
-                <span className="text-zinc-500">Vehículo y chofer:</span> {datos.guia.vehiculo?.matricula ?? "-"} ·{" "}
+                <span className="text-muted-foreground">Vehículo y chofer:</span> {datos.guia.vehiculo?.matricula ?? "-"} ·{" "}
                 {[datos.guia.chofer?.primerNombre, datos.guia.chofer?.primerApellido].filter(Boolean).join(" ") ||
                   datos.guia.chofer?.cedula ||
                   "-"}
               </p>
             </section>
 
-            <section aria-labelledby="rutas-autorizadas-titulo" className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
+            <section aria-labelledby="rutas-autorizadas-titulo" className="rounded-xl border bg-card p-6 text-sm shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="rutas-autorizadas-titulo" className="text-lg font-semibold">Ruta admitida</h2>
                 <Link href={`/empresa/guias/${encodeURIComponent(id)}/rutas`}
-                  className="rounded-lg bg-[#0068b3] px-4 py-2 font-medium text-white hover:bg-[#005596]">
+                  className="rounded-lg bg-primary px-4 py-2 font-medium text-white hover:bg-primary/90">
                   {datos.guia.estado === "SIN_ASIGNAR" || datos.guia.estado === "ASIGNADA"
                     ? "Consultar ruta admitida" : "Ver ruta en el mapa"}
                 </Link>
@@ -181,13 +181,13 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
                   No pudimos consultar la ruta de esta guía. Podés volver a intentarlo desde la pantalla de ruta.
                 </p>
               ) : rutasAutorizadas.length === 0 ? (
-                <p className="mt-3 text-zinc-600 dark:text-zinc-400">Esta guía todavía no tiene ruta admitida.</p>
+                <p className="mt-3 text-muted-foreground">Esta guía todavía no tiene ruta admitida.</p>
               ) : (
                 <ol className="mt-3 grid gap-2 sm:grid-cols-2">
                   {rutasAutorizadas.slice(0, 1).map(r => (
-                    <li key={r.idRuta} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+                    <li key={r.idRuta} className="rounded-lg bg-background p-3">
                       <span className="font-medium">Ruta admitida</span>
-                      <span className="ml-2 text-zinc-600 dark:text-zinc-400">
+                      <span className="ml-2 text-muted-foreground">
                         {(r.distanciaMetros / 1000).toLocaleString("es-UY", { maximumFractionDigits: 1 })} km
                       </span>
                     </li>
@@ -209,9 +209,9 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
             )}
 
             {datos.guia.estado === "SIN_ASIGNAR" && <Link href={`/empresa/guias/${encodeURIComponent(id)}/asignar`}
-              className="self-start rounded-lg bg-[#0068b3] px-4 py-2 font-medium text-white">Asignar vehículo y chofer</Link>}
+              className="self-start rounded-lg bg-primary px-4 py-2 font-medium text-white">Asignar vehículo y chofer</Link>}
             <section className="flex flex-col gap-3">
-              <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Línea de tiempo del viaje</h2>
+              <h2 className="text-lg font-semibold text-foreground">Línea de tiempo del viaje</h2>
               {conflictos > 0 && (
                 <p role="status" className="rounded-lg bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                   {conflictos === 1 ? "Hay 1 evento" : `Hay ${conflictos} eventos`} que no se pudo aplicar a la guía
@@ -219,40 +219,40 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
                 </p>
               )}
               {linea.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">El chofer todavía no registró eventos.</p>
+                <p className="text-muted-foreground">El chofer todavía no registró eventos.</p>
               ) : (
                 <ol className="flex flex-col gap-3">
                   {linea.map(({ evento: e, modificacion: m }) =>
                     m ? (
                       <li
                         key={`mod-${m.fecha}`}
-                        className="rounded-xl border-l-4 border-[#0068b3] bg-white p-4 text-sm shadow-sm dark:bg-zinc-950"
+                        className="rounded-xl border-l-4 border-primary bg-card p-4 text-sm shadow-sm"
                       >
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-medium text-black dark:text-zinc-50">{MODIFICACIONES[m.tipo] ?? m.tipo}</span>
-                          <span className="text-xs text-zinc-500">{hora(m.fecha)} · responsable C.I. {m.ciResponsable}</span>
+                          <span className="font-medium text-foreground">{MODIFICACIONES[m.tipo] ?? m.tipo}</span>
+                          <span className="text-xs text-muted-foreground">{hora(m.fecha)} · responsable C.I. {m.ciResponsable}</span>
                         </div>
                         {m.cambios && <p className="mt-1">{m.cambios}</p>}
                         {m.motivo && <p className="mt-1">Motivo: {m.motivo}</p>}
-                        <p className="mt-1 text-xs text-zinc-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Versión de la guía {m.versionAnterior} → {m.versionNueva}
                         </p>
                       </li>
                     ) : e ? (
                     <li
                       key={e.idEvento}
-                      className={`rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-zinc-950 ${
+                      className={`rounded-xl border bg-card p-4 text-sm shadow-sm ${
                         e.resultado === "CONFLICTO" ? "border-l-4 border-amber-500" : ""
                       }`}
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="font-medium text-black dark:text-zinc-50">{TIPOS[e.tipo] ?? e.tipo}</span>
-                        <span className="text-xs text-zinc-500">
+                        <span className="font-medium text-foreground">{TIPOS[e.tipo] ?? e.tipo}</span>
+                        <span className="text-xs text-muted-foreground">
                           Ocurrió {hora(e.fechaHoraDispositivo)} · recibido {hora(e.fechaRecepcion)}
                         </span>
                       </div>
                       {e.descripcion && <p className="mt-1">{e.descripcion}</p>}
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         Chofer: {[e.chofer?.primerNombre, e.chofer?.primerApellido].filter(Boolean).join(" ") || e.chofer?.cedula}
                         {e.latitud != null && e.longitud != null && (
                           <>
@@ -274,7 +274,7 @@ export default async function DetalleGuia({ params }: PageProps<"/empresa/guias/
                         </p>
                       )}
                       {e.resultado === "SIN_EFECTO" && (
-                        <p className="mt-2 text-zinc-500">Sin efecto: {e.detalle ?? e.codigo}</p>
+                        <p className="mt-2 text-muted-foreground">Sin efecto: {e.detalle ?? e.codigo}</p>
                       )}
                       {e.conFoto && (
                         // eslint-disable-next-line @next/next/no-img-element

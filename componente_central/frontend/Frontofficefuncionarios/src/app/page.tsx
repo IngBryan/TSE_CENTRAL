@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
-import { Encabezado, botonPrimario } from "@/components/encabezado";
+import { Building2, ClipboardList, Route, ShieldCheck } from "lucide-react";
+import { botonPrimario } from "@/components/encabezado";
+import { Brillos, Marca } from "@/components/marca";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -31,34 +33,54 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const error = typeof params.error === "string" ? (MENSAJES[params.error] ?? MENSAJES.error_idp) : null;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
-      <Encabezado sesion={sesion} />
+    // Tarjeta de ingreso con los brillos azul y violeta detras, como el login del backoffice
+    <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-background px-4 py-16 font-sans">
+      <Brillos />
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-12">
+      <section className="relative flex w-full max-w-md flex-col gap-6 rounded-2xl border bg-card p-8 shadow-xl shadow-primary/5">
+        <div className="flex items-center gap-3">
+          <Marca className="size-11 rounded-xl shadow-md [&_svg]:size-5" />
+          <div className="leading-tight">
+            <p className="font-semibold tracking-tight">CARGA.UY</p>
+            <p className="text-sm text-muted-foreground">Funcionarios MTOP</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Fiscalización del transporte de carga</h1>
+          <p className="text-sm text-muted-foreground">
+            Revisá los casos detectados, su evidencia y el descargo de la empresa, y resolvelos con fundamento.
+          </p>
+        </div>
+
         {error && (
-          <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+          <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
           </p>
         )}
         {params.sesion === "cerrada" && (
-          <p className="rounded-lg bg-zinc-100 p-4 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-            Cerraste sesión correctamente.
-          </p>
+          <p className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">Cerraste sesión correctamente.</p>
         )}
 
-        <section className="flex flex-col gap-4">
-          <h1 className="text-3xl font-semibold tracking-tight text-black sm:text-4xl dark:text-zinc-50">
-            Fiscalización del transporte de carga
-          </h1>
-          <p className="text-lg text-zinc-700 dark:text-zinc-300">
-            Revisá los casos de fiscalización detectados, su evidencia y el descargo de la empresa, y resolvelos
-            con fundamento. Ingresá con tu cuenta de ID Uruguay.
-          </p>
-          <a href={`${BASE_PATH}/auth/login`} className={`${botonPrimario} h-12 self-start px-6 text-base`}>
-            Ingresar con gub.uy
-          </a>
-        </section>
-      </main>
-    </div>
+        <a href={`${BASE_PATH}/auth/login`} className={`${botonPrimario} h-11 w-full`}>
+          <ShieldCheck /> Ingresar con ID Uruguay
+        </a>
+
+        <ul className="grid gap-2 border-t pt-5 text-sm text-muted-foreground">
+          {[
+            { icono: ClipboardList, texto: "Bandeja de casos de fiscalización" },
+            { icono: Route, texto: "Seguimiento de viajes en tiempo real" },
+            { icono: Building2, texto: "Gestión de empresas y vehículos" },
+          ].map(({ icono: Icono, texto }) => (
+            <li key={texto} className="flex items-center gap-2.5">
+              <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icono className="size-3.5" />
+              </span>
+              {texto}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </main>
   );
 }
