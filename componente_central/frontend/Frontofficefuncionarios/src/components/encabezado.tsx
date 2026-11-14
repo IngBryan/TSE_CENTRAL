@@ -1,38 +1,73 @@
+import { Building2, ClipboardList, LogOut, Route } from "lucide-react";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/base-path";
 import type { Sesion } from "@/lib/auth/session";
+import { Marca } from "./marca";
+import { NavLink } from "./nav-link";
 
+// Mismo aspecto que el Button del backoffice: esquinas rounded-lg, azul primario con sombra suave y
+// secundario con borde.
 export const linkBoton =
-  "flex h-10 items-center justify-center rounded-full px-5 text-sm font-medium transition-colors disabled:opacity-50";
-export const botonPrimario = `${linkBoton} bg-[#0068b3] text-white hover:bg-[#00558f]`;
-export const botonSecundario = `${linkBoton} border border-black/10 hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10`;
+  "flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4";
+export const botonPrimario = `${linkBoton} bg-primary text-primary-foreground shadow-sm shadow-primary/30 hover:bg-primary/90`;
+export const botonSecundario = `${linkBoton} border bg-card text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground`;
 
-// Barra superior del frontoffice de funcionarios (mismo estilo que el de ciudadanos).
+const SECCIONES = [
+  { href: "/casos", nombre: "Casos", icono: ClipboardList },
+  { href: "/viajes", nombre: "Viajes", icono: Route },
+  { href: "/empresas", nombre: "Empresas", icono: Building2 },
+];
+
+const iniciales = (nombre: string) =>
+  nombre
+    .split(/\s+/)
+    .filter((p) => p && !p.startsWith("C.I."))
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("") || "F";
+
+// Barra superior del frontoffice de funcionarios, con la marca y el estilo del backoffice.
 export function Encabezado({ sesion }: { sesion: Sesion | null }) {
   return (
-    <header className="border-b border-black/5 bg-white dark:border-white/10 dark:bg-zinc-950">
+    <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur print:hidden">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
-          carga.uy <span className="font-normal text-zinc-500">· Funcionarios</span>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Marca />
+          <span className="grid leading-tight">
+            <span className="font-semibold tracking-tight text-foreground">CARGA.UY</span>
+            <span className="text-xs text-muted-foreground">Funcionarios</span>
+          </span>
         </Link>
+
         {sesion && (
-          <nav className="flex items-center gap-3">
-            <Link href="/casos" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
-              Casos
-            </Link>
-            <Link href="/viajes" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
-              Viajes
-            </Link>
-            <Link href="/empresas" className="text-sm text-zinc-700 hover:underline dark:text-zinc-300">
-              Empresas
-            </Link>
-            <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">{sesion.usuario.nombre}</span>
-            <form method="post" action={`${BASE_PATH}/auth/logout`}>
-              <button type="submit" className={botonSecundario}>
-                Cerrar sesión
-              </button>
-            </form>
-          </nav>
+          <>
+            <nav className="flex flex-1 items-center justify-center gap-1">
+              {SECCIONES.map(({ href, nombre, icono: Icono }) => (
+                <NavLink key={href} href={href}>
+                  <Icono />
+                  <span className="hidden sm:inline">{nombre}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 md:flex" title={sesion.usuario.nombre}>
+                <span className="flex size-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                  {iniciales(sesion.usuario.nombre)}
+                </span>
+                <span className="grid max-w-44 text-xs leading-tight">
+                  <span className="truncate font-medium text-foreground">{sesion.usuario.nombre}</span>
+                  <span className="text-muted-foreground">Funcionario MTOP</span>
+                </span>
+              </div>
+              <form method="post" action={`${BASE_PATH}/auth/logout`}>
+                <button type="submit" className={botonSecundario} title="Cerrar sesión">
+                  <LogOut />
+                  <span className="hidden lg:inline">Cerrar sesión</span>
+                </button>
+              </form>
+            </div>
+          </>
         )}
       </div>
       {sesion?.usuario.identidadVerificada === false && (

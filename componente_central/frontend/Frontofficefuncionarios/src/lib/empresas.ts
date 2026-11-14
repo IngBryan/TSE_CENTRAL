@@ -83,5 +83,5 @@ export const ESTADOS_VALIDACION: Record<string, string> = {
 
 export const COLOR_HABILITADA = {
   si: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
-  no: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200",
+  no: "bg-muted text-foreground",
 };

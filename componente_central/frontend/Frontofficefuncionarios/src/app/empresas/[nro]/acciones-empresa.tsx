@@ -119,8 +119,8 @@ export function AccionesEmpresa({
       )}
 
       {ofrecerHabilitar && !empresa.habilitada && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/15 dark:bg-zinc-950">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <div className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+          <p className="text-sm text-foreground/80">
             La empresa ya tiene responsable. ¿Querés habilitarla ahora? Solo una empresa habilitada puede dar de
             alta choferes.
           </p>

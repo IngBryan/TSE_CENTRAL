@@ -19,9 +19,9 @@ import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
-const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
-const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
-const dato = "text-zinc-500";
+const tarjeta = "rounded-xl border bg-card p-6 text-sm shadow-sm";
+const titulo = "text-lg font-semibold text-foreground";
+const dato = "text-muted-foreground";
 
 // CU Monitorear viajes y pesajes: detalle de un viaje asignado, en curso o finalizado con los pesajes del
 // vehiculo durante el viaje y la linea de tiempo. Que quien consulta sea funcionario lo controla el backend
@@ -63,10 +63,10 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
       <section className={`grid gap-x-6 gap-y-2 sm:grid-cols-2 ${tarjeta}`}>
         <p>
           <span className={dato}>Empresa:</span> {v.empresa ?? "-"}
-          {v.nroEmpresa != null && <span className="text-zinc-500"> (N° {v.nroEmpresa})</span>}
+          {v.nroEmpresa != null && <span className="text-muted-foreground"> (N° {v.nroEmpresa})</span>}
         </p>
         <p><span className={dato}>Fecha de la guía:</span> {fecha(v.fecha)}</p>
-        <p><span className={dato}>Chofer:</span> {nombreChofer(v.chofer)}{v.chofer?.ci && <span className="text-zinc-500"> (C.I. {v.chofer.ci})</span>}</p>
+        <p><span className={dato}>Chofer:</span> {nombreChofer(v.chofer)}{v.chofer?.ci && <span className="text-muted-foreground"> (C.I. {v.chofer.ci})</span>}</p>
         <p><span className={dato}>Asignada:</span> {fechaHora(v.fechaAsignacion)}</p>
         <p><span className={dato}>Inicio:</span> {v.inicio ? fechaHora(v.inicio) : v.estado === "ASIGNADA" ? "todavía no empezó" : "-"}</p>
         <p><span className={dato}>Fin:</span> {v.fin ? fechaHora(v.fin) : v.estado === "EN_CURSO" ? "en curso" : "-"}</p>
@@ -92,7 +92,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
             </p>
           </>
         ) : (
-          <p className="text-zinc-600 dark:text-zinc-400">La guía no tiene vehículo asignado.</p>
+          <p className="text-muted-foreground">La guía no tiene vehículo asignado.</p>
         )}
       </section>
 
@@ -109,7 +109,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
         </div>
         <div className={tarjeta}>
           {v.pesajes.length === 0 ? (
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-muted-foreground">
               {v.estado === "ASIGNADA"
                 ? "El viaje todavía no empezó."
                 : v.estado === "EN_CURSO"
@@ -119,7 +119,7 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="text-zinc-500">
+                <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                   <tr>
                     <th className="py-1 pr-4 font-normal">Fecha y hora</th>
                     <th className="py-1 pr-4 font-normal">Balanza</th>
@@ -129,13 +129,13 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
                 </thead>
                 <tbody>
                   {v.pesajes.map((p, i) => (
-                    <tr key={`${p.fechaHora}-${i}`} className="border-t border-black/5 dark:border-white/10">
+                    <tr key={`${p.fechaHora}-${i}`} className="border-t border-border">
                       <td className="py-2 pr-4">{fechaHora(p.fechaHora)}</td>
                       <td className="py-2 pr-4">{p.balanza ?? "-"}</td>
                       <td className="py-2 pr-4 text-right tabular-nums">{kg(p.pesoKg)}</td>
                       <td
                         className={`py-2 text-right tabular-nums ${
-                          p.excesoKg > 0 ? "font-medium text-red-700 dark:text-red-300" : "text-zinc-500"
+                          p.excesoKg > 0 ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"
                         }`}
                       >
                         {p.excesoKg > 0 ? `+${kg(p.excesoKg)}` : "-"}
@@ -153,25 +153,25 @@ export default async function DetalleViaje({ params }: PageProps<"/viajes/[id]">
         <h2 className={titulo}>Casos generados</h2>
         <div className={tarjeta}>
           {v.casos.length === 0 ? (
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-muted-foreground">
               {v.estado === "FINALIZADA"
                 ? "La fiscalización automática no detectó casos en este viaje."
                 : "La fiscalización automática no detectó casos en este viaje hasta ahora."}
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-black/5 dark:divide-white/10">
+            <ul className="flex flex-col divide-y divide-border">
               {v.casos.map((c) => (
                 <li key={c.id} className="py-2 first:pt-0 last:pb-0">
                   <Link href={`/casos/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 hover:underline">
                     <span>
-                      <span className="font-medium text-black dark:text-zinc-50">{tipoCaso(c.tipo)}</span>
-                      <span className="text-zinc-500"> · caso N° {c.id} · {fechaHora(c.fechaDeteccion)}</span>
+                      <span className="font-medium text-foreground">{tipoCaso(c.tipo)}</span>
+                      <span className="text-muted-foreground"> · caso N° {c.id} · {fechaHora(c.fechaDeteccion)}</span>
                     </span>
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${COLOR_ESTADO[c.estado] ?? ""}`}>
                       {estado(c.estado)}
                     </span>
                   </Link>
-                  {c.descripcion && <p className="mt-1 text-zinc-600 dark:text-zinc-400">{c.descripcion}</p>}
+                  {c.descripcion && <p className="mt-1 text-muted-foreground">{c.descripcion}</p>}
                 </li>
               ))}
             </ul>
@@ -200,23 +200,23 @@ function Pagina({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/viajes" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/viajes" className="text-sm text-muted-foreground hover:underline">
             ← Viajes
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-mono text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">{id}</h1>
+            <h1 className="font-mono text-3xl font-semibold tracking-tight text-foreground">{id}</h1>
             {actual && (
               <span className={`rounded-full px-3 py-1 text-sm font-medium ${COLOR_ESTADO_VIAJE[actual] ?? ""}`}>
                 {estadoViaje(actual)}
               </span>
             )}
           </div>
-          {subtitulo && <p className="text-lg text-zinc-700 dark:text-zinc-300">{subtitulo}</p>}
+          {subtitulo && <p className="text-lg text-foreground/80">{subtitulo}</p>}
         </div>
 
         {error ? (

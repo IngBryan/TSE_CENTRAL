@@ -28,15 +28,15 @@ export default async function PerfilEmpresa() {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/mi-cuenta" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/mi-cuenta" className="text-sm text-muted-foreground hover:underline">
             ← Mi cuenta
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Datos de la empresa</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Datos de la empresa</h1>
           {empresa && !empresa.habilitada && (
             <p className="text-sm text-amber-800 dark:text-amber-300">
               La empresa todavía no está habilitada por el MTOP.

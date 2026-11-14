@@ -43,8 +43,8 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
     campos[n] && <span className="text-xs font-normal text-red-700 dark:text-red-300">{campos[n]}</span>;
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Resolver el caso</h2>
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Resolver el caso</h2>
       {sinDescargo && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           La empresa no presentó descargo. Igual podés resolver el caso con la evidencia disponible.
@@ -58,18 +58,18 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
       )}
 
       <fieldset disabled={pendiente || confirmar} className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">Decisión</legend>
+        <legend className="mb-2 text-sm font-medium text-foreground/80">Decisión</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           {OPCIONES.map((o) => (
             <label
               key={o.valor}
               className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm ${
                 decision === o.valor
-                  ? "border-[#0068b3] bg-[#0068b3]/5"
-                  : "border-black/15 dark:border-white/20"
+                  ? "border-primary bg-primary/5"
+                  : "border-input"
               }`}
             >
-              <span className="flex items-center gap-2 font-medium text-black dark:text-zinc-50">
+              <span className="flex items-center gap-2 font-medium text-foreground">
                 <input
                   type="radio"
                   name="decision"
@@ -79,14 +79,14 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
                 />
                 {o.texto}
               </span>
-              <span className="text-zinc-600 dark:text-zinc-400">{o.ayuda}</span>
+              <span className="text-muted-foreground">{o.ayuda}</span>
             </label>
           ))}
         </div>
         {errorCampo("decision")}
       </fieldset>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground/80">
         Fundamento (obligatorio)
         <textarea
           value={fundamento}
@@ -94,9 +94,9 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
           rows={4}
           disabled={pendiente || confirmar}
           onChange={(e) => setFundamento(e.target.value)}
-          className="rounded-lg border border-black/15 bg-transparent p-3 text-base font-normal text-black dark:border-white/20 dark:text-zinc-50"
+          className="rounded-lg border border-input bg-transparent p-3 text-base font-normal text-foreground"
         />
-        <span className="self-end text-xs font-normal text-zinc-500">
+        <span className="self-end text-xs font-normal text-muted-foreground">
           {fundamento.length}/{MAX_FUNDAMENTO}
         </span>
         {errorCampo("fundamento")}
@@ -112,8 +112,8 @@ export function ResolverCaso({ idCaso, sinDescargo }: { idCaso: number; sinDesca
           Registrar resolución
         </button>
       ) : (
-        <div className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+          <p className="text-sm text-foreground/80">
             ¿{decision === "CONFIRMAR" ? "Confirmar" : "Desestimar"} el caso N° {idCaso}? La resolución es definitiva y
             queda registrada en la auditoría con tu cédula y el fundamento.
           </p>

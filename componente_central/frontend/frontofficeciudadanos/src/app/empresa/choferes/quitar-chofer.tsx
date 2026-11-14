@@ -27,7 +27,7 @@ export function QuitarChofer({ cedula, nombre }: { cedula: string; nombre: strin
     <div className="flex flex-col items-end gap-1">
       {confirmar ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">¿Quitar a {nombre} de la empresa?</span>
+          <span className="text-xs text-muted-foreground">¿Quitar a {nombre} de la empresa?</span>
           <button
             type="button"
             onClick={quitar}
@@ -40,7 +40,7 @@ export function QuitarChofer({ cedula, nombre }: { cedula: string; nombre: strin
             type="button"
             onClick={() => setConfirmar(false)}
             disabled={pendiente}
-            className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+            className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-accent"
           >
             No
           </button>

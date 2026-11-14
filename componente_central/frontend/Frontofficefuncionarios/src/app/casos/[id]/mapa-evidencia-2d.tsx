@@ -76,7 +76,7 @@ export default function MapaEvidencia2D({ rutas, puntos, pruebas, mostrarRutas =
       ? "Evidencia registrada: dos mediciones del desvío y geometrías de referencia archivadas"
       : contexto === "sin-guia" ? "Posiciones vinculadas a la circulación sin guía"
       : "Recorrido GPS posterior a la detección y rutas actualmente autorizadas"}
-      className="relative z-0 h-[370px] w-full rounded-xl border border-black/10 dark:border-white/10 sm:h-[480px]" />
+      className="relative z-0 h-[370px] w-full rounded-xl border border-border sm:h-[480px]" />
     {errorBase && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
       El mapa base podría no estar disponible. Revisá la conexión con el proveedor cartográfico.
     </p>}

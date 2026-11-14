@@ -6,8 +6,8 @@ import { MAX_DISPONIBLES, nombreUsuario, type UsuarioDisponible } from "@/lib/em
 import { buscarUsuariosDisponibles, type ResultadoUsuarios } from "./actions";
 
 const entrada =
-  "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-base font-normal text-black disabled:opacity-60 dark:border-white/20 dark:text-zinc-50";
-const etiqueta = "flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "h-10 rounded-lg border border-input bg-transparent px-3 text-base font-normal text-foreground disabled:opacity-60";
+const etiqueta = "flex flex-col gap-1 text-sm font-medium text-foreground/80";
 
 // Buscador de usuarios registrados y validados que todavia no son responsables de ninguna empresa. Lo usan
 // el alta (FA1) y la asociacion del responsable a una empresa que no lo tiene (FA4).
@@ -69,19 +69,19 @@ export function ElegirResponsable({
   };
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">{titulo}</h2>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h2 className="text-lg font-semibold text-foreground">{titulo}</h2>
+        <p className="text-sm text-muted-foreground">
           Elegí un usuario registrado y validado con la PDI que no sea responsable de otra empresa.
         </p>
       </div>
 
       {elegido ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#0068b3] bg-[#0068b3]/5 p-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary bg-primary/5 p-3 text-sm">
           <span>
-            <span className="font-medium text-black dark:text-zinc-50">{nombreUsuario(elegido)}</span>
-            <span className="text-zinc-500"> · C.I. <span className="font-mono">{elegido.ci}</span></span>
+            <span className="font-medium text-foreground">{nombreUsuario(elegido)}</span>
+            <span className="text-muted-foreground"> · C.I. <span className="font-mono">{elegido.ci}</span></span>
           </span>
           <button type="button" disabled={deshabilitado} onClick={() => onElegir(null)} className={botonSecundario}>
             Quitar
@@ -103,34 +103,34 @@ export function ElegirResponsable({
           </label>
 
           {buscando ? (
-            <p className="text-sm text-zinc-500">Buscando…</p>
+            <p className="text-sm text-muted-foreground">Buscando…</p>
           ) : !resultado.ok ? (
             <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
               {resultado.error}
             </p>
           ) : usuarios.length === 0 ? (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               {filtro ? "No hay usuarios disponibles con esa cédula." : "No hay usuarios disponibles."}
             </p>
           ) : (
             <>
-              <ul className="flex max-h-72 flex-col divide-y divide-black/5 overflow-y-auto rounded-lg border border-black/10 dark:divide-white/10 dark:border-white/15">
+              <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto rounded-lg border border-border">
                 {usuarios.map((u) => (
                   <li key={u.ci}>
                     <button
                       type="button"
                       disabled={deshabilitado}
                       onClick={() => onElegir(u)}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:opacity-60 dark:hover:bg-zinc-900"
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:opacity-60"
                     >
-                      <span className="text-black dark:text-zinc-50">{nombreUsuario(u)}</span>
-                      <span className="font-mono text-zinc-500">C.I. {u.ci}</span>
+                      <span className="text-foreground">{nombreUsuario(u)}</span>
+                      <span className="font-mono text-muted-foreground">C.I. {u.ci}</span>
                     </button>
                   </li>
                 ))}
               </ul>
               {cortada && (
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Se muestran los primeros {MAX_DISPONIBLES}. Si no encontrás al usuario, filtrá por cédula.
                 </p>
               )}

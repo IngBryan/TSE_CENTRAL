@@ -46,14 +46,14 @@ export default async function Empresas() {
   return (
     <Pagina sesion={sesion}>
       {empresas.length === 0 ? (
-        <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
           No hay empresas de transporte registradas.
         </p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+          <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="text-zinc-500">
+              <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-normal">N°</th>
                   <th className="px-4 py-3 font-normal">Nombre público</th>
@@ -67,18 +67,18 @@ export default async function Empresas() {
                 {empresas.map((e) => (
                   <tr
                     key={e.nroEmpresa}
-                    className="border-t border-black/5 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-zinc-900"
+                    className="border-t border-border hover:bg-muted/60"
                   >
                     <td className="px-4 py-3">
                       <Link
                         href={`/empresas/${e.nroEmpresa}`}
-                        className="font-medium text-[#0068b3] hover:underline dark:text-sky-400"
+                        className="font-medium text-primary hover:underline dark:text-sky-400"
                       >
                         {e.nroEmpresa}
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/empresas/${e.nroEmpresa}`} className="text-black hover:underline dark:text-zinc-50">
+                      <Link href={`/empresas/${e.nroEmpresa}`} className="text-foreground hover:underline">
                         {e.nombrePublico ?? "-"}
                       </Link>
                     </td>
@@ -87,7 +87,7 @@ export default async function Empresas() {
                       {e.ciResponsable ? (
                         <span className="font-mono">C.I. {e.ciResponsable}</span>
                       ) : (
-                        <span className="text-zinc-500">Sin responsable</span>
+                        <span className="text-muted-foreground">Sin responsable</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -101,7 +101,7 @@ export default async function Empresas() {
               </tbody>
             </table>
           </div>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             {empresas.length === 1 ? "1 empresa" : `${empresas.length} empresas`}
           </p>
         </>
@@ -113,7 +113,7 @@ export default async function Empresas() {
 // Fiscalizacion de habilitaciones: cuantos vehiculos activos estan habilitados y, debajo, una nota con los
 // que no lo estan o estan por vencer. Cada parte lleva al listado de vehiculos de la empresa ya filtrado.
 function ResumenVehiculos({ nroEmpresa, resumen }: { nroEmpresa: number; resumen: ResumenHabilitaciones }) {
-  if (resumen.total === 0) return <span className="text-zinc-500">Sin vehículos</span>;
+  if (resumen.total === 0) return <span className="text-muted-foreground">Sin vehículos</span>;
   const activos = resumen.habilitados + resumen.noHabilitados;
   const avisos = [
     resumen.noHabilitados > 0 && {
@@ -128,7 +128,7 @@ function ResumenVehiculos({ nroEmpresa, resumen }: { nroEmpresa: number; resumen
         {resumen.habilitados} de {activos} habilitados
       </Link>
       {avisos.length > 0 && (
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-muted-foreground">
           {avisos.map((a, i) => (
             <span key={a.filtro}>
               {i > 0 && " · "}
@@ -153,12 +153,12 @@ function Pagina({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Empresas de transporte</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Empresas de transporte</h1>
           <Link href="/empresas/nueva" className={botonPrimario}>
             Nueva empresa
           </Link>

@@ -36,8 +36,8 @@ export function NuevoVehiculo() {
   }
 
   return (
-    <form action={accion} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-      <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Nuevo vehículo</h2>
+    <form action={accion} className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Nuevo vehículo</h2>
       {estado.error && (
         <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
           {estado.error}
@@ -49,7 +49,7 @@ export function NuevoVehiculo() {
           return (
             <label
               key={c.nombre}
-              className={`flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300 ${c.nombre === "matricula" ? "sm:col-span-2" : ""}`}
+              className={`flex flex-col gap-1 text-sm font-medium text-foreground/80 ${c.nombre === "matricula" ? "sm:col-span-2" : ""}`}
             >
               {c.etiqueta}
               <input
@@ -61,14 +61,14 @@ export function NuevoVehiculo() {
                 step={c.tipo === "number" ? 1 : undefined}
                 autoCapitalize={c.nombre === "matricula" ? "characters" : undefined}
                 aria-invalid={error ? true : undefined}
-                className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-black dark:text-zinc-50 ${
-                  error ? "border-red-500" : "border-black/15 dark:border-white/20"
+                className={`h-10 rounded-lg border bg-transparent px-3 text-base font-normal text-foreground ${
+                  error ? "border-red-500" : "border-input"
                 } ${c.nombre === "matricula" ? "uppercase" : ""}`}
               />
               {error ? (
                 <span className="text-xs font-normal text-red-700 dark:text-red-300">{error}</span>
               ) : (
-                "ayuda" in c && <span className="text-xs font-normal text-zinc-500">{c.ayuda}</span>
+                "ayuda" in c && <span className="text-xs font-normal text-muted-foreground">{c.ayuda}</span>
               )}
             </label>
           );

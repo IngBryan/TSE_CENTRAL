@@ -15,9 +15,9 @@ import { registrarLog } from "@/lib/log";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
-const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
-const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
-const dato = "text-zinc-500";
+const tarjeta = "rounded-xl border bg-card p-6 text-sm shadow-sm";
+const titulo = "text-lg font-semibold text-foreground";
+const dato = "text-muted-foreground";
 
 // CU Gestionar empresas de transporte: consulta de la empresa (FA2), su modificacion (FA3) y, si no tiene
 // responsable, la asociacion de uno (FA4). Que quien
@@ -101,13 +101,13 @@ export default async function DetalleEmpresa({ params, searchParams }: PageProps
         {r ? (
           <p>
             {[r.primerNombre, r.primerApellido].filter(Boolean).join(" ") || "Sin nombre registrado"}
-            <span className="text-zinc-500">
+            <span className="text-muted-foreground">
               {" "}· C.I. <span className="font-mono">{r.ci}</span>
               {r.estado && ` · ${ESTADOS_VALIDACION[r.estado] ?? r.estado}`}
             </span>
           </p>
         ) : (
-          <p className="text-zinc-600 dark:text-zinc-400">La empresa no tiene un responsable asociado.</p>
+          <p className="text-muted-foreground">La empresa no tiene un responsable asociado.</p>
         )}
       </section>
 
@@ -144,21 +144,21 @@ function Pagina({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/empresas" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/empresas" className="text-sm text-muted-foreground hover:underline">
             ← Empresas de transporte
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
               {empresa?.nombrePublico ?? `Empresa N° ${nro}`}
             </h1>
             {empresa && <Habilitada habilitada={empresa.habilitada} />}
           </div>
-          {empresa && <p className="text-zinc-600 dark:text-zinc-400">Empresa N° {empresa.nroEmpresa}</p>}
+          {empresa && <p className="text-muted-foreground">Empresa N° {empresa.nroEmpresa}</p>}
         </div>
 
         {error ? (

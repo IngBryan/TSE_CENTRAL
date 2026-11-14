@@ -71,7 +71,7 @@ export const ESTADOS_VEHICULO: Record<EstadoVehiculo, string> = {
 const VERDE = "bg-emerald-500";
 const AMBAR = "bg-amber-500";
 const ROJO = "bg-red-500";
-const GRIS = "bg-zinc-400 dark:bg-zinc-500";
+const GRIS = "bg-zinc-400";
 
 export const PUNTO_DOCUMENTO: Record<EstadoDocumento, string> = {
   VIGENTE: VERDE,
@@ -85,7 +85,7 @@ export const PUNTO_VEHICULO: Record<EstadoVehiculo, string> = {
   HABILITADO: VERDE,
   NO_HABILITADO: GRIS,
   // Hueco: ya no circula
-  DADO_DE_BAJA: "border border-zinc-400 dark:border-zinc-500",
+  DADO_DE_BAJA: "border border-zinc-400",
 };
 
 // Una linea con el estado de un permiso o una ITV: "Vigente", "Vence en 12 días", "Venció hace 5 días"...

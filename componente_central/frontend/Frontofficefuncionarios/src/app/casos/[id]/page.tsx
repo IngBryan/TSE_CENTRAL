@@ -27,9 +27,9 @@ import { EvidenciasEnVivo } from "./evidencias-en-vivo";
 
 const NO_DISPONIBLE = "El servicio no está disponible en este momento. Probá de nuevo en unos minutos.";
 
-const tarjeta = "rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950";
-const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
-const dato = "text-zinc-500";
+const tarjeta = "rounded-xl border bg-card p-6 text-sm shadow-sm";
+const titulo = "text-lg font-semibold text-foreground";
+const dato = "text-muted-foreground";
 
 // Ciclo de vida de la letra (seccion 3.5); el ultimo paso es CONFIRMADA o DESESTIMADA
 const PASOS: EstadoCaso[] = ["DETECTADA", "NOTIFICADA", "EN_DESCARGO"];
@@ -102,7 +102,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
         <p><span className={dato}>Detectado:</span> {fechaHora(caso.fechaDeteccion)}</p>
         <p>
           <span className={dato}>Empresa:</span> {caso.empresa ?? "-"}
-          {caso.nroEmpresa != null && <span className="text-zinc-500"> (N° {caso.nroEmpresa})</span>}
+          {caso.nroEmpresa != null && <span className="text-muted-foreground"> (N° {caso.nroEmpresa})</span>}
         </p>
         <p><span className={dato}>Guía:</span> <span className="font-mono">{caso.guia?.id ?? "Sin guía"}</span></p>
         <p>
@@ -111,7 +111,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
             // Su permiso de circulacion y sus ITV: la evidencia de un caso VEHICULO_SIN_HABILITACION
             <Link
               href={`/empresas/${caso.nroEmpresa}/vehiculos/${encodeURIComponent(caso.matricula)}`}
-              className="font-mono text-[#0068b3] hover:underline dark:text-sky-400"
+              className="font-mono text-primary hover:underline dark:text-sky-400"
             >
               {caso.matricula}
             </Link>
@@ -131,7 +131,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
           <h2 className={titulo}>Resolución</h2>
           <p>
             <span className="font-medium">{DECISIONES[caso.resolucion.decision] ?? caso.resolucion.decision}</span>
-            <span className="text-zinc-500">
+            <span className="text-muted-foreground">
               {" "}· {fechaHora(caso.resolucion.fechaHora)} · funcionario C.I. {caso.resolucion.ciFuncionario}
             </span>
           </p>
@@ -140,7 +140,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
       ) : caso.puedeResolverse ? (
         <ResolverCaso idCaso={caso.id} sinDescargo={sinDescargo} />
       ) : (
-        <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
           El caso todavía no se puede resolver: se resuelve cuando está en descargo. Estado actual: {estado(caso.estado)}.
         </p>
       )}
@@ -158,7 +158,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
             )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className={`flex flex-col gap-1 ${tarjeta}`}>
-                <h3 className="font-medium text-black dark:text-zinc-50">Guía de viaje</h3>
+                <h3 className="font-medium text-foreground">Guía de viaje</h3>
                 {ev.guia ? (
                   <>
                     <p><span className={dato}>Fecha:</span> {fecha(ev.guia.fecha)}</p>
@@ -171,13 +171,13 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                     <p><span className={dato}>Estado de la guía:</span> {ev.guia.estado ?? "-"}</p>
                   </>
                 ) : (
-                  <p className="text-zinc-600 dark:text-zinc-400">
+                  <p className="text-muted-foreground">
                     El vehículo no tenía una guía asignada ni en curso.
                   </p>
                 )}
               </div>
               <div className={`flex flex-col gap-1 ${tarjeta}`}>
-                <h3 className="font-medium text-black dark:text-zinc-50">Vehículo (datos declarados)</h3>
+                <h3 className="font-medium text-foreground">Vehículo (datos declarados)</h3>
                 {ev.vehiculo ? (
                   <>
                     <p>
@@ -209,19 +209,19 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                     </>}
                   </>
                 ) : (
-                  <p className="text-zinc-600 dark:text-zinc-400">La guía no tiene vehículo asignado.</p>
+                  <p className="text-muted-foreground">La guía no tiene vehículo asignado.</p>
                 )}
               </div>
             </div>
 
             <div className={tarjeta}>
-              <h3 className="mb-3 font-medium text-black dark:text-zinc-50">Pesajes</h3>
+              <h3 className="mb-3 font-medium text-foreground">Pesajes</h3>
               {ev.pesajes.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">El caso no tiene pesajes asociados.</p>
+                <p className="text-muted-foreground">El caso no tiene pesajes asociados.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="text-zinc-500">
+                    <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                       <tr>
                         <th className="py-1 pr-4 font-normal">Fecha y hora</th>
                         <th className="py-1 pr-4 font-normal">Balanza</th>
@@ -231,13 +231,13 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
                     </thead>
                     <tbody>
                       {ev.pesajes.map((p, i) => (
-                        <tr key={i} className="border-t border-black/5 dark:border-white/10">
+                        <tr key={i} className="border-t border-border">
                           <td className="py-2 pr-4">{fechaHora(p.fechaHora)}</td>
                           <td className="py-2 pr-4">{p.balanza ?? "-"}</td>
                           <td className="py-2 pr-4 text-right tabular-nums">{kg(p.pesoKg)}</td>
                           <td
                             className={`py-2 text-right tabular-nums ${
-                              p.excesoKg > 0 ? "font-medium text-red-700 dark:text-red-300" : "text-zinc-500"
+                              p.excesoKg > 0 ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"
                             }`}
                           >
                             {p.excesoKg > 0 ? `+${kg(p.excesoKg)}` : "-"}
@@ -263,7 +263,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
         <h2 className={titulo}>Descargo de la empresa</h2>
         {desc ? (
           <div className={`flex flex-col gap-1 ${tarjeta}`}>
-            {desc.estado && <p className="text-xs uppercase tracking-wide text-zinc-500">{desc.estado.replace(/_/g, " ")}</p>}
+            {desc.estado && <p className="text-xs uppercase tracking-wide text-muted-foreground">{desc.estado.replace(/_/g, " ")}</p>}
             <p className="whitespace-pre-line">{desc.descripcion ?? "-"}</p>
             {desc.fechaPresentacion && (
               <p className={`text-xs ${dato}`}>
@@ -273,7 +273,7 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
             )}
           </div>
         ) : sinDescargo ? (
-          <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
             {caso.estado === "DETECTADA" || caso.estado === "NOTIFICADA"
               ? "La empresa no presentó un descargo para este caso."
               : "La empresa no presentó un descargo dentro del plazo: el caso pasó a descargo al vencer."}
@@ -288,23 +288,23 @@ export default async function DetalleCaso({ params }: PageProps<"/casos/[id]">) 
       <section className="flex flex-col gap-3">
         <h2 className={titulo}>Historial del caso</h2>
         {caso.historial.length === 0 ? (
-          <p className="text-zinc-600 dark:text-zinc-400">No hay registros de auditoría para este caso.</p>
+          <p className="text-muted-foreground">No hay registros de auditoría para este caso.</p>
         ) : (
           <ol className="flex flex-col gap-3">
             {caso.historial.map((r, i) => (
               <li
                 key={`${r.fechaHora}-${i}`}
-                className={`rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-zinc-950 ${
-                  r.accion === "RESOLUCION" ? "border-l-4 border-[#0068b3]" : ""
+                className={`rounded-xl border bg-card p-4 text-sm shadow-sm ${
+                  r.accion === "RESOLUCION" ? "border-l-4 border-primary" : ""
                 }`}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-medium text-black dark:text-zinc-50">{ACCIONES[r.accion] ?? r.accion}</span>
-                  <span className="text-xs text-zinc-500">
+                  <span className="font-medium text-foreground">{ACCIONES[r.accion] ?? r.accion}</span>
+                  <span className="text-xs text-muted-foreground">
                     {fechaHora(r.fechaHora)} · {r.usuario}
                   </span>
                 </div>
-                <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-muted-foreground">
                   {r.estadoAnterior ? `${estado(r.estadoAnterior)} → ` : ""}
                   {estado(r.estadoNuevo)}
                 </p>
@@ -334,23 +334,23 @@ function Pagina({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/casos" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/casos" className="text-sm text-muted-foreground hover:underline">
             ← Casos de fiscalización
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Caso N° {id}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Caso N° {id}</h1>
             {actual && (
               <span className={`rounded-full px-3 py-1 text-sm font-medium ${COLOR_ESTADO[actual] ?? ""}`}>
                 {estado(actual)}
               </span>
             )}
           </div>
-          {subtitulo && <p className="text-lg text-zinc-700 dark:text-zinc-300">{subtitulo}</p>}
+          {subtitulo && <p className="text-lg text-foreground/80">{subtitulo}</p>}
         </div>
 
         {error ? (
@@ -380,13 +380,13 @@ function CicloDeVida({ actual }: { actual: EstadoCaso | null }) {
               i === indice
                 ? `font-medium ${COLOR_ESTADO[p]}`
                 : i < indice
-                  ? "text-zinc-700 dark:text-zinc-300"
-                  : "text-zinc-400 dark:text-zinc-600"
+                  ? "text-foreground/80"
+                  : "text-muted-foreground/70"
             }`}
           >
             {i === pasos.length - 1 && indice < i ? "Confirmada / Desestimada" : estado(p)}
           </span>
-          {i < pasos.length - 1 && <span className="text-zinc-400">→</span>}
+          {i < pasos.length - 1 && <span className="text-muted-foreground/70">→</span>}
         </li>
       ))}
     </ol>

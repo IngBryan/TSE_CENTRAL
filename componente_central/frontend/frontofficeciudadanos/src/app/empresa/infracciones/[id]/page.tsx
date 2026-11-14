@@ -8,8 +8,8 @@ import { BackendNoDisponible, llamarBackend } from "@/lib/backend";
 import { ESTADOS, fecha, fechaHora, tipoInfraccion, type InfraccionDetalle } from "@/lib/infracciones";
 import { PresentarDescargo } from "./presentar-descargo";
 
-const tarjeta = "rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950";
-const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
+const tarjeta = "rounded-xl border bg-card p-6 shadow-sm";
+const titulo = "text-lg font-semibold text-foreground";
 
 // Detalle de una infraccion: la evidencia que la origino, el descargo (o el formulario para presentarlo
 // dentro del plazo) y la resolucion del funcionario. Abrirlo marca la notificacion como vista.
@@ -40,11 +40,11 @@ export default async function Infraccion({ params }: PageProps<"/empresa/infracc
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-12">
-        <Link href="/empresa/infracciones" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/empresa/infracciones" className="text-sm text-muted-foreground hover:underline">
           ← Infracciones
         </Link>
 
@@ -66,15 +66,15 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
     <>
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            {tipoInfraccion(i.tipoCaso)} <span className="text-zinc-400">n.º {i.id}</span>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            {tipoInfraccion(i.tipoCaso)} <span className="text-muted-foreground/70">n.º {i.id}</span>
           </h1>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${ESTADOS[i.estado].color}`}>
             {ESTADOS[i.estado].texto}
           </span>
         </div>
-        {i.descripcion && <p className="text-zinc-700 dark:text-zinc-300">{i.descripcion}</p>}
-        <p className="text-sm text-zinc-500">Detectada el {fechaHora(i.fechaDeteccion)}</p>
+        {i.descripcion && <p className="text-foreground/80">{i.descripcion}</p>}
+        <p className="text-sm text-muted-foreground">Detectada el {fechaHora(i.fechaDeteccion)}</p>
       </div>
 
       <section className="flex flex-col gap-3">
@@ -84,14 +84,14 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
         )}
         <div className={`grid gap-4 sm:grid-cols-2 ${tarjeta}`}>
           <div className="flex flex-col gap-1 text-sm">
-            <p className="text-xs uppercase tracking-wide text-zinc-500">Vehículo</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Vehículo</p>
             {vehiculo ? (
               <>
                 <p className="font-mono">{vehiculo.matricula}</p>
                 <p>
                   {vehiculo.marca} {vehiculo.modelo}
                 </p>
-                <p className="text-zinc-600 dark:text-zinc-400">
+                <p className="text-muted-foreground">
                   Peso {vehiculo.pesoKg.toLocaleString("es-UY")} kg + capacidad declarada{" "}
                   {vehiculo.capacidadCargaKg.toLocaleString("es-UY")} kg ={" "}
                   <strong>máximo {vehiculo.pesoMaximoKg.toLocaleString("es-UY")} kg</strong>
@@ -102,27 +102,27 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
             )}
           </div>
           <div className="flex flex-col gap-1 text-sm">
-            <p className="text-xs uppercase tracking-wide text-zinc-500">Guía</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Guía</p>
             {guia ? (
               <>
                 <p className="font-mono">{guia.id}</p>
                 <p>
                   {guia.origen ?? "-"} → {guia.destino ?? "-"} ({fecha(guia.fecha)})
                 </p>
-                <p className="text-zinc-600 dark:text-zinc-400">
+                <p className="text-muted-foreground">
                   {guia.rubroCliente ?? "-"} · carga declarada {guia.pesoCargaKg.toLocaleString("es-UY")} kg
                 </p>
               </>
             ) : (
-              <p className="text-zinc-600 dark:text-zinc-400">Sin guía asociada.</p>
+              <p className="text-muted-foreground">Sin guía asociada.</p>
             )}
           </div>
         </div>
 
         {pesajes.length > 0 && (
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+          <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-black/5 text-zinc-500 dark:border-white/10">
+              <thead className="border-b border-border text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Pesaje</th>
                   <th className="px-4 py-3 font-medium">Balanza</th>
@@ -132,7 +132,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
               </thead>
               <tbody>
                 {pesajes.map((p, n) => (
-                  <tr key={n} className="border-b border-black/5 last:border-0 dark:border-white/10">
+                  <tr key={n} className="border-b border-border last:border-0">
                     <td className="whitespace-nowrap px-4 py-3">{fechaHora(p.fechaHora)}</td>
                     <td className="px-4 py-3">{p.balanza ?? "-"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{p.pesoKg.toLocaleString("es-UY")} kg</td>
@@ -146,7 +146,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
           </div>
         )}
         {detalle.eventosTracking > 0 && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             {detalle.eventosTracking === 1
               ? "1 posición reportada por el sistema de tracking."
               : `${detalle.eventosTracking} posiciones reportadas por el sistema de tracking.`}
@@ -161,7 +161,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
             <div className={`flex flex-col gap-2 ${tarjeta}`}>
               <p className="whitespace-pre-line">{descargo.descripcion}</p>
               {descargo.fechaPresentacion && (
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Presentado el {fechaHora(descargo.fechaPresentacion)}
                   {descargo.ciPresentante ? ` por C.I. ${descargo.ciPresentante}` : ""}
                 </p>
@@ -173,7 +173,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
         ) : (
           <>
             <h2 className={titulo}>Descargo</h2>
-            <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+            <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
               {/* Sin descargo, EN_DESCARGO es que el caso paso solo al vencer el plazo; NOTIFICADA, que vencio y
                   todavia no corrio el vencimiento automatico */}
               {i.estado === "NOTIFICADA" || i.estado === "EN_DESCARGO"
@@ -192,7 +192,7 @@ function Contenido({ detalle }: { detalle: InfraccionDetalle }) {
               {resolucion.decision === "CONFIRMADA" ? "Infracción confirmada" : "Infracción desestimada"}
             </p>
             {resolucion.fundamento && <p className="whitespace-pre-line">{resolucion.fundamento}</p>}
-            {resolucion.fechaHora && <p className="text-xs text-zinc-500">Resuelta el {fechaHora(resolucion.fechaHora)}</p>}
+            {resolucion.fechaHora && <p className="text-xs text-muted-foreground">Resuelta el {fechaHora(resolucion.fechaHora)}</p>}
           </div>
         </section>
       )}

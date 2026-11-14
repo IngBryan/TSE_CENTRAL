@@ -73,7 +73,7 @@ export function AsociarResponsable({
       />
 
       {elegido && (
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <p className="text-sm text-foreground/80">
           ¿Asociar a {nombreUsuario(elegido)} (C.I. {elegido.ci}) como responsable de la empresa N° {nroEmpresa}
           {nombreEmpresa ? ` "${nombreEmpresa}"` : ""}?
         </p>

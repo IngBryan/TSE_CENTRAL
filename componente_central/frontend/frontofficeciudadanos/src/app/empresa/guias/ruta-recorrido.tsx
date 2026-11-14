@@ -30,7 +30,7 @@ export function RutaRecorrido({ origenId, destinoId, onChange }: {
 
   return <section className="flex flex-col gap-3" aria-label="Ruta admitida">
     <h2 className="text-lg font-semibold">Ruta admitida</h2>
-    <p className="text-sm text-zinc-600 dark:text-zinc-400">Se admite únicamente la ruta de menor duración.</p>
+    <p className="text-sm text-muted-foreground">Se admite únicamente la ruta de menor duración.</p>
     {error ? <>
       <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>
       <button type="button" className={`${botonSecundario} self-start`} onClick={() => {

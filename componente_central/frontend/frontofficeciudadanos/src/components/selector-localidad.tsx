@@ -14,7 +14,7 @@ type Props = {
 
 export function SelectorLocalidad({ nombre, etiqueta, localidades, valor, onChange, error, deshabilitado }: Props) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <label className="flex flex-col gap-1 text-sm font-medium text-foreground/80">
       {etiqueta}
       <select
         name={nombre}
@@ -23,8 +23,8 @@ export function SelectorLocalidad({ nombre, etiqueta, localidades, valor, onChan
         onChange={e => onChange?.(e.target.value ? Number(e.target.value) : null)}
         disabled={deshabilitado || localidades.length === 0}
         aria-invalid={error ? true : undefined}
-        className={`h-10 rounded-lg border bg-white px-3 text-base font-normal text-black dark:bg-zinc-950 dark:text-zinc-50 ${
-          error ? "border-red-500" : "border-black/15 dark:border-white/20"
+        className={`h-10 rounded-lg border bg-card px-3 text-base font-normal text-foreground ${
+          error ? "border-red-500" : "border-input"
         }`}
       >
         <option value="">Seleccionar localidad…</option>

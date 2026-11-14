@@ -85,9 +85,9 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
   if (viajes.length === 0 && total > 0) {
     return (
       <Pagina sesion={sesion} filtros={filtros}>
-        <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
           La página {pagina} no existe.{" "}
-          <Link href={urlListado(filtros, totalPaginas)} className="font-medium text-[#0068b3] hover:underline dark:text-sky-400">
+          <Link href={urlListado(filtros, totalPaginas)} className="font-medium text-primary hover:underline dark:text-sky-400">
             Ir a la última página
           </Link>
         </p>
@@ -100,13 +100,13 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
   return (
     <Pagina sesion={sesion} filtros={filtros}>
       {viajes.length === 0 ? (
-        <p className="rounded-lg bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        <p className="rounded-lg bg-muted p-4 text-sm text-foreground/80">
           {conFiltros ? "No hay viajes que coincidan con los filtros." : "Todavía no hay viajes."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
           <table className="w-full text-left text-sm">
-            <thead className="text-zinc-500">
+            <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-normal">Guía</th>
                 <th className="px-4 py-3 font-normal">Fecha</th>
@@ -119,11 +119,11 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
             </thead>
             <tbody>
               {viajes.map((v) => (
-                <tr key={v.id} className="border-t border-black/5 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-zinc-900">
+                <tr key={v.id} className="border-t border-border hover:bg-muted/60">
                   <td className="px-4 py-3">
                     <Link
                       href={`/viajes/${encodeURIComponent(v.id)}`}
-                      className="font-mono font-medium text-[#0068b3] hover:underline dark:text-sky-400"
+                      className="font-mono font-medium text-primary hover:underline dark:text-sky-400"
                     >
                       {v.id}
                     </Link>
@@ -134,7 +134,7 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
                   </td>
                   <td className="px-4 py-3">
                     {v.empresa ?? "-"}
-                    {v.nroEmpresa != null && <span className="text-zinc-500"> (N° {v.nroEmpresa})</span>}
+                    {v.nroEmpresa != null && <span className="text-muted-foreground"> (N° {v.nroEmpresa})</span>}
                   </td>
                   <td className="px-4 py-3 font-mono">{v.matricula ?? "-"}</td>
                   <td className="px-4 py-3">{nombreChofer(v.chofer)}</td>
@@ -152,13 +152,13 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
 
       {total > 0 && (
         <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p className="text-zinc-600 dark:text-zinc-400">
+          <p className="text-muted-foreground">
             {primero}–{primero + viajes.length - 1} de {total === 1 ? "1 viaje" : `${total} viajes`}
           </p>
           {totalPaginas > 1 && (
             <div className="flex items-center gap-2">
               <CambioPagina href={pagina > 1 ? urlListado(filtros, pagina - 1) : null}>← Anterior</CambioPagina>
-              <span className="px-2 text-zinc-600 dark:text-zinc-400">
+              <span className="px-2 text-muted-foreground">
                 Página {pagina} de {totalPaginas}
               </span>
               <CambioPagina href={pagina < totalPaginas ? urlListado(filtros, pagina + 1) : null}>Siguiente →</CambioPagina>
@@ -171,13 +171,13 @@ export default async function Viajes({ searchParams }: PageProps<"/viajes">) {
 }
 
 function CambioPagina({ href, children }: { href: string | null; children: React.ReactNode }) {
-  const clase = "rounded-full border border-black/10 px-3 py-1 dark:border-white/15";
+  const clase = "rounded-full border border-border px-3 py-1";
   return href ? (
-    <Link href={href} className={`${clase} transition-colors hover:bg-black/5 dark:hover:bg-white/10`}>
+    <Link href={href} className={`${clase} transition-colors hover:bg-accent`}>
       {children}
     </Link>
   ) : (
-    <span aria-disabled className={`${clase} text-zinc-400 dark:text-zinc-600`}>
+    <span aria-disabled className={`${clase} text-muted-foreground/70`}>
       {children}
     </span>
   );
@@ -194,13 +194,13 @@ function Pagina({
   error?: string;
   children?: React.ReactNode;
 }) {
-  const campo = "h-10 rounded-lg border border-black/15 bg-transparent px-3 text-sm dark:border-white/20";
+  const campo = "h-10 rounded-lg border border-input bg-transparent px-3 text-sm";
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-12">
-        <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">Viajes</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Viajes</h1>
 
         <nav aria-label="Filtrar por estado" className="flex flex-wrap gap-2 text-sm">
           {[null, ...FILTROS].map((e) => {
@@ -212,8 +212,8 @@ function Pagina({
                 aria-current={activo ? "page" : undefined}
                 className={`rounded-full px-3 py-1 transition-colors ${
                   activo
-                    ? "bg-[#0068b3] font-medium text-white"
-                    : "border border-black/10 text-zinc-700 hover:bg-black/5 dark:border-white/15 dark:text-zinc-300 dark:hover:bg-white/10"
+                    ? "bg-primary font-medium text-white"
+                    : "border border-border text-foreground/80 hover:bg-accent"
                 }`}
               >
                 {e ? ESTADOS_VIAJE[e] : "Todos"}
@@ -225,11 +225,11 @@ function Pagina({
         {/* GET: los filtros quedan en la URL. next/form agrega el basePath y navega sin recargar. */}
         <Form action="/viajes" className="flex flex-wrap items-end gap-3 text-sm">
           {filtros.estado && <input type="hidden" name="estado" value={filtros.estado} />}
-          <label className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-col gap-1 text-foreground/80">
             Matrícula
             <input name="matricula" defaultValue={filtros.matricula} maxLength={20} placeholder="SBA1234" className={campo} />
           </label>
-          <label className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-col gap-1 text-foreground/80">
             N° de empresa
             <input
               name="nroEmpresa"
@@ -244,7 +244,7 @@ function Pagina({
             Buscar
           </button>
           {(filtros.matricula || filtros.nroEmpresa) && (
-            <Link href={urlListado({ ...filtros, matricula: "", nroEmpresa: "" })} className="py-2 text-zinc-500 hover:underline">
+            <Link href={urlListado({ ...filtros, matricula: "", nroEmpresa: "" })} className="py-2 text-muted-foreground hover:underline">
               Limpiar búsqueda
             </Link>
           )}

@@ -33,15 +33,15 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresa/ve
   const v = datos?.vehiculo;
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
         <div className="flex flex-col gap-1">
-          <Link href="/empresa/vehiculos" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/empresa/vehiculos" className="text-sm text-muted-foreground hover:underline">
             ← Vehículos
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Vehículo <span className="font-mono">{v?.matricula ?? id}</span>
           </h1>
         </div>
@@ -52,39 +52,39 @@ export default async function DetalleVehiculo({ params }: PageProps<"/empresa/ve
           </p>
         ) : (
           <>
-            <section className="grid gap-x-6 gap-y-2 rounded-2xl bg-white p-6 text-sm shadow-sm sm:grid-cols-2 dark:bg-zinc-950">
+            <section className="grid gap-x-6 gap-y-2 rounded-xl border bg-card p-6 text-sm shadow-sm sm:grid-cols-2">
               <p className="flex items-center gap-2 sm:col-span-2">
-                <span className="text-zinc-500">Estado:</span> <Habilitacion vehiculo={v} />
+                <span className="text-muted-foreground">Estado:</span> <Habilitacion vehiculo={v} />
               </p>
-              <p><span className="text-zinc-500">Marca y modelo:</span> {v.marca} {v.modelo}</p>
-              <p><span className="text-zinc-500">Peso del vehículo:</span> {v.peso.toLocaleString("es-UY")} kg</p>
-              <p><span className="text-zinc-500">Capacidad de carga:</span> {v.capacidadCargaKg.toLocaleString("es-UY")} kg</p>
+              <p><span className="text-muted-foreground">Marca y modelo:</span> {v.marca} {v.modelo}</p>
+              <p><span className="text-muted-foreground">Peso del vehículo:</span> {v.peso.toLocaleString("es-UY")} kg</p>
+              <p><span className="text-muted-foreground">Capacidad de carga:</span> {v.capacidadCargaKg.toLocaleString("es-UY")} kg</p>
               <p>
-                <span className="text-zinc-500">Peso máximo con carga:</span>{" "}
+                <span className="text-muted-foreground">Peso máximo con carga:</span>{" "}
                 {(v.peso + v.capacidadCargaKg).toLocaleString("es-UY")} kg
               </p>
               <div className="flex gap-1">
-                <span className="text-zinc-500">Permiso:</span> <EstadoPermiso vehiculo={v} />
+                <span className="text-muted-foreground">Permiso:</span> <EstadoPermiso vehiculo={v} />
               </div>
-              <p><span className="text-zinc-500">ITV:</span> <EstadoItv vehiculo={v} /></p>
+              <p><span className="text-muted-foreground">ITV:</span> <EstadoItv vehiculo={v} /></p>
             </section>
 
             {v.activo ? (
               <GestionarVehiculo vehiculo={v} />
             ) : (
-              <p role="status" className="rounded-lg bg-zinc-100 p-4 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              <p role="status" className="rounded-lg bg-muted p-4 text-foreground/80">
                 El vehículo está dado de baja: no se puede asignar a viajes ni modificar. Se conserva su historial.
               </p>
             )}
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Historial de ITV</h2>
+              <h2 className="text-lg font-semibold text-foreground">Historial de ITV</h2>
               {datos.itvs.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Todavía no se registró ninguna inspección.</p>
+                <p className="text-muted-foreground">Todavía no se registró ninguna inspección.</p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {datos.itvs.map((i) => (
-                    <li key={i.id} className="flex items-center justify-between rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-zinc-950">
+                    <li key={i.id} className="flex items-center justify-between rounded-xl border bg-card p-4 text-sm shadow-sm">
                       <span>Vence {formatoFecha(i.fechaVencimiento)}</span>
                       <span className={i.vigente ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}>
                         {i.vigente ? "Vigente" : "Vencida"}

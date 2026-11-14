@@ -23,7 +23,7 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
   const chofer = roles.filter((r) => r.rol === "CHOFER");
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-4 py-12">
@@ -34,11 +34,11 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
             ejemplo, no podés ser asignado como chofer. Te avisaremos cuando se complete.
           </p>
         )}
-        <div className="flex flex-col gap-6 rounded-2xl bg-white p-10 shadow-sm dark:bg-zinc-950">
-          <p className="text-lg text-zinc-700 dark:text-zinc-300">
+        <div className="flex flex-col gap-6 rounded-xl border bg-card p-10 shadow-sm">
+          <p className="text-lg text-foreground/80">
             {params.bienvenida ? "Bienvenido/a, creamos tu perfil" : "Hola"}, {perfil.nombre}.
           </p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-zinc-700 dark:text-zinc-300">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-foreground/80">
             <dt className="font-medium">Cédula</dt>
             <dd>{perfil.cedula}</dd>
             <dt className="font-medium">Email</dt>
@@ -53,10 +53,10 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
 
         {/* CU-01 paso 9: pantalla de inicio segun el rol */}
         <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Mis empresas</h2>
+          <h2 className="text-lg font-semibold text-foreground">Mis empresas</h2>
           {responsable.map((r) => (
-            <div key={`r-${r.nroEmpresa}`} className="flex flex-col gap-3 rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-              <p className="text-zinc-700 dark:text-zinc-300">
+            <div key={`r-${r.nroEmpresa}`} className="flex flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+              <p className="text-foreground/80">
                 Sos responsable de <strong>{r.empresa}</strong> (empresa n.º {r.nroEmpresa}).
               </p>
               <div className="flex flex-wrap gap-3">
@@ -79,8 +79,8 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
             </div>
           ))}
           {chofer.map((r) => (
-            <div key={`c-${r.nroEmpresa}`} className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950">
-              <p className="text-zinc-700 dark:text-zinc-300">
+            <div key={`c-${r.nroEmpresa}`} className="rounded-xl border bg-card p-6 shadow-sm">
+              <p className="text-foreground/80">
                 Sos chofer de <strong>{r.empresa}</strong>
                 {r.estado === "PENDIENTE_VALIDACION"
                   ? " (pendiente de validación: todavía no te pueden asignar viajes)."
@@ -89,7 +89,7 @@ export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">
             </div>
           ))}
           {roles.length === 0 && (
-            <p className="rounded-2xl bg-white p-6 text-zinc-600 shadow-sm dark:bg-zinc-950 dark:text-zinc-400">
+            <p className="rounded-xl border bg-card p-6 text-muted-foreground shadow-sm">
               Sin empresa asociada. Cuando una empresa te registre como chofer o el MTOP te asocie como responsable,
               lo vas a ver acá.
             </p>

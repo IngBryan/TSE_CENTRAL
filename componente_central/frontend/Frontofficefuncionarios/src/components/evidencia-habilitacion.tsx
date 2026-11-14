@@ -21,16 +21,16 @@ export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion
   const visibles = pruebas.slice(inicio, inicio + TAMANIO_PAGINA);
 
   return (
-    <div className="rounded-2xl bg-white p-6 text-sm shadow-sm dark:bg-zinc-950">
-      <h3 className="font-medium text-black dark:text-zinc-50">Permiso de circulación e ITV</h3>
-      <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+    <div className="rounded-xl border bg-card p-6 text-sm shadow-sm">
+      <h3 className="font-medium text-foreground">Permiso de circulación e ITV</h3>
+      <p className="mt-1 text-muted-foreground">
         Documentos considerados a la fecha del evento. La falta de registro o de vigencia de cualquiera de los dos origina la infracción.
       </p>
       {pruebas.length === 0 ? (
-        <p className="mt-3 text-zinc-600 dark:text-zinc-400">Este caso no tiene una evaluación documental registrada.</p>
+        <p className="mt-3 text-muted-foreground">Este caso no tiene una evaluación documental registrada.</p>
       ) : <div className="mt-4 flex flex-col gap-4">
         {visibles.map((p, indice) => (
-          <div key={`${inicio + indice}-${p.origen}-${p.fechaHora}`} className="border-t border-black/10 pt-4 dark:border-white/10">
+          <div key={`${inicio + indice}-${p.origen}-${p.fechaHora}`} className="border-t border-border pt-4">
             <p className="mb-3 font-medium">{fechaHora(p.fechaHora)} · {p.origen === "PESAJE" ? "Pesaje" : "GPS"}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Documento titulo="Permiso nacional de circulación" estado={p.estadoPermiso}
@@ -42,12 +42,12 @@ export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion
         ))}
       </div>}
       {pruebas.length > 0 && <nav className="mt-4 flex flex-wrap items-center justify-between gap-2" aria-label="Paginación de evidencia de habilitación">
-        <span className="text-xs text-zinc-500">{inicio + 1}–{inicio + visibles.length} de {pruebas.length} · Página {paginaActual} de {totalPaginas}</span>
+        <span className="text-xs text-muted-foreground">{inicio + 1}–{inicio + visibles.length} de {pruebas.length} · Página {paginaActual} de {totalPaginas}</span>
         <div className="flex gap-2">
           <button type="button" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)}
-            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-900">Anterior</button>
+            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40">Anterior</button>
           <button type="button" disabled={paginaActual === totalPaginas} onClick={() => setPagina(paginaActual + 1)}
-            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-900">Siguiente</button>
+            className="rounded-lg border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40">Siguiente</button>
         </div>
       </nav>}
     </div>

@@ -77,7 +77,7 @@ export function Campana({ inicial }: { inicial: Notificaciones }) {
         aria-expanded={abierta}
         aria-haspopup="true"
         aria-label={noVistas > 0 ? `Notificaciones, ${noVistas} sin ver` : "Notificaciones"}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full text-zinc-700 transition-colors hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground/80 transition-colors hover:bg-accent"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-6 w-6" aria-hidden>
           <path
@@ -94,15 +94,15 @@ export function Campana({ inicial }: { inicial: Notificaciones }) {
       </button>
 
       {abierta && (
-        <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-black/5 bg-white shadow-lg dark:border-white/10 dark:bg-zinc-950">
-          <div className="flex items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/10">
-            <p className="font-semibold text-black dark:text-zinc-50">Notificaciones</p>
+        <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-card shadow-lg">
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <p className="font-semibold text-foreground">Notificaciones</p>
             {noVistas > 0 && (
               <button
                 type="button"
                 onClick={todasVistas}
                 disabled={pendiente}
-                className="text-sm text-[#0068b3] hover:underline disabled:opacity-50"
+                className="text-sm text-primary hover:underline disabled:opacity-50"
               >
                 Marcar todas como vistas
               </button>
@@ -110,28 +110,28 @@ export function Campana({ inicial }: { inicial: Notificaciones }) {
           </div>
 
           {notificaciones.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-zinc-500">No tenés notificaciones.</p>
+            <p className="px-4 py-6 text-sm text-muted-foreground">No tenés notificaciones.</p>
           ) : (
             <ul className="max-h-96 overflow-y-auto">
               {notificaciones.map((n) => (
-                <li key={n.id} className="border-b border-black/5 last:border-0 dark:border-white/10">
+                <li key={n.id} className="border-b border-border last:border-0">
                   <button
                     type="button"
                     onClick={() => abrir(n.id)}
                     disabled={pendiente}
-                    className={`flex w-full gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-black/5 disabled:opacity-60 dark:hover:bg-white/10 ${n.vista ? "" : "bg-sky-50/70 dark:bg-sky-950/40"}`}
+                    className={`flex w-full gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60 ${n.vista ? "" : "bg-sky-50/70 dark:bg-sky-950/40"}`}
                   >
                     <span
-                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.vista ? "bg-transparent" : "bg-[#0068b3]"}`}
+                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.vista ? "bg-transparent" : "bg-primary"}`}
                       aria-hidden
                     />
                     <span className="flex flex-col gap-0.5">
-                      <span className={n.vista ? "text-zinc-700 dark:text-zinc-300" : "font-medium text-black dark:text-zinc-50"}>
+                      <span className={n.vista ? "text-foreground/80" : "font-medium text-foreground"}>
                         {n.vista ? "" : <span className="sr-only">Sin ver: </span>}
                         Infracción por {tipoInfraccion(n.tipoCaso).toLowerCase()}
                         {n.matricula ? ` · ${n.matricula}` : ""}
                       </span>
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-muted-foreground">
                         {n.admiteDescargo && n.venceDescargo
                           ? `Podés presentar el descargo hasta el ${fecha(n.venceDescargo)} inclusive`
                           : `Notificada el ${fechaHora(n.fecha)}`}
@@ -146,7 +146,7 @@ export function Campana({ inicial }: { inicial: Notificaciones }) {
           <Link
             href="/empresa/infracciones"
             onClick={() => setAbierta(false)}
-            className="block border-t border-black/5 px-4 py-3 text-center text-sm text-[#0068b3] hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+            className="block border-t border-border px-4 py-3 text-center text-sm text-primary hover:bg-accent"
           >
             Ver todas las infracciones
           </Link>

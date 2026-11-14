@@ -15,8 +15,8 @@ import {
   type Valor,
 } from "@/lib/portal";
 
-const tarjeta = "rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-950";
-const titulo = "text-lg font-semibold text-black dark:text-zinc-50";
+const tarjeta = "rounded-xl border bg-card p-6 shadow-sm";
+const titulo = "text-lg font-semibold text-foreground";
 const RESERVADO = "Reservado";
 
 // Listados de Informacion Publica (portal publico, sin login): estadisticas agregadas del transporte de carga.
@@ -37,18 +37,18 @@ export default async function EstadisticasPublicas() {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-1 flex-col bg-background font-sans">
       <Encabezado sesion={sesion} />
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-4 py-12">
         <div className="flex flex-col gap-2">
-          <Link href="/" className="text-sm text-zinc-500 hover:underline">
+          <Link href="/" className="text-sm text-muted-foreground hover:underline">
             ← Inicio
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             El transporte de carga en números
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
+          <p className="text-muted-foreground">
             Información pública y agregada sobre empresas, vehículos, viajes e infracciones del transporte de carga por
             carretera.
           </p>
@@ -157,7 +157,7 @@ function Contenido({ d }: { d: Estadisticas }) {
         vacio="No hay infracciones confirmadas en el año."
       />
 
-      <section className={`flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400 ${tarjeta}`}>
+      <section className={`flex flex-col gap-2 text-sm text-muted-foreground ${tarjeta}`}>
         <h2 className={titulo}>Cómo se protegen los datos</h2>
         <p>
           Para proteger los datos de las empresas (Ley 18.331), cada número se publica solo si reúne datos de al menos{" "}
@@ -187,11 +187,11 @@ function Indicador({
 }) {
   return (
     <div className={`flex flex-col gap-1 ${tarjeta}`}>
-      <p className="text-sm text-zinc-500">{etiqueta}</p>
-      <p className="text-2xl font-semibold tabular-nums text-black dark:text-zinc-50">
-        {valor.reservado ? <span className="text-base font-normal text-zinc-500">{RESERVADO}</span> : formato(valor.valor)}
+      <p className="text-sm text-muted-foreground">{etiqueta}</p>
+      <p className="text-2xl font-semibold tabular-nums text-foreground">
+        {valor.reservado ? <span className="text-base font-normal text-muted-foreground">{RESERVADO}</span> : formato(valor.valor)}
       </p>
-      <p className="text-xs text-zinc-500">{aclaracion}</p>
+      <p className="text-xs text-muted-foreground">{aclaracion}</p>
     </div>
   );
 }
@@ -236,18 +236,18 @@ function Tabla({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className={titulo}>{texto}</h2>
         {filas.length > 0 && !sinDatos && (
-          <a href={`/estadisticas/csv?tabla=${tabla}`} className="text-sm text-[#0068b3] hover:underline">
+          <a href={`/estadisticas/csv?tabla=${tabla}`} className="text-sm text-primary hover:underline">
             Descargar CSV
           </a>
         )}
       </div>
-      {nota && <p className="-mt-1 text-sm text-zinc-600 dark:text-zinc-400">{nota}</p>}
+      {nota && <p className="-mt-1 text-sm text-muted-foreground">{nota}</p>}
       {sinDatos ? (
-        <p className="text-zinc-600 dark:text-zinc-400">{vacio}</p>
+        <p className="text-muted-foreground">{vacio}</p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm dark:bg-zinc-950">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-black/5 text-zinc-500 dark:border-white/10">
+            <thead className="border-b border-border text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">{primera}</th>
                 {columnas.map((c) => (
@@ -261,15 +261,15 @@ function Tabla({
               {filas.map((f) => {
                 const ancho = !f.reservado && maximo > 0 ? ((barra(f) ?? 0) / maximo) * 100 : 0;
                 return (
-                  <tr key={f.clave} className="border-b border-black/5 last:border-0 dark:border-white/10">
+                  <tr key={f.clave} className="border-b border-border last:border-0">
                     <td className="min-w-40 px-4 py-3">
                       {etiqueta(f)}
-                      <div className="mt-1 h-1.5 rounded-full bg-black/5 dark:bg-white/10" aria-hidden>
-                        {ancho > 0 && <div className="h-full rounded-full bg-[#0068b3]" style={{ width: `${ancho}%` }} />}
+                      <div className="mt-1 h-1.5 rounded-full bg-muted" aria-hidden>
+                        {ancho > 0 && <div className="h-full rounded-full bg-primary" style={{ width: `${ancho}%` }} />}
                       </div>
                     </td>
                     {f.reservado ? (
-                      <td colSpan={columnas.length} className="px-4 py-3 text-right text-zinc-500">
+                      <td colSpan={columnas.length} className="px-4 py-3 text-right text-muted-foreground">
                         {RESERVADO}
                       </td>
                     ) : (
