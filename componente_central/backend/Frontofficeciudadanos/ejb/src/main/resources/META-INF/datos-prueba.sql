@@ -295,3 +295,97 @@ INSERT INTO guias_rutas_autorizadas (guia_id, ruta_referencia_id, numero_alterna
 -- Reglas de fiscalización: revisión inicial y referencia global.
 INSERT INTO reglas_fiscalizacion_revisiones (revision,tolerancia_porcentaje,tolerancia_kg,distancia_metros,ventana_segundos,creada_en,usuario,fundamento) VALUES (1,0,0,2000,30,CURRENT_TIMESTAMP,'SISTEMA','Configuración inicial');
 INSERT INTO reglas_fiscalizacion_vigente (id,revision,version) VALUES (1,1,0);
+
+-- ============================================================================================
+-- BULK2025 / Volumen adicional para probar reporteria (portal publico y KPIs del backoffice):
+-- cubre 2025 y 2026. Es puramente aditivo, no modifica ni borra nada de lo anterior. Los
+-- ciudadanos, empresas y vehiculos nuevos son ficticios (prefijo SZ en matriculas, ci sinteticas).
+-- ============================================================================================
+
+-- Localidades nuevas, para que quede representado todo el pais en el reporte por departamento.
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (14, 'Artigas', 'Artigas', -30.4016, -56.4669);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (15, 'Bella Union', 'Artigas', -30.2467, -57.5959);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (16, 'Canelones', 'Canelones', -34.5385, -56.2719);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (17, 'Las Piedras', 'Canelones', -34.7246, -56.2176);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (18, 'Melo', 'Cerro Largo', -32.3614, -54.1817);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (19, 'Rio Branco', 'Cerro Largo', -32.5775, -53.4258);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (20, 'Trinidad', 'Flores', -33.5306, -56.8983);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (21, 'Ismael Cortinas', 'Flores', -33.6167, -57.0167);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (22, 'Florida', 'Florida', -34.0961, -56.2153);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (23, 'Sarandi Grande', 'Florida', -33.7417, -56.3375);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (24, 'Minas', 'Lavalleja', -34.3717, -55.2383);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (25, 'Jose Pedro Varela', 'Lavalleja', -33.9667, -54.8833);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (26, 'Rocha', 'Rocha', -34.4833, -54.3333);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (27, 'Chuy', 'Rocha', -33.6975, -53.4617);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (28, 'Fray Bentos', 'Rio Negro', -33.1392, -58.3031);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (29, 'Young', 'Rio Negro', -32.6889, -57.6342);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (30, 'Salto', 'Salto', -31.3833, -57.9667);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (31, 'Dayman', 'Salto', -31.45, -57.9);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (32, 'San Jose de Mayo', 'San Jose', -34.3367, -56.7161);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (33, 'Libertad', 'San Jose', -34.6333, -56.65);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (34, 'Treinta y Tres', 'Treinta y Tres', -33.2333, -54.3833);
+INSERT INTO localidades (id, nombre, departamento, latitud, longitud) VALUES (35, 'Vergara', 'Treinta y Tres', -32.9333, -53.95);
+
+-- Empresas nuevas (ids 7-42): 30 habilitadas (7-36) y 6 no habilitadas (37-42), fechaAlta repartida
+-- entre hace ~3 anios y ~7 meses, para que los KPI "al dia" tengan historia.
+-- NOTA: Hibernate carga este archivo linea por linea (una sentencia SQL por linea fisica); por eso
+-- cada INSERT/UPDATE/WITH de aca abajo va en una sola linea, aunque sea larga.
+INSERT INTO empresas (nroEmpresa, nombrePublico, razonSocial, direccion, habilitada, fechaAlta, version) SELECT n, (ARRAY['Transportes','Logistica','Fletes','Cargas','Transporte','Distribuidora','Camiones','Flota'])[1 + (n % 8)] || ' ' || (ARRAY['del Norte','del Sur','del Este','del Oeste','del Litoral','de la Frontera','del Interior','Rural','Federal','Nacional','Austral','del Plata'])[1 + ((n * 7) % 12)], (ARRAY['Transportes','Logistica','Fletes','Cargas','Transporte','Distribuidora','Camiones','Flota'])[1 + (n % 8)] || ' ' || (ARRAY['del Norte','del Sur','del Este','del Oeste','del Litoral','de la Frontera','del Interior','Rural','Federal','Nacional','Austral','del Plata'])[1 + ((n * 7) % 12)] || CASE WHEN n % 2 = 0 THEN ' S.A.' ELSE ' S.R.L.' END, 'Ruta ' || (1 + (n % 18)) || ' km ' || (10 + (n * 17) % 500), n <= 36, CURRENT_DATE - (200 + (n * 53) % 900), 0 FROM generate_series(7, 42) AS n;
+
+INSERT INTO empresa_rubros (nro_empresa, id_rubro) SELECT n, 1 + (n % 10) FROM generate_series(7, 42) AS n;
+INSERT INTO empresa_rubros (nro_empresa, id_rubro) SELECT n, 1 + ((n + 5) % 10) FROM generate_series(7, 42) AS n WHERE n % 2 = 0;
+
+-- Responsable ficticio de cada empresa nueva (ci sintetica, no colisiona con las existentes).
+INSERT INTO ciudadanos (ci, estado, creado) SELECT '6' || lpad(n::text, 7, '0'), 'PENDIENTE_VALIDACION', CURRENT_TIMESTAMP FROM generate_series(7, 42) AS n;
+INSERT INTO responsables (ci, nro_empresa) SELECT '6' || lpad(n::text, 7, '0'), n FROM generate_series(7, 42) AS n;
+
+-- Choferes de cada empresa nueva: 3 o 4 por empresa, habilitados.
+INSERT INTO ciudadanos (ci, estado, creado) SELECT '7' || lpad((n * 10 + slot)::text, 7, '0'), 'VALIDADO', CURRENT_TIMESTAMP FROM generate_series(7, 42) AS n CROSS JOIN generate_series(1, 4) AS slot WHERE slot <= 3 + (n % 2);
+INSERT INTO choferes (ci, nro_empresa, estado, fechaAlta) SELECT '7' || lpad((n * 10 + slot)::text, 7, '0'), n, 'HABILITADO', CURRENT_TIMESTAMP FROM generate_series(7, 42) AS n CROSS JOIN generate_series(1, 4) AS slot WHERE slot <= 3 + (n % 2);
+
+-- Flota de cada empresa nueva (matriculas SZ00001..SZ00288): 6, 8 o 10 vehiculos por empresa.
+INSERT INTO vehiculos (matricula, marca, modelo, peso, capacidadCargaKg, activo, nro_empresa) SELECT 'SZ' || lpad((row_number() over (ORDER BY n, slot))::text, 5, '0'), (ARRAY['Scania', 'Volvo', 'Iveco', 'Mercedes-Benz', 'DAF', 'MAN'])[1 + ((n + slot) % 6)], (ARRAY['R 450', 'FH 500', 'S-Way', 'Actros', 'XF 480', 'TGX'])[1 + ((n * slot) % 6)], 7000 + ((n * slot * 37) % 3000), 16000 + ((n * slot * 53) % 13000), true, n FROM generate_series(7, 42) AS n CROSS JOIN generate_series(1, 10) AS slot WHERE slot <= 6 + (n % 3) * 2;
+
+-- Permiso de circulacion por vehiculo (~90% vigente, ~10% vencido para variedad).
+INSERT INTO permisos_circulacion (nro, fechaEmision, fechaVencimiento, matricula) SELECT 'PNC-' || matricula, CASE WHEN (row_number() over (ORDER BY matricula)) % 10 = 0 THEN CURRENT_DATE - 400 ELSE CURRENT_DATE - 60 END, CASE WHEN (row_number() over (ORDER BY matricula)) % 10 = 0 THEN CURRENT_DATE - 30 ELSE CURRENT_DATE + 300 END, matricula FROM vehiculos WHERE matricula LIKE 'SZ%';
+
+-- ITV por vehiculo (~92% vigente, ~8% vencida); a 32 de ellos se les agrega una ITV anterior ya vencida (historial).
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) SELECT CASE WHEN (row_number() over (ORDER BY matricula)) % 12 = 0 THEN CURRENT_DATE - 400 ELSE CURRENT_DATE - 60 END, CASE WHEN (row_number() over (ORDER BY matricula)) % 12 = 0 THEN CURRENT_DATE - 20 ELSE CURRENT_DATE + 250 END, matricula FROM vehiculos WHERE matricula LIKE 'SZ%';
+INSERT INTO itv (fechaEmision, fechaVencimiento, matricula) SELECT fechaEmision - INTERVAL '400 days', fechaVencimiento - INTERVAL '400 days', matricula FROM itv WHERE matricula IN (SELECT matricula FROM vehiculos WHERE matricula LIKE 'SZ%' ORDER BY matricula LIMIT 32);
+
+-- Viajes FINALIZADOS de 2025-01-01 a hoy, repartidos entre las empresas habilitadas (las 5 originales
+-- habilitadas y las 30 nuevas), por mes, rubro, tipo de carga y localidad de origen/destino.
+WITH pool AS (SELECT ARRAY[1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36] AS empresas, (SELECT array_agg(nombre ORDER BY id) FROM rubros) AS rubros, (SELECT array_agg(nombre ORDER BY id) FROM tipos_carga) AS tipos, (SELECT array_agg(id ORDER BY id) FROM localidades) AS localidades) INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, id_localidad_origen, id_localidad_destino, nro_empresa, estado, version) SELECT 'GV-H25-' || lpad(n::text, 5, '0'), pool.rubros[1 + (n % array_length(pool.rubros, 1))], pool.tipos[1 + (n % array_length(pool.tipos, 1))], 8000 + ((n * 37) % 20000), LEAST((DATE '2025-01-01' + (((n / 35) % 23)) * INTERVAL '1 month' + ((n * 7) % 26) * INTERVAL '1 day')::date, CURRENT_DATE), lo.nombre, ld.nombre, lo.id, ld.id, pool.empresas[1 + (n % array_length(pool.empresas, 1))], 'FINALIZADA', 0 FROM generate_series(0, 7999) AS n CROSS JOIN pool JOIN localidades lo ON lo.id = pool.localidades[1 + (n % array_length(pool.localidades, 1))] JOIN localidades ld ON ld.id = pool.localidades[1 + ((n * 13 + 7) % array_length(pool.localidades, 1))] WHERE lo.id <> ld.id;
+
+-- Guias pendientes de asignar (actividad "reciente" en el pipeline, sin afectar reportes historicos).
+INSERT INTO guias (id, rubroCliente, tipoCarga, pesoCargaKg, fecha, origen, destino, nro_empresa, estado, version) SELECT 'GV-PEND-' || lpad(n::text, 4, '0'), (SELECT nombre FROM rubros ORDER BY id LIMIT 1 OFFSET (n % 10)), (SELECT nombre FROM tipos_carga ORDER BY id LIMIT 1 OFFSET (n % 16)), 9000 + ((n * 53) % 15000), CURRENT_DATE + (n % 14), 'Montevideo', 'Paysandu', (ARRAY[1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36])[1 + (n % 35)], 'SIN_ASIGNAR', 0 FROM generate_series(1, 120) AS n;
+
+-- Casos de fiscalizacion automatica, 2025-2026, sobre la flota SZ: EXCESO_CARGA, VIAJE_SIN_GUIA,
+-- VEHICULO_SIN_HABILITACION y DESVIO_RUTA, en distintos estados. Las primeras 280 filas usan cada
+-- una un vehiculo distinto (para poder incluir estados abiertos sin violar el indice unico de casos
+-- abiertos); de la 280 en adelante se repiten vehiculos pero siempre en estados ya cerrados.
+WITH szv AS (SELECT array_agg(matricula ORDER BY matricula) AS arr FROM vehiculos WHERE matricula LIKE 'SZ%') INSERT INTO casos_fiscalizacion (descripcion, tipoCaso, estado, fechaDeteccion, id_vehiculo, notificacion_vista) SELECT 'BULK2025: caso de fiscalizacion automatica #' || n, CASE WHEN (n % 22) < 8 THEN 'EXCESO_CARGA' WHEN (n % 22) < 13 THEN 'VIAJE_SIN_GUIA' WHEN (n % 22) < 18 THEN 'VEHICULO_SIN_HABILITACION' ELSE 'DESVIO_RUTA' END, CASE WHEN n >= 280 THEN CASE WHEN n % 3 = 0 THEN 'CONFIRMADA' WHEN n % 3 = 1 THEN 'DESESTIMADA' ELSE 'EN_DESCARGO' END ELSE CASE WHEN (n % 20) < 7 THEN 'CONFIRMADA' WHEN (n % 20) < 10 THEN 'DESESTIMADA' WHEN (n % 20) < 14 THEN 'EN_DESCARGO' WHEN (n % 20) < 17 THEN 'NOTIFICADA' ELSE 'DETECTADA' END END, CURRENT_DATE - (14 + (n * 31) % 666) + ((8 + (n % 12)) || ' hours')::interval + ((n % 3600) || ' seconds')::interval, szv.arr[1 + (n % array_length(szv.arr, 1))], false FROM generate_series(0, 439) AS n, szv;
+
+UPDATE casos_fiscalizacion SET notificacion_vista = true WHERE descripcion LIKE 'BULK2025:%' AND estado <> 'DETECTADA';
+
+-- Evidencia de EXCESO_CARGA: un pesaje historico por caso, en la balanza inactiva reservada para evidencia.
+WITH casos_exceso AS (SELECT id, id_vehiculo AS matricula, fechaDeteccion, row_number() over (ORDER BY id) AS rn FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND tipoCaso = 'EXCESO_CARGA') INSERT INTO eventos_pesajes (matricula, fecha_hora, id_externo, peso, detectado, id_nodo_balanza) SELECT matricula, fechaDeteccion - INTERVAL '2 hours', 500000 + rn, 38000 + (rn * 173) % 6000, true, (SELECT id FROM nodos_perifericos WHERE tipo = 'BALANZA' AND id_externo = 1) FROM casos_exceso;
+WITH casos_exceso AS (SELECT id, id_vehiculo AS matricula, fechaDeteccion FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND tipoCaso = 'EXCESO_CARGA') INSERT INTO casos_eventos_pesajes (id_caso, matricula, fecha_hora) SELECT id, matricula, fechaDeteccion - INTERVAL '2 hours' FROM casos_exceso;
+
+-- Evidencia de VEHICULO_SIN_HABILITACION: copia del permiso e ITV del vehiculo al momento del caso.
+WITH casos_hab AS (SELECT c.id, c.id_vehiculo AS matricula, c.fechaDeteccion, p.nro AS nroPermiso, p.fechaEmision AS emisionPermiso, p.fechaVencimiento AS vencimientoPermiso, i.fechaEmision AS emisionItv, i.fechaVencimiento AS vencimientoItv FROM casos_fiscalizacion c LEFT JOIN permisos_circulacion p ON p.matricula = c.id_vehiculo LEFT JOIN itv i ON i.matricula = c.id_vehiculo AND i.fechaEmision >= CURRENT_DATE - 100 WHERE c.descripcion LIKE 'BULK2025:%' AND c.tipoCaso = 'VEHICULO_SIN_HABILITACION') INSERT INTO casos_evidencias_habilitacion (id_caso, matricula, fecha_hora, origen, nroPermiso, emisionPermiso, vencimientoPermiso, emisionItv, vencimientoItv) SELECT id, matricula, fechaDeteccion - INTERVAL '1 hour', 'TRACKING', nroPermiso, emisionPermiso, vencimientoPermiso, emisionItv, vencimientoItv FROM casos_hab;
+
+-- Evidencia de DESVIO_RUTA: snapshot geometrico aproximado (no recalcula rutas OSRM reales).
+WITH casos_desvio AS (SELECT id, id_vehiculo AS matricula, fechaDeteccion, row_number() over (ORDER BY id) AS rn FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND tipoCaso = 'DESVIO_RUTA') INSERT INTO casos_evidencias_desvio (id_caso, matricula, fecha_hora, fecha_pareja, lat_confirmante, lon_confirmante, lat_pareja, lon_pareja, dist_confirmante_m, dist_pareja_m, umbral_m, ventana_seg, rutas_sha) SELECT id, matricula, fechaDeteccion - INTERVAL '30 minutes', fechaDeteccion - INTERVAL '25 minutes', -33.5 + (rn % 100) * 0.01, -57.0 + (rn % 100) * 0.01, -33.5 + ((rn + 5) % 100) * 0.01, -57.0 + ((rn + 5) % 100) * 0.01, 2100 + (rn * 13 % 500), 2050 + (rn * 11 % 500), 2000, 30, 'bulk2025desvio' || rn FROM casos_desvio;
+
+-- Auditoria de los casos BULK2025, en capas segun el estado al que llegaron (mismo patron que la demo original).
+INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNuevo, fundamento, fechaHora, correlationId) SELECT id, 'SISTEMA', 'CREACION', NULL, 'DETECTADA', 'Caso detectado por fiscalizacion automatica', fechaDeteccion, 'bulk-2025' FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%';
+INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNuevo, fundamento, fechaHora, correlationId) SELECT id, 'SISTEMA', 'CAMBIO_ESTADO', 'DETECTADA', 'NOTIFICADA', NULL, fechaDeteccion + INTERVAL '1 hour', 'bulk-2025' FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado <> 'DETECTADA';
+INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNuevo, fundamento, fechaHora, correlationId) SELECT id, 'SISTEMA', 'CAMBIO_ESTADO', 'NOTIFICADA', 'EN_DESCARGO', NULL, fechaDeteccion + INTERVAL '1 day', 'bulk-2025' FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado IN ('EN_DESCARGO', 'CONFIRMADA', 'DESESTIMADA');
+INSERT INTO auditoria_casos (id_caso, usuario, accion, estadoAnterior, estadoNuevo, fundamento, fechaHora, correlationId) SELECT id, '54074380', 'RESOLUCION', 'EN_DESCARGO', estado, CASE WHEN estado = 'CONFIRMADA' THEN 'Se confirma la infraccion detectada por fiscalizacion automatica.' ELSE 'Se desestima: evidencia insuficiente o diferencia no significativa.' END, fechaDeteccion + INTERVAL '3 days', 'bulk-2025' FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado IN ('CONFIRMADA', 'DESESTIMADA');
+
+-- Descargos presentados para los casos que llegaron a EN_DESCARGO (o mas alla).
+INSERT INTO descargos (descripcion, tipoCaso, estado, fechaPresentacion, ciPresentante, id_caso) SELECT 'Descargo de prueba (datos generados para reporteria)', tipoCaso, 'PRESENTADO', fechaDeteccion + INTERVAL '1 day 2 hours', '54074380', id FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado IN ('EN_DESCARGO', 'CONFIRMADA', 'DESESTIMADA');
+
+-- Fundamentos de resolucion para los casos cerrados (confirmados o desestimados), firmados por el funcionario de prueba existente.
+INSERT INTO fundamentos_resolucion (descripcion, fechaHora, ci_funcionario, id_caso) SELECT CASE WHEN estado = 'CONFIRMADA' THEN 'Se confirma la infraccion detectada por fiscalizacion automatica.' ELSE 'Se desestima: evidencia insuficiente o diferencia no significativa.' END, fechaDeteccion + INTERVAL '3 days', '54074380', id FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado IN ('CONFIRMADA', 'DESESTIMADA');
