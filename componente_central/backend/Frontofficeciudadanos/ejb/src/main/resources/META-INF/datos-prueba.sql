@@ -321,3 +321,6 @@ INSERT INTO descargos (descripcion, tipoCaso, estado, fechaPresentacion, ciPrese
 
 -- Fundamentos de resolucion para los casos cerrados (confirmados o desestimados), firmados por el funcionario de prueba existente.
 INSERT INTO fundamentos_resolucion (descripcion, fechaHora, ci_funcionario, id_caso) SELECT CASE WHEN estado = 'CONFIRMADA' THEN 'Se confirma la infraccion detectada por fiscalizacion automatica.' ELSE 'Se desestima: evidencia insuficiente o diferencia no significativa.' END, fechaDeteccion + INTERVAL '3 days', '54074380', id FROM casos_fiscalizacion WHERE descripcion LIKE 'BULK2025:%' AND estado IN ('CONFIRMADA', 'DESESTIMADA');
+
+-- Plazo administrativo independiente del motor de fiscalización.
+INSERT INTO configuracion_descargos (id, revision, plazo_dias, actualizada_en, usuario, fundamento) VALUES (1, 1, 10, CURRENT_TIMESTAMP, 'SISTEMA', 'Configuración inicial');

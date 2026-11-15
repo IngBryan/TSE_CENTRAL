@@ -9,27 +9,21 @@ const ESTADOS: Record<EstadoDocumentoHabilitacion, string> = {
 };
 
 export function EvidenciaHabilitacion({ pruebas }: { pruebas: PruebaHabilitacion[] }) {
+  // Mostrar una vez los documentos que acreditaron la infracción inicial.
+  const prueba = pruebas.reduce<PruebaHabilitacion | null>((primera, actual) =>
+    !primera || Date.parse(actual.fechaHora) < Date.parse(primera.fechaHora) ? actual : primera, null);
   return (
     <div className="rounded-xl border bg-card p-6 text-sm shadow-sm">
       <h3 className="font-medium text-foreground">Permiso de circulación e ITV</h3>
-      <p className="mt-1 text-muted-foreground">
-        Documentos considerados a la fecha del evento. La falta de registro o de vigencia de cualquiera de los dos origina la infracción.
-      </p>
-      {pruebas.length === 0 ? (
-        <p className="mt-3 text-muted-foreground">Este caso no tiene una evaluación documental registrada.</p>
-      ) : <div className="mt-4 flex flex-col gap-4">
-        {pruebas.map((p) => (
-          <div key={`${p.origen}-${p.fechaHora}`} className="border-t border-border pt-4">
-            <p className="mb-3 font-medium">{fechaHora(p.fechaHora)} · {p.origen === "PESAJE" ? "Pesaje" : "GPS"}</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Documento titulo="Permiso nacional de circulación" estado={p.estadoPermiso}
-                numero={p.nroPermiso} emision={p.emisionPermiso} vencimiento={p.vencimientoPermiso} />
-              <Documento titulo="Inspección técnica vehicular (ITV)" estado={p.estadoItv}
-                emision={p.emisionItv} vencimiento={p.vencimientoItv} />
-            </div>
-          </div>
-        ))}
-      </div>}
+      {prueba ? <>
+        <p className="mt-2 text-muted-foreground">Evaluación inicial: {fechaHora(prueba.fechaHora)} · {prueba.origen === "PESAJE" ? "Pesaje" : "GPS"}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Documento titulo="Permiso nacional de circulación" estado={prueba.estadoPermiso}
+            numero={prueba.nroPermiso} emision={prueba.emisionPermiso} vencimiento={prueba.vencimientoPermiso} />
+          <Documento titulo="Inspección técnica vehicular (ITV)" estado={prueba.estadoItv}
+            emision={prueba.emisionItv} vencimiento={prueba.vencimientoItv} />
+        </div>
+      </> : <p className="mt-3 text-muted-foreground">Este caso no tiene una evaluación documental registrada.</p>}
     </div>
   );
 }

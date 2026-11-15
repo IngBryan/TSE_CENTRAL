@@ -72,6 +72,7 @@ class InfraccionesServiceTest {
         Vehiculo ajeno = new Vehiculo("SCL2001", "Volvo", "FH", 9000, 26000, otra);
 
         em.getTransaction().begin();
+        em.persist(tse.lab.model.ConfiguracionDescargos.inicial());
         em.persist(este);
         em.persist(otra);
         em.persist(perfil);
@@ -355,6 +356,29 @@ class InfraccionesServiceTest {
         assertFalse(servicio.listar(RESPONSABLE, "t").get(0).nueva());
     }
 
+    @Test
+    void cambioAdministrativoAfectaVencimientoSinRecrearElServicio() throws Exception {
+        notificadoEl(Instant.parse("2026-11-01T15:00:00Z"));
+        servicio = conPlazo(null, enUruguay("2026-11-12T00:05:00"));
+        set(servicio, "configuracionDescargos", conEm(new tse.lab.frontofficeciudadanos.data.PlazoDescargoDAO()));
+        em.getTransaction().begin();
+        assertTrue(servicio.casosConPlazoVencido().contains(notificado));
+        em.getTransaction().commit();
+        em.getTransaction().begin();
+        em.find(tse.lab.model.ConfiguracionDescargos.class, 1L).actualizar(15, "admin", "Ampliar plazo");
+        em.getTransaction().commit(); em.clear();
+        em.getTransaction().begin();
+        assertFalse(servicio.casosConPlazoVencido().contains(notificado));
+        assertFalse(servicio.vencerPlazo(notificado, "corr"));
+        var d = servicio.detalle(RESPONSABLE, notificado, "corr");
+        assertEquals(15, d.plazoDescargoDias());
+        assertEquals("2026-11-16", d.infraccion().venceDescargo());
+        assertTrue(d.infraccion().admiteDescargo());
+        var presentado = servicio.presentarDescargo(RESPONSABLE, notificado, new NuevoDescargo("Dentro del plazo ampliado"), "corr");
+        assertEquals("EN_DESCARGO", presentado.infraccion().estado());
+        em.getTransaction().commit();
+    }
+
     // Caso creado por la fiscalizacion automatica; notificado = ademas se le notifico a la empresa
     private Long caso(String descripcion, String tipo, Vehiculo vehiculo, boolean notificado) {
         CasoFiscalizacion caso = new CasoFiscalizacion(descripcion, tipo, vehiculo, null);
@@ -395,7 +419,7 @@ class InfraccionesServiceTest {
         return conPlazo(dias, Clock.systemUTC());
     }
 
-    private InfraccionesService conPlazo(int dias, Clock reloj) throws Exception {
+    private InfraccionesService conPlazo(Integer dias, Clock reloj) throws Exception {
         AutorizacionResponsable autorizacion = new AutorizacionResponsable();
         set(autorizacion, "responsables", conEm(new ResponsableDAO()));
         set(autorizacion, "perfiles", conEm(new CiudadanoDAO()));

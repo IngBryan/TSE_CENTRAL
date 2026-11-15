@@ -1,5 +1,7 @@
 import { requerirRol } from "@/lib/backoffice-sesion";
 import { obtenerReglas, historialReglas } from "@/lib/reglas-fiscalizacion-backend";
+import { obtenerPlazoDescargo } from "@/lib/plazo-descargo-backend";
+import FormularioPlazoDescargo from "./FormularioPlazoDescargo";
 import FormularioReglas from "./FormularioReglas";
 
 function fecha(valor: string) {
@@ -8,11 +10,10 @@ function fecha(valor: string) {
 
 export default async function ReglasFiscalizacionPage() {
   await requerirRol("ADMINISTRADOR");
-  const [resultado, historial] = await Promise.all([obtenerReglas(), historialReglas()]);
+  const [resultado, historial, plazo] = await Promise.all([obtenerReglas(), historialReglas(), obtenerPlazoDescargo()]);
   return <div className="w-full min-w-0 space-y-6 px-6 py-8 lg:px-8">
     <header>
       <h1 className="text-3xl font-semibold tracking-tight">Reglas de fiscalización</h1>
-      <p className="mt-2 text-muted-foreground">Ajustá las tolerancias de carga y desvío de ruta para toda la plataforma.</p>
     </header>
     {!resultado.ok ? <div role="alert" className="rounded-lg border p-4 text-destructive">{resultado.mensaje}</div> : <>
       <div className="rounded-lg bg-muted p-4 text-sm">
@@ -21,6 +22,18 @@ export default async function ReglasFiscalizacionPage() {
       </div>
       <FormularioReglas configuracion={resultado.configuracion} />
     </>}
+    <section aria-labelledby="plazo-descargo-titulo" className="space-y-5 rounded-lg border p-6">
+      <h2 id="plazo-descargo-titulo" className="text-xl font-semibold">Plazo para presentar descargo</h2>
+      <p id="plazo-descargo-ayuda" className="text-sm text-muted-foreground">
+        Días corridos desde la notificación. El día de la notificación no cuenta y el último día se admite completo.
+        Al vencer sin descargo, el caso pasa automáticamente a la etapa de resolución por el funcionario.
+        El cambio se aplica también a los casos que siguen notificados y sin descargo.
+      </p>
+      {!plazo.ok ? <p role="alert" className="text-sm text-destructive">{plazo.mensaje}</p> : <>
+        <p className="text-sm text-muted-foreground">Actualizado el {fecha(plazo.configuracion.fechaActualizacion)} por {plazo.configuracion.usuario}.</p>
+        <FormularioPlazoDescargo configuracion={plazo.configuracion} />
+      </>}
+    </section>
     <section aria-labelledby="historial-titulo" className="space-y-3">
       <h2 id="historial-titulo" className="text-xl font-semibold">Últimas revisiones</h2>
       {historial === null ? <p role="status" className="text-sm text-muted-foreground">No se pudo cargar el historial.</p> :

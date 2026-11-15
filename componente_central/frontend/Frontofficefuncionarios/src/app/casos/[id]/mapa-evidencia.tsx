@@ -28,8 +28,7 @@ export type MapaEvidenciaProps = {
   contexto?: "evidencia" | "seguimiento" | "sin-guia";
 };
 
-/** Dos usos excluyentes: la prueba inmutable (rutas por SHA + par de coordenadas)
- * y el seguimiento posterior. No mezcla sus capas en una única vista probatoria. */
+/** Distingue el recorrido GPS de las mediciones y rutas archivadas de la confirmación. */
 export default function MapaEvidencia(props: MapaEvidenciaProps) {
   const { rutas, puntos, pruebas, mostrarRutas = true, mostrarRecorrido = true,
     enfocar = 0, modoEncuadre = "todo", contexto = "seguimiento" } = props;
@@ -124,7 +123,7 @@ export default function MapaEvidencia(props: MapaEvidenciaProps) {
 
   return <div>
     <div ref={nodo} role="img" aria-label={contexto === "evidencia"
-      ? "Evidencia registrada: dos mediciones del desvío y geometrías de referencia archivadas"
+      ? "Recorrido GPS del viaje, confirmación del desvío y rutas de referencia archivadas"
       : contexto === "sin-guia" ? "Posiciones vinculadas a la circulación sin guía"
       : "Recorrido GPS posterior a la detección y rutas actualmente autorizadas"}
       className="h-[370px] w-full rounded-xl border border-border sm:h-[480px]" />
