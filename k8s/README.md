@@ -1,7 +1,12 @@
+# carga.uy — Despliegue de Central en Kubernetes
 
-# Deploy en Kubernetes con Argo CD
+Esta guía describe el despliegue de Central en ANTEL Elastic Cloud mediante
+Kubernetes, Kustomize, Argo CD e Image Updater.
 
-El componente central de TSE utiliza Kubernetes para el despliegue de sus servicios y Argo CD para la sincronización automática con los manifiestos del repositorio.
+Los comandos se ejecutan desde la raíz de TSE_CENTRAL, con kubectl configurado
+para el clúster y las imágenes publicadas en GHCR.
+
+El arranque local con Docker se documenta en el [README principal](../README.md).
 
 ## Componentes
 
@@ -13,23 +18,37 @@ El componente central de TSE utiliza Kubernetes para el despliegue de sus servic
 
 Cada frontend dispone de su propio Deployment, Service e Ingress.
 
-### Backends
+### WildFly
 
-**WildFly:** servidor de aplicaciones que contiene los tres EAR Jakarta EE:
+Servidor de aplicaciones que contiene los tres EAR Jakarta EE:
 
 - `frontofficeciudadanos.ear`
 - `frontofficefuncionarios.ear`
 - `backofficeautoridadesadministradores.ear`
 
-Escala horizontalmente con un HPA por CPU (`k8s/apps/wildfly/hpa.yaml`: 2 a 3 réplicas, objetivo 70 % del request de 1 CPU; requiere metrics-server). Puede porque no guarda estado propio: el backoffice se autentica con un token firmado (`BACKOFFICE_JWT_SECRET`) en lugar de sesión, y los timers EJB de WildFly (revalidación de la PDI y vencimiento del descargo, que corre a las 00:05) toman un lock en PostgreSQL para que los corra una sola réplica a la vez. No son `CronJob` de Kubernetes: se programan solos al desplegar el EAR.
+El HPA definido en `k8s/apps/wildfly/hpa.yaml` mantiene entre 2 y 3 réplicas,
+con un objetivo de utilización de CPU del 70 %. Requiere metrics-server.
 
-**Fiscalizacionautomatica:** daemon Java independiente que consume eventos de la cola `tracking.events` de RabbitMQ, los persiste en MongoDB y detecta los casos de fiscalización. Utiliza un Deployment sin Service ni Ingress, ya que no expone una interfaz HTTP; KEDA ajusta sus réplicas (1 a 5) según los mensajes pendientes en la cola. La misma imagen corre como CronJob (`fiscalizacionautomatica-poller`) cada 30 minutos para consultar las balanzas.
+El backoffice utiliza tokens firmados mediante `BACKOFFICE_JWT_SECRET`.
+Los timers EJB de revalidación de PDI y vencimiento de descargos utilizan
+un lock en PostgreSQL para evitar su ejecución simultánea entre réplicas.
+
+### Fiscalización automática
+
+Aplicación Java independiente que consume la cola `tracking.events`,
+persiste los eventos en MongoDB y detecta situaciones de fiscalización.
+
+Se ejecuta como Deployment, sin Service ni Ingress. KEDA ajusta su cantidad
+de réplicas entre 1 y 5.
+
+La misma imagen se utiliza en el CronJob `fiscalizacionautomatica-poller`,
+que consulta Balanzas cada 30 minutos.
 
 ### Infraestructura externa
 
-PostgreSQL, MongoDB y RabbitMQ se encuentran alojados en ANTEL Elastic Cloud, fuera del cluster Kubernetes.
-
-Para acceder a estos servicios, Kubernetes utiliza Services de tipo `ExternalName`, definidos en `k8s/infrastructure/`.
+PostgreSQL, MongoDB y RabbitMQ están alojados en ANTEL Elastic Cloud,
+fuera del clúster Kubernetes. Las aplicaciones acceden mediante Services
+de tipo `ExternalName`.
 
 | Service | Destino | Puerto |
 |---|---|---|
@@ -37,84 +56,76 @@ Para acceder a estos servicios, Kubernetes utiliza Services de tipo `ExternalNam
 | `mongodb` | `node6260-tse-mongo.web.elasticloud.uy` | 27017 |
 | `rabbitmq` | `tse-rabbitmq.web.elasticloud.uy` | 5672 |
 
-Las aplicaciones utilizan los nombres internos `postgres`, `mongodb` y `rabbitmq`, sin depender directamente de los dominios externos.
+KEDA también requiere acceso a la API de administración de RabbitMQ
+en el puerto 15672.
 
-La configuración inicial de RabbitMQ se encuentra en `rabbitmq/definitions.json`, que define el exchange `tracking`, la cola `tracking.events` y su binding con routing key `tracking.event`.
+La inicialización de estos servicios se realiza por separado:
 
-La inicialización de MongoDB se encuentra en `mongodb/init/01-tracking.js`, que crea la colección `tracking`.
+- `rabbitmq/definitions.json`: exchange `tracking`, cola `tracking.events`
+  y binding con routing key `tracking.event`.
+- `mongodb/init/01-tracking.js`: colección `tracking`.
+- `mongodb/init/02-balanzas-metadata.js`: colección `balanzas_metadata`.
 
-Estas configuraciones deben estar aplicadas en las instancias correspondientes de Elastic Cloud.
+## Organización del directorio
 
-Las credenciales de conexión se proporcionan mediante el Secret Kubernetes `tse-runtime-secrets`.
+- `k8s/apps/`: manifiestos y configuración Kustomize de las aplicaciones.
+- `k8s/infrastructure/`: Services para la infraestructura externa.
+- `k8s/argocd/`: Applications de Argo CD y recursos de Image Updater.
 
-## Organización
+## Publicación y actualización de imágenes
 
-- `k8s/apps/`: manifiestos de cada aplicación y sus archivos Kustomize.
-- `k8s/infrastructure/`: Services `ExternalName` para conectar con PostgreSQL, MongoDB y RabbitMQ alojados en ANTEL Elastic Cloud.
-- `k8s/argocd/`: Applications de Argo CD y configuraciones de Image Updater.
-
-## Publicación y actualización
-
-Los workflows de GitHub Actions construyen y publican las imágenes Docker en GitHub Container Registry (GHCR).
-
-Las imágenes se publican con los tags:
+Los workflows de GitHub Actions construyen y publican las imágenes Docker
+en GitHub Container Registry, con los tags:
 
 ```text
 latest
 sha-<commit>
 ```
 
-Argo CD Image Updater detecta las nuevas imágenes y actualiza la aplicación correspondiente. Argo CD sincroniza los cambios con Kubernetes.
+Image Updater selecciona tags `sha-<commit>` de siete caracteres hexadecimales
+mediante la estrategia `newest-build`. Actualiza las aplicaciones mediante
+write-back `argocd`, y Argo CD sincroniza los cambios con Kubernetes.
 
-PostgreSQL, MongoDB y RabbitMQ se administran externamente en ANTEL Elastic Cloud, por lo que sus imágenes y actualizaciones no son gestionadas mediante los manifiestos Kubernetes de este repositorio ni por Image Updater.
+PostgreSQL, MongoDB y RabbitMQ se administran externamente; sus actualizaciones
+no son gestionadas por los manifiestos de aplicaciones ni por Image Updater.
 
 ## Configuración inicial
 
-### 1. Crear namespaces
+### 1. Requisitos del clúster
+
+- Controlador NGINX Ingress.
+- metrics-server para el HPA de WildFly.
+- Argo CD.
+- Argo CD Image Updater compatible con el recurso `ImageUpdater`.
+- KEDA para el escalado de fiscalización.
+
+Crear los namespaces si todavía no existen:
 
 ```bash
 kubectl create namespace tse
 kubectl create namespace argocd
 ```
 
-### 2. Crear secretos de runtime
+### 2. Secretos de las aplicaciones
 
-Los manifiestos utilizan el Secret `tse-runtime-secrets` en el namespace `tse`, con las siguientes claves:
+El Secret `tse-runtime-secrets`, en el namespace `tse`, contiene las
+credenciales compartidas por las aplicaciones.
 
-```text
-postgres-user
-postgres-password
-mongo-user
-mongo-password
-rabbitmq-user
-rabbitmq-password
-ciudadanos-api-key
-funcionarios-api-key
-ejb-user
-ejb-password
-oidc-client-secret
-session-secret
-movil-token-secret
-backoffice-jwt-secret
-pdi-organismo-clave
-```
+| Claves | Uso |
+|---|---|
+| `postgres-user`, `postgres-password` | Conexión de WildFly a PostgreSQL |
+| `mongo-user`, `mongo-password` | Conexión a MongoDB |
+| `rabbitmq-user`, `rabbitmq-password` | Conexión a RabbitMQ y autenticación de KEDA |
+| `ciudadanos-api-key` | Clave compartida entre el frontend y backend de ciudadanos |
+| `funcionarios-api-key` | Clave compartida entre el frontend y backend de funcionarios |
+| `ejb-user`, `ejb-password` | Autenticación EJB remota de fiscalización |
+| `oidc-client-secret` | Cliente ID Uruguay de los frontends y WildFly |
+| `session-secret` | Sesión del frontend de ciudadanos |
+| `movil-token-secret` | Referenciado por WildFly y el frontend de ciudadanos; WildFly lo usa para firmar tokens móviles |
+| `backoffice-jwt-secret` | Firma de tokens del backoffice en WildFly |
+| `pdi-organismo-clave` | Autenticación de Central ante la PDI |
 
-| Clave | Variable (`.env` local) | La usa |
-|---|---|---|
-| `ciudadanos-api-key` | `CIUDADANOS_API_KEY` | wildfly y frontofficeciudadanos-front (`BACKEND_API_KEY`), el mismo valor |
-| `oidc-client-secret` | `OIDC_CLIENT_SECRET` | frontofficeciudadanos-front |
-| `session-secret` | `SESSION_SECRET` | frontofficeciudadanos-front |
-| `movil-token-secret` | `MOVIL_TOKEN_SECRET` | frontofficeciudadanos-front |
-| `backoffice-jwt-secret` | `BACKOFFICE_JWT_SECRET` | wildfly: firma el token del backoffice, que reemplaza a la sesion para poder tener varias replicas (sin la clave, el login del backoffice responde 503) |
-| `pdi-organismo-clave` | `PDI_ORGANISMO_CLAVE` | wildfly (igual al de la PDI) |
-
-`ejb-user` / `ejb-password` son el usuario de aplicacion de WildFly con el que Fiscalizacionautomatica
-llama por EJB remoto a Frontofficeciudadanos: WildFly lo crea al arrancar (`wildfly/start.sh`) y
-fiscalizacion se autentica con el. En WildFly son opcionales (sin ellas arranca, sin el usuario), pero
-el consumidor de tracking de fiscalizacion las necesita: al arrancar pide la lista de GPS activos por EJB
-remoto y no consume hasta tenerla. Hay que cargarlas en el Secret antes de desplegar.
-
-Crearlo con los valores correspondientes al entorno:
+Crear el Secret con los valores del entorno:
 
 ```bash
 kubectl -n tse create secret generic tse-runtime-secrets \
@@ -135,54 +146,46 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=pdi-organismo-clave='<PDI_ORGANISMO_CLAVE>'
 ```
 
-Si el Secret ya existe, agregar las claves nuevas sin recrearlo (y reiniciar WildFly para que cree el
-usuario: `kubectl -n tse rollout restart deployment/wildfly`):
+WildFly crea el usuario EJB al arrancar mediante `wildfly/start.sh`.
+Fiscalización necesita esas credenciales para consultar los GPS activos
+antes de comenzar a consumir eventos.
+
+Para actualizar claves de un Secret existente:
 
 ```bash
 kubectl -n tse patch secret tse-runtime-secrets --type merge \
   -p '{"stringData":{"ejb-user":"<EJB_USER>","ejb-password":"<EJB_PASSWORD>"}}'
 ```
 
-Lo mismo para las del front de ciudadanos y la PDI:
+Después de cambiar secretos utilizados como variables de entorno,
+reiniciar los Deployments afectados para que tomen los nuevos valores.
 
-```bash
-kubectl -n tse patch secret tse-runtime-secrets --type merge \
-  -p '{"stringData":{"oidc-client-secret":"<OIDC_CLIENT_SECRET>","session-secret":"<SESSION_SECRET>","movil-token-secret":"<MOVIL_TOKEN_SECRET>","pdi-organismo-clave":"<PDI_ORGANISMO_CLAVE>"}}'
+### 3. Configuración e integración con ID Uruguay y PDI
+
+La configuración no secreta se encuentra junto a cada aplicación:
+
+- `k8s/apps/frontofficeciudadanos-front/configmap.yaml`:
+  `APP_BASE_URL`, `OIDC_CLIENT_ID` y `BACKEND_URL`.
+- `k8s/apps/frontofficefuncionarios-front/app.json`:
+  URLs del frontend, backend y configuración OIDC.
+- `k8s/apps/wildfly/configmap.yaml`:
+  URL y código del organismo PDI, entre otros parámetros.
+
+Las URI de retorno y logout deben estar registradas en ID Uruguay:
+
+```text
+https://env-6537388.web.elasticloud.uy/ciudadanos
+https://env-6537388.web.elasticloud.uy/ciudadanos/logout
+https://env-6537388.web.elasticloud.uy/funcionarios
+https://env-6537388.web.elasticloud.uy/funcionarios/logout
 ```
 
-Y la del token del backoffice (despues, `kubectl -n tse rollout restart deployment/wildfly`):
+`PDI_URL` debe apuntar al servicio PDI desplegado. El código del organismo
+y `pdi-organismo-clave` deben coincidir con sus credenciales.
 
-```bash
-kubectl -n tse patch secret tse-runtime-secrets --type merge \
-  -p '{"stringData":{"backoffice-jwt-secret":"<BACKOFFICE_JWT_SECRET>"}}'
-```
+### 4. Instalar Argo CD e Image Updater
 
-Los secretos de produccion deben ser distintos a los de desarrollo local. Despues de cambiar el
-Secret, reiniciar los pods para que tomen los valores nuevos
-(`kubectl -n tse rollout restart deployment/wildfly deployment/frontofficeciudadanos-front`).
-
-La configuracion que no es secreta esta en ConfigMaps junto a cada aplicacion:
-
-- `apps/frontofficeciudadanos-front/configmap.yaml`: `APP_BASE_URL`, `OIDC_CLIENT_ID`, `BACKEND_URL`.
-- `apps/wildfly/configmap.yaml`: `PDI_URL`, `PDI_ORGANISMO_CODIGO`.
-
-**Login con ID Uruguay:** la redirect URI es `APP_BASE_URL` y la de logout `APP_BASE_URL/logout`
-(`https://env-6537388.web.elasticloud.uy/ciudadanos` y `.../ciudadanos/logout`). Ambas tienen que estar
-registradas en ID Uruguay; si no, gub.uy rechaza el login. El ingress no tiene TLS: el HTTPS lo termina
-el proxy de Elastic Cloud que esta delante.
-
-El front de funcionarios usa el mismo cliente OIDC (`oidc.clientId` en
-`apps/frontofficefuncionarios-front/app.json` y `oidc-client-secret` de `tse-runtime-secrets`). Su redirect
-URI es `appBaseUrl` y la de logout `appBaseUrl/logout`: `https://env-6537388.web.elasticloud.uy/funcionarios`
-y `.../funcionarios/logout`, también registradas en ID Uruguay. Después del login, WildFly controla que la
-cédula esté en la tabla `funcionarios` y la valida contra la PDI (que exista en DNIC y sea mayor de edad).
-
-**PDI:** `PDI_URL` tiene que apuntar a donde este desplegada la PDI (`TSE_NODOS`), y
-`PDI_ORGANISMO_CODIGO` / `pdi-organismo-clave` coincidir con los que usa la PDI.
-
-Las credenciales deben coincidir con las configuradas en los servicios de ANTEL Elastic Cloud y no deben almacenarse en el repositorio.
-
-### 3. Instalar Argo CD e Image Updater
+Si todavía no están instalados:
 
 ```bash
 kubectl apply -n argocd --server-side --force-conflicts \
@@ -192,9 +195,9 @@ kubectl apply -n argocd \
   -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
 ```
 
-### 4. Configurar acceso al repositorio
+### 5. Acceso al repositorio y al registro de imágenes
 
-Para acceder al repositorio privado, Argo CD requiere un token de GitHub con permiso de lectura.
+Para que Argo CD pueda leer el repositorio privado:
 
 ```bash
 kubectl -n argocd create secret generic repo-tse-central \
@@ -207,11 +210,10 @@ kubectl -n argocd label secret repo-tse-central \
   argocd.argoproj.io/secret-type=repository
 ```
 
-### 5. Configurar acceso a GHCR
+Para descargar imágenes privadas de GHCR, utilizar un token con
+permiso `read:packages`.
 
-Se necesita un token de GitHub con permiso `read:packages` para descargar las imágenes privadas.
-
-Crear el Secret en `tse`, utilizado por los pods:
+Crear las credenciales en `tse`, para los pods:
 
 ```bash
 kubectl -n tse create secret docker-registry ghcr-credentials \
@@ -220,7 +222,7 @@ kubectl -n tse create secret docker-registry ghcr-credentials \
   --docker-password='<TOKEN_PACKAGES>'
 ```
 
-Crear el mismo Secret en `argocd`, utilizado por Image Updater:
+Crear las credenciales en `argocd`, para Image Updater:
 
 ```bash
 kubectl -n argocd create secret docker-registry ghcr-credentials \
@@ -229,74 +231,93 @@ kubectl -n argocd create secret docker-registry ghcr-credentials \
   --docker-password='<TOKEN_PACKAGES>'
 ```
 
-### 6. Secretos del front de funcionarios
+### 6. Configuración del frontend de funcionarios
 
-Se crean en el namespace `tse` y no deben almacenarse en el repositorio.
+El Secret `frontofficefuncionarios-front-secrets` contiene:
 
-`SESSION_SECRET` cifra la cookie de sesión (string largo y aleatorio, distinto del de ciudadanos) y `BACKEND_API_KEY` debe coincidir con `funcionarios-api-key` de `tse-runtime-secrets` (no con la key de ciudadanos).
+- `SESSION_SECRET`: secreto de sesión, distinto del utilizado por ciudadanos.
+- `BACKEND_API_KEY`: mismo valor que `funcionarios-api-key`
+  de `tse-runtime-secrets`.
+
+Completar `SESSION_SECRET` con una clave larga y aleatoria generada previamente.
 
 ```bash
 kubectl -n tse create secret generic frontofficefuncionarios-front-secrets \
-  --from-literal=SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+  --from-literal=SESSION_SECRET='<FUNCIONARIOS_SESSION_SECRET>' \
   --from-literal=BACKEND_API_KEY='<FUNCIONARIOS_API_KEY>'
 ```
 
-El ingreso de testing con cédula (`LOGIN_TESTING=true` en `deployment.yaml` y `FUNCIONARIOS_INGRESO_TESTING=true` en `apps/wildfly/configmap.yaml`) sigue habilitado hasta que ande el login con gub.uy en `/funcionarios`: mientras tanto cualquiera puede ingresar con la cédula de un funcionario registrado (WildFly igual la valida contra la PDI). Apagar los dos cuando gub.uy esté registrado.
-
-Certificado TLS del host del ingress (`env-6537388.web.elasticloud.uy`), a partir del certificado y su clave privada en formato PEM:
+El Ingress de funcionarios referencia un Secret TLS:
 
 ```bash
 kubectl -n tse create secret tls frontofficefuncionarios-front-tls \
-  --cert=<certificado.pem> \
-  --key=<clave.pem>
+  --cert='<certificado.pem>' \
+  --key='<clave.pem>'
 ```
 
-Las URLs de la aplicación y del backend no son secretas: se encuentran en `k8s/apps/frontofficefuncionarios-front/app.json`, que se monta como ConfigMap en `/app/config/app.json`.
+El ingreso de testing por cédula requiere `LOGIN_TESTING=true` en el
+frontend y `FUNCIONARIOS_INGRESO_TESTING=true` en WildFly.
+Deshabilitar ambos para utilizar exclusivamente ID Uruguay.
 
-### 7. Fiscalización automática: KEDA y datos de balanzas
+### 7. KEDA y poller de Balanzas
 
-**KEDA** escala el consumidor de tracking (`k8s/apps/fiscalizacionautomatica/keda.yaml`: una réplica cada 100 mensajes pendientes en `tracking.events`, entre 1 y 5). Se instala una vez en el cluster:
+KEDA escala fiscalización entre 1 y 5 réplicas combinando dos señales:
+
+- Tasa de publicación: objetivo de 1.500 mensajes por segundo por réplica.
+- Cola pendiente: objetivo de 300 mensajes por réplica.
+
+El manifiesto está en `k8s/apps/fiscalizacionautomatica/keda.yaml`.
+Consulta cada 15 segundos y configura una ventana de estabilización
+de reducción de 300 segundos, con una réplica menos cada 120 segundos.
+
+Instalar KEDA si todavía no está disponible:
 
 ```bash
-kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+kubectl apply --server-side \
+  -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
 ```
 
-El `ScaledObject` usa las claves `rabbitmq-user` / `rabbitmq-password` de `tse-runtime-secrets`. El Deployment no declara `replicas`: las maneja KEDA.
+El ScaledObject utiliza `rabbitmq-user` y `rabbitmq-password`
+de `tse-runtime-secrets`. KEDA administra las réplicas del Deployment.
 
-**Datos del nodo de balanzas** para el CronJob del poller (corre cada 30 minutos con `ENVIRONMENT=prod`):
+El poller consulta Balanzas cada 30 minutos con `ENVIRONMENT=prod`:
 
-- La URL de balanzas y el client id están en `k8s/apps/fiscalizacionautomatica/app.json` (`balanzasUrl`, `balanzasClientId`), que el `configMapGenerator` publica como ConfigMap y el CronJob monta en `/app/config/app.json`. Se cambian en el repo y Argo CD los sincroniza.
-- El client secret está en el Secret `fiscalizacion-balanzas` (`secret-balanzas.yaml`), que Argo CD crea con la clave vacía y no vuelve a sincronizar (`ignoreDifferences` en la Application). El valor de producción se carga a mano:
+- URL y client ID: `k8s/apps/fiscalizacionautomatica/app.json`,
+  montado mediante ConfigMap.
+- Client secret: Secret `fiscalizacion-balanzas`.
+
+Argo CD crea ese Secret con la clave vacía y conserva las modificaciones
+manuales mediante `ignoreDifferences`. Después de su creación, cargar:
 
 ```bash
 kubectl -n tse patch secret fiscalizacion-balanzas --type merge \
   -p '{"stringData":{"BALANZAS_CLIENT_SECRET":"<client secret>"}}'
 ```
 
-Mientras esté vacío, el poller falla al arrancar (`Missing environment variables`) y el Job queda como fallido: `kubectl -n tse get jobs`.
+Mientras esté vacío, el poller falla al arrancar.
 
 ## Registrar aplicaciones en Argo CD
 
-Con los manifiestos e imágenes publicados en `main`:
+Con los manifiestos y las imágenes publicados en `main`, y los requisitos
+anteriores preparados:
 
 ```bash
 kubectl apply -f k8s/argocd/infrastructure.yaml
-
 kubectl apply -f k8s/argocd/frontofficeciudadanos-front.yaml
 kubectl apply -f k8s/argocd/frontofficefuncionarios-front.yaml
 kubectl apply -f k8s/argocd/backofficeautoridadesadministradores-front.yaml
-
 kubectl apply -f k8s/argocd/wildfly.yaml
 kubectl apply -f k8s/argocd/fiscalizacionautomatica.yaml
 ```
 
 ## Validación
 
-### Validar manifiestos sin acceder al cluster
+### Manifiestos
+
+Estos comandos generan los manifiestos sin aplicarlos al clúster:
 
 ```bash
 kubectl kustomize k8s/infrastructure
-
 kubectl kustomize k8s/apps/frontofficeciudadanos-front
 kubectl kustomize k8s/apps/frontofficefuncionarios-front
 kubectl kustomize k8s/apps/backofficeautoridadesadministradores-front
@@ -304,86 +325,73 @@ kubectl kustomize k8s/apps/wildfly
 kubectl kustomize k8s/apps/fiscalizacionautomatica
 ```
 
-### Comprobar recursos desplegados
+### Recursos desplegados
 
 ```bash
 kubectl -n tse get deployments
 kubectl -n tse get pods
 kubectl -n tse get services
 kubectl -n tse get ingress
+kubectl -n tse get jobs
+kubectl -n tse get hpa
+kubectl -n tse get scaledobjects
 ```
 
-### Comprobar servicios externos
+### Infraestructura externa
 
-Verificar que los Services Kubernetes apunten a los destinos configurados en Elastic Cloud:
+Comprobar los destinos de los Services:
 
 ```bash
 kubectl -n tse get svc postgres mongodb rabbitmq -o wide
 ```
 
-Para validar la conectividad real, se deben comprobar desde un pod del cluster las conexiones TCP a los siguientes servicios:
+Verificar desde el clúster la conectividad con:
 
-- PostgreSQL: `postgres:5432`
-- MongoDB: `mongodb:27017`
-- RabbitMQ: `rabbitmq:5672`
+- PostgreSQL: `postgres:5432`.
+- MongoDB: `mongodb:27017`.
+- RabbitMQ: `rabbitmq:5672`.
+- Administración de RabbitMQ para KEDA: `rabbitmq:15672`.
 
-Los Services de tipo `ExternalName` proporcionan resolución DNS, pero no garantizan por sí solos que los destinos externos acepten conexiones TCP.
+Los Services `ExternalName` proporcionan resolución DNS; también deben
+comprobarse la conectividad TCP, las credenciales y la inicialización
+de los servicios externos.
 
-También deben verificarse las credenciales y la inicialización correspondiente de MongoDB y RabbitMQ.
-
-### Consultar logs
+### Logs
 
 ```bash
 kubectl -n tse logs deployment/wildfly
-
 kubectl -n tse logs deployment/fiscalizacionautomatica
-```
-
-Para observar el estado de los pods:
-
-```bash
 kubectl -n tse get pods -w
 ```
 
-## Acceso HTTP
+## Acceso a las aplicaciones
 
-Host configurado en NGINX Ingress:
+Host configurado en los Ingress:
 
 ```text
 env-6537388.web.elasticloud.uy
 ```
 
-Rutas de los frontends:
-
-```text
-/ciudadanos
-/funcionarios
-/backoffice
-```
-
-Rutas de las aplicaciones Jakarta EE:
-
-```text
-/frontofficeciudadanos-web
-/frontofficefuncionarios-web
-/backofficeautoridadesadministradores-web
-```
+| Aplicación | Ruta |
+|---|---|
+| Ciudadanos | `/ciudadanos` |
+| Funcionarios | `/funcionarios` |
+| Backoffice | `/backoffice` |
+| Backend de ciudadanos | `/frontofficeciudadanos-web` |
+| Backend de funcionarios | `/frontofficefuncionarios-web` |
+| Backend de autoridades y administradores | `/backofficeautoridadesadministradores-web` |
 
 ## Interfaz de Argo CD
 
-Acceder mediante port-forward:
+Crear un port-forward:
 
 ```bash
-kubectl -n argocd port-forward svc/argocd-server 8081:443
+kubectl -n argocd port-forward svc/argocd-server 9090:443
 ```
 
-Abrir:
+Abrir `https://localhost:9090`.
 
-```text
-https://localhost:8081
-```
-
-Obtener la contraseña inicial del usuario `admin`:
+Para obtener la contraseña inicial de `admin`:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -392,11 +400,14 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 
 ## Diagnóstico
 
-- **ImagePullBackOff:** comprobar `ghcr-credentials` en el namespace `tse` y los permisos de GHCR.
-- **Argo CD no accede al repositorio:** verificar `repo-tse-central`.
-- **Image Updater no detecta imágenes:** revisar sus logs y `ghcr-credentials` en `argocd`.
-- **Contenedores sin credenciales:** verificar las claves de `tse-runtime-secrets`.
-- **Error de conexión con infraestructura externa:** comprobar resolución DNS, conectividad TCP, puertos, credenciales y disponibilidad de los servicios en Elastic Cloud.
-- **WildFly no inicia:** revisar logs y conectividad con PostgreSQL.
-- **Fiscalización no consume eventos:** revisar la conexión a RabbitMQ, la cola `tracking.events` y MongoDB.
-- **Front de funcionarios sin sesión o con 401 del backend:** verificar `frontofficefuncionarios-front-secrets` (`SESSION_SECRET` y `BACKEND_API_KEY`).
+| Problema | Comprobaciones |
+|---|---|
+| `ImagePullBackOff` | Secret `ghcr-credentials` en `tse` y permisos de GHCR |
+| Argo CD no accede al repositorio | Secret `repo-tse-central` |
+| Image Updater no actualiza imágenes | Tags publicados, logs y credenciales en `argocd` |
+| WildFly no inicia | Logs, PostgreSQL y secretos requeridos |
+| Fiscalización no consume | RabbitMQ, cola `tracking.events`, MongoDB y autenticación EJB |
+| Poller fallido | Credenciales de Balanzas, conectividad y logs del Job |
+| Funcionarios responde 401 | Correspondencia de `BACKEND_API_KEY` con `funcionarios-api-key` |
+| KEDA no escala | Acceso a RabbitMQ, credenciales y estado del ScaledObject |
+| HPA no escala | metrics-server, métricas disponibles y solicitudes de CPU |

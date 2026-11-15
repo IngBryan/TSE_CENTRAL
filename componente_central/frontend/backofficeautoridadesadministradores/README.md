@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# carga.uy — Backoffice de autoridades y administradores
 
-## Getting Started
+Aplicación Next.js para consultar reportes y administrar usuarios, nodos
+periféricos y reglas de fiscalización según el rol del usuario.
+Consume la API del backoffice desplegada en WildFly.
 
-First, run the development server:
+## Ejecución con Docker
+
+La preparación del entorno se documenta en el [README principal](../../../README.md).
+Desde la raíz de TSE_CENTRAL, para construir y levantar este frontend:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d --build backofficeautoridadesadministradores-front
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acceso local: http://localhost:3004/backoffice.
+Estado: http://localhost:3004/backoffice/health.
+Compose proporciona `BACKOFFICE_API_URL` con la dirección interna de WildFly.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Desarrollo sin Docker
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requiere Node.js 24 y npm, con WildFly disponible en el puerto 8081.
+Crear `.env.local` en esta carpeta con:
 
-## Learn More
+```dotenv
+BACKOFFICE_API_URL=http://localhost:8081/backofficeautoridadesadministradores-web/api
+```
 
-To learn more about Next.js, take a look at the following resources:
+Desde esta carpeta:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm ci
+npm run dev -- --port 3004
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Abrir http://localhost:3004/backoffice. El prefijo `/backoffice` está definido
+en `next.config.ts`.
 
-## Deploy on Vercel
+## Autenticación y roles
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El ingreso utiliza cédula y contraseña de un usuario registrado en el backoffice.
+WildFly valida las credenciales, emite un JWT y comprueba el rol en cada operación.
+El frontend guarda el token en una cookie HTTP-only y lo envía como Bearer
+en las llamadas al backend.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`BACKOFFICE_JWT_SECRET` se configura en WildFly mediante el `.env` de la raíz
+o el Secret de Kubernetes. Es necesario para emitir los tokens de acceso.
+La configuración propia de este frontend requiere `BACKOFFICE_API_URL`.
+
+Las secciones incluyen dashboard, reportes, usuarios, nodos periféricos,
+reglas de fiscalización y cuenta. El acceso depende del rol.
+Cuando el backend exige cambiar la contraseña inicial, el frontend dirige
+al usuario al formulario correspondiente antes de continuar.
+
+## Verificación y compilación
+
+Desde esta carpeta:
+
+```bash
+npm run lint
+npm run build
+```
+
+Para ejecutar la compilación en el puerto local documentado:
+
+```bash
+npm start -- -p 3004
+```
+
+Despliegue remoto: [Kubernetes y Argo CD](../../../k8s/README.md).
