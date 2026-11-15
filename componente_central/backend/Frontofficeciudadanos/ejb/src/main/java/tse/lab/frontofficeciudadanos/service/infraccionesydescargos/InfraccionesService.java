@@ -16,6 +16,7 @@ import jakarta.ejb.Stateless;
 import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
 import tse.lab.frontofficeciudadanos.data.CasoFiscalizacionDAO;
+import tse.lab.frontofficeciudadanos.data.PlazoDescargoDAO;
 import tse.lab.frontofficeciudadanos.service.AutorizacionResponsable;
 import tse.lab.frontofficeciudadanos.service.ConflictoException;
 import tse.lab.frontofficeciudadanos.service.DatosInvalidosException;
@@ -38,8 +39,8 @@ import tse.lab.model.EvidenciaHabilitacion;
 // Gestion de Infracciones (frontoffice de ciudadanos): el responsable de la empresa consulta los casos de
 // fiscalizacion de sus vehiculos con la evidencia que los origino y presenta un descargo dentro del plazo.
 // - La empresa ve el caso recien cuando se le notifica (NOTIFICADA en adelante), nunca DETECTADA.
-// - El descargo se presenta una sola vez, con el caso NOTIFICADA y dentro de PLAZO_DESCARGO_DIAS dias
-//   corridos (10 por defecto) desde la notificacion. El plazo se cuenta por dias de Uruguay: el dia de la
+// - El descargo se presenta una sola vez, con el caso NOTIFICADA y dentro del plazo administrativo en días
+//   corridos (10 inicialmente) desde la notificacion. El plazo se cuenta por dias de Uruguay: el dia de la
 //   notificacion no cuenta y el ultimo dia se puede presentar hasta las 23:59. Pasa el caso a EN_DESCARGO
 //   (la transicion la controla CasoFiscalizacion) y queda en la pista de auditoria con la cedula de quien
 //   lo presento. Si vence el plazo sin descargo, VencimientoDescargoJob pasa el caso a EN_DESCARGO (sin
@@ -61,16 +62,17 @@ public class InfraccionesService {
     @EJB
     private CasoFiscalizacionDAO casos;
 
-    private final int plazoDias;
+    @EJB private PlazoDescargoDAO configuracionDescargos;
+    private final Integer plazoDiasFijo;
     private final Clock reloj;
 
     public InfraccionesService() {
-        this(plazoConfigurado(), Clock.systemUTC());
+        this(null, Clock.systemUTC());
     }
 
-    // Para los tests: sin leer el entorno y con la hora que elija el test
-    InfraccionesService(int plazoDias, Clock reloj) {
-        this.plazoDias = plazoDias;
+    // Para los tests: plazo fijo opcional y reloj controlado
+    InfraccionesService(Integer plazoDias, Clock reloj) {
+        this.plazoDiasFijo = plazoDias;
         this.reloj = reloj;
     }
 
@@ -208,7 +210,7 @@ public class InfraccionesService {
         if (caso.getEstado() == EstadoCaso.EN_DESCARGO) {
             // Si no tiene descargo pero el caso ya esta EN_DESCARGO: lo paso VencimientoDescargoJob al vencer el plazo
             throw rechazo(caso, ciResponsable, correlationId, "PLAZO_VENCIDO",
-                    "Venció el plazo de " + plazoDias + " días para presentar el descargo.");
+                    "Venció el plazo para presentar el descargo.");
         }
         if (caso.getEstado() != EstadoCaso.NOTIFICADA) {
             throw rechazo(caso, ciResponsable, correlationId, "TRANSICION_NO_PERMITIDA",
@@ -216,7 +218,7 @@ public class InfraccionesService {
         }
         if (!dentroDelPlazo(venceDescargo(caso))) {
             throw rechazo(caso, ciResponsable, correlationId, "PLAZO_VENCIDO",
-                    "Venció el plazo de " + plazoDias + " días para presentar el descargo.");
+                    "Venció el plazo de " + plazoDias() + " días para presentar el descargo.");
         }
 
         Descargo descargo = Descargo.presentar(texto, caso, ciResponsable);
@@ -254,7 +256,7 @@ public class InfraccionesService {
         caso.cambiarEstado(EstadoCaso.EN_DESCARGO);
         casos.registrarAuditoria(new RegistroAuditoriaCaso(caso.getId(), RegistroAuditoriaCaso.SISTEMA,
                 AccionAuditoriaCaso.CAMBIO_ESTADO, EstadoCaso.NOTIFICADA, EstadoCaso.EN_DESCARGO,
-                "Venció el plazo de " + plazoDias + " días sin descargo de la empresa", correlationId));
+                "Venció el plazo de " + plazoDias() + " días sin descargo de la empresa", correlationId));
         LOG.info(() -> LogCiudadanos.evento("infraccion.plazo_vencido").correlationId(correlationId)
                 .usuario(RegistroAuditoriaCaso.SISTEMA).campo("caso", idCaso).toString());
         return true;
@@ -286,7 +288,7 @@ public class InfraccionesService {
 
     // Ultimo dia para presentar el descargo: el dia (en Uruguay) de la notificacion mas plazoDias
     private LocalDate ultimoDia(Instant notificada) {
-        return LocalDate.ofInstant(notificada, URUGUAY).plusDays(plazoDias);
+        return LocalDate.ofInstant(notificada, URUGUAY).plusDays(plazoDias());
     }
 
     // El ultimo dia cuenta entero: vence a las 00:00 (hora de Uruguay) del dia siguiente
@@ -330,7 +332,7 @@ public class InfraccionesService {
                         d.getCiPresentante()),
                 resuelto ? new ResolucionVista(caso.getEstado().name(), f == null ? null : f.getDescripcion(),
                         f == null ? null : texto(f.getFechaHora())) : null,
-                plazoDias, caso.getEvidenciasHabilitacion().stream()
+                plazoDias(), caso.getEvidenciasHabilitacion().stream()
                         .sorted(Comparator.comparing(EvidenciaHabilitacion::getFechaHora)
                                 .thenComparing(EvidenciaHabilitacion::getOrigen))
                         .map(EvidenciaHabilitacionVista::de).toList());
@@ -340,13 +342,7 @@ public class InfraccionesService {
         return valor == null ? null : valor.toString();
     }
 
-    private static int plazoConfigurado() {
-        String valor = System.getenv("PLAZO_DESCARGO_DIAS");
-        try {
-            int dias = valor == null || valor.isBlank() ? 10 : Integer.parseInt(valor.trim());
-            return dias > 0 ? dias : 10;
-        } catch (NumberFormatException e) {
-            return 10;
-        }
+    private int plazoDias() {
+        return plazoDiasFijo != null ? plazoDiasFijo : configuracionDescargos.dias();
     }
 }

@@ -136,7 +136,6 @@ FUNCIONARIOS_API_KEY=<string largo y aleatorio>
 FUNCIONARIOS_SESSION_SECRET=<string largo y aleatorio>
 
 #Infracciones y descargos - WildFly
-#PLAZO_DESCARGO_DIAS=10                 # opcional: dias corridos desde la notificacion para presentar el descargo
 #VENCIMIENTO_DESCARGO_ACTIVO=true       # opcional: false apaga el pasaje automatico a EN_DESCARGO al vencer el plazo
 
 #Portal publico - WildFly
@@ -818,7 +817,11 @@ recargar. Abrir el detalle de la infraccion tambien la marca vista.
 - El descargo se presenta **una sola vez**, con el caso `NOTIFICADA`, dentro del plazo y con hasta 2000
   caracteres. Si no: `400` (texto vacio o largo), `409 DESCARGO_YA_PRESENTADO`,
   `409 TRANSICION_NO_PERMITIDA` o `409 PLAZO_VENCIDO`.
-- **Plazo:** `PLAZO_DESCARGO_DIAS` dias corridos (10 por defecto) desde la notificacion, que se toma de la
+- **Plazo:** dias corridos (10 inicialmente), configurables por el administrador en **Reglas de fiscalizacion →
+  Plazo para presentar descargo**, con guardado independiente de Carga y Desvio. Se persiste en
+  `configuracion_descargos` y no modifica revisiones, mensajes ni parametros del motor de fiscalizacion.
+  Se aplica tambien a los casos `NOTIFICADA` pendientes de descargo (no reabre los ya pasados a `EN_DESCARGO`).
+  Se calcula desde la notificacion, que se toma de la
   pista de auditoria (el ultimo `CAMBIO_ESTADO` a `NOTIFICADA`; si no hay, la fecha de deteccion). Se cuenta
   por dias de Uruguay: el dia de la notificacion no cuenta y el ultimo dia vale entero (vence a las 00:00 del
   dia siguiente). `venceDescargo` es ese ultimo dia (`yyyy-MM-dd`). Ej.: notificada el 1/11 a cualquier hora,
@@ -846,8 +849,14 @@ de testing), abrir *Infracciones* y presentar el descargo del caso `DEMO DESVIO`
 `NOTIFICADA`). Despues, en el frontoffice de funcionarios, el caso aparece *En descargo* con el texto y
 la auditoria (ver el escenario E11 de `Frontofficeciudadanos/.../META-INF/README_ESCENARIOS.md`).
 
-**Pendiente:** un caso `NOTIFICADA` cuyo plazo vence sin descargo queda trabado: la empresa ya no puede
-presentarlo y el funcionario solo resuelve casos `EN_DESCARGO`.
+**Base existente:** antes de desplegar esta version, aplicar
+`Frontofficeciudadanos/ejb/src/main/resources/META-INF/migracion-plazo-descargo.sql`
+(dentro de `componente_central/backend/`). Inicializa el plazo en 10 dias sin borrar datos ni modificar
+las reglas del motor. Si antes se usaba `PLAZO_DESCARGO_DIAS` con otro valor, conservarlo en la fila inicial
+de la migracion. Ya no se lee esa variable. En desarrollo, `datos-prueba.sql` inicializa los 10 dias junto
+con las otras semillas. La API administrativa `GET/PUT /plazo-descargo` requiere administrador;
+el PUT recibe `revisionBase`, `plazoDescargoDias` (entero de 1 a 365) y `fundamento` (1 a 500 caracteres),
+con control de ediciones concurrentes y registro `descargos.plazo_actualizado`.
 
 ### Portal publico (frontofficeciudadanos, sin login)
 

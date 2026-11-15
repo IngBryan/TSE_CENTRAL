@@ -280,7 +280,7 @@ class CicloVidaCasosFiscalizacionTest {
     }
 
     private InfraccionesService conReloj(Instant ahora) throws Exception {
-        var constructor = InfraccionesService.class.getDeclaredConstructor(int.class, Clock.class);
+        var constructor = InfraccionesService.class.getDeclaredConstructor(Integer.class, Clock.class);
         constructor.setAccessible(true);
         var servicio = constructor.newInstance(10, Clock.fixed(ahora, URUGUAY));
         var autorizacion = new AutorizacionResponsable();

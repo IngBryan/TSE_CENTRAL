@@ -73,7 +73,7 @@ export default function MapaEvidencia2D({ rutas, puntos, pruebas, mostrarRutas =
 
   return <div>
     <div ref={nodo} role="img" aria-label={contexto === "evidencia"
-      ? "Evidencia registrada: dos mediciones del desvío y geometrías de referencia archivadas"
+      ? "Recorrido GPS del viaje, confirmación del desvío y rutas de referencia archivadas"
       : contexto === "sin-guia" ? "Posiciones vinculadas a la circulación sin guía"
       : "Recorrido GPS posterior a la detección y rutas actualmente autorizadas"}
       className="relative z-0 h-[370px] w-full rounded-xl border border-border sm:h-[480px]" />

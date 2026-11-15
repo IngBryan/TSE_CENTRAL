@@ -198,8 +198,6 @@ services:
       # Claves que exigen las API REST (header X-Api-Key): una por frontoffice
       - CIUDADANOS_API_KEY=${CIUDADANOS_API_KEY}
       - FUNCIONARIOS_API_KEY=${FUNCIONARIOS_API_KEY}
-      # Dias corridos desde la notificacion para que la empresa presente el descargo de una infraccion
-      - PLAZO_DESCARGO_DIAS=${PLAZO_DESCARGO_DIAS:-10}
       # Pasar solos a EN_DESCARGO los casos con el plazo vencido sin descargo (todos los dias a las 00:05)
       - VENCIMIENTO_DESCARGO_ACTIVO=${VENCIMIENTO_DESCARGO_ACTIVO:-true}
       # Portal publico: minimo de empresas distintas para publicar un numero (nunca menos de 3)
