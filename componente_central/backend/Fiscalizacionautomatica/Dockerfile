@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM maven:3.9-eclipse-temurin-25 AS builder
+ARG OTEL_JAVAAGENT_VERSION=2.11.0
 WORKDIR /build
 # The remote EJB contracts (ejb-client of Frontofficeciudadanos, Frontofficefuncionarios and
 # Backofficeautoridadesadministradores) come from the "backend" context (componente_central/backend,
@@ -21,11 +22,18 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp -q -f Backofficeautoridadesadministradores/pom.xml -pl ejb -am clean install -Dmaven.test.skip=true; \
     mvn -B -ntp -q -f Fiscalizacionautomatica/pom.xml package -Dmaven.test.skip=true
 
+RUN curl -fsSL -o /out-otel-javaagent.jar \
+    "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVAAGENT_VERSION}/opentelemetry-javaagent.jar"
+
 # ---- runtime ----
 FROM eclipse-temurin:25-jre-alpine
 # Unprivileged user with a fixed uid, so Kubernetes can verify it is not root
 RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app
 COPY --from=builder /build/Fiscalizacionautomatica/target/fiscalizacionautomatica.jar /app/fiscalizacionautomatica.jar
+# OpenTelemetry Java agent: auto-instrumentacion de amqp-client (consumo de RabbitMQ) y mongodb-driver.
+# Se activa via JAVA_TOOL_OPTIONS (deployment.yaml) solo en el modo tracking-consumer; el poller de
+# balanzas (cronjob-poller.yaml) no la define porque habla con un nodo periferico, fuera de alcance.
+COPY --from=builder /out-otel-javaagent.jar /app/otel-javaagent.jar
 USER app
 # The mode goes as argument: tracking-consumer (default), weighings-poller or detect-situations
 ENTRYPOINT ["java", "-jar", "/app/fiscalizacionautomatica.jar"]

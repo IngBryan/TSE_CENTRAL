@@ -8,6 +8,7 @@
 
 ARG WILDFLY_IMAGE=quay.io/wildfly/wildfly:41.0.0.Final-jdk25
 ARG PG_JDBC_VERSION=42.7.13
+ARG OTEL_JAVAAGENT_VERSION=2.11.0
 
 # ---- build: compila los proyectos Maven (el codigo usa release 24, se compila con JDK 25) ----
 FROM maven:3.9-eclipse-temurin-25 AS builder
@@ -33,9 +34,15 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 # ---- runtime ----
 FROM ${WILDFLY_IMAGE}
+ARG OTEL_JAVAAGENT_VERSION
 USER jboss
 COPY --from=builder --chown=jboss:jboss /out/postgresql.jar /tmp/postgresql.jar
 COPY --chown=jboss:jboss datasources.cli /tmp/cli/
+
+# OpenTelemetry Java agent (auto-instrumentacion: JAX-RS/Servlet, JDBC, cliente AMQP). Se activa via
+# JAVA_TOOL_OPTIONS en deployment.yaml, sin tocar start.sh ni standalone.conf.
+RUN curl -fsSL -o /opt/jboss/wildfly/otel-javaagent.jar \
+  "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVAAGENT_VERSION}/opentelemetry-javaagent.jar"
 
 # Configura WildFly una vez, al construir la imagen. Host, usuario y password de la base quedan
 # como expresiones: se resuelven al arrancar el contenedor con DB_HOST/DB_PORT/DB_USER/DB_PASSWORD,

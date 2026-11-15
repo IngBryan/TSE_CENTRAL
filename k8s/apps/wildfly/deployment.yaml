@@ -142,6 +142,30 @@ spec:
             - name: JBOSS_JAVA_SIZING
               value: "-Xms256m -Xmx1200m"
 
+            # OpenTelemetry: JAVA_TOOL_OPTIONS lo lee la JVM directamente (java binary), asi que no
+            # pisa el resto de JAVA_OPTS que arma standalone.conf.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/opt/jboss/wildfly/otel-javaagent.jar"
+
+            - name: OTEL_SERVICE_NAME
+              value: "wildfly-central"
+
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://grafana-cloud-otel-receiver.grafana-cloud.svc.cluster.local:4317"
+
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+
+            # De momento solo trazas: las metricas de postgres/rabbitmq/mongo ya las manda Alloy aparte.
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+
           envFrom:
             - configMapRef:
                 name: wildfly-config
