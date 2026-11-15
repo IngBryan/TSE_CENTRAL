@@ -52,6 +52,15 @@
         </dependency>
 
         <!-- Test scope dependencies -->
+        <!-- El ciclo completo usa las operaciones reales de descargo y vencimiento.
+             Solo para tests: no se agrega el EJB de Ciudadanos al despliegue. -->
+        <dependency>
+            <groupId>tse.lab.frontofficeciudadanos</groupId>
+            <artifactId>frontofficeciudadanos-ejb</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <type>ejb</type>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

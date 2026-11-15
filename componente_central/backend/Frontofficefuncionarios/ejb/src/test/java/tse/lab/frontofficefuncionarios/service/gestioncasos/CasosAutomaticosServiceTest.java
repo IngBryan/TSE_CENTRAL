@@ -18,6 +18,8 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
@@ -202,15 +204,28 @@ class CasosAutomaticosServiceTest {
         assertEquals(EstadoCaso.NOTIFICADA, cambio.getEstadoNuevo());
     }
 
-    @Test
-    void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada() {
-        DatosCaso creado = iniciarCirculacion();
+    @ParameterizedTest(name = "CL-G12: notificar nuevamente desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = "DETECTADA", mode = EnumSource.Mode.EXCLUDE)
+    void notificarUnCasoQueYaNoEstaDetectadoNoHaceNada(EstadoCaso estado) {
+        DatosCaso creado = enTx(() -> servicio.registrarEvidencia(
+                TipoCasoAutomatico.EXCESO_CARGA, "GV-1", PESAJE_T1));
         enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
+        enTx(() -> {
+            var c = em.find(CasoFiscalizacion.class, creado.getId());
+            if (estado != EstadoCaso.NOTIFICADA) c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            if (estado.esFinal()) c.cambiarEstado(estado);
+            return null;
+        });
+        var registrosPrevios = auditoria(creado.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
 
-        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "c-1"));
+        DatosCaso otraVez = enTx(() -> servicio.notificarCaso(creado.getId(), "repetida"));
 
-        assertEquals("NOTIFICADA", otraVez.getEstado());
-        assertEquals(2, auditoria(creado.getId()).size());
+        assertEquals(creado.getId(), otraVez.getId());
+        assertEquals(estado.name(), otraVez.getEstado());
+        assertEquals(estado, caso(creado.getId()).getEstado());
+        assertEquals(1, caso(creado.getId()).getEventosPesajes().size());
+        assertEquals(registrosPrevios,
+                auditoria(creado.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
     }
 
     @Test
@@ -312,17 +327,54 @@ class CasosAutomaticosServiceTest {
                 servicio.registrarEvidencia(TipoCasoAutomatico.VIAJE_SIN_GUIA, null, TRACKING_T1)));
     }
 
-    @Test
-    void reprocesarEventoDeCasoResueltoNoAbreOtroCaso() {
+    @ParameterizedTest(name = "TR-C01: reentrega de GPS desde {0}")
+    @EnumSource(value = EstadoCaso.class, names = { "EN_DESCARGO", "CONFIRMADA", "DESESTIMADA" })
+    void reprocesarGpsConservaSuCasoInclusoSiEstaResuelto(EstadoCaso estado) {
         DatosCaso primero = iniciarCirculacion();
+        enTx(() -> servicio.notificarCaso(primero.getId(), "notificacion"));
         enTx(() -> {
             CasoFiscalizacion c = em.find(CasoFiscalizacion.class, primero.getId());
-            c.cambiarEstado(EstadoCaso.NOTIFICADA);
             c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            if (estado.esFinal()) c.cambiarEstado(estado);
             return null;
         });
+        var claves = List.copyOf(caso(primero.getId()).getClavesEventosTracking());
+        var registros = auditoria(primero.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
         DatosCaso repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T1, -34.9, -56.1)));
         assertEquals(primero.getId(), repetido.getId());
+        assertEquals(estado.name(), repetido.getEstado());
+        assertEquals(claves, caso(primero.getId()).getClavesEventosTracking());
+        assertEquals(registros, auditoria(primero.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
+        assertEquals(1L, em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c", Long.class).getSingleResult());
+    }
+
+    @ParameterizedTest(name = "TR-C02: GPS nuevo después de {0}")
+    @EnumSource(value = EstadoCaso.class, names = { "CONFIRMADA", "DESESTIMADA" })
+    void gpsNuevoTrasResolucionCreaOtroCasoYLaReentregaConservaElAnterior(EstadoCaso estado) {
+        DatosCaso anterior = iniciarCirculacion();
+        enTx(() -> servicio.notificarCaso(anterior.getId(), "notificacion"));
+        enTx(() -> {
+            var c = em.find(CasoFiscalizacion.class, anterior.getId());
+            c.cambiarEstado(EstadoCaso.EN_DESCARGO);
+            c.cambiarEstado(estado);
+            return null;
+        });
+        var evidenciaAnterior = List.copyOf(caso(anterior.getId()).getClavesEventosTracking());
+        var auditoriaAnterior = auditoria(anterior.getId()).stream().map(RegistroAuditoriaCaso::getId).toList();
+        Instant siguiente = T2.plusSeconds(10);
+        var nuevo = enTx(() -> servicio.registrarCirculacionSinGuia(gps(siguiente, -34.9, -56.096)));
+        assertNotEquals(anterior.getId(), nuevo.getId());
+        assertEquals("DETECTADA", nuevo.getEstado());
+        assertEquals(List.of(new ClaveEvento("SBC1234", siguiente)), caso(nuevo.getId()).getClavesEventosTracking());
+        assertEquals(MotivoFinCirculacionSinGuia.CASO_RESUELTO, circulacion(anterior.getId()).getMotivoFin());
+        assertEquals(EstadoCirculacionSinGuia.ACTIVA, circulacion(nuevo.getId()).getEstado());
+
+        var repetido = enTx(() -> servicio.registrarCirculacionSinGuia(gps(T2, -34.9, -56.098)));
+        assertEquals(anterior.getId(), repetido.getId());
+        assertEquals(estado, caso(anterior.getId()).getEstado());
+        assertEquals(evidenciaAnterior, caso(anterior.getId()).getClavesEventosTracking());
+        assertEquals(auditoriaAnterior, auditoria(anterior.getId()).stream().map(RegistroAuditoriaCaso::getId).toList());
+        assertEquals(2L, em.createQuery("SELECT COUNT(c) FROM CasoFiscalizacion c", Long.class).getSingleResult());
     }
 
     @Test

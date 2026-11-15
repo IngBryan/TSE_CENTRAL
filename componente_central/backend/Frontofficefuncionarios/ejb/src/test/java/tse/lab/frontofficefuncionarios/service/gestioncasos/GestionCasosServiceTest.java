@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -20,6 +21,10 @@ import jakarta.persistence.Persistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import tse.lab.frontofficefuncionarios.data.AuditoriaCasoDAO;
 import tse.lab.frontofficefuncionarios.data.NoOpTransactions;
@@ -440,33 +445,63 @@ class GestionCasosServiceTest {
         }
     }
 
-    @Test
-    void unCasoResueltoNoSePuedeVolverAResolver() throws Exception {
-        enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo, new Resolucion("CONFIRMAR", "primera"), "t"));
-        for (String decision : List.of("CONFIRMAR", "DESESTIMAR")) {
-            assertEquals("TRANSICION_NO_PERMITIDA", assertThrows(ConflictoException.class, () -> enTx(
-                    () -> servicio.resolver(FUNCIONARIO, enDescargo, new Resolucion(decision, "segunda"), "t")))
-                    .getCodigo());
-        }
+    @ParameterizedTest(name = "CL-G02: {0}, luego intentar {2}")
+    @CsvSource({
+            "CONFIRMAR, CONFIRMADA, CONFIRMAR",
+            "CONFIRMAR, CONFIRMADA, DESESTIMAR",
+            "DESESTIMAR, DESESTIMADA, CONFIRMAR",
+            "DESESTIMAR, DESESTIMADA, DESESTIMAR"
+    })
+    void unCasoResueltoNoSePuedeVolverAResolver(String primera, EstadoCaso estado, String segunda) throws Exception {
+        enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo, new Resolucion(primera, "primera"), "original"));
         em.clear();
-        assertEquals(EstadoCaso.CONFIRMADA, em.find(CasoFiscalizacion.class, enDescargo).getEstado());
-        assertEquals(1, auditoria(enDescargo).size());
+        var resolucionOriginal = em.find(CasoFiscalizacion.class, enDescargo).getFundamentoResolucion().getId();
+        var auditoriaOriginal = auditoria(enDescargo).stream().map(RegistroAuditoriaCaso::getId).toList();
+
+        assertEquals("TRANSICION_NO_PERMITIDA", assertThrows(ConflictoException.class, () -> enTx(
+                () -> servicio.resolver(FUNCIONARIO, enDescargo, new Resolucion(segunda, "segunda"), "reintento")))
+                .getCodigo());
+        em.clear();
+        var caso = em.find(CasoFiscalizacion.class, enDescargo);
+        assertEquals(estado, caso.getEstado());
+        assertEquals(resolucionOriginal, caso.getFundamentoResolucion().getId());
+        assertEquals(1, caso.getEventosPesajes().size());
+        assertEquals("La balanza estaba descalibrada", caso.getDescargo().getDescripcion());
+        assertEquals(auditoriaOriginal, auditoria(enDescargo).stream().map(RegistroAuditoriaCaso::getId).toList());
         assertEquals("primera", em.createQuery("SELECT f.descripcion FROM FundamentoResolucion f", String.class)
                 .getSingleResult());
     }
 
-    @Test
-    void datosInvalidosNoModificanElCaso() {
+    @ParameterizedTest(name = "CL-G09/G10: {0}")
+    @MethodSource("resolucionesInvalidas")
+    void datosInvalidosNoModificanElCaso(String escenario, Resolucion datos, String campo) {
         DatosInvalidosException e = assertThrows(DatosInvalidosException.class,
-                () -> enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo, new Resolucion("APROBAR", "   "), "t")));
+                () -> enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo, datos, "t")));
+        assertTrue(e.getErrores().containsKey(campo));
+        assertSinCambios(enDescargo, EstadoCaso.EN_DESCARGO);
+        var caso = em.find(CasoFiscalizacion.class, enDescargo);
+        assertEquals("La balanza estaba descalibrada", caso.getDescargo().getDescripcion());
+        assertEquals(1, caso.getEventosPesajes().size());
+    }
+
+    static Stream<Arguments> resolucionesInvalidas() {
+        var fundamentos = Stream.of("CONFIRMAR", "DESESTIMAR").flatMap(decision -> Stream.of(
+                Arguments.of(decision + " sin fundamento", new Resolucion(decision, null), "fundamento"),
+                Arguments.of(decision + " con fundamento vacío", new Resolucion(decision, ""), "fundamento"),
+                Arguments.of(decision + " con espacios", new Resolucion(decision, "   "), "fundamento"),
+                Arguments.of(decision + " con fundamento demasiado largo",
+                        new Resolucion(decision, "x".repeat(RegistroAuditoriaCaso.MAX_FUNDAMENTO + 1)), "fundamento")));
+        return Stream.concat(fundamentos, Stream.of(
+                Arguments.of("decisión inválida y fundamento válido", new Resolucion("APROBAR", "Fundamento válido"), "decision"),
+                Arguments.of("sin datos", null, "fundamento")));
+    }
+
+    @Test
+    void losErroresDeDecisionYFundamentoSeInformanJuntos() {
+        var e = assertThrows(DatosInvalidosException.class, () -> enTx(() -> servicio.resolver(FUNCIONARIO,
+                enDescargo, new Resolucion("APROBAR", "   "), "t")));
         assertTrue(e.getErrores().containsKey("decision"));
         assertTrue(e.getErrores().containsKey("fundamento"));
-        assertTrue(assertThrows(DatosInvalidosException.class,
-                () -> enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo,
-                        new Resolucion("CONFIRMAR", "x".repeat(RegistroAuditoriaCaso.MAX_FUNDAMENTO + 1)), "t")))
-                .getErrores().get("fundamento").contains("2000"));
-        assertThrows(DatosInvalidosException.class,
-                () -> enTx(() -> servicio.resolver(FUNCIONARIO, enDescargo, null, "t")));
         assertSinCambios(enDescargo, EstadoCaso.EN_DESCARGO);
     }
 
