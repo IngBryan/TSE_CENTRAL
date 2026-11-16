@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Encabezado, botonGubUy, botonSecundario } from "@/components/encabezado";
-import type { EstadoPerfil } from "@/lib/auth/perfil";
+import { perfilVigente, type EstadoPerfil } from "@/lib/auth/perfil";
 import { getSesion } from "@/lib/auth/session";
 import { BASE_PATH } from "@/lib/base-path";
 
@@ -15,9 +15,11 @@ const ESTADOS: Record<EstadoPerfil, string> = {
 // Area privada: sin sesion se vuelve al portal publico.
 export default async function MiCuenta({ searchParams }: PageProps<"/mi-cuenta">) {
   const params = await searchParams;
-  const sesion = await getSesion();
-  if (!sesion) redirect("/");
-  const { perfil } = sesion;
+  const deCookie = await getSesion();
+  if (!deCookie) redirect("/");
+  // El estado vigente (validado por el job de la PDI despues del ingreso, roles nuevos) y no la foto del login
+  const perfil = await perfilVigente(deCookie.perfil);
+  const sesion = { ...deCookie, perfil };
   const roles = perfil.roles ?? [];
   const responsable = roles.filter((r) => r.rol === "RESPONSABLE");
   const chofer = roles.filter((r) => r.rol === "CHOFER");

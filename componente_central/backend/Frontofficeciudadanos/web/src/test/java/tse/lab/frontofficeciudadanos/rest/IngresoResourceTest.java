@@ -15,8 +15,10 @@ import org.junit.jupiter.api.Test;
 import tse.lab.frontofficeciudadanos.rest.IngresoResource.IngresoRequest;
 import tse.lab.frontofficeciudadanos.rest.IngresoResource.IngresoResponse;
 import tse.lab.frontofficeciudadanos.rest.IngresoResource.IngresoTestingRequest;
+import tse.lab.frontofficeciudadanos.rest.IngresoResource.PerfilActualResponse;
 import tse.lab.frontofficeciudadanos.service.adaptadorpdi.ResultadoValidacion;
 import tse.lab.frontofficeciudadanos.service.autenticacion.IngresoService;
+import tse.lab.frontofficeciudadanos.service.autenticacion.PerfilActual;
 import tse.lab.frontofficeciudadanos.service.autenticacion.ResultadoIngreso;
 import tse.lab.frontofficeciudadanos.service.autenticacion.RolPersona;
 import tse.lab.model.Ciudadano;
@@ -88,8 +90,44 @@ class IngresoResourceTest {
         assertNull(ingreso.llamada);
     }
 
+    @Test
+    void perfilDevuelveElEstadoActualYLosRoles() {
+        var res = recurso.perfil(CI);
+
+        assertEquals(200, res.getStatus());
+        PerfilActualResponse r = (PerfilActualResponse) res.getEntity();
+        assertEquals(CI, r.perfil().cedula());
+        assertEquals("VALIDADO", r.perfil().estado());
+        assertEquals(List.of(RolPersona.Rol.RESPONSABLE), r.roles().stream().map(RolPersona::rol).toList());
+        assertEquals("perfil " + CI, ingreso.llamada);
+    }
+
+    @Test
+    void perfilDeCedulaSinPerfilRespondeNotFound() {
+        assertEquals(404, recurso.perfil(SIN_PERFIL).getStatus());
+    }
+
+    @Test
+    void perfilSinUsuarioEsInvalido() {
+        assertEquals(400, recurso.perfil(null).getStatus());
+        assertEquals(400, recurso.perfil("12").getStatus());
+        assertNull(ingreso.llamada);
+    }
+
+    private static final String SIN_PERFIL = "11111111";
+
     private static class IngresoFalso extends IngresoService {
         String llamada;
+
+        @Override
+        public PerfilActual perfilActual(String cedula) {
+            llamada = "perfil " + cedula;
+            if (SIN_PERFIL.equals(cedula)) {
+                return null;
+            }
+            ResultadoIngreso r = resultado(cedula);
+            return new PerfilActual(r.perfil(), r.roles());
+        }
 
         @Override
         public ResultadoIngreso ingresarConGubUy(String cedula, String email, String sub, String correlationId) {

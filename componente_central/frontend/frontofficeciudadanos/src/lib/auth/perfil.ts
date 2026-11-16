@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { BackendNoDisponible, llamarBackend } from "../backend";
 import { ErrorLogin, type ClaimsGubUy } from "./oidc";
 
@@ -87,4 +88,31 @@ async function ingresar(ruta: string, body: unknown, nombreAlternativo: string, 
     sesionPermitida: r.sesionPermitida,
     nuevo: r.nuevo,
   };
+}
+
+type RespuestaPerfil = { perfil: RespuestaIngreso["perfil"]; roles?: Rol[] };
+
+// Perfil vigente: el de la sesion es una foto del momento del ingreso, y el job de revalidacion de la PDI
+// (CU-04) o un alta de rol lo pueden cambiar despues. Se lo pide al backend (sin consultar la PDI); si el
+// backend no responde, se sigue mostrando el de la sesion.
+export async function perfilVigente(deSesion: PerfilCiudadano): Promise<PerfilCiudadano> {
+  try {
+    const res = await llamarBackend<RespuestaPerfil>("/ciudadanos/perfil", {
+      correlationId: randomUUID(),
+      usuarioCi: deSesion.cedula,
+    });
+    if (res.status !== 200 || !res.data) return deSesion;
+    const p = res.data.perfil;
+    const nombrePdi = [p.nombres, p.apellidos].filter(Boolean).join(" ");
+    return {
+      cedula: p.cedula,
+      nombre: nombrePdi || deSesion.nombre,
+      email: p.email ?? deSesion.email,
+      estado: p.estado,
+      roles: res.data.roles ?? [],
+    };
+  } catch (e) {
+    if (e instanceof BackendNoDisponible) return deSesion;
+    throw e;
+  }
 }
