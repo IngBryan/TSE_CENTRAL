@@ -101,6 +101,21 @@ class IngresoServiceTest {
         assertEquals("nuevo@prueba.uy", guardado.getEmail());
     }
 
+    @Test
+    void perfilActualDevuelveElEstadoYLosRolesSinConsultarLaPdi() throws Exception {
+        set(servicio, "validacionPdi", null); // si consultara la PDI fallaria
+
+        PerfilActual p = servicio.perfilActual(RESPONSABLE);
+
+        assertEquals(EstadoValidacion.VALIDADO, p.perfil().getEstado());
+        assertEquals(List.of(RolPersona.Rol.RESPONSABLE), p.roles().stream().map(RolPersona::rol).toList());
+    }
+
+    @Test
+    void perfilActualDeCedulaSinPerfilEsNull() {
+        assertNull(servicio.perfilActual("48060995"));
+    }
+
     // PDI falsa: valida a cualquiera
     private static class PdiQueValida extends ValidacionPdiService {
         @Override
