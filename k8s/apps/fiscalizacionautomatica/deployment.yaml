@@ -24,12 +24,15 @@ spec:
           image: ghcr.io/ingbryan/tse_central/fiscalizacionautomatica:latest
 
           env:
+            - name: ENVIRONMENT
+              value: "prod"
+
             # RabbitMQ
             - name: RABBITMQ_HOST
               value: rabbitmq
 
             - name: RABBITMQ_PORT
-              value: "5672"
+              value: "5671"
 
             - name: RABBITMQ_USER
               valueFrom:

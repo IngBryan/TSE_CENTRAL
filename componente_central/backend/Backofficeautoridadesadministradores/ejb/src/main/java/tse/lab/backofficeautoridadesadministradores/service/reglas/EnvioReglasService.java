@@ -23,6 +23,9 @@ public class EnvioReglasService {
         f.setPort(Integer.parseInt(env("RABBITMQ_PORT", "5672")));
         f.setUsername(env("RABBITMQ_USER", "guest"));
         f.setPassword(env("RABBITMQ_PASSWORD", "guest"));
+        if (!"dev".equals(env("ENVIRONMENT", "dev"))) {
+            f.useSslProtocol();
+        }
         f.setConnectionTimeout(3000); f.setHandshakeTimeout(3000);
         f.setAutomaticRecoveryEnabled(false);
         try (Connection connection=f.newConnection("backoffice-reglas"); Channel canal=connection.createChannel()) {

@@ -6,5 +6,5 @@ spec:
   type: ExternalName
   externalName: tse-rabbitmq.web.elasticloud.uy
   ports:
-    - name: amqp
-      port: 5672
+    - name: amqps
+      port: 5671

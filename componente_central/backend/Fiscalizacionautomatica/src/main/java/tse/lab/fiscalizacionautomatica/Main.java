@@ -13,6 +13,7 @@ import com.rabbitmq.client.AuthenticationFailureException;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -99,7 +100,7 @@ public class Main {
      * releases the main thread, which closes everything in reverse order (first RabbitMQ, so nothing new
      * arrives, then the queued detections, then the clients) before the JVM exits.
      */
-    private static void startTrackingConsumer() throws IOException, InterruptedException {
+    private static void startTrackingConsumer() throws IOException, InterruptedException, GeneralSecurityException {
         requireEnv("RABBITMQ_USER", "RABBITMQ_PASSWORD", "MONGO_USER", "MONGO_PASSWORD", "EJB_USER", "EJB_PASSWORD");
         String user = System.getenv("EJB_USER");
         String password = System.getenv("EJB_PASSWORD");
@@ -376,12 +377,15 @@ public class Main {
         }
     }
 
-    private static ConnectionFactory createRabbitConnectionFactory() {
+    private static ConnectionFactory createRabbitConnectionFactory() throws GeneralSecurityException {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(env("RABBITMQ_HOST", "localhost"));
         factory.setPort(Integer.parseInt(env("RABBITMQ_PORT", "5672")));
         factory.setUsername(System.getenv("RABBITMQ_USER"));
         factory.setPassword(System.getenv("RABBITMQ_PASSWORD"));
+        if (!"dev".equals(env("ENVIRONMENT", "dev"))) {
+            factory.useSslProtocol();
+        }
         // If the connection drops, the client reconnects on its own and registers the consumer again
         factory.setAutomaticRecoveryEnabled(true);
         return factory;
