@@ -24,7 +24,8 @@ public class EnvioReglasService {
         f.setUsername(env("RABBITMQ_USER", "guest"));
         f.setPassword(env("RABBITMQ_PASSWORD", "guest"));
         if (!"dev".equals(env("ENVIRONMENT", "dev"))) {
-            f.useSslProtocol();
+            // The deployed RabbitMQ uses a hand-made certificate, not from a trusted CA
+            f.useTlsWithNoVerification();
         }
         f.setConnectionTimeout(3000); f.setHandshakeTimeout(3000);
         f.setAutomaticRecoveryEnabled(false);

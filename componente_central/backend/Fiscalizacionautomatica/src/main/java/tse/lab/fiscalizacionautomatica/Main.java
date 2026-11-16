@@ -384,7 +384,8 @@ public class Main {
         factory.setUsername(System.getenv("RABBITMQ_USER"));
         factory.setPassword(System.getenv("RABBITMQ_PASSWORD"));
         if (!"dev".equals(env("ENVIRONMENT", "dev"))) {
-            factory.useSslProtocol();
+            // The deployed RabbitMQ uses a hand-made certificate, not from a trusted CA
+            factory.useTlsWithNoVerification();
         }
         // If the connection drops, the client reconnects on its own and registers the consumer again
         factory.setAutomaticRecoveryEnabled(true);
