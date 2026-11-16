@@ -51,6 +51,31 @@ spec:
                   name: tse-runtime-secrets
                   key: postgres-password
 
+            # MongoDB: consulta de posiciones GPS en Funcionarios
+            - name: MONGO_HOST
+              value: mongodb
+
+            - name: MONGO_PORT
+              value: "27017"
+
+            - name: MONGO_DB
+              value: main_db
+
+            - name: MONGO_AUTH_DB
+              value: admin
+
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: mongo-user
+
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tse-runtime-secrets
+                  key: mongo-password
+
             # RabbitMQ
             - name: RABBITMQ_HOST
               value: rabbitmq
