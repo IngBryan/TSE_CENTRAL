@@ -46,6 +46,11 @@ spec:
                   name: tse-runtime-secrets
                   key: rabbitmq-password
 
+            # El agente de OpenTelemetry tira NoClassDefFoundError (RabbitCommandInstrumentation$SpanHolder)
+            # al crear el canal AMQP. Se desactiva esa instrumentacion puntual hasta resolverlo.
+            - name: OTEL_INSTRUMENTATION_RABBITMQ_ENABLED
+              value: "false"
+
             # MongoDB
             - name: MONGO_HOST
               value: mongodb
