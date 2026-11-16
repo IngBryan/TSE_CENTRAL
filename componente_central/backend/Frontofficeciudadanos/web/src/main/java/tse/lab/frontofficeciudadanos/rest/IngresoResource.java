@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 import jakarta.ejb.EJB;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -14,6 +16,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import tse.lab.frontofficeciudadanos.service.autenticacion.IngresoService;
+import tse.lab.frontofficeciudadanos.service.autenticacion.PerfilActual;
 import tse.lab.frontofficeciudadanos.service.autenticacion.ResultadoIngreso;
 import tse.lab.frontofficeciudadanos.service.autenticacion.RolPersona;
 import tse.lab.model.Ciudadano;
@@ -79,6 +82,26 @@ public class IngresoResource {
         }
         String correlationId = (String) req.getAttribute(ApiKeyFilter.CORRELATION_ID);
         return respuesta(ingreso.ingresarParaTesting(body.cedula(), correlationId));
+    }
+
+    public record PerfilActualResponse(PerfilResponse perfil, List<RolPersona> roles) {
+    }
+
+    // Perfil y roles vigentes de quien tiene la sesion (X-Usuario-Ci), sin consultar la PDI. El front lo usa
+    // para no quedarse con el estado que tenia al ingresar (el job CU-04 puede haberlo validado despues).
+    @GET
+    @Path("/perfil")
+    public Response perfil(@HeaderParam("X-Usuario-Ci") String usuario) {
+        if (usuario == null || !CEDULA.matcher(usuario).matches()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "X-Usuario-Ci (6 a 8 digitos) obligatorio"))
+                    .build();
+        }
+        PerfilActual p = ingreso.perfilActual(usuario);
+        if (p == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(new PerfilActualResponse(PerfilResponse.de(p.perfil()), p.roles())).build();
     }
 
     private static Response respuesta(ResultadoIngreso r) {

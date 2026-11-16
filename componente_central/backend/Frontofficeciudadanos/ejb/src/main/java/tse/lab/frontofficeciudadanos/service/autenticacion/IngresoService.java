@@ -79,4 +79,12 @@ public class IngresoService {
                 .campo("roles", rolesPersona.stream().map(r -> r.rol() + ":" + r.nroEmpresa()).toList()).toString());
         return new ResultadoIngreso(perfil, resultado, nuevo, sesion, rolesPersona);
     }
+
+    // Perfil y roles actuales, de solo lectura: no consulta la PDI ni actualiza el ultimo ingreso. El front lo
+    // pide para mostrar el estado vigente, porque el job de revalidacion (CU-04) puede haber validado el
+    // perfil despues del ingreso. null si la cedula no tiene perfil.
+    public PerfilActual perfilActual(String cedula) {
+        Ciudadano perfil = perfiles.buscarPorCi(cedula);
+        return perfil == null ? null : new PerfilActual(perfil, roles.rolesDe(cedula));
+    }
 }
