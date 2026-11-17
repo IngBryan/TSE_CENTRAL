@@ -64,6 +64,7 @@ spec:
         protocol: amqp
         host: amqps://node6261-tse-rabbitmq.web.elasticloud.uy:5671
         tls: enable
+        unsafeSsl: "true"
         vhostName: "/"
         queueName: tracking.events
         mode: QueueLength
