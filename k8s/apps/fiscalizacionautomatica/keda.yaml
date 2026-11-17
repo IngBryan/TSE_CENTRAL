@@ -20,6 +20,9 @@ spec:
     - parameter: password
       name: tse-runtime-secrets
       key: rabbitmq-password
+    - parameter: ca
+      name: tse-runtime-secrets
+      key: rabbitmq-ca
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -59,7 +62,8 @@ spec:
       name: queue-length
       metadata:
         protocol: amqp
-        host: amqp://rabbitmq.tse.svc.cluster.local:5672
+        host: amqps://rabbitmq.tse.svc.cluster.local:5671
+        tls: enable
         vhostName: "/"
         queueName: tracking.events
         mode: QueueLength
