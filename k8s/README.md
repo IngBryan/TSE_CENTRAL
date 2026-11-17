@@ -116,7 +116,6 @@ credenciales compartidas por las aplicaciones.
 | `postgres-user`, `postgres-password` | Conexión de WildFly a PostgreSQL |
 | `mongo-user`, `mongo-password` | Conexión a MongoDB |
 | `rabbitmq-user`, `rabbitmq-password` | Conexión a RabbitMQ y autenticación de KEDA |
-| `rabbitmq-ca` | Certificado de RabbitMQ (AMQPS), usado por KEDA para validar la conexión del trigger `queue-length` |
 | `ciudadanos-api-key` | Clave compartida entre el frontend y backend de ciudadanos |
 | `funcionarios-api-key` | Clave compartida entre el frontend y backend de funcionarios |
 | `ejb-user`, `ejb-password` | Autenticación EJB remota de fiscalización |
@@ -136,7 +135,6 @@ kubectl -n tse create secret generic tse-runtime-secrets \
   --from-literal=mongo-password='<MONGO_PASSWORD>' \
   --from-literal=rabbitmq-user='<RABBITMQ_USER>' \
   --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>' \
-  --from-literal=rabbitmq-ca="$(cat rabbitmq.crt)" \
   --from-literal=ciudadanos-api-key='<CIUDADANOS_API_KEY>' \
   --from-literal=funcionarios-api-key='<FUNCIONARIOS_API_KEY>' \
   --from-literal=ejb-user='<EJB_USER>' \
@@ -161,14 +159,6 @@ kubectl -n tse patch secret tse-runtime-secrets --type merge \
 
 Después de cambiar secretos utilizados como variables de entorno,
 reiniciar los Deployments afectados para que tomen los nuevos valores.
-
-`rabbitmq-ca` es el certificado (PEM), con saltos de línea, así que
-conviene cargarlo desde un archivo en vez de `--from-literal`:
-
-```bash
-kubectl -n tse patch secret tse-runtime-secrets --type merge \
-  -p "{\"stringData\":{\"rabbitmq-ca\":\"$(cat rabbitmq.crt)\"}}"
-```
 
 ### 3. Configuración e integración con ID Uruguay y PDI
 

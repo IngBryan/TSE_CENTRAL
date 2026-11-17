@@ -20,9 +20,6 @@ spec:
     - parameter: password
       name: tse-runtime-secrets
       key: rabbitmq-password
-    - parameter: ca
-      name: tse-runtime-secrets
-      key: rabbitmq-ca
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -62,9 +59,11 @@ spec:
       name: queue-length
       metadata:
         protocol: amqp
-        host: amqps://node6261-tse-rabbitmq.web.elasticloud.uy:5671
-        tls: enable
-        unsafeSsl: "true"
+        # KEDA (bug conocido en su scaler de rabbitmq) ignora el CA provisto y rechaza el certificado
+        # autofirmado incluso con unsafeSsl. Como este trigger solo corre dentro del cluster (nunca
+        # expuesto a Internet) y no mueve datos de negocio (solo el largo de la cola), se deja en AMQP
+        # plano; el consumo real de mensajes (WildFly, Fiscalizacionautomatica) sigue en AMQPS.
+        host: amqp://node6261-tse-rabbitmq.web.elasticloud.uy:5672
         vhostName: "/"
         queueName: tracking.events
         mode: QueueLength
