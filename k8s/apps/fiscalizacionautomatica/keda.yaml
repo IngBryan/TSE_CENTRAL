@@ -62,7 +62,7 @@ spec:
       name: queue-length
       metadata:
         protocol: amqp
-        host: amqps://rabbitmq.tse.svc.cluster.local:5671
+        host: amqps://node6261-tse-rabbitmq.web.elasticloud.uy:5671
         tls: enable
         vhostName: "/"
         queueName: tracking.events
