@@ -4,7 +4,7 @@ metadata:
   name: rabbitmq
 spec:
   type: ExternalName
-  externalName: tse-rabbitmq.web.elasticloud.uy
+  externalName: node6261-tse-rabbitmq.web.elasticloud.uy
   ports:
     - name: amqps
-      port: 5671
+      port: 11017

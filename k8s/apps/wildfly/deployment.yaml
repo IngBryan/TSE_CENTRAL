@@ -81,7 +81,7 @@ spec:
               value: rabbitmq
 
             - name: RABBITMQ_PORT
-              value: "5671"
+              value: "11017"
 
             - name: RABBITMQ_USER
               valueFrom:
