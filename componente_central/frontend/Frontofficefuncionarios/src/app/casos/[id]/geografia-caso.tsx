@@ -108,22 +108,24 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
-  const [pagina, setPagina] = useState(1);
+  const [pagina, setPagina] = useState<number | null>(null);
   const [claveSeleccionada, setClaveSeleccionada] = useState<string | null>(null);
   const [revisionFoco, setRevisionFoco] = useState(0);
   const [modoEncuadre, setModoEncuadre] = useState<"todo" | "confirmacion">("todo");
   const [mostrarRutas, setMostrarRutas] = useState(true);
   const [mostrarRecorrido, setMostrarRecorrido] = useState(true);
   const totalPaginas = Math.max(1, Math.ceil(pruebas.length / CONFIRMACIONES_POR_PAGINA));
-  const paginaActual = Math.min(pagina, totalPaginas);
-  // Guardar identidad, no índice: un nuevo registro nunca cambia la prueba elegida.
+  const paginaActual = Math.min(pagina ?? totalPaginas, totalPaginas);
+  // Sin selección manual, seguir el último par; conservar por identidad una prueba histórica elegida.
   const clavePrueba = (p: PruebaDesvioVista) => `${p.fechaPareja}|${p.fechaHora}|${p.latConfirmante}|${p.lonConfirmante}`;
-  const indiceBuscado = claveSeleccionada === null ? 0 : pruebas.findIndex(p => clavePrueba(p) === claveSeleccionada);
-  const indiceActual = indiceBuscado < 0 ? 0 : indiceBuscado;
+  const ultimoIndice = pruebas.length - 1;
+  const indiceBuscado = claveSeleccionada === null ? ultimoIndice : pruebas.findIndex(p => clavePrueba(p) === claveSeleccionada);
+  const indiceActual = indiceBuscado < 0 ? ultimoIndice : indiceBuscado;
   const pruebaActual = pruebas[indiceActual];
   const paginaInicio = (paginaActual - 1) * CONFIRMACIONES_POR_PAGINA;
   const seleccionar = (indice: number) => {
-    setClaveSeleccionada(clavePrueba(pruebas[indice]));
+    setClaveSeleccionada(indice === ultimoIndice ? null : clavePrueba(pruebas[indice]));
+    if (indice === ultimoIndice) setPagina(null);
     setModoEncuadre("confirmacion");
     setRevisionFoco(n => n + 1);
   };
@@ -283,7 +285,7 @@ export function GeografiaCaso({ id, tipo, guiaId, fechaDeteccion, pruebas, circu
           enfocar={revisionFoco} modoEncuadre={modoEncuadre} />
         <p className="mt-2 text-xs text-muted-foreground">
           {esDesvio
-            ? "Naranja: recorrido GPS. Amarillo y rojo: mediciones de la confirmación seleccionada. Verde, azul y violeta: rutas evaluadas en esa confirmación."
+            ? "Naranja: recorrido GPS. Amarillo y rojo: mediciones de la confirmación seleccionada."
             : `GPS del expediente: ${puntos.length}. Verde: primera posición; rojo: última posición observada.`}
         </p>
       </> : !cargando && !error && <p className="py-4 text-muted-foreground">

@@ -145,7 +145,7 @@ public final class RouteDeviationRule implements SituationRule {
     }
 
     private boolean confirmarPar(TrackingEvent actual, TrackingEvent otra, String idGuia,
-            List<IntervaloGuiaGps> ventanas, CorredorRutas corredor) {
+            List<IntervaloGuiaGps> ventanas, CorredorRutas corredor) throws IOException {
         Duration diferencia = Duration.between(actual.timestamp(), otra.timestamp()).abs();
         return !diferencia.isZero() && diferencia.compareTo(ventanaConfirmacion) <= 0
                 && AsociadorGpsGuia.resolver(otra, ventanas).correspondeA(idGuia)

@@ -111,6 +111,26 @@ class RouteDeviationRuleTest {
     }
 
     @Test
+    void confirmaConDistanciasUtmSoloAlSuperarElUmbral() throws IOException {
+        autorizadas = List.of(ruta(1, "{\"type\":\"LineString\",\"coordinates\":[[-57,-34.26],[-57,-34.24]]}"));
+        // Coordenadas inversas de PROJ en UTM 21S: 1999 y 2001 m de la ruta.
+        TrackingEvent dentro = new TrackingEvent("dentro", 0, 5, MATRICULA,
+                -34.249998077708, -56.978289772720, T);
+        TrackingEvent fuera = new TrackingEvent("fuera", 1, 5, MATRICULA,
+                -34.249998073860, -56.978268051634, T.plusSeconds(10));
+        TrackingEvent confirmante = new TrackingEvent("confirma", 2, 5, MATRICULA,
+                fuera.latitude(), fuera.longitude(), T.plusSeconds(20));
+        dao.save(dentro);
+        dao.save(fuera);
+        assertTrue(regla.evaluar(fuera, HECHOS).isEmpty());
+        dao.save(confirmante);
+        var prueba = regla.evaluar(confirmante, HECHOS).orElseThrow();
+        assertEquals(fuera, prueba.pareja());
+        assertEquals(2001, prueba.distanciaConfirmanteMetros(), 0.001);
+        assertEquals(2001, prueba.distanciaParejaMetros(), 0.001);
+    }
+
+    @Test
     void unaAlternativaHistoricaYaNoEvitaElDesvio() throws IOException {
         autorizadas = List.of(ruta(1, RUTA_A), ruta(2, RUTA_B));
         regla = nuevaRegla();
