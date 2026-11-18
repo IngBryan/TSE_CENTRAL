@@ -178,7 +178,8 @@ public class Main {
         factory.setUsername(env("RABBITMQ_USER", "guest"));
         factory.setPassword(env("RABBITMQ_PASSWORD", "guest"));
         if (Boolean.parseBoolean(env("RABBITMQ_TLS", "false"))) {
-            factory.useSslProtocol();
+            // The deployed RabbitMQ uses a hand-made certificate, not from a trusted CA
+            factory.useTlsWithNoVerification();
         }
         return factory;
     }
